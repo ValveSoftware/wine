@@ -1524,6 +1524,26 @@ void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, str
                 *dst_component = float_16_to_32(tmp);
             else if (format->type == FORMAT_ARGBF)
                 *dst_component = *(float *)&tmp;
+            else if (format->type == FORMAT_ARGB_SNORM)
+            {
+                const uint32_t sign_bit = (1 << (format->bits[c] - 1));
+                uint32_t tmp_extended, tmp_masked = (tmp >> format->shift[c] % 8) & mask;
+
+                tmp_extended = tmp_masked;
+                if (tmp_masked & sign_bit)
+                {
+                    tmp_extended |= ~(sign_bit - 1);
+
+                    /*
+                     * In order to clamp to an even range, we need to ignore
+                     * the maximum negative value.
+                     */
+                    if (tmp_masked == sign_bit)
+                        tmp_extended |= 1;
+                }
+
+                *dst_component = (float)(((int32_t)tmp_extended)) / (sign_bit - 1);
+            }
             else
                 *dst_component = (float)((tmp >> format->shift[c] % 8) & mask) / mask;
         }
@@ -1533,7 +1553,8 @@ void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, str
 }
 
 /* It doesn't work for components bigger than 32 bits. */
-void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 *src, BYTE *dst)
+void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 *src, enum format_type src_type,
+        BYTE *dst)
 {
     DWORD v, mask32;
     unsigned int c, i;
@@ -1554,11 +1575,24 @@ void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 
             v = float_32_to_16(src_component);
         else if (format->type == FORMAT_ARGBF)
             v = *(DWORD *)&src_component;
+        else if (format->type == FORMAT_ARGB_SNORM)
+        {
+            const uint32_t max_value = (1 << (format->bits[c] - 1)) - 1;
+            float val = src_component;
+
+            if (src_type == FORMAT_ARGB)
+                val = (val * 2.0f) - 1.0f;
+
+            v = d3dx_clamp(val, -1.0f, 1.0f) * max_value + 0.5f;
+        }
         else
         {
-            float val = d3dx_clamp(src_component, 0.0f, 1.0f);
+            float val = src_component;
 
-            v = val * ((1 << format->bits[c]) - 1) + 0.5f;
+            if (src_type == FORMAT_ARGB_SNORM)
+                val = (val + 1.0f) / 2.0f;
+
+            v = d3dx_clamp(val, 0.0f, 1.0f) * ((1 << format->bits[c]) - 1) + 0.5f;
         }
 
         for (i = format->shift[c] / 8 * 8; i < format->shift[c] + format->bits[c]; i += 8)
@@ -1691,7 +1725,7 @@ void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pit
                     {
                         DWORD ck_pixel;
 
-                        format_from_vec4(ck_format, &tmp, (BYTE *)&ck_pixel);
+                        format_from_vec4(ck_format, &tmp, src_format->type, (BYTE *)&ck_pixel);
                         if (ck_pixel == color_key)
                             tmp.w = 0.0f;
                     }
@@ -1701,7 +1735,7 @@ void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pit
                     else
                         color = tmp;
 
-                    format_from_vec4(dst_format, &color, dst_ptr);
+                    format_from_vec4(dst_format, &color, src_format->type, dst_ptr);
                 }
 
                 src_ptr += src_format->bytes_per_pixel;
@@ -1799,7 +1833,7 @@ void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slic
                     {
                         DWORD ck_pixel;
 
-                        format_from_vec4(ck_format, &tmp, (BYTE *)&ck_pixel);
+                        format_from_vec4(ck_format, &tmp, src_format->type, (BYTE *)&ck_pixel);
                         if (ck_pixel == color_key)
                             tmp.w = 0.0f;
                     }
@@ -1809,7 +1843,7 @@ void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slic
                     else
                         color = tmp;
 
-                    format_from_vec4(dst_format, &color, dst_ptr);
+                    format_from_vec4(dst_format, &color, src_format->type, dst_ptr);
                 }
 
                 dst_ptr += dst_format->bytes_per_pixel;
