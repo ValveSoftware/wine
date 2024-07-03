@@ -1533,7 +1533,7 @@ void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, str
 }
 
 /* It doesn't work for components bigger than 32 bits. */
-static void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 *src, BYTE *dst)
+void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 *src, BYTE *dst)
 {
     DWORD v, mask32;
     unsigned int c, i;
