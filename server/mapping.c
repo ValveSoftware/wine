@@ -726,7 +726,6 @@ static unsigned int get_image_params( struct mapping *mapping, file_pos_t file_s
 {
     static const char builtin_signature[] = "Wine builtin DLL";
     static const char fakedll_signature[] = "Wine placeholder DLL";
-    static const char valve_signature[] = {'V','L','V',0,1,0,0,0};
 
     IMAGE_COR20_HEADER clr;
     IMAGE_SECTION_HEADER sec[96];
@@ -816,8 +815,7 @@ static unsigned int get_image_params( struct mapping *mapping, file_pos_t file_s
         if (nt.opt.hdr32.SectionAlignment & page_mask)
             mapping->image.image_flags |= IMAGE_FLAGS_ImageMappedFlat;
         else if ((nt.opt.hdr32.DllCharacteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE) &&
-                 (has_relocs || mapping->image.contains_code) && !(clr_va && clr_size) &&
-                 memcmp( mz.buffer, valve_signature, sizeof(valve_signature) ))
+                 (has_relocs || mapping->image.contains_code) && !(clr_va && clr_size))
             mapping->image.image_flags |= IMAGE_FLAGS_ImageDynamicallyRelocated;
         break;
 
@@ -865,8 +863,7 @@ static unsigned int get_image_params( struct mapping *mapping, file_pos_t file_s
         if (nt.opt.hdr64.SectionAlignment & page_mask)
             mapping->image.image_flags |= IMAGE_FLAGS_ImageMappedFlat;
         else if ((nt.opt.hdr64.DllCharacteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE) &&
-                 (has_relocs || mapping->image.contains_code) && !(clr_va && clr_size) &&
-                 memcmp( mz.buffer, valve_signature, sizeof(valve_signature) ))
+                 (has_relocs || mapping->image.contains_code) && !(clr_va && clr_size))
             mapping->image.image_flags |= IMAGE_FLAGS_ImageDynamicallyRelocated;
         break;
 
