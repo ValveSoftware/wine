@@ -2950,6 +2950,17 @@ HRESULT WINAPI MFUnwrapMediaType(IMFMediaType *wrapper, IMFMediaType **ret)
     return S_OK;
 }
 
+static const UINT32 default_channel_mask[7] =
+{
+    0,
+    SPEAKER_FRONT_LEFT,
+    SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT,
+    SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT | SPEAKER_FRONT_CENTER,
+    KSAUDIO_SPEAKER_QUAD,
+    KSAUDIO_SPEAKER_QUAD | SPEAKER_FRONT_CENTER,
+    KSAUDIO_SPEAKER_5POINT1,
+};
+
 /***********************************************************************
  *      MFCreateWaveFormatExFromMFMediaType (mfplat.@)
  */
@@ -3023,6 +3034,8 @@ HRESULT WINAPI MFCreateWaveFormatExFromMFMediaType(IMFMediaType *mediatype, WAVE
 
         if (SUCCEEDED(IMFMediaType_GetUINT32(mediatype, &MF_MT_AUDIO_CHANNEL_MASK, &value)))
             format_ext->dwChannelMask = value;
+        else if (format_ext->Format.nChannels < ARRAY_SIZE(default_channel_mask))
+            format_ext->dwChannelMask = default_channel_mask[format_ext->Format.nChannels];
         memcpy(&format_ext->SubFormat, &KSDATAFORMAT_SUBTYPE_PCM, sizeof(format_ext->SubFormat));
     }
 
