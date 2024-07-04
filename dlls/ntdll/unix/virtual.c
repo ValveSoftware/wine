@@ -3356,6 +3356,17 @@ static NTSTATUS map_image_into_view( struct file_view *view, const WCHAR *filena
         else
             ((IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.ImageBase = image_info->map_addr;
 
+#ifdef __i386__
+        {
+            const char *env = getenv( "PROTON_DISABLE_LSTEAMCLIENT" );
+            const WCHAR *p;
+
+            if (!(env && *env != '0') && nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC && filename
+                && (p = wcsrchr(filename, '\\')) && !wcsicmp(p, u"\\steamclient.dll"))
+                ((IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.ImageBase = image_info->base;
+        }
+#endif
+
         if ((dir = get_data_dir( nt, total_size, IMAGE_DIRECTORY_ENTRY_BASERELOC )))
         {
             IMAGE_BASE_RELOCATION *rel = (IMAGE_BASE_RELOCATION *)(ptr + dir->VirtualAddress);
