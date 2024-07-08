@@ -4361,9 +4361,7 @@ static void test_credentials(void)
     size = 4;
     SetLastError(0xdeadbeef);
     ret = WinHttpQueryOption(req, WINHTTP_OPTION_PROXY_USERNAME, NULL, &size);
-    todo_wine
     ok(!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected error %lu\n", GetLastError());
-    todo_wine
     ok(size == 2, "Unexpected size %lu\n", size);
 
     size = ARRAY_SIZE(buffer);
@@ -4375,9 +4373,7 @@ static void test_credentials(void)
     size = 4;
     SetLastError(0xdeadbeef);
     ret = WinHttpQueryOption(req, WINHTTP_OPTION_PROXY_PASSWORD, NULL, &size);
-    todo_wine
     ok(!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected error %lu\n", GetLastError());
-    todo_wine
     ok(size == 2, "Unexpected size %lu\n", size);
 
     ret = WinHttpSetOption(req, WINHTTP_OPTION_PROXY_USERNAME, proxy_userW, lstrlenW(proxy_userW));
@@ -4392,19 +4388,14 @@ static void test_credentials(void)
     buffer[0] = 0x1;
     SetLastError(0xdeadbeef);
     ret = WinHttpQueryOption(req, WINHTTP_OPTION_PROXY_USERNAME, &buffer, &size);
-    todo_wine
     ok(!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected error %lu\n", GetLastError());
-    todo_wine
     ok(*buffer == 0x1, "unexpected result %s\n", wine_dbgstr_w(buffer));
-    todo_wine
     ok(size == (lstrlenW(proxy_userW) + 1) * sizeof(WCHAR), "unexpected result %lu\n", size);
 
     size = 0;
     SetLastError(0xdeadbeef);
     ret = WinHttpQueryOption(req, WINHTTP_OPTION_PROXY_USERNAME, NULL, &size);
-    todo_wine
     ok(!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected error %lu\n", GetLastError());
-    todo_wine
     ok(size == (lstrlenW(proxy_userW) + 1) * sizeof(WCHAR), "Unexpected size %lu\n", size);
 
     size = ARRAY_SIZE(buffer);
@@ -4416,9 +4407,7 @@ static void test_credentials(void)
     size = 4;
     SetLastError(0xdeadbeef);
     ret = WinHttpQueryOption(req, WINHTTP_OPTION_USERNAME, NULL, &size);
-    todo_wine
     ok(!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected error %lu\n", GetLastError());
-    todo_wine
     ok(size == 2, "Unexpected size %lu\n", size);
 
     size = ARRAY_SIZE(buffer);
@@ -4430,9 +4419,7 @@ static void test_credentials(void)
     size = 4;
     SetLastError(0xdeadbeef);
     ret = WinHttpQueryOption(req, WINHTTP_OPTION_PASSWORD, NULL, &size);
-    todo_wine
     ok(!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected error %lu\n", GetLastError());
-    todo_wine
     ok(size == 2, "Unexpected size %lu\n", size);
 
     ret = WinHttpSetOption(req, WINHTTP_OPTION_PROXY_PASSWORD, proxy_passW, lstrlenW(proxy_passW));
@@ -4447,19 +4434,14 @@ static void test_credentials(void)
     buffer[0] = 0x1;
     SetLastError(0xdeadbeef);
     ret = WinHttpQueryOption(req, WINHTTP_OPTION_PROXY_PASSWORD, &buffer, &size);
-    todo_wine
     ok(!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected error %lu\n", GetLastError());
-    todo_wine
     ok(*buffer == 0x1, "unexpected result %s\n", wine_dbgstr_w(buffer));
-    todo_wine
     ok(size == (lstrlenW(proxy_passW) + 1) * sizeof(WCHAR), "unexpected result %lu\n", size);
 
     size = 0;
     SetLastError(0xdeadbeef);
     ret = WinHttpQueryOption(req, WINHTTP_OPTION_PROXY_PASSWORD, NULL, &size);
-    todo_wine
     ok(!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected error %lu\n", GetLastError());
-    todo_wine
     ok(size == (lstrlenW(proxy_passW) + 1) * sizeof(WCHAR), "Unexpected size %lu\n", size);
 
     ret = WinHttpSetOption(req, WINHTTP_OPTION_USERNAME, userW, lstrlenW(userW));
@@ -4474,19 +4456,14 @@ static void test_credentials(void)
     buffer[0] = 0x1;
     SetLastError(0xdeadbeef);
     ret = WinHttpQueryOption(req, WINHTTP_OPTION_USERNAME, &buffer, &size);
-    todo_wine
     ok(!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected error %lu\n", GetLastError());
-    todo_wine
     ok(*buffer == 0x1, "unexpected result %s\n", wine_dbgstr_w(buffer));
-    todo_wine
     ok(size == (lstrlenW(userW) + 1) * sizeof(WCHAR), "unexpected result %lu\n", size);
 
     size = 0;
     SetLastError(0xdeadbeef);
     ret = WinHttpQueryOption(req, WINHTTP_OPTION_USERNAME, NULL, &size);
-    todo_wine
     ok(!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected error %lu\n", GetLastError());
-    todo_wine
     ok(size == (lstrlenW(userW) + 1) * sizeof(WCHAR), "Unexpected size %lu\n", size);
 
     ret = WinHttpSetOption(req, WINHTTP_OPTION_PASSWORD, passW, lstrlenW(passW));
@@ -4501,19 +4478,14 @@ static void test_credentials(void)
     buffer[0] = 0x1;
     SetLastError(0xdeadbeef);
     ret = WinHttpQueryOption(req, WINHTTP_OPTION_PASSWORD, &buffer, &size);
-    todo_wine
     ok(!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected error %lu\n", GetLastError());
-    todo_wine
     ok(*buffer == 0x1, "unexpected result %s\n", wine_dbgstr_w(buffer));
-    todo_wine
     ok(size == (lstrlenW(passW) + 1) * sizeof(WCHAR), "unexpected result %lu\n", size);
 
     size = 0;
     SetLastError(0xdeadbeef);
     ret = WinHttpQueryOption(req, WINHTTP_OPTION_PASSWORD, NULL, &size);
-    todo_wine
     ok(!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected error %lu\n", GetLastError());
-    todo_wine
     ok(size == (lstrlenW(passW) + 1) * sizeof(WCHAR), "Unexpected size %lu\n", size);
 
     WinHttpCloseHandle(req);
