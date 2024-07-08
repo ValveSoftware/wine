@@ -98,8 +98,6 @@ struct pixel_format_desc {
     UINT block_height;
     UINT block_byte_count;
     struct pixel_format_type_desc fmt_type_desc;
-    void (*from_rgba)(const struct vec4 *src, struct vec4 *dst);
-    void (*to_rgba)(const struct vec4 *src, struct vec4 *dst, const PALETTEENTRY *palette);
 };
 
 struct d3dx_pixels
@@ -216,7 +214,8 @@ HRESULT write_buffer_to_file(const WCHAR *filename, ID3DXBuffer *buffer);
 const struct pixel_format_desc *get_format_info(D3DFORMAT format);
 const struct pixel_format_desc *get_format_info_idx(int idx);
 
-void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, struct vec4 *dst);
+void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, const PALETTEENTRY *palette,
+        struct vec4 *dst);
 void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 *src,
         const struct pixel_format_type_desc *src_type, BYTE *dst);
 

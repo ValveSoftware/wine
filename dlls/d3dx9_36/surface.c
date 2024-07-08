@@ -1504,8 +1504,27 @@ static DWORD make_argb_color(const struct argb_conversion_info *info, const DWOR
     return val;
 }
 
+static BYTE get_channel_from_palette_entry(const PALETTEENTRY *entry, uint32_t channel)
+{
+    switch (channel)
+    {
+    case 0: /* Alpha. */
+        return entry->peFlags;
+    case 1: /* Red. */
+        return entry->peRed;
+    case 2: /* Green. */
+        return entry->peGreen;
+    case 3: /* Blue. */
+        return entry->peBlue;
+    default:
+        assert(0);
+        return 0;
+    }
+}
+
 /* It doesn't work for components bigger than 32 bits (or somewhat smaller but unaligned). */
-void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, struct vec4 *dst)
+void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, const PALETTEENTRY *palette,
+        struct vec4 *dst)
 {
     const struct pixel_format_type_desc *type = &format->fmt_type_desc;
     DWORD mask, tmp;
@@ -1533,8 +1552,12 @@ void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, str
                     *dst_component = *(float *)&tmp;
                 break;
 
-            case CTYPE_LUMA:
             case CTYPE_INDEX:
+                *dst_component = get_channel_from_palette_entry(&palette[(tmp >> format->shift[c] % 8) & mask], c);
+                *dst_component /= 255.0f;
+                break;
+
+            case CTYPE_LUMA:
             case CTYPE_UNORM:
                 *dst_component = (float)((tmp >> format->shift[c] % 8) & mask) / mask;
                 break;
@@ -1747,8 +1770,7 @@ void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pit
             BYTE *dst_ptr = dst_slice_ptr + y * dst_row_pitch;
 
             for (x = 0; x < min_width; x++) {
-                if (!src_format->to_rgba && !dst_format->from_rgba
-                        && format_types_match(src_format, dst_format)
+                if (format_types_match(src_format, dst_format)
                         && src_format->bytes_per_pixel <= 4 && dst_format->bytes_per_pixel <= 4)
                 {
                     DWORD val;
@@ -1771,11 +1793,8 @@ void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pit
                 {
                     struct vec4 color, tmp;
 
-                    format_to_vec4(src_format, src_ptr, &color);
-                    if (src_format->to_rgba)
-                        src_format->to_rgba(&color, &tmp, palette);
-                    else
-                        tmp = color;
+                    format_to_vec4(src_format, src_ptr, palette, &color);
+                    tmp = color;
 
                     if (ck_format)
                     {
@@ -1786,11 +1805,7 @@ void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pit
                             tmp.w = 0.0f;
                     }
 
-                    if (dst_format->from_rgba)
-                        dst_format->from_rgba(&tmp, &color);
-                    else
-                        color = tmp;
-
+                    color = tmp;
                     format_from_vec4(dst_format, &color, &src_format->fmt_type_desc, dst_ptr);
                 }
 
@@ -1855,8 +1870,7 @@ void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slic
             {
                 const BYTE *src_ptr = src_row_ptr + (x * src_size->width / dst_size->width) * src_format->bytes_per_pixel;
 
-                if (!src_format->to_rgba && !dst_format->from_rgba
-                        && format_types_match(src_format, dst_format)
+                if (format_types_match(src_format, dst_format)
                         && src_format->bytes_per_pixel <= 4 && dst_format->bytes_per_pixel <= 4)
                 {
                     DWORD val;
@@ -1879,11 +1893,8 @@ void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slic
                 {
                     struct vec4 color, tmp;
 
-                    format_to_vec4(src_format, src_ptr, &color);
-                    if (src_format->to_rgba)
-                        src_format->to_rgba(&color, &tmp, palette);
-                    else
-                        tmp = color;
+                    format_to_vec4(src_format, src_ptr, palette, &color);
+                    tmp = color;
 
                     if (ck_format)
                     {
@@ -1894,11 +1905,7 @@ void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slic
                             tmp.w = 0.0f;
                     }
 
-                    if (dst_format->from_rgba)
-                        dst_format->from_rgba(&tmp, &color);
-                    else
-                        color = tmp;
-
+                    color = tmp;
                     format_from_vec4(dst_format, &color, &src_format->fmt_type_desc, dst_ptr);
                 }
 
