@@ -69,15 +69,24 @@ static inline void set_volume_struct(struct volume *volume, uint32_t width, uint
     volume->depth = depth;
 }
 
-/* for internal use */
-enum format_type {
-    FORMAT_ARGB,   /* unsigned */
-    FORMAT_ARGBF16,/* float 16 */
-    FORMAT_ARGBF,  /* float */
-    FORMAT_DXT,
-    FORMAT_INDEX,
-    FORMAT_ARGB_SNORM,
-    FORMAT_UNKNOWN
+enum component_type {
+    CTYPE_EMPTY = 0x00,
+    CTYPE_UNORM = 0x01,
+    CTYPE_SNORM = 0x02,
+    CTYPE_FLOAT = 0x03,
+    CTYPE_LUMA  = 0x04,
+    CTYPE_INDEX = 0x05,
+};
+
+enum format_flag {
+    FMT_FLAG_NONE = 0x00,
+    FMT_FLAG_DXT  = 0x01,
+};
+
+struct pixel_format_type_desc {
+    enum component_type a_type;
+    enum component_type rgb_type;
+    uint32_t fmt_flags;
 };
 
 struct pixel_format_desc {
@@ -88,7 +97,7 @@ struct pixel_format_desc {
     UINT block_width;
     UINT block_height;
     UINT block_byte_count;
-    enum format_type type;
+    struct pixel_format_type_desc fmt_type_desc;
     void (*from_rgba)(const struct vec4 *src, struct vec4 *dst);
     void (*to_rgba)(const struct vec4 *src, struct vec4 *dst, const PALETTEENTRY *palette);
 };
@@ -162,33 +171,41 @@ static inline BOOL is_unknown_format(const struct pixel_format_desc *format)
 
 static inline BOOL is_index_format(const struct pixel_format_desc *format)
 {
-    return (format->type == FORMAT_INDEX);
+    return (format->fmt_type_desc.a_type == CTYPE_INDEX || format->fmt_type_desc.rgb_type == CTYPE_INDEX);
 }
 
 static inline BOOL is_compressed_format(const struct pixel_format_desc *format)
 {
-    return (format->type == FORMAT_DXT);
+    return !!(format->fmt_type_desc.fmt_flags & FMT_FLAG_DXT);
 }
 
 static inline BOOL format_types_match(const struct pixel_format_desc *src, const struct pixel_format_desc *dst)
 {
-    return (src->type == dst->type);
+    const struct pixel_format_type_desc *src_type = &src->fmt_type_desc;
+    const struct pixel_format_type_desc *dst_type = &dst->fmt_type_desc;
+
+    if ((src_type->a_type != dst_type->a_type) && (src_type->a_type != CTYPE_EMPTY) &&
+            (dst_type->a_type != CTYPE_EMPTY))
+        return FALSE;
+
+    if ((src_type->rgb_type != dst_type->rgb_type) && (src_type->rgb_type != CTYPE_EMPTY) &&
+            (dst_type->rgb_type != CTYPE_EMPTY))
+        return FALSE;
+
+    if (src_type->fmt_flags != dst_type->fmt_flags)
+        return FALSE;
+
+    return (src_type->rgb_type == dst_type->rgb_type || src_type->a_type == dst_type->a_type);
 }
 
 static inline BOOL is_conversion_from_supported(const struct pixel_format_desc *format)
 {
-    if (format->type == FORMAT_ARGB || format->type == FORMAT_ARGBF16
-            || format->type == FORMAT_ARGBF || format->type == FORMAT_DXT || format->type == FORMAT_ARGB_SNORM)
-        return TRUE;
-    return !!format->to_rgba;
+    return !is_unknown_format(format);
 }
 
 static inline BOOL is_conversion_to_supported(const struct pixel_format_desc *format)
 {
-    if (format->type == FORMAT_ARGB || format->type == FORMAT_ARGBF16
-            || format->type == FORMAT_ARGBF || format->type == FORMAT_DXT || format->type == FORMAT_ARGB_SNORM)
-        return TRUE;
-    return !!format->from_rgba;
+    return !is_index_format(format) && !is_unknown_format(format);
 }
 
 HRESULT map_view_of_file(const WCHAR *filename, void **buffer, DWORD *length);
@@ -200,8 +217,8 @@ const struct pixel_format_desc *get_format_info(D3DFORMAT format);
 const struct pixel_format_desc *get_format_info_idx(int idx);
 
 void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, struct vec4 *dst);
-void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 *src, enum format_type src_type,
-        BYTE *dst);
+void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 *src,
+        const struct pixel_format_type_desc *src_type, BYTE *dst);
 
 void copy_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch,
     BYTE *dst, UINT dst_row_pitch, UINT dst_slice_pitch, const struct volume *size,
