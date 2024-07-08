@@ -195,6 +195,7 @@ static DWORD WINAPI stream_thread(void *arg)
 static HRESULT vfw_capture_init_stream(struct strmbase_filter *iface)
 {
     struct vfw_capture *filter = impl_from_strmbase_filter(iface);
+    struct start_params params;
     HRESULT hr;
 
     if (!filter->source.pin.peer)
@@ -202,6 +203,13 @@ static HRESULT vfw_capture_init_stream(struct strmbase_filter *iface)
 
     if (FAILED(hr = IMemAllocator_Commit(filter->source.pAllocator)))
         ERR("Failed to commit allocator, hr %#lx.\n", hr);
+
+    params.device = filter->device;
+    if (FAILED(hr = V4L_CALL( start, &params )))
+    {
+        ERR("start stream failed.\n");
+        return hr;
+    }
 
     EnterCriticalSection(&filter->state_cs);
     filter->state = State_Paused;
