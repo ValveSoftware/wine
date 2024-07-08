@@ -1314,13 +1314,14 @@ HRESULT WINAPI D3DXFillTexture(struct IDirect3DTexture9 *texture, LPD3DXFILL2D f
 
             for (x = 0; x < desc.Width; x++)
             {
+                static const struct pixel_format_type_desc src_type = { CTYPE_FLOAT, CTYPE_FLOAT };
                 BYTE *dst = data + y * lock_rect.Pitch + x * format->bytes_per_pixel;
 
                 coord.x = (x + 0.5f) / desc.Width;
 
                 function(&value, &coord, &size, funcdata);
 
-                format_from_vec4(format, (const struct vec4 *)&value, FORMAT_ARGBF, dst);
+                format_from_vec4(format, (const struct vec4 *)&value, &src_type, dst);
             }
         }
         if (FAILED(hr = unlock_surface(surface, NULL, temp_surface, TRUE)))
@@ -1703,6 +1704,7 @@ HRESULT WINAPI D3DXFillCubeTexture(struct IDirect3DCubeTexture9 *texture, LPD3DX
             {
                 for (x = 0; x < desc.Width; x++)
                 {
+                    static const struct pixel_format_type_desc src_type = { CTYPE_FLOAT, CTYPE_FLOAT };
                     BYTE *dst = data + y * lock_rect.Pitch + x * format->bytes_per_pixel;
 
                     coord.x = get_cube_coord(coordmap[f][0], x, y, desc.Width) / desc.Width * 2.0f - 1.0f;
@@ -1711,7 +1713,7 @@ HRESULT WINAPI D3DXFillCubeTexture(struct IDirect3DCubeTexture9 *texture, LPD3DX
 
                     function(&value, &coord, &size, funcdata);
 
-                    format_from_vec4(format, (const struct vec4 *)&value, FORMAT_ARGBF, dst);
+                    format_from_vec4(format, (const struct vec4 *)&value, &src_type, dst);
                 }
             }
             IDirect3DCubeTexture9_UnlockRect(texture, f, m);
@@ -1773,12 +1775,13 @@ HRESULT WINAPI D3DXFillVolumeTexture(struct IDirect3DVolumeTexture9 *texture, LP
                 for (x = 0; x < desc.Width; x++)
                 {
                     BYTE *dst = data + z * lock_box.SlicePitch + y * lock_box.RowPitch + x * format->bytes_per_pixel;
+                    static const struct pixel_format_type_desc src_type = { CTYPE_FLOAT, CTYPE_FLOAT };
 
                     coord.x = (x + 0.5f) / desc.Width;
 
                     function(&value, &coord, &size, funcdata);
 
-                    format_from_vec4(format, (const struct vec4 *)&value, FORMAT_ARGBF, dst);
+                    format_from_vec4(format, (const struct vec4 *)&value, &src_type, dst);
                 }
             }
         }
