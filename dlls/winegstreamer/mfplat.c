@@ -362,15 +362,19 @@ HRESULT mfplat_DllRegisterServer(void)
     };
     MFT_REGISTER_TYPE_INFO video_decoder_output_types[] =
     {
+        {MFMediaType_Video, MFVideoFormat_NV12},
         {MFMediaType_Video, MFVideoFormat_YV12},
+        {MFMediaType_Video, MFVideoFormat_IYUV},
+        {MFMediaType_Video, MFVideoFormat_I420},
         {MFMediaType_Video, MFVideoFormat_YUY2},
         {MFMediaType_Video, MFVideoFormat_NV11},
-        {MFMediaType_Video, MFVideoFormat_NV12},
-        {MFMediaType_Video, MFVideoFormat_RGB32},
-        {MFMediaType_Video, MFVideoFormat_RGB24},
-        {MFMediaType_Video, MFVideoFormat_RGB565},
-        {MFMediaType_Video, MFVideoFormat_RGB555},
-        {MFMediaType_Video, MFVideoFormat_RGB8},
+        {MFMediaType_Video, MFVideoFormat_UYVY},
+        {MFMediaType_Video, MFVideoFormat_YVYU},
+        {MFMediaType_Video, DMOVideoFormat_RGB32},
+        {MFMediaType_Video, DMOVideoFormat_RGB24},
+        {MFMediaType_Video, DMOVideoFormat_RGB565},
+        {MFMediaType_Video, DMOVideoFormat_RGB555},
+        {MFMediaType_Video, DMOVideoFormat_RGB8},
     };
 
     struct mft
