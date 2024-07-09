@@ -1639,7 +1639,6 @@ HRESULT video_decoder_create(REFIID riid, void **out)
             | MFT_OUTPUT_STREAM_FIXED_SAMPLE_SIZE;
     decoder->output_info.cbSize = 1920 * 1088 * 2;
 
-    decoder->wg_transform_attrs.output_plane_align = 15;
     decoder->wg_transform_attrs.allow_format_change = TRUE;
 
     TRACE("Created video decoder transform %p.\n", &decoder->IMFTransform_iface);
