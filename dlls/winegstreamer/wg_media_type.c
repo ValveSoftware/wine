@@ -210,10 +210,13 @@ static GstAudioFormat wave_format_tag_to_gst_audio_format(UINT tag, UINT depth)
 static GstCaps *caps_from_wave_format_ex(const WAVEFORMATEX *format, UINT32 format_size, const GUID *subtype, UINT64 channel_mask)
 {
     GstAudioFormat audio_format = wave_format_tag_to_gst_audio_format(subtype->Data1, format->wBitsPerSample);
+    const void *codec_data = format + 1;
     GstCaps *caps;
 
     if (IsEqualGUID(subtype, &MFAudioFormat_GStreamer))
-        return gst_caps_from_string((char *)(format + 1));
+        return gst_caps_from_string(codec_data);
+    if (format_size > sizeof(*format) + 8 && !strncmp(codec_data, "audio/x-", 8))
+        return gst_caps_from_string(codec_data);
 
     if (!(caps = gst_caps_new_simple("audio/x-raw", "format", G_TYPE_STRING, gst_audio_format_to_string(audio_format),
             "layout", G_TYPE_STRING, "interleaved", "rate", G_TYPE_INT, format->nSamplesPerSec,
@@ -394,6 +397,7 @@ static BOOL is_mf_video_area_empty(const MFVideoArea *area)
 static GstCaps *caps_from_video_format(const MFVIDEOFORMAT *format, UINT32 format_size)
 {
     GstVideoFormat video_format = subtype_to_gst_video_format(&format->guidFormat);
+    const void *codec_data = format + 1;
     GstCaps *caps;
 
     GST_TRACE("subtype " WG_GUID_FORMAT " %ux%u, FPS " WG_RATIO_FORMAT ", aperture " WG_APERTURE_FORMAT ", "
@@ -404,7 +408,9 @@ static GstCaps *caps_from_video_format(const MFVIDEOFORMAT *format, UINT32 forma
     if (format->dwSize > sizeof(*format)) GST_MEMDUMP("extra bytes:", (guint8 *)(format + 1), format->dwSize - sizeof(*format));
 
     if (IsEqualGUID(&format->guidFormat, &MFVideoFormat_GStreamer))
-        return gst_caps_from_string((char *)(format + 1));
+        return gst_caps_from_string(codec_data);
+    if (format_size > sizeof(*format) + 8 && !strncmp(codec_data, "video/x-", 8))
+        return gst_caps_from_string(codec_data);
 
     if (!(caps = gst_caps_new_simple("video/x-raw", "format", G_TYPE_STRING, gst_video_format_to_string(video_format), NULL)))
         return NULL;
