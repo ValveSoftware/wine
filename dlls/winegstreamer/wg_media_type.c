@@ -378,6 +378,7 @@ static GstVideoFormat subtype_to_gst_video_format(const GUID *subtype)
         case D3DFMT_R5G6B5:   return GST_VIDEO_FORMAT_RGB16;
         case MAKEFOURCC('A','Y','U','V'): return GST_VIDEO_FORMAT_AYUV;
         case MAKEFOURCC('I','4','2','0'): return GST_VIDEO_FORMAT_I420;
+        case MAKEFOURCC('I','Y','U','V'): return GST_VIDEO_FORMAT_I420;
         case MAKEFOURCC('N','V','1','2'): return GST_VIDEO_FORMAT_NV12;
         case MAKEFOURCC('U','Y','V','Y'): return GST_VIDEO_FORMAT_UYVY;
         case MAKEFOURCC('Y','U','Y','2'): return GST_VIDEO_FORMAT_YUY2;
