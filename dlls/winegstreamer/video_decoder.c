@@ -77,6 +77,14 @@ static const GUID *const video_decoder_output_types[] =
     &MFVideoFormat_IYUV,
     &MFVideoFormat_I420,
     &MFVideoFormat_YUY2,
+    &MFVideoFormat_UYVY,
+    &MFVideoFormat_YVYU,
+    &MFVideoFormat_NV11,
+    &MFVideoFormat_RGB32,
+    &MFVideoFormat_RGB24,
+    &MFVideoFormat_RGB565,
+    &MFVideoFormat_RGB555,
+    &MFVideoFormat_RGB8,
 };
 
 struct video_decoder
