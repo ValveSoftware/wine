@@ -129,6 +129,20 @@ enum d3dx_resource_type {
     D3DX_RESOURCE_TYPE_CUBE_TEXTURE,
 };
 
+enum d3dx_image_file_format
+{
+    D3DX_IMAGE_FILE_FORMAT_BMP  = 0,
+    D3DX_IMAGE_FILE_FORMAT_JPG  = 1,
+    D3DX_IMAGE_FILE_FORMAT_TGA  = 2,
+    D3DX_IMAGE_FILE_FORMAT_PNG  = 3,
+    D3DX_IMAGE_FILE_FORMAT_DDS  = 4,
+    D3DX_IMAGE_FILE_FORMAT_PPM  = 5,
+    D3DX_IMAGE_FILE_FORMAT_DIB  = 6,
+    D3DX_IMAGE_FILE_FORMAT_HDR  = 7,
+    D3DX_IMAGE_FILE_FORMAT_PFM  = 8,
+    D3DX_IMAGE_FILE_FORMAT_FORCE_DWORD = 0x7fffffff
+};
+
 enum component_type {
     CTYPE_EMPTY = 0x00,
     CTYPE_UNORM = 0x01,
@@ -209,7 +223,7 @@ struct d3dx_image
     void *image_buf;
     PALETTEENTRY *image_palette;
 
-    D3DXIMAGE_FILEFORMAT image_file_format;
+    enum d3dx_image_file_format image_file_format;
 };
 
 HRESULT d3dx_image_init(const void *src_data, uint32_t src_data_size, struct d3dx_image *image,
