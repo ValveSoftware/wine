@@ -123,6 +123,12 @@ enum d3dx_pixel_format_id {
     D3DX_PIXEL_FORMAT_COUNT,
 };
 
+enum d3dx_resource_type {
+    D3DX_RESOURCE_TYPE_TEXTURE_2D,
+    D3DX_RESOURCE_TYPE_TEXTURE_3D,
+    D3DX_RESOURCE_TYPE_CUBE_TEXTURE,
+};
+
 enum component_type {
     CTYPE_EMPTY = 0x00,
     CTYPE_UNORM = 0x01,
@@ -184,7 +190,7 @@ static inline void set_d3dx_pixels(struct d3dx_pixels *pixels, const void *data,
 #define D3DX_IMAGE_INFO_ONLY 1
 struct d3dx_image
 {
-    D3DRESOURCETYPE resource_type;
+    enum d3dx_resource_type resource_type;
     enum d3dx_pixel_format_id format;
 
     struct volume size;

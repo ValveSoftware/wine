@@ -660,7 +660,7 @@ static HRESULT d3dx_initialize_image_from_dds(const void *src_data, uint32_t src
     if (header->flags & DDS_DEPTH)
     {
         image->size.depth = max(header->depth, 1);
-        image->resource_type = D3DRTYPE_VOLUMETEXTURE;
+        image->resource_type = D3DX_RESOURCE_TYPE_TEXTURE_3D;
     }
     else if (header->caps2 & DDS_CAPS2_CUBEMAP)
     {
@@ -671,10 +671,10 @@ static HRESULT d3dx_initialize_image_from_dds(const void *src_data, uint32_t src
         }
 
         image->layer_count = 6;
-        image->resource_type = D3DRTYPE_CUBETEXTURE;
+        image->resource_type = D3DX_RESOURCE_TYPE_CUBE_TEXTURE;
     }
     else
-        image->resource_type = D3DRTYPE_TEXTURE;
+        image->resource_type = D3DX_RESOURCE_TYPE_TEXTURE_2D;
 
     image->layer_pitch = d3dx_calculate_layer_pixels_size(image->format, image->size.width, image->size.height,
             image->size.depth, image->mip_levels);
@@ -1058,7 +1058,7 @@ static HRESULT d3dx_initialize_image_from_wic(const void *src_data, uint32_t src
     image->size.depth = 1;
     image->mip_levels = 1;
     image->layer_count = 1;
-    image->resource_type = D3DRTYPE_TEXTURE;
+    image->resource_type = D3DX_RESOURCE_TYPE_TEXTURE_2D;
 
 exit:
     if (is_dib)
@@ -1144,7 +1144,12 @@ void d3dximage_info_from_d3dx_image(D3DXIMAGE_INFO *info, struct d3dx_image *ima
     info->Depth = image->size.depth;
     info->MipLevels = image->mip_levels;
     info->Format = d3dformat_from_d3dx_pixel_format_id(image->format);
-    info->ResourceType = image->resource_type;
+    if (image->resource_type == D3DX_RESOURCE_TYPE_TEXTURE_3D)
+        info->ResourceType = D3DRTYPE_VOLUMETEXTURE;
+    else if (image->resource_type == D3DX_RESOURCE_TYPE_CUBE_TEXTURE)
+        info->ResourceType = D3DRTYPE_CUBETEXTURE;
+    else
+        info->ResourceType = D3DRTYPE_TEXTURE;
 }
 
 /************************************************************
