@@ -185,7 +185,7 @@ static inline void set_d3dx_pixels(struct d3dx_pixels *pixels, const void *data,
 struct d3dx_image
 {
     D3DRESOURCETYPE resource_type;
-    D3DFORMAT format;
+    enum d3dx_pixel_format_id format;
 
     struct volume size;
     uint32_t mip_levels;
