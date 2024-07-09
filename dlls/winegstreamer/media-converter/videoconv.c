@@ -387,6 +387,8 @@ static int video_conv_state_create(struct video_conv_state **out)
 
 static void video_conv_state_release(struct video_conv_state *state)
 {
+    if ((state->state_flags & VIDEO_CONV_IS_DUMPING))
+        pthread_mutex_unlock(&dump_fozdb.mutex);
     if (state->read_fozdb)
         fozdb_release(state->read_fozdb);
     close(state->blank_file);
