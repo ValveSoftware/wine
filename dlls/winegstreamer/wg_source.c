@@ -527,6 +527,26 @@ static gboolean sink_event_eos(struct wg_source *source, GstPad *pad, GstEvent *
     return true;
 }
 
+static gboolean sink_event_flush_stop(struct wg_source *source, GstPad *pad, GstEvent *event)
+{
+    struct source_stream *stream = source_stream_from_pad(source, pad);
+    GstBuffer *buffer;
+
+    GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, event);
+
+    if (stream->buffer)
+    {
+        gst_buffer_unref(stream->buffer);
+        stream->buffer = NULL;
+    }
+
+    while ((buffer = gst_atomic_queue_pop(stream->queue)))
+        gst_buffer_unref(buffer);
+
+    gst_event_unref(event);
+    return true;
+}
+
 static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
 {
     struct wg_source *source = gst_pad_get_element_private(pad);
@@ -541,6 +561,8 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
         return sink_event_stream_start(source, pad, event);
     case GST_EVENT_EOS:
         return sink_event_eos(source, pad, event);
+    case GST_EVENT_FLUSH_STOP:
+        return sink_event_flush_stop(source, pad, event);
     default:
         return gst_pad_event_default(pad, parent, event);
     }
@@ -916,6 +938,9 @@ NTSTATUS wg_source_read_data(void *args)
     GstBuffer *buffer;
 
     GST_TRACE("source %p, index %#x, sample %p", source, index, sample);
+
+    if (gst_atomic_queue_length(source->seek_queue))
+        return STATUS_PENDING;
 
     if ((status = source_get_stream_buffer(source, index, &buffer)))
         return status;
