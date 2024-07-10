@@ -1522,7 +1522,7 @@ DECL_HANDLER(open_process)
     reply->handle = 0;
     if (process)
     {
-        reply->handle = alloc_handle( current->process, process, req->access, req->attributes );
+        reply->handle = alloc_handle_user_open( current->process, process, req->access, req->attributes );
         release_object( process );
     }
 }

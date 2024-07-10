@@ -1738,7 +1738,7 @@ DECL_HANDLER(open_thread)
     reply->handle = 0;
     if (thread)
     {
-        reply->handle = alloc_handle( current->process, thread, req->access, req->attributes );
+        reply->handle = alloc_handle_user_open( current->process, thread, req->access, req->attributes );
         release_object( thread );
     }
 }
