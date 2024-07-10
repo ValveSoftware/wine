@@ -5738,9 +5738,7 @@ static void test_mutex_security(HANDLE token)
 
         SetLastError(0xdeadbeef);
         dup = OpenMutexA(0, FALSE, "WineTestMutex");
-        todo_wine
         ok(!dup, "OpenMutex should fail\n");
-        todo_wine
         ok(GetLastError() == ERROR_ACCESS_DENIED, "wrong error %lu\n", GetLastError());
     }
 
@@ -5795,9 +5793,7 @@ static void test_event_security(HANDLE token)
 
         SetLastError(0xdeadbeef);
         dup = OpenEventA(0, FALSE, "WineTestEvent");
-        todo_wine
         ok(!dup, "OpenEvent should fail\n");
-        todo_wine
         ok(GetLastError() == ERROR_ACCESS_DENIED, "wrong error %lu\n", GetLastError());
     }
 
