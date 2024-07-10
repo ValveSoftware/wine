@@ -73,6 +73,7 @@ static NTSTATUS (WINAPI *pNtCreateDebugObject)( HANDLE *, ACCESS_MASK, OBJECT_AT
 static NTSTATUS (WINAPI *pNtGetNextThread)(HANDLE process, HANDLE thread, ACCESS_MASK access, ULONG attributes,
                                             ULONG flags, HANDLE *handle);
 static NTSTATUS (WINAPI *pNtOpenProcessToken)(HANDLE,DWORD,HANDLE*);
+static NTSTATUS (WINAPI *pNtOpenThread)(HANDLE *, ACCESS_MASK, const OBJECT_ATTRIBUTES *, const CLIENT_ID * );
 static NTSTATUS (WINAPI *pNtOpenThreadToken)(HANDLE,DWORD,BOOLEAN,HANDLE*);
 static NTSTATUS (WINAPI *pNtDuplicateToken)(HANDLE,ACCESS_MASK,OBJECT_ATTRIBUTES*,BOOLEAN,TOKEN_TYPE,HANDLE*);
 static NTSTATUS (WINAPI *pNtDuplicateObject)(HANDLE,HANDLE,HANDLE,HANDLE*,ACCESS_MASK,ULONG,ULONG);
@@ -3161,6 +3162,85 @@ static void test_null_in_object_name(void)
         skip("Limited access to \\Registry\\Machine\\Software key, skipping the tests\n");
 }
 
+static void test_zero_access(void)
+{
+    OBJECT_ATTRIBUTES attr;
+    UNICODE_STRING str;
+    NTSTATUS status;
+    WCHAR name[256];
+    CLIENT_ID cid;
+    HANDLE h1, h2;
+
+    swprintf( name, ARRAY_SIZE(name), L"\\Sessions\\%u\\BaseNamedObjects\\test_object", NtCurrentTeb()->Peb->SessionId );
+    pRtlInitUnicodeString( &str, name );
+    InitializeObjectAttributes( &attr, &str, 0, 0, NULL );
+
+    status = pNtCreateEvent( &h1, 0, &attr, NotificationEvent, FALSE );
+    ok( !status, "got %#lx.\n", status );
+
+    status = pNtOpenEvent( &h2, EVENT_ALL_ACCESS, &attr );
+    ok( !status, "got %#lx.\n", status );
+    CloseHandle( h2 );
+
+    status = NtOpenEvent(&h2, 0, &attr);
+    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
+    if (!status) CloseHandle( h2 );
+
+    InitializeObjectAttributes( &attr, &str, OBJ_INHERIT, 0, NULL );
+    status = NtOpenEvent(&h2, 0, &attr);
+    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
+    if (!status) CloseHandle( h2 );
+
+    status = pNtDuplicateObject( GetCurrentProcess(), h1, GetCurrentProcess(), &h2, 0, 0, 0 );
+    ok( !status, "got %#lx.\n", status );
+    CloseHandle( h2 );
+    status = pNtDuplicateObject( GetCurrentProcess(), h1, GetCurrentProcess(), &h2, EVENT_ALL_ACCESS, 0, 0 );
+    ok( !status, "got %#lx.\n", status );
+    CloseHandle( h2 );
+
+    CloseHandle( h1 );
+
+    InitializeObjectAttributes( &attr, &str, 0, 0, NULL );
+    status = pNtCreateMutant( &h1, 0, &attr, FALSE );
+    ok( !status, "got %#lx.\n", status );
+    status = NtOpenMutant(&h2, 0, &attr);
+    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
+    if (!status) CloseHandle( h2 );
+    CloseHandle( h1 );
+
+    status = pNtCreateTimer( &h1, 0, &attr, NotificationTimer );
+    ok( !status, "got %#lx.\n", status );
+    status = pNtOpenTimer( &h2, 0, &attr );
+    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
+    if (!status) CloseHandle( h2 );
+    CloseHandle( h1 );
+
+    status = NtGetNextThread(GetCurrentProcess(), NULL, 0, 0, 0, &h1);
+    todo_wine ok( status == STATUS_NO_MORE_ENTRIES, "got %#lx.\n", status );
+    if (!status) CloseHandle( h1 );
+
+    InitializeObjectAttributes( &attr, NULL, 0, 0, NULL );
+    cid.UniqueProcess = ULongToHandle( GetCurrentProcessId() );
+    cid.UniqueThread  = 0;
+    status = pNtOpenProcess( &h1, 0, &attr, &cid );
+    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
+    if (!status) CloseHandle( h1 );
+
+    InitializeObjectAttributes( &attr, NULL, 0, 0, NULL );
+    cid.UniqueProcess = 0;
+    cid.UniqueThread  = ULongToHandle( GetCurrentThreadId() );
+    status = pNtOpenThread( &h1, 0, &attr, &cid );
+    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
+    if (!status) CloseHandle( h1 );
+
+    InitializeObjectAttributes( &attr, &str, OBJ_OPENIF, 0, NULL );
+    swprintf( name, ARRAY_SIZE(name), L"\\Sessions\\%u", NtCurrentTeb()->Peb->SessionId );
+    RtlInitUnicodeString( &str, name );
+    pNtOpenDirectoryObject( &h1, 0, &attr );
+    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
+    if (!status) CloseHandle( h1 );
+}
+
 START_TEST(om)
 {
     HMODULE hntdll = GetModuleHandleA("ntdll.dll");
@@ -3205,6 +3285,7 @@ START_TEST(om)
     pNtDuplicateToken       =  (void *)GetProcAddress(hntdll, "NtDuplicateToken");
     pNtDuplicateObject      =  (void *)GetProcAddress(hntdll, "NtDuplicateObject");
     pNtCompareObjects       =  (void *)GetProcAddress(hntdll, "NtCompareObjects");
+    pNtOpenThread           =  (void *)GetProcAddress(hntdll, "NtOpenThread");
 
     test_null_in_object_name();
     test_case_sensitive();
@@ -3224,4 +3305,5 @@ START_TEST(om)
     test_globalroot();
     test_object_identity();
     test_query_directory();
+    test_zero_access();
 }
