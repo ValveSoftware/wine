@@ -2302,9 +2302,13 @@ DECL_HANDLER(get_next_thread)
         thread = LIST_ENTRY( ptr, struct thread, entry );
         if (thread->process == process)
         {
-            reply->handle = alloc_handle( current->process, thread, req->access, req->attributes );
-            release_object( process );
-            return;
+            reply->handle = alloc_handle_user_open( current->process, thread, req->access, req->attributes );
+            if (get_error() != STATUS_ACCESS_DENIED)
+            {
+                release_object( process );
+                return;
+            }
+            clear_error();
         }
         ptr = req->flags ? list_prev( &thread_list, &thread->entry )
                          : list_next( &thread_list, &thread->entry );
