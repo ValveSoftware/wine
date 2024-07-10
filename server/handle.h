@@ -38,6 +38,8 @@ extern obj_handle_t alloc_handle( struct process *process, void *obj,
                                   unsigned int access, unsigned int attr );
 extern obj_handle_t alloc_handle_no_access_check( struct process *process, void *ptr,
                                                   unsigned int access, unsigned int attr );
+extern obj_handle_t alloc_handle_user_open( struct process *process, void *obj,
+                                            unsigned int access, unsigned int attr );
 extern unsigned int close_handle( struct process *process, obj_handle_t handle );
 extern struct object *get_handle_obj( struct process *process, obj_handle_t handle,
                                       unsigned int access, const struct object_ops *ops );

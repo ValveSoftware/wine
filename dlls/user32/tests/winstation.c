@@ -172,6 +172,10 @@ static void test_handles(void)
     else if (le == ERROR_ACCESS_DENIED)
         win_skip( "Not enough privileges for CreateWindowStation\n" );
 
+    w2 = OpenWindowStationA("winsta0", TRUE, 0 );
+    ok( !w2, "got non-NULL.\n" );
+    ok( GetLastError() == ERROR_ACCESS_DENIED, "got %ld.\n", GetLastError() );
+
     w2 = OpenWindowStationA("winsta0", TRUE, WINSTA_ALL_ACCESS );
     ok( w2 != 0, "OpenWindowStation failed\n" );
     ok( w2 != w1, "OpenWindowStation returned default handle\n" );

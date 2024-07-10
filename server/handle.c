@@ -290,6 +290,15 @@ obj_handle_t alloc_handle( struct process *process, void *ptr, unsigned int acce
     return alloc_handle_entry( process, ptr, access, attr );
 }
 
+/* allocate handle for opening an object by userspace request */
+obj_handle_t alloc_handle_user_open( struct process *process, void *obj, unsigned int access, unsigned int attr )
+{
+    if (access) return alloc_handle( process, obj, access, attr );
+
+    set_error( STATUS_ACCESS_DENIED );
+    return 0;
+}
+
 /* allocate a global handle for an object, incrementing its refcount */
 /* return the handle, or 0 on error */
 static obj_handle_t alloc_global_handle_no_access_check( void *obj, unsigned int access )
@@ -642,7 +651,7 @@ obj_handle_t open_object( struct process *process, obj_handle_t parent, unsigned
 
     if ((obj = open_named_object( root, ops, name, attributes )))
     {
-        handle = alloc_handle( process, obj, access, attributes );
+        handle = alloc_handle_user_open( process, obj, access, attributes );
         release_object( obj );
     }
     if (root) release_object( root );
