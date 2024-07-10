@@ -3183,13 +3183,11 @@ static void test_zero_access(void)
     CloseHandle( h2 );
 
     status = NtOpenEvent(&h2, 0, &attr);
-    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
-    if (!status) CloseHandle( h2 );
+    ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
 
     InitializeObjectAttributes( &attr, &str, OBJ_INHERIT, 0, NULL );
     status = NtOpenEvent(&h2, 0, &attr);
-    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
-    if (!status) CloseHandle( h2 );
+    ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
 
     status = pNtDuplicateObject( GetCurrentProcess(), h1, GetCurrentProcess(), &h2, 0, 0, 0 );
     ok( !status, "got %#lx.\n", status );
@@ -3204,15 +3202,13 @@ static void test_zero_access(void)
     status = pNtCreateMutant( &h1, 0, &attr, FALSE );
     ok( !status, "got %#lx.\n", status );
     status = NtOpenMutant(&h2, 0, &attr);
-    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
-    if (!status) CloseHandle( h2 );
+    ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
     CloseHandle( h1 );
 
     status = pNtCreateTimer( &h1, 0, &attr, NotificationTimer );
     ok( !status, "got %#lx.\n", status );
     status = pNtOpenTimer( &h2, 0, &attr );
-    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
-    if (!status) CloseHandle( h2 );
+    ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
     CloseHandle( h1 );
 
     status = NtGetNextThread(GetCurrentProcess(), NULL, 0, 0, 0, &h1);
@@ -3223,22 +3219,19 @@ static void test_zero_access(void)
     cid.UniqueProcess = ULongToHandle( GetCurrentProcessId() );
     cid.UniqueThread  = 0;
     status = pNtOpenProcess( &h1, 0, &attr, &cid );
-    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
-    if (!status) CloseHandle( h1 );
+    ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
 
     InitializeObjectAttributes( &attr, NULL, 0, 0, NULL );
     cid.UniqueProcess = 0;
     cid.UniqueThread  = ULongToHandle( GetCurrentThreadId() );
     status = pNtOpenThread( &h1, 0, &attr, &cid );
-    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
-    if (!status) CloseHandle( h1 );
+    ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
 
     InitializeObjectAttributes( &attr, &str, OBJ_OPENIF, 0, NULL );
     swprintf( name, ARRAY_SIZE(name), L"\\Sessions\\%u", NtCurrentTeb()->Peb->SessionId );
     RtlInitUnicodeString( &str, name );
     pNtOpenDirectoryObject( &h1, 0, &attr );
-    todo_wine ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
-    if (!status) CloseHandle( h1 );
+    ok( status == STATUS_ACCESS_DENIED, "got %#lx.\n", status );
 }
 
 START_TEST(om)
