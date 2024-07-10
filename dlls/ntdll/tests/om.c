@@ -3212,8 +3212,7 @@ static void test_zero_access(void)
     CloseHandle( h1 );
 
     status = NtGetNextThread(GetCurrentProcess(), NULL, 0, 0, 0, &h1);
-    todo_wine ok( status == STATUS_NO_MORE_ENTRIES, "got %#lx.\n", status );
-    if (!status) CloseHandle( h1 );
+    ok( status == STATUS_NO_MORE_ENTRIES, "got %#lx.\n", status );
 
     InitializeObjectAttributes( &attr, NULL, 0, 0, NULL );
     cid.UniqueProcess = ULongToHandle( GetCurrentProcessId() );
