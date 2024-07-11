@@ -3361,7 +3361,7 @@ static NTSTATUS map_image_into_view( struct file_view *view, const WCHAR *filena
             const char *env = getenv( "PROTON_DISABLE_LSTEAMCLIENT" );
             const WCHAR *p;
 
-            if (env && *env != '0' && nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC && filename
+            if (!(env && *env != '0') && nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC && filename
                 && (p = wcsrchr(filename, '\\')) && !wcsicmp(p, u"\\steamclient.dll"))
                 ((IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.ImageBase = image_info->base;
         }
