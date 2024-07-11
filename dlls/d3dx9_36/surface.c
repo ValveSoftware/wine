@@ -643,8 +643,18 @@ static HRESULT d3dx_initialize_image_from_dds(const void *src_data, uint32_t src
         return D3DXERR_INVALIDDATA;
     }
 
-    image->pixels = ((BYTE *)src_data) + sizeof(*header);
     image->image_file_format = D3DXIFF_DDS;
+    if (header->pixel_format.flags & DDS_PF_INDEXED)
+    {
+        image->palette = (PALETTEENTRY *)(((BYTE *)src_data) + sizeof(*header));
+        image->pixels = ((BYTE *)image->palette) + DDS_PALETTE_SIZE;
+    }
+    else
+    {
+        image->palette = NULL;
+        image->pixels = ((BYTE *)src_data) + sizeof(*header);
+    }
+
     if (starting_mip_level && (image->mip_levels > 1))
     {
         uint32_t i, row_pitch, slice_pitch, initial_mip_levels;
@@ -891,13 +901,13 @@ static HRESULT d3dx_image_wic_frame_decode(struct d3dx_image *image,
     }
 
     image->image_buf = image->pixels = buffer;
-    image->palette = palette;
+    image->image_palette = image->palette = palette;
 
 exit:
     free(colors);
     if (image->image_buf != buffer)
         free(buffer);
-    if (image->palette != palette)
+    if (image->image_palette != palette)
         free(palette);
     if (wic_palette)
         IWICPalette_Release(wic_palette);
@@ -1033,7 +1043,7 @@ HRESULT d3dx_image_init(const void *src_data, uint32_t src_data_size, struct d3d
 void d3dx_image_cleanup(struct d3dx_image *image)
 {
     free(image->image_buf);
-    free(image->palette);
+    free(image->image_palette);
 }
 
 HRESULT d3dx_image_get_pixels(struct d3dx_image *image, uint32_t layer, uint32_t mip_level,
