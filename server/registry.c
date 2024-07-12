@@ -100,6 +100,7 @@ struct key
 #define KEY_SYMLINK  0x0008  /* key is a symbolic link */
 #define KEY_WOWREFLECT 0x0010  /* key is a Wow64 shared and reflected key (used for Software\Classes) */
 #define KEY_PREDEF   0x0020  /* key is marked as predefined */
+#define KEY_WOWSHARE 0x0040  /* key is Wow64 shared */
 
 #define OBJ_KEY_WOW64 0x100000 /* magic flag added to attributes for WoW64 redirection */
 
@@ -605,7 +606,7 @@ static int key_link_name( struct object *obj, struct object_name *name, struct o
     for (i = ++parent_key->last_subkey; i > index; i--)
         parent_key->subkeys[i] = parent_key->subkeys[i - 1];
     parent_key->subkeys[index] = (struct key *)grab_object( key );
-    if (is_wow6432node( name->name, name->len ) &&
+    if (!(parent_key->flags & KEY_WOWSHARE) && is_wow6432node( name->name, name->len ) &&
         !is_wow6432node( parent_key->obj.name->name, parent_key->obj.name->len ))
         parent_key->wow6432node = key;
     name->parent = parent;
@@ -1896,6 +1897,7 @@ void init_registry(void)
                                                'M','a','c','h','i','n','e','\\',
                                                'S','y','s','t','e','m','\\',
                                                'C','o','n','t','r','o','l','S','e','t','0','0','1'};
+    static const WCHAR software[] = {'S','o','f','t','w','a','r','e',};
     static const struct unicode_str root_name = { REGISTRY, sizeof(REGISTRY) };
     static const struct unicode_str HKLM_name = { HKLM, sizeof(HKLM) };
     static const struct unicode_str HKU_name = { HKU_default, sizeof(HKU_default) };
@@ -1903,7 +1905,7 @@ void init_registry(void)
     static const struct unicode_str controlset_name = { controlset, sizeof(controlset) };
 
     WCHAR *current_user_path;
-    struct unicode_str current_user_str;
+    struct unicode_str current_user_str, name;
     struct key *key, *hklm, *hkcu;
     unsigned int i;
     char *p;
@@ -1962,8 +1964,6 @@ void init_registry(void)
     /* set the shared flag on Software\Classes\Wow6432Node for all platforms */
     for (i = 1; i < supported_machines_count; i++)
     {
-        struct unicode_str name;
-
         switch (supported_machines[i])
         {
         case IMAGE_FILE_MACHINE_I386:  name.str = classes_i386;  name.len = sizeof(classes_i386);  break;
@@ -1975,7 +1975,15 @@ void init_registry(void)
             key->flags |= KEY_WOWREFLECT;
             release_object( key );
         }
-        /* FIXME: handle HKCU too */
+    }
+
+    name.str = software;
+    name.len = sizeof(software);
+    if ((key = create_key_recursive( hkcu, &name, current_time )))
+    {
+        key->flags |= KEY_WOWSHARE;
+        key->wow6432node = NULL;
+        release_object( key );
     }
 
     if ((key = create_key_recursive( hklm, &perflib_name, current_time )))
