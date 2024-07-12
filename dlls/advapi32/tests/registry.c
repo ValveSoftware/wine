@@ -3201,6 +3201,78 @@ static void test_redirection(void)
 
     RegDeleteKeyA( key32, "" );
     RegCloseKey( key32 );
+
+    /* HKCU\\Software is shared. */
+    err = RegCreateKeyExA( HKEY_CURRENT_USER, "Software\\Wow6432Node\\tmp", 0, NULL, 0, KEY_ALL_ACCESS | KEY_WOW64_32KEY, NULL, &key, NULL );
+    ok( !err, "got %#lx.\n", err );
+    RegDeleteKeyA( key, "" );
+    RegCloseKey( key );
+
+    err = RegCreateKeyExA( HKEY_CURRENT_USER, "Software\\TestKey", 0, NULL, 0, KEY_ALL_ACCESS | KEY_WOW64_32KEY, NULL, &root64, NULL );
+    ok( !err, "got %#lx.\n", err );
+    err = RegOpenKeyExA( HKEY_CURRENT_USER, "Software\\Wow6432Node\\TestKey", 0, KEY_ALL_ACCESS | KEY_WOW64_64KEY, &root32 );
+    ok ( err == ERROR_FILE_NOT_FOUND, "got %#lx.\n", err );
+
+    err = RegCreateKeyExA( HKEY_CURRENT_USER, "Software\\Wow6432Node\\TestKey", 0, NULL, 0, KEY_ALL_ACCESS | KEY_WOW64_32KEY, NULL, &root32, NULL );
+    ok( !err, "got %#lx.\n", err );
+
+    dw = 1;
+    err = RegSetKeyValueA( root64, NULL, "val", REG_DWORD, &dw, sizeof(dw) );
+    ok( !err, "got %#lx.\n", err );
+
+    dw = 2;
+    err = RegSetKeyValueA( root32, NULL, "val", REG_DWORD, &dw, sizeof(dw) );
+    ok( !err, "got %#lx.\n", err );
+
+    err = RegCreateKeyExA( root64, "subkey", 0, NULL, 0, KEY_ALL_ACCESS | KEY_WOW64_64KEY, NULL, &key64, NULL );
+    ok( !err, "got %#lx.\n", err );
+    dw = 1;
+    err = RegSetKeyValueA( key64, NULL, "val", REG_DWORD, &dw, sizeof(dw) );
+    ok( !err, "got %#lx.\n", err );
+
+    err = RegCreateKeyExA( root32, "subkey", 0, NULL, 0, KEY_ALL_ACCESS | KEY_WOW64_32KEY, NULL, &key32, NULL );
+    ok( !err, "got %#lx.\n", err );
+    dw = 2;
+    err = RegSetKeyValueA( key32, NULL, "val", REG_DWORD, &dw, sizeof(dw) );
+    ok( !err, "got %#lx.\n", err );
+
+    err = RegOpenKeyExA( HKEY_CURRENT_USER, "Software\\TestKey", 0, KEY_ALL_ACCESS | KEY_WOW64_64KEY, &key );
+    ok( !err, "got %#lx.\n", err );
+    len = sizeof(dw);
+    err = RegQueryValueExA( key, "val", NULL, NULL, (BYTE *)&dw, &len );
+    ok( !err, "got %#lx.\n", err );
+    ok( dw == 1, "got %lu.\n", dw );
+    RegCloseKey( key );
+    err = RegOpenKeyExA( HKEY_CURRENT_USER, "Software\\TestKey", 0, KEY_ALL_ACCESS | KEY_WOW64_32KEY, &key );
+    ok( !err, "got %#lx.\n", err );
+    len = sizeof(dw);
+    err = RegQueryValueExA( key, "val", NULL, NULL, (BYTE *)&dw, &len );
+    ok( !err, "got %#lx.\n", err );
+    ok( dw == 1, "got %lu.\n", dw );
+    RegCloseKey( key );
+    err = RegOpenKeyExA( HKEY_CURRENT_USER, "Software\\TestKey\\subkey", 0, KEY_ALL_ACCESS | KEY_WOW64_64KEY, &key );
+    ok( !err, "got %#lx.\n", err );
+    len = sizeof(dw);
+    err = RegQueryValueExA( key, "val", NULL, NULL, (BYTE *)&dw, &len );
+    ok( !err, "got %#lx.\n", err );
+    ok( dw == 1, "got %lu.\n", dw );
+    RegCloseKey( key );
+    err = RegOpenKeyExA( HKEY_CURRENT_USER, "Software\\TestKey\\subkey", 0, KEY_ALL_ACCESS | KEY_WOW64_32KEY, &key );
+    ok( !err, "got %#lx.\n", err );
+    len = sizeof(dw);
+    err = RegQueryValueExA( key, "val", NULL, NULL, (BYTE *)&dw, &len );
+    ok( !err, "got %#lx.\n", err );
+    ok( dw == 1, "got %lu.\n", dw );
+    RegCloseKey( key );
+
+    RegDeleteKeyA( key64, "" );
+    RegCloseKey( key64 );
+    RegDeleteKeyA( key32, "" );
+    RegCloseKey( key32 );
+    RegDeleteKeyA( root32, "" );
+    RegCloseKey( root32 );
+    RegDeleteKeyA( root64, "" );
+    RegCloseKey( root64 );
 }
 
 static void test_classesroot(void)
