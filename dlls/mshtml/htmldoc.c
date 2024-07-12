@@ -5973,6 +5973,7 @@ HRESULT get_document_node(nsIDOMDocument *dom_document, HTMLDocumentNode **ret)
 
     if(!node) {
         ERR("document not initialized\n");
+        *ret = NULL;
         return E_FAIL;
     }
 
