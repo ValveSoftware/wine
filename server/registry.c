@@ -98,7 +98,7 @@ struct key
 #define KEY_DELETED  0x0002  /* key has been deleted */
 #define KEY_DIRTY    0x0004  /* key has been modified */
 #define KEY_SYMLINK  0x0008  /* key is a symbolic link */
-#define KEY_WOWSHARE 0x0010  /* key is a Wow64 shared key (used for Software\Classes) */
+#define KEY_WOWREFLECT 0x0010  /* key is a Wow64 shared and reflected key (used for Software\Classes) */
 #define KEY_PREDEF   0x0020  /* key is marked as predefined */
 
 #define OBJ_KEY_WOW64 0x100000 /* magic flag added to attributes for WoW64 redirection */
@@ -520,7 +520,7 @@ static struct object *key_lookup_name( struct object *obj, struct unicode_str *n
         }
 
         key = (struct key *)obj;
-        if (key && (key->flags & KEY_WOWSHARE) && (attr & OBJ_KEY_WOW64) && !name->str)
+        if (key && (key->flags & KEY_WOWREFLECT) && (attr & OBJ_KEY_WOW64) && !name->str)
         {
             key = get_parent( key );
             release_object( obj );
@@ -547,7 +547,7 @@ static struct object *key_lookup_name( struct object *obj, struct unicode_str *n
 
     if (!(found = find_subkey( key, &tmp, &index )))
     {
-        if ((key->flags & KEY_WOWSHARE) && (attr & OBJ_KEY_WOW64))
+        if ((key->flags & KEY_WOWREFLECT) && (attr & OBJ_KEY_WOW64))
         {
             /* try in the 64-bit parent */
             key = get_parent( key );
@@ -782,7 +782,7 @@ static struct key *grab_wow6432node( struct key *key )
     struct key *ret = key->wow6432node;
 
     if (!ret) return key;
-    if (ret->flags & KEY_WOWSHARE) return key;
+    if (ret->flags & KEY_WOWREFLECT) return key;
     grab_object( ret );
     release_object( key );
     return ret;
@@ -828,7 +828,7 @@ static struct key *open_key( struct key *parent, const struct unicode_str *name,
     if (parent && !(access & KEY_WOW64_64KEY) && !is_wow6432node( name->str, name->len ))
     {
         key = get_wow6432node( parent );
-        if (key && ((access & KEY_WOW64_32KEY) || (key->flags & KEY_WOWSHARE)))
+        if (key && ((access & KEY_WOW64_32KEY) || (key->flags & KEY_WOWREFLECT)))
             parent = key;
     }
 
@@ -854,7 +854,7 @@ static struct key *create_key( struct key *parent, const struct unicode_str *nam
     if (parent && !(access & KEY_WOW64_64KEY) && !is_wow6432node( name->str, name->len ))
     {
         key = get_wow6432node( parent );
-        if (key && ((access & KEY_WOW64_32KEY) || (key->flags & KEY_WOWSHARE)))
+        if (key && ((access & KEY_WOW64_32KEY) || (key->flags & KEY_WOWREFLECT)))
             parent = key;
     }
 
@@ -1966,7 +1966,7 @@ void init_registry(void)
         }
         if ((key = create_key_recursive( hklm, &name, current_time )))
         {
-            key->flags |= KEY_WOWSHARE;
+            key->flags |= KEY_WOWREFLECT;
             release_object( key );
         }
         /* FIXME: handle HKCU too */
