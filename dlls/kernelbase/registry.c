@@ -159,6 +159,37 @@ static BOOL is_classes_wow6432node( HKEY key )
     return ret;
 }
 
+static BOOL is_wow6432_shared( HANDLE key )
+{
+    static const WCHAR users_root[] = L"\\Registry\\User\\";
+    const DWORD users_root_len = ARRAY_SIZE( users_root ) - 1;
+    static const WCHAR software[] = L"\\Software";
+    const DWORD software_len = ARRAY_SIZE( software ) - 1;
+    KEY_NAME_INFORMATION *info;
+    char buffer[256];
+    BOOL ret = FALSE;
+    WCHAR *name;
+    DWORD len;
+
+    info = get_key_name( key, buffer, sizeof(buffer) );
+    len =  info->NameLength / sizeof(WCHAR);
+    if (len <= users_root_len) goto done;
+    name = info->Name;
+    if (wcsnicmp( name, users_root, users_root_len )) goto done;
+    name += users_root_len;
+    len -= users_root_len;
+    while (len && *name != '\\')
+    {
+        ++name;
+        --len;
+    }
+    if (len != software_len) goto done;
+    ret = !wcsnicmp( name, software, software_len );
+done:
+    if ((char *)info != buffer) heap_free( info );
+    return ret;
+}
+
 /* Open the Wow6432Node subkey of the specified key */
 static HANDLE open_wow6432node( HANDLE key )
 {
@@ -173,6 +204,11 @@ static HANDLE open_wow6432node( HANDLE key )
     attr.SecurityDescriptor = NULL;
     attr.SecurityQualityOfService = NULL;
     if (NtOpenKeyEx( &ret, MAXIMUM_ALLOWED | KEY_WOW64_64KEY, &attr, 0 )) return key;
+    if (is_wow6432_shared( key ))
+    {
+        NtClose( ret );
+        return key;
+    }
     return ret;
 }
 
