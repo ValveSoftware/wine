@@ -368,6 +368,9 @@ static D3DFORMAT dds_bump_to_d3dformat(const struct dds_pixel_format *pixel_form
         return D3DFMT_V8U8;
     if (pixel_format->bpp == 32 && pixel_format->rmask == 0x0000ffff && pixel_format->gmask == 0xffff0000)
         return D3DFMT_V16U16;
+    if (pixel_format->bpp == 32 && pixel_format->rmask == 0x000000ff && pixel_format->gmask == 0x0000ff00
+            && pixel_format->bmask == 0x00ff0000 && pixel_format->amask == 0xff000000)
+        return D3DFMT_Q8W8V8U8;
 
     WARN("Unknown bump pixel format (bpp %lu, r %#lx, g %#lx, b %#lx, a %#lx).\n", pixel_format->bpp,
             pixel_format->rmask, pixel_format->gmask, pixel_format->bmask, pixel_format->amask);
