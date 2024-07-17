@@ -589,6 +589,7 @@ static HRESULT save_dds_surface_to_memory(ID3DXBuffer **dst_buffer, IDirect3DSur
     return D3D_OK;
 }
 
+#define DDS_PALETTE_SIZE (sizeof(PALETTEENTRY) * 256)
 static HRESULT d3dx_initialize_image_from_dds(const void *src_data, uint32_t src_data_size,
         struct d3dx_image *image, uint32_t starting_mip_level)
 {
@@ -632,7 +633,10 @@ static HRESULT d3dx_initialize_image_from_dds(const void *src_data, uint32_t src
             image->size.depth, image->mip_levels);
     if (!image->layer_pitch)
         return D3DXERR_INVALIDDATA;
+
     expected_src_data_size = (image->layer_pitch * image->layer_count) + sizeof(*header);
+    if (header->pixel_format.flags & DDS_PF_INDEXED)
+        expected_src_data_size += DDS_PALETTE_SIZE;
     if (src_data_size < expected_src_data_size)
     {
         WARN("File is too short %u, expected at least %u bytes.\n", src_data_size, expected_src_data_size);
