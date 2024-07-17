@@ -1565,6 +1565,10 @@ void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, str
                 break;
             }
         }
+        else if (dst_ctype == CTYPE_LUMA)
+        {
+            *dst_component = dst->x;
+        }
         else
         {
             *dst_component = 1.0f;
@@ -1604,6 +1608,16 @@ void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 
             break;
 
         case CTYPE_LUMA:
+        {
+            float val = src->x * 0.2125f + src->y * 0.7154f + src->z * 0.0721f;
+
+            if (src_ctype == CTYPE_SNORM)
+                val = (val + 1.0f) / 2.0f;
+
+            v = d3dx_clamp(val, 0.0f, 1.0f) * ((1 << format->bits[c]) - 1) + 0.5f;
+            break;
+        }
+
         case CTYPE_UNORM:
         {
             float val = src_component;
