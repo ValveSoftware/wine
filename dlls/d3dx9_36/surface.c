@@ -163,6 +163,8 @@ static D3DFORMAT dds_fourcc_to_d3dformat(DWORD fourcc)
         D3DFMT_R16F,
         D3DFMT_G16R16F,
         D3DFMT_A16B16G16R16F,
+        D3DFMT_A16B16G16R16,
+        D3DFMT_Q16W16V16U16,
         D3DFMT_R32F,
         D3DFMT_G32R32F,
         D3DFMT_A32B32G32R32F,

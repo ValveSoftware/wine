@@ -709,8 +709,8 @@ static void test_D3DXGetImageInfo(void)
      * D3DFMTs that aren't fourCC values, but are supported in the fourCC
      * field.
      */
-    todo_wine check_dds_pixel_format(DDS_PF_FOURCC, D3DFMT_A16B16G16R16, 0, 0, 0, 0, 0, D3DFMT_A16B16G16R16);
-    todo_wine check_dds_pixel_format(DDS_PF_FOURCC, D3DFMT_Q16W16V16U16, 0, 0, 0, 0, 0, D3DFMT_Q16W16V16U16);
+    check_dds_pixel_format(DDS_PF_FOURCC, D3DFMT_A16B16G16R16, 0, 0, 0, 0, 0, D3DFMT_A16B16G16R16);
+    check_dds_pixel_format(DDS_PF_FOURCC, D3DFMT_Q16W16V16U16, 0, 0, 0, 0, 0, D3DFMT_Q16W16V16U16);
     check_dds_pixel_format(DDS_PF_FOURCC, D3DFMT_R16F, 0, 0, 0, 0, 0, D3DFMT_R16F);
     check_dds_pixel_format(DDS_PF_FOURCC, D3DFMT_G16R16F, 0, 0, 0, 0, 0, D3DFMT_G16R16F);
     check_dds_pixel_format(DDS_PF_FOURCC, D3DFMT_A16B16G16R16F, 0, 0, 0, 0, 0, D3DFMT_A16B16G16R16F);
