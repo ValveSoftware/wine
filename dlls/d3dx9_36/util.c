@@ -69,6 +69,7 @@ static const struct pixel_format_desc formats[] =
     {D3DFMT_V16U16,        { 0, 16, 16,  0}, { 0,  0, 16,  0},  4, 1, 1,  4, { CTYPE_EMPTY, CTYPE_SNORM, FMT_FLAG_NONE }},
     {D3DFMT_X8L8V8U8,      { 8,  8,  8,  0}, {16,  0,  8,  0},  4, 1, 1,  4, { CTYPE_UNORM, CTYPE_SNORM, FMT_FLAG_NONE }},
     {D3DFMT_A2W10V10U10,   { 2, 10, 10, 10}, {30,  0, 10, 20},  4, 1, 1,  4, { CTYPE_UNORM, CTYPE_SNORM, FMT_FLAG_NONE }},
+    {D3DFMT_Q16W16V16U16,  {16, 16, 16, 16}, {48,  0, 16, 32},  8, 1, 1,  8, { CTYPE_SNORM, CTYPE_SNORM, FMT_FLAG_NONE }},
     /* marks last element */
     {D3DFMT_UNKNOWN,       { 0,  0,  0,  0}, { 0,  0,  0,  0},  0, 1, 1,  0, { CTYPE_EMPTY, CTYPE_EMPTY, FMT_FLAG_NONE }},
 };
