@@ -1623,17 +1623,11 @@ BOOL fs_hack_put_image_scaled( HWND hwnd, Window window, GC gc, XImage *image, u
                                unsigned int width, unsigned int height, BOOL is_argb )
 {
     Picture src_pict, dst_pict, mask_pict = 0;
-    struct x11drv_win_data *data;
     XRenderPictureAttributes pa;
     enum wxr_format src_format;
     Pixmap pixmap;
-    BOOL fshack;
 
     if (default_format == WXR_INVALID_FORMAT) return FALSE;
-    if (!(data = get_win_data( hwnd ))) return FALSE;
-    fshack = data->fs_hack;
-    release_win_data( data );
-    if (!fshack) return FALSE;
 
     if ((src_format = get_xrender_format_from_ximage( image )) == WXR_INVALID_FORMAT)
     {
