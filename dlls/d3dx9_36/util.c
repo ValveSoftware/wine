@@ -22,20 +22,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(d3dx);
 
-static void la_from_rgba(const struct vec4 *rgba, struct vec4 *la)
-{
-    la->x = rgba->x * 0.2125f + rgba->y * 0.7154f + rgba->z * 0.0721f;
-    la->w = rgba->w;
-}
-
-static void la_to_rgba(const struct vec4 *la, struct vec4 *rgba, const PALETTEENTRY *palette)
-{
-    rgba->x = la->x;
-    rgba->y = la->x;
-    rgba->z = la->x;
-    rgba->w = la->w;
-}
-
 static void index_to_rgba(const struct vec4 *index, struct vec4 *rgba, const PALETTEENTRY *palette)
 {
     ULONG idx = (ULONG)(index->x * 255.0f + 0.5f);
@@ -83,10 +69,10 @@ static const struct pixel_format_desc formats[] =
     {D3DFMT_R32F,          { 0, 32,  0,  0}, { 0,  0,  0,  0},  4, 1, 1,  4, { CTYPE_EMPTY, CTYPE_FLOAT, FMT_FLAG_NONE }, NULL,         NULL         },
     {D3DFMT_G32R32F,       { 0, 32, 32,  0}, { 0,  0, 32,  0},  8, 1, 1,  8, { CTYPE_EMPTY, CTYPE_FLOAT, FMT_FLAG_NONE }, NULL,         NULL         },
     {D3DFMT_A32B32G32R32F, {32, 32, 32, 32}, {96,  0, 32, 64}, 16, 1, 1, 16, { CTYPE_FLOAT, CTYPE_FLOAT, FMT_FLAG_NONE }, NULL,         NULL         },
-    {D3DFMT_A8L8,          { 8,  8,  0,  0}, { 8,  0,  0,  0},  2, 1, 1,  2, { CTYPE_UNORM, CTYPE_LUMA,  FMT_FLAG_NONE }, la_from_rgba, la_to_rgba   },
-    {D3DFMT_A4L4,          { 4,  4,  0,  0}, { 4,  0,  0,  0},  1, 1, 1,  1, { CTYPE_UNORM, CTYPE_LUMA,  FMT_FLAG_NONE }, la_from_rgba, la_to_rgba   },
-    {D3DFMT_L8,            { 0,  8,  0,  0}, { 0,  0,  0,  0},  1, 1, 1,  1, { CTYPE_EMPTY, CTYPE_LUMA,  FMT_FLAG_NONE }, la_from_rgba, la_to_rgba   },
-    {D3DFMT_L16,           { 0, 16,  0,  0}, { 0,  0,  0,  0},  2, 1, 1,  2, { CTYPE_EMPTY, CTYPE_LUMA,  FMT_FLAG_NONE }, la_from_rgba, la_to_rgba   },
+    {D3DFMT_A8L8,          { 8,  8,  0,  0}, { 8,  0,  0,  0},  2, 1, 1,  2, { CTYPE_UNORM, CTYPE_LUMA,  FMT_FLAG_NONE }, NULL,         NULL         },
+    {D3DFMT_A4L4,          { 4,  4,  0,  0}, { 4,  0,  0,  0},  1, 1, 1,  1, { CTYPE_UNORM, CTYPE_LUMA,  FMT_FLAG_NONE }, NULL,         NULL         },
+    {D3DFMT_L8,            { 0,  8,  0,  0}, { 0,  0,  0,  0},  1, 1, 1,  1, { CTYPE_EMPTY, CTYPE_LUMA,  FMT_FLAG_NONE }, NULL,         NULL         },
+    {D3DFMT_L16,           { 0, 16,  0,  0}, { 0,  0,  0,  0},  2, 1, 1,  2, { CTYPE_EMPTY, CTYPE_LUMA,  FMT_FLAG_NONE }, NULL,         NULL         },
     {D3DFMT_P8,            { 8,  8,  8,  8}, { 0,  0,  0,  0},  1, 1, 1,  1, { CTYPE_INDEX, CTYPE_INDEX, FMT_FLAG_NONE }, NULL,         index_to_rgba},
     {D3DFMT_Q8W8V8U8,      { 8,  8,  8,  8}, {24,  0,  8, 16},  4, 1, 1,  4, { CTYPE_SNORM, CTYPE_SNORM, FMT_FLAG_NONE }, NULL,         NULL         },
     {D3DFMT_V8U8,          { 0,  8,  8,  0}, { 0,  0,  8,  0},  2, 1, 1,  2, { CTYPE_EMPTY, CTYPE_SNORM, FMT_FLAG_NONE }, NULL,         NULL         },
