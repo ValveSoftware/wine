@@ -394,19 +394,19 @@ static enum d3dx_pixel_format_id dds_indexed_to_d3dx_pixel_format(const struct d
     return D3DX_PIXEL_FORMAT_COUNT;
 }
 
-static D3DFORMAT dds_bump_to_d3dformat(const struct dds_pixel_format *pixel_format)
+static enum d3dx_pixel_format_id dds_bump_to_d3dx_pixel_format(const struct dds_pixel_format *pixel_format)
 {
     if (pixel_format->bpp == 16 && pixel_format->rmask == 0x00ff && pixel_format->gmask == 0xff00)
-        return D3DFMT_V8U8;
+        return D3DX_PIXEL_FORMAT_U8V8_SNORM;
     if (pixel_format->bpp == 32 && pixel_format->rmask == 0x0000ffff && pixel_format->gmask == 0xffff0000)
-        return D3DFMT_V16U16;
+        return D3DX_PIXEL_FORMAT_U16V16_SNORM;
     if (pixel_format->bpp == 32 && pixel_format->rmask == 0x000000ff && pixel_format->gmask == 0x0000ff00
             && pixel_format->bmask == 0x00ff0000 && pixel_format->amask == 0xff000000)
-        return D3DFMT_Q8W8V8U8;
+        return D3DX_PIXEL_FORMAT_U8V8W8Q8_SNORM;
 
     WARN("Unknown bump pixel format (bpp %lu, r %#lx, g %#lx, b %#lx, a %#lx).\n", pixel_format->bpp,
             pixel_format->rmask, pixel_format->gmask, pixel_format->bmask, pixel_format->amask);
-    return D3DFMT_UNKNOWN;
+    return D3DX_PIXEL_FORMAT_COUNT;
 }
 
 static D3DFORMAT dds_bump_luminance_to_d3dformat(const struct dds_pixel_format *pixel_format)
@@ -438,7 +438,7 @@ static D3DFORMAT dds_pixel_format_to_d3dformat(const struct dds_pixel_format *pi
     if (pixel_format->flags & DDS_PF_ALPHA_ONLY)
         return d3dformat_from_d3dx_pixel_format_id(dds_alpha_to_d3dx_pixel_format(pixel_format));
     if (pixel_format->flags & DDS_PF_BUMPDUDV)
-        return dds_bump_to_d3dformat(pixel_format);
+        return d3dformat_from_d3dx_pixel_format_id(dds_bump_to_d3dx_pixel_format(pixel_format));
     if (pixel_format->flags & DDS_PF_BUMPLUMINANCE)
         return dds_bump_luminance_to_d3dformat(pixel_format);
 
