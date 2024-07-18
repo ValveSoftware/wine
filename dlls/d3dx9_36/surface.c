@@ -1979,17 +1979,17 @@ static HRESULT d3dx_pixels_decompress(struct d3dx_pixels *pixels, const struct p
 
     switch (desc->format)
     {
-        case D3DFMT_DXT1:
+        case D3DX_PIXEL_FORMAT_DXT1_UNORM:
             uncompressed_desc = get_format_info(D3DFMT_A8B8G8R8);
             fetch_dxt_texel = fetch_2d_texel_rgba_dxt1;
             break;
-        case D3DFMT_DXT2:
-        case D3DFMT_DXT3:
+        case D3DX_PIXEL_FORMAT_DXT2_UNORM:
+        case D3DX_PIXEL_FORMAT_DXT3_UNORM:
             uncompressed_desc = get_format_info(D3DFMT_A8B8G8R8);
             fetch_dxt_texel = fetch_2d_texel_rgba_dxt3;
             break;
-        case D3DFMT_DXT4:
-        case D3DFMT_DXT5:
+        case D3DX_PIXEL_FORMAT_DXT4_UNORM:
+        case D3DX_PIXEL_FORMAT_DXT5_UNORM:
             uncompressed_desc = get_format_info(D3DFMT_A8B8G8R8);
             fetch_dxt_texel = fetch_2d_texel_rgba_dxt5;
             break;
@@ -2054,10 +2054,10 @@ exit:
 }
 
 HRESULT d3dx_pixels_init(const void *data, uint32_t row_pitch, uint32_t slice_pitch,
-        const PALETTEENTRY *palette, D3DFORMAT format, uint32_t left, uint32_t top, uint32_t right, uint32_t bottom,
-        uint32_t front, uint32_t back, struct d3dx_pixels *pixels)
+        const PALETTEENTRY *palette, enum d3dx_pixel_format_id format, uint32_t left, uint32_t top, uint32_t right,
+        uint32_t bottom, uint32_t front, uint32_t back, struct d3dx_pixels *pixels)
 {
-    const struct pixel_format_desc *fmt_desc = get_format_info(format);
+    const struct pixel_format_desc *fmt_desc = get_d3dx_pixel_format_info(format);
     const BYTE *ptr = data;
     RECT unaligned_rect;
 
@@ -2216,15 +2216,15 @@ HRESULT d3dx_load_pixels_from_pixels(struct d3dx_pixels *dst_pixels,
             TRACE("Compressing DXTn surface.\n");
             switch (dst_desc->format)
             {
-                case D3DFMT_DXT1:
+                case D3DX_PIXEL_FORMAT_DXT1_UNORM:
                     gl_format = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
                     break;
-                case D3DFMT_DXT2:
-                case D3DFMT_DXT3:
+                case D3DX_PIXEL_FORMAT_DXT2_UNORM:
+                case D3DX_PIXEL_FORMAT_DXT3_UNORM:
                     gl_format = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
                     break;
-                case D3DFMT_DXT4:
-                case D3DFMT_DXT5:
+                case D3DX_PIXEL_FORMAT_DXT4_UNORM:
+                case D3DX_PIXEL_FORMAT_DXT5_UNORM:
                     gl_format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
                     break;
                 default:
