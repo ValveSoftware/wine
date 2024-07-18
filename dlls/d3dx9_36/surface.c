@@ -383,15 +383,15 @@ static enum d3dx_pixel_format_id dds_alpha_to_d3dx_pixel_format(const struct dds
     return D3DX_PIXEL_FORMAT_COUNT;
 }
 
-static D3DFORMAT dds_indexed_to_d3dformat(const struct dds_pixel_format *pixel_format)
+static enum d3dx_pixel_format_id dds_indexed_to_d3dx_pixel_format(const struct dds_pixel_format *pixel_format)
 {
     if (pixel_format->bpp == 8)
-        return D3DFMT_P8;
+        return D3DX_PIXEL_FORMAT_P8_UINT;
     if (pixel_format->bpp == 16 && pixel_format->amask == 0xff00)
-        return D3DFMT_A8P8;
+        return D3DX_PIXEL_FORMAT_P8_UINT_A8_UNORM;
 
     WARN("Unknown indexed pixel format (bpp %lu).\n", pixel_format->bpp);
-    return D3DFMT_UNKNOWN;
+    return D3DX_PIXEL_FORMAT_COUNT;
 }
 
 static D3DFORMAT dds_bump_to_d3dformat(const struct dds_pixel_format *pixel_format)
@@ -430,7 +430,7 @@ static D3DFORMAT dds_pixel_format_to_d3dformat(const struct dds_pixel_format *pi
     if (pixel_format->flags & DDS_PF_FOURCC)
         return d3dformat_from_d3dx_pixel_format_id(dds_fourcc_to_d3dx_pixel_format(pixel_format->fourcc));
     if (pixel_format->flags & DDS_PF_INDEXED)
-        return dds_indexed_to_d3dformat(pixel_format);
+        return d3dformat_from_d3dx_pixel_format_id(dds_indexed_to_d3dx_pixel_format(pixel_format));
     if (pixel_format->flags & DDS_PF_RGB)
         return dds_rgb_to_d3dformat(pixel_format);
     if (pixel_format->flags & DDS_PF_LUMINANCE)
