@@ -270,21 +270,24 @@ static HRESULT check_texture_requirements(struct IDirect3DDevice9 *device, UINT 
         channels = !!fmt->bits[0] + !!fmt->bits[1] + !!fmt->bits[2] + !!fmt->bits[3];
         usedformat = D3DFMT_UNKNOWN;
 
-        while ((curfmt = get_format_info_idx(i)))
+        for (i = 0; i < D3DX_PIXEL_FORMAT_COUNT; ++i)
         {
-            unsigned int curchannels = !!curfmt->bits[0] + !!curfmt->bits[1]
-                    + !!curfmt->bits[2] + !!curfmt->bits[3];
-            int score;
+            D3DFORMAT cur_d3dfmt;
+            uint32_t curchannels;
+            int32_t score;
 
-            i++;
+            curfmt = get_format_info_idx(i);
+            if ((cur_d3dfmt = d3dformat_from_d3dx_pixel_format_id(curfmt->format)) == D3DFMT_UNKNOWN)
+                continue;
 
+            curchannels = !!curfmt->bits[0] + !!curfmt->bits[1] + !!curfmt->bits[2] + !!curfmt->bits[3];
             if (curchannels < channels)
                 continue;
             if (curfmt->bytes_per_pixel == 3 && !allow_24bits)
                 continue;
 
             hr = IDirect3D9_CheckDeviceFormat(d3d, params.AdapterOrdinal, params.DeviceType,
-                    mode.Format, usage, resource_type, curfmt->format);
+                    mode.Format, usage, resource_type, cur_d3dfmt);
             if (FAILED(hr))
                 continue;
 
@@ -302,7 +305,7 @@ static HRESULT check_texture_requirements(struct IDirect3DDevice9 *device, UINT 
             if (score > bestscore)
             {
                 bestscore = score;
-                usedformat = curfmt->format;
+                usedformat = cur_d3dfmt;
                 bestfmt = curfmt;
             }
         }
