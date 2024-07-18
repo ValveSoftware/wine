@@ -173,37 +173,41 @@ struct dds_header
     DWORD reserved2;
 };
 
-static D3DFORMAT dds_fourcc_to_d3dformat(DWORD fourcc)
+static enum d3dx_pixel_format_id dds_fourcc_to_d3dx_pixel_format(uint32_t fourcc)
 {
-    unsigned int i;
-    static const DWORD known_fourcc[] = {
-        D3DFMT_UYVY,
-        D3DFMT_YUY2,
-        D3DFMT_R8G8_B8G8,
-        D3DFMT_G8R8_G8B8,
-        D3DFMT_DXT1,
-        D3DFMT_DXT2,
-        D3DFMT_DXT3,
-        D3DFMT_DXT4,
-        D3DFMT_DXT5,
-        D3DFMT_R16F,
-        D3DFMT_G16R16F,
-        D3DFMT_A16B16G16R16F,
-        D3DFMT_A16B16G16R16,
-        D3DFMT_Q16W16V16U16,
-        D3DFMT_R32F,
-        D3DFMT_G32R32F,
-        D3DFMT_A32B32G32R32F,
+    static const struct {
+        uint32_t fourcc;
+        enum d3dx_pixel_format_id format;
+    } fourcc_formats[] = {
+        { MAKEFOURCC('U','Y','V','Y'),     D3DX_PIXEL_FORMAT_UYVY },
+        { MAKEFOURCC('Y','U','Y','2'),     D3DX_PIXEL_FORMAT_YUY2 },
+        { MAKEFOURCC('R','G','B','G'),     D3DX_PIXEL_FORMAT_R8G8_B8G8_UNORM },
+        { MAKEFOURCC('G','R','G','B'),     D3DX_PIXEL_FORMAT_G8R8_G8B8_UNORM },
+        { MAKEFOURCC('D','X','T','1'),     D3DX_PIXEL_FORMAT_DXT1_UNORM },
+        { MAKEFOURCC('D','X','T','2'),     D3DX_PIXEL_FORMAT_DXT2_UNORM },
+        { MAKEFOURCC('D','X','T','3'),     D3DX_PIXEL_FORMAT_DXT3_UNORM },
+        { MAKEFOURCC('D','X','T','4'),     D3DX_PIXEL_FORMAT_DXT4_UNORM },
+        { MAKEFOURCC('D','X','T','5'),     D3DX_PIXEL_FORMAT_DXT5_UNORM },
+        /* These aren't actually fourcc values, they're just D3DFMT values. */
+        { 0x24, /* D3DFMT_A16B16G16R16 */  D3DX_PIXEL_FORMAT_R16G16B16A16_UNORM },
+        { 0x6e, /* D3DFMT_Q16W16V16U16 */  D3DX_PIXEL_FORMAT_U16V16W16Q16_SNORM },
+        { 0x6f, /* D3DFMT_R16F */          D3DX_PIXEL_FORMAT_R16_FLOAT },
+        { 0x70, /* D3DFMT_G16R16F */       D3DX_PIXEL_FORMAT_R16G16_FLOAT },
+        { 0x71, /* D3DFMT_A16B16G16R16F */ D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT },
+        { 0x72, /* D3DFMT_R32F */          D3DX_PIXEL_FORMAT_R32_FLOAT },
+        { 0x73, /* D3DFMT_G32R32F */       D3DX_PIXEL_FORMAT_R32G32_FLOAT },
+        { 0x74, /* D3DFMT_A32B32G32R32F */ D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT },
     };
+    uint32_t i;
 
-    for (i = 0; i < ARRAY_SIZE(known_fourcc); i++)
+    for (i = 0; i < ARRAY_SIZE(fourcc_formats); ++i)
     {
-        if (known_fourcc[i] == fourcc)
-            return fourcc;
+        if (fourcc_formats[i].fourcc == fourcc)
+            return fourcc_formats[i].format;
     }
 
-    WARN("Unknown FourCC %#lx.\n", fourcc);
-    return D3DFMT_UNKNOWN;
+    WARN("Unknown FourCC %s.\n", debugstr_fourcc(fourcc));
+    return D3DX_PIXEL_FORMAT_COUNT;
 }
 
 static const struct {
@@ -424,7 +428,7 @@ static D3DFORMAT dds_pixel_format_to_d3dformat(const struct dds_pixel_format *pi
             pixel_format->bmask, pixel_format->amask);
 
     if (pixel_format->flags & DDS_PF_FOURCC)
-        return dds_fourcc_to_d3dformat(pixel_format->fourcc);
+        return d3dformat_from_d3dx_pixel_format_id(dds_fourcc_to_d3dx_pixel_format(pixel_format->fourcc));
     if (pixel_format->flags & DDS_PF_INDEXED)
         return dds_indexed_to_d3dformat(pixel_format);
     if (pixel_format->flags & DDS_PF_RGB)
