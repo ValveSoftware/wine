@@ -25,6 +25,7 @@
 #include <stdint.h>
 #include "wine/debug.h"
 #include "wine/rbtree.h"
+#include "d3dx_helpers.h"
 
 #define COBJMACROS
 #include "d3dx9.h"
@@ -50,187 +51,81 @@ static inline HRESULT d3dx9_handle_load_filter(DWORD *filter)
     return d3dx9_validate_filter(*filter);
 }
 
+/* dds_header.flags */
+#define DDS_CAPS 0x1
+#define DDS_HEIGHT 0x2
+#define DDS_WIDTH 0x4
+#define DDS_PITCH 0x8
+#define DDS_PIXELFORMAT 0x1000
+#define DDS_MIPMAPCOUNT 0x20000
+#define DDS_LINEARSIZE 0x80000
+#define DDS_DEPTH 0x800000
+
+/* dds_header.caps */
+#define DDS_CAPS_COMPLEX 0x8
+#define DDS_CAPS_TEXTURE 0x1000
+#define DDS_CAPS_MIPMAP 0x400000
+
+/* dds_header.caps2 */
+#define DDS_CAPS2_CUBEMAP 0x200
+#define DDS_CAPS2_CUBEMAP_POSITIVEX 0x400
+#define DDS_CAPS2_CUBEMAP_NEGATIVEX 0x800
+#define DDS_CAPS2_CUBEMAP_POSITIVEY 0x1000
+#define DDS_CAPS2_CUBEMAP_NEGATIVEY 0x2000
+#define DDS_CAPS2_CUBEMAP_POSITIVEZ 0x4000
+#define DDS_CAPS2_CUBEMAP_NEGATIVEZ 0x8000
+#define DDS_CAPS2_CUBEMAP_ALL_FACES ( DDS_CAPS2_CUBEMAP_POSITIVEX | DDS_CAPS2_CUBEMAP_NEGATIVEX \
+                                    | DDS_CAPS2_CUBEMAP_POSITIVEY | DDS_CAPS2_CUBEMAP_NEGATIVEY \
+                                    | DDS_CAPS2_CUBEMAP_POSITIVEZ | DDS_CAPS2_CUBEMAP_NEGATIVEZ )
+#define DDS_CAPS2_VOLUME 0x200000
+
+/* dds_pixel_format.flags */
+#define DDS_PF_ALPHA 0x1
+#define DDS_PF_ALPHA_ONLY 0x2
+#define DDS_PF_FOURCC 0x4
+#define DDS_PF_INDEXED 0x20
+#define DDS_PF_RGB 0x40
+#define DDS_PF_YUV 0x200
+#define DDS_PF_LUMINANCE 0x20000
+#define DDS_PF_BUMPLUMINANCE 0x40000
+#define DDS_PF_BUMPDUDV 0x80000
+
+struct dds_pixel_format
+{
+    DWORD size;
+    DWORD flags;
+    DWORD fourcc;
+    DWORD bpp;
+    DWORD rmask;
+    DWORD gmask;
+    DWORD bmask;
+    DWORD amask;
+};
+
+struct dds_header
+{
+    DWORD signature;
+    DWORD size;
+    DWORD flags;
+    DWORD height;
+    DWORD width;
+    DWORD pitch_or_linear_size;
+    DWORD depth;
+    DWORD miplevels;
+    DWORD reserved[11];
+    struct dds_pixel_format pixel_format;
+    DWORD caps;
+    DWORD caps2;
+    DWORD caps3;
+    DWORD caps4;
+    DWORD reserved2;
+};
+
 struct vec4
 {
     float x, y, z, w;
 };
 
-struct volume
-{
-    UINT width;
-    UINT height;
-    UINT depth;
-};
-
-static inline void set_volume_struct(struct volume *volume, uint32_t width, uint32_t height, uint32_t depth)
-{
-    volume->width = width;
-    volume->height = height;
-    volume->depth = depth;
-}
-
-/* These are custom Wine only filter flags. */
-#define D3DX_FILTER_PMA_IN  0x00800000
-#define D3DX_FILTER_PMA_OUT 0x01000000
-#define D3DX_FILTER_PMA     0x01800000
-
-/* These values act as indexes into the pixel_format_desc table. */
-enum d3dx_pixel_format_id {
-    D3DX_PIXEL_FORMAT_B8G8R8_UNORM,
-    D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM,
-    D3DX_PIXEL_FORMAT_B8G8R8X8_UNORM,
-    D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM,
-    D3DX_PIXEL_FORMAT_R8G8B8X8_UNORM,
-    D3DX_PIXEL_FORMAT_B5G6R5_UNORM,
-    D3DX_PIXEL_FORMAT_B5G5R5X1_UNORM,
-    D3DX_PIXEL_FORMAT_B5G5R5A1_UNORM,
-    D3DX_PIXEL_FORMAT_B2G3R3_UNORM,
-    D3DX_PIXEL_FORMAT_B2G3R3A8_UNORM,
-    D3DX_PIXEL_FORMAT_B4G4R4A4_UNORM,
-    D3DX_PIXEL_FORMAT_B4G4R4X4_UNORM,
-    D3DX_PIXEL_FORMAT_B10G10R10A2_UNORM,
-    D3DX_PIXEL_FORMAT_R10G10B10A2_UNORM,
-    D3DX_PIXEL_FORMAT_R16G16B16A16_UNORM,
-    D3DX_PIXEL_FORMAT_R16G16_UNORM,
-    D3DX_PIXEL_FORMAT_A8_UNORM,
-    D3DX_PIXEL_FORMAT_DXT1_UNORM,
-    D3DX_PIXEL_FORMAT_DXT2_UNORM,
-    D3DX_PIXEL_FORMAT_DXT3_UNORM,
-    D3DX_PIXEL_FORMAT_DXT4_UNORM,
-    D3DX_PIXEL_FORMAT_DXT5_UNORM,
-    D3DX_PIXEL_FORMAT_R16_FLOAT,
-    D3DX_PIXEL_FORMAT_R16G16_FLOAT,
-    D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT,
-    D3DX_PIXEL_FORMAT_R32_FLOAT,
-    D3DX_PIXEL_FORMAT_R32G32_FLOAT,
-    D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT,
-    D3DX_PIXEL_FORMAT_L8A8_UNORM,
-    D3DX_PIXEL_FORMAT_L4A4_UNORM,
-    D3DX_PIXEL_FORMAT_L8_UNORM,
-    D3DX_PIXEL_FORMAT_L16_UNORM,
-    D3DX_PIXEL_FORMAT_P8_UINT,
-    D3DX_PIXEL_FORMAT_P8_UINT_A8_UNORM,
-    D3DX_PIXEL_FORMAT_U8V8W8Q8_SNORM,
-    D3DX_PIXEL_FORMAT_U8V8_SNORM,
-    D3DX_PIXEL_FORMAT_U16V16_SNORM,
-    D3DX_PIXEL_FORMAT_U8V8_SNORM_L8X8_UNORM,
-    D3DX_PIXEL_FORMAT_U10V10W10_SNORM_A2_UNORM,
-    D3DX_PIXEL_FORMAT_U16V16W16Q16_SNORM,
-    D3DX_PIXEL_FORMAT_R8G8_B8G8_UNORM,
-    D3DX_PIXEL_FORMAT_G8R8_G8B8_UNORM,
-    D3DX_PIXEL_FORMAT_UYVY,
-    D3DX_PIXEL_FORMAT_YUY2,
-    D3DX_PIXEL_FORMAT_COUNT,
-};
-
-enum d3dx_resource_type {
-    D3DX_RESOURCE_TYPE_TEXTURE_2D,
-    D3DX_RESOURCE_TYPE_TEXTURE_3D,
-    D3DX_RESOURCE_TYPE_CUBE_TEXTURE,
-};
-
-enum d3dx_image_file_format
-{
-    D3DX_IMAGE_FILE_FORMAT_BMP  = 0,
-    D3DX_IMAGE_FILE_FORMAT_JPG  = 1,
-    D3DX_IMAGE_FILE_FORMAT_TGA  = 2,
-    D3DX_IMAGE_FILE_FORMAT_PNG  = 3,
-    D3DX_IMAGE_FILE_FORMAT_DDS  = 4,
-    D3DX_IMAGE_FILE_FORMAT_PPM  = 5,
-    D3DX_IMAGE_FILE_FORMAT_DIB  = 6,
-    D3DX_IMAGE_FILE_FORMAT_HDR  = 7,
-    D3DX_IMAGE_FILE_FORMAT_PFM  = 8,
-    D3DX_IMAGE_FILE_FORMAT_FORCE_DWORD = 0x7fffffff
-};
-
-enum component_type {
-    CTYPE_EMPTY = 0x00,
-    CTYPE_UNORM = 0x01,
-    CTYPE_SNORM = 0x02,
-    CTYPE_FLOAT = 0x03,
-    CTYPE_LUMA  = 0x04,
-    CTYPE_INDEX = 0x05,
-};
-
-enum format_flag {
-    FMT_FLAG_NONE = 0x00,
-    FMT_FLAG_DXT  = 0x01,
-    FMT_FLAG_PACKED = 0x02,
-    FMT_FLAG_PM_ALPHA = 0x04,
-};
-
-#define FMT_FLAG_PMA_DXT (FMT_FLAG_DXT | FMT_FLAG_PM_ALPHA)
-
-struct pixel_format_type_desc {
-    enum component_type a_type;
-    enum component_type rgb_type;
-    uint32_t fmt_flags;
-};
-
-struct pixel_format_desc {
-    enum d3dx_pixel_format_id format;
-    BYTE bits[4];
-    BYTE shift[4];
-    UINT bytes_per_pixel;
-    UINT block_width;
-    UINT block_height;
-    UINT block_byte_count;
-    struct pixel_format_type_desc fmt_type_desc;
-};
-
-struct d3dx_pixels
-{
-    const void *data;
-    uint32_t row_pitch;
-    uint32_t slice_pitch;
-    const PALETTEENTRY *palette;
-
-    struct volume size;
-    RECT unaligned_rect;
-};
-
-static inline void set_d3dx_pixels(struct d3dx_pixels *pixels, const void *data, uint32_t row_pitch,
-        uint32_t slice_pitch, const PALETTEENTRY *palette, uint32_t width, uint32_t height, uint32_t depth,
-        const RECT *unaligned_rect)
-{
-    pixels->data = data;
-    pixels->row_pitch = row_pitch;
-    pixels->slice_pitch = slice_pitch;
-    pixels->palette = palette;
-    set_volume_struct(&pixels->size, width, height, depth);
-    pixels->unaligned_rect = *unaligned_rect;
-}
-
-#define D3DX_IMAGE_INFO_ONLY 1
-struct d3dx_image
-{
-    enum d3dx_resource_type resource_type;
-    enum d3dx_pixel_format_id format;
-
-    struct volume size;
-    uint32_t mip_levels;
-    uint32_t layer_count;
-
-    BYTE *pixels;
-    PALETTEENTRY *palette;
-    uint32_t layer_pitch;
-
-    /*
-     * image_buf and image_palette are pointers to allocated memory used to store
-     * image data. If they are non-NULL, they need to be freed when no longer
-     * in use.
-     */
-    void *image_buf;
-    PALETTEENTRY *image_palette;
-
-    enum d3dx_image_file_format image_file_format;
-};
-
-HRESULT d3dx_image_init(const void *src_data, uint32_t src_data_size, struct d3dx_image *image,
-        uint32_t starting_mip_level, uint32_t flags);
-void d3dx_image_cleanup(struct d3dx_image *image);
-HRESULT d3dx_image_get_pixels(struct d3dx_image *image, uint32_t layer, uint32_t mip_level,
-        struct d3dx_pixels *pixels);
 void d3dximage_info_from_d3dx_image(D3DXIMAGE_INFO *info, struct d3dx_image *image);
 
 struct d3dx_include_from_file
@@ -302,6 +197,13 @@ HRESULT map_view_of_file(const WCHAR *filename, void **buffer, DWORD *length);
 HRESULT load_resource_into_memory(HMODULE module, HRSRC resinfo, void **buffer, DWORD *length);
 
 HRESULT write_buffer_to_file(const WCHAR *filename, ID3DXBuffer *buffer);
+
+enum d3dx_pixel_format_id wic_guid_to_d3dx_pixel_format_id(const GUID *guid);
+const GUID *d3dx_pixel_format_id_to_wic_guid(enum d3dx_pixel_format_id format);
+HRESULT d3dx_pixel_format_to_dds_pixel_format(struct dds_pixel_format *pixel_format,
+        enum d3dx_pixel_format_id format);
+HRESULT d3dx_calculate_pixels_size(enum d3dx_pixel_format_id format, uint32_t width, uint32_t height,
+    uint32_t *pitch, uint32_t *size);
 
 D3DFORMAT d3dformat_from_d3dx_pixel_format_id(enum d3dx_pixel_format_id format);
 enum d3dx_pixel_format_id d3dx_pixel_format_id_from_d3dformat(D3DFORMAT format);
