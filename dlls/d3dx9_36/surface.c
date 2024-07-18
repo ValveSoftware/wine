@@ -524,6 +524,9 @@ static UINT calculate_dds_file_size(D3DFORMAT format, UINT width, UINT height, U
     return file_size;
 }
 
+static void copy_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch,
+        BYTE *dst, UINT dst_row_pitch, UINT dst_slice_pitch, const struct volume *size,
+        const struct pixel_format_desc *format);
 static HRESULT save_dds_surface_to_memory(ID3DXBuffer **dst_buffer, IDirect3DSurface9 *src_surface, const RECT *src_rect)
 {
     HRESULT hr;
@@ -1543,6 +1546,20 @@ static BYTE get_channel_from_palette_entry(const PALETTEENTRY *entry, uint32_t c
     }
 }
 
+static void premultiply_alpha(struct vec4 *vec)
+{
+    vec->x *= vec->w;
+    vec->y *= vec->w;
+    vec->z *= vec->w;
+}
+
+static void demultiply_alpha(struct vec4 *vec)
+{
+    vec->x = (vec->w == 0.0f) ? 0.0f : vec->x / vec->w;
+    vec->y = (vec->w == 0.0f) ? 0.0f : vec->y / vec->w;
+    vec->z = (vec->w == 0.0f) ? 0.0f : vec->z / vec->w;
+}
+
 /* It doesn't work for components bigger than 32 bits (or somewhat smaller but unaligned). */
 void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, const PALETTEENTRY *palette,
         struct vec4 *dst)
@@ -1721,7 +1738,7 @@ void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 
  * Works for any pixel format.
  * The source and the destination must be block-aligned.
  */
-void copy_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch,
+static void copy_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch,
         BYTE *dst, UINT dst_row_pitch, UINT dst_slice_pitch, const struct volume *size,
         const struct pixel_format_desc *format)
 {
@@ -1752,14 +1769,15 @@ void copy_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch,
  * any necessary format conversion and color keying.
  * Pixels outsize the source rect are blacked out.
  */
-void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch, const struct volume *src_size,
+static void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch, const struct volume *src_size,
         const struct pixel_format_desc *src_format, BYTE *dst, UINT dst_row_pitch, UINT dst_slice_pitch,
         const struct volume *dst_size, const struct pixel_format_desc *dst_format, D3DCOLOR color_key,
-        const PALETTEENTRY *palette)
+        const PALETTEENTRY *palette, uint32_t filter_flags)
 {
     struct argb_conversion_info conv_info, ck_conv_info;
     const struct pixel_format_desc *ck_format = NULL;
     DWORD channels[4];
+    BOOL src_pma, dst_pma;
     UINT min_width, min_height, min_depth;
     UINT x, y, z;
 
@@ -1771,6 +1789,8 @@ void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pit
     ZeroMemory(channels, sizeof(channels));
     init_argb_conversion_info(src_format, dst_format, &conv_info);
 
+    src_pma = !!(filter_flags & D3DX_FILTER_PMA_IN);
+    dst_pma = !!(filter_flags & D3DX_FILTER_PMA_OUT);
     min_width = min(src_size->width, dst_size->width);
     min_height = min(src_size->height, dst_size->height);
     min_depth = min(src_size->depth, dst_size->depth);
@@ -1791,7 +1811,7 @@ void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pit
             BYTE *dst_ptr = dst_slice_ptr + y * dst_row_pitch;
 
             for (x = 0; x < min_width; x++) {
-                if (format_types_match(src_format, dst_format)
+                if (format_types_match(src_format, dst_format) && filter_flags_match(filter_flags)
                         && src_format->bytes_per_pixel <= 4 && dst_format->bytes_per_pixel <= 4)
                 {
                     DWORD val;
@@ -1815,6 +1835,8 @@ void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pit
                     struct vec4 color, tmp;
 
                     format_to_vec4(src_format, src_ptr, palette, &color);
+                    if (src_pma && src_pma != dst_pma)
+                        demultiply_alpha(&color);
                     tmp = color;
 
                     if (ck_format)
@@ -1827,6 +1849,8 @@ void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pit
                     }
 
                     color = tmp;
+                    if (dst_pma && src_pma != dst_pma)
+                        premultiply_alpha(&color);
                     format_from_vec4(dst_format, &color, &src_format->fmt_type_desc, dst_ptr);
                 }
 
@@ -1852,13 +1876,14 @@ void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pit
  * any necessary format conversion, color keying and stretching
  * using a point filter.
  */
-void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch, const struct volume *src_size,
+static void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch, const struct volume *src_size,
         const struct pixel_format_desc *src_format, BYTE *dst, UINT dst_row_pitch, UINT dst_slice_pitch,
         const struct volume *dst_size, const struct pixel_format_desc *dst_format, D3DCOLOR color_key,
-        const PALETTEENTRY *palette)
+        const PALETTEENTRY *palette, uint32_t filter_flags)
 {
     struct argb_conversion_info conv_info, ck_conv_info;
     const struct pixel_format_desc *ck_format = NULL;
+    BOOL src_pma, dst_pma;
     DWORD channels[4];
     UINT x, y, z;
 
@@ -1867,6 +1892,8 @@ void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slic
             src, src_row_pitch, src_slice_pitch, src_size, src_format, dst, dst_row_pitch, dst_slice_pitch, dst_size,
             dst_format, color_key, palette);
 
+    src_pma = !!(filter_flags & D3DX_FILTER_PMA_IN);
+    dst_pma = !!(filter_flags & D3DX_FILTER_PMA_OUT);
     ZeroMemory(channels, sizeof(channels));
     init_argb_conversion_info(src_format, dst_format, &conv_info);
 
@@ -1891,7 +1918,7 @@ void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slic
             {
                 const BYTE *src_ptr = src_row_ptr + (x * src_size->width / dst_size->width) * src_format->bytes_per_pixel;
 
-                if (format_types_match(src_format, dst_format)
+                if (format_types_match(src_format, dst_format) && filter_flags_match(filter_flags)
                         && src_format->bytes_per_pixel <= 4 && dst_format->bytes_per_pixel <= 4)
                 {
                     DWORD val;
@@ -1915,6 +1942,8 @@ void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slic
                     struct vec4 color, tmp;
 
                     format_to_vec4(src_format, src_ptr, palette, &color);
+                    if (src_pma && src_pma != dst_pma)
+                        demultiply_alpha(&color);
                     tmp = color;
 
                     if (ck_format)
@@ -1927,6 +1956,8 @@ void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slic
                     }
 
                     color = tmp;
+                    if (dst_pma && src_pma != dst_pma)
+                        premultiply_alpha(&color);
                     format_from_vec4(dst_format, &color, &src_format->fmt_type_desc, dst_ptr);
                 }
 
@@ -2075,11 +2106,21 @@ HRESULT d3dx_load_pixels_from_pixels(struct d3dx_pixels *dst_pixels,
        const struct pixel_format_desc *src_desc, uint32_t filter_flags, uint32_t color_key)
 {
     struct volume src_size, dst_size, dst_size_aligned;
+    BOOL src_pma, dst_pma;
     HRESULT hr = S_OK;
 
     TRACE("dst_pixels %s, dst_desc %p, src_pixels %s, src_desc %p, filter_flags %#x, color_key %#x.\n",
             debug_d3dx_pixels(dst_pixels), dst_desc, debug_d3dx_pixels(src_pixels), src_desc,
             filter_flags, color_key);
+
+    if (src_desc->fmt_type_desc.fmt_flags & FMT_FLAG_PM_ALPHA)
+        filter_flags |= D3DX_FILTER_PMA_IN;
+
+    if (dst_desc->fmt_type_desc.fmt_flags & FMT_FLAG_PM_ALPHA)
+        filter_flags |= D3DX_FILTER_PMA_OUT;
+
+    src_pma = !!(filter_flags & D3DX_FILTER_PMA_IN);
+    dst_pma = !!(filter_flags & D3DX_FILTER_PMA_OUT);
 
     if (is_compressed_format(src_desc))
         set_volume_struct(&src_size, (src_pixels->unaligned_rect.right - src_pixels->unaligned_rect.left),
@@ -2099,6 +2140,7 @@ HRESULT d3dx_load_pixels_from_pixels(struct d3dx_pixels *dst_pixels,
             && (dst_size.width == src_size.width && !(dst_size.width % dst_desc->block_width))
             && (dst_size.height == src_size.height && !(dst_size.height % dst_desc->block_height))
             && (dst_size.depth == src_size.depth)
+            && (src_pma == dst_pma)
             && color_key == 0
             && !(src_pixels->unaligned_rect.left & (src_desc->block_width - 1))
             && !(src_pixels->unaligned_rect.top & (src_desc->block_height - 1))
@@ -2206,7 +2248,7 @@ HRESULT d3dx_load_pixels_from_pixels(struct d3dx_pixels *dst_pixels,
     {
         convert_argb_pixels(src_pixels->data, src_pixels->row_pitch, src_pixels->slice_pitch, &src_size, src_desc,
                 (BYTE *)dst_pixels->data, dst_pixels->row_pitch, dst_pixels->slice_pitch, &dst_size, dst_desc,
-                color_key, src_pixels->palette);
+                color_key, src_pixels->palette, filter_flags);
     }
     else /* if ((filter & 0xf) == D3DX_FILTER_POINT) */
     {
@@ -2217,7 +2259,7 @@ HRESULT d3dx_load_pixels_from_pixels(struct d3dx_pixels *dst_pixels,
          * D3DX_FILTER_TRIANGLE and D3DX_FILTER_BOX are implemented. */
         point_filter_argb_pixels(src_pixels->data, src_pixels->row_pitch, src_pixels->slice_pitch, &src_size,
                 src_desc, (BYTE *)dst_pixels->data, dst_pixels->row_pitch, dst_pixels->slice_pitch, &dst_size,
-                dst_desc, color_key, src_pixels->palette);
+                dst_desc, color_key, src_pixels->palette, filter_flags);
     }
 
 exit:
@@ -2737,7 +2779,7 @@ HRESULT WINAPI D3DXSaveSurfaceToFileInMemory(ID3DXBuffer **dst_buffer, D3DXIMAGE
                 goto cleanup;
             }
             convert_argb_pixels(locked_rect.pBits, locked_rect.Pitch, 0, &size, src_format_desc,
-                dst_data, dst_pitch, 0, &size, dst_format_desc, 0, NULL);
+                dst_data, dst_pitch, 0, &size, dst_format_desc, 0, NULL, 0);
             unlock_surface(src_surface, src_rect, temp_surface, FALSE);
 
             IWICBitmapFrameEncode_WritePixels(frame, height, dst_pitch, dst_pitch * height, dst_data);

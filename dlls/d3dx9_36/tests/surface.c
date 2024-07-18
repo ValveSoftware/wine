@@ -1161,7 +1161,7 @@ static void test_dxt_premultiplied_alpha(IDirect3DDevice9 *device)
         for (y = 0; y < 4; ++y)
         {
             for (x = 0; x < 4; ++x)
-                check_readback_pixel_4bpp(&surface_rb, x, y, src_pixels_expected_pma[(y * 4) + x], !!(x & 0x01));
+                check_readback_pixel_4bpp(&surface_rb, x, y, src_pixels_expected_pma[(y * 4) + x], FALSE);
         }
         release_surface_readback(&surface_rb);
 
@@ -1184,7 +1184,7 @@ static void test_dxt_premultiplied_alpha(IDirect3DDevice9 *device)
         for (y = 0; y < 4; ++y)
         {
             for (x = 0; x < 4; ++x)
-                todo_wine check_pixel_4bpp(&lock_rect, x, y, 0x00000000);
+                check_pixel_4bpp(&lock_rect, x, y, 0x00000000);
         }
         IDirect3DSurface9_UnlockRect(decomp_surf);
 
