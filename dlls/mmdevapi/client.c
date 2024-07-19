@@ -880,9 +880,6 @@ static HRESULT WINAPI client_GetService(IAudioClient3 *iface, REFIID riid, void 
     } else if (IsEqualIID(riid, &IID_IAudioClock)) {
         IAudioClock_AddRef(&This->IAudioClock_iface);
         *ppv = &This->IAudioClock_iface;
-    } else if (IsEqualIID(riid, &IID_IAudioClockAdjustment)) {
-        IAudioClockAdjustment_AddRef(&This->IAudioClockAdjustment_iface);
-        *ppv = &This->IAudioClockAdjustment_iface;
     } else if (IsEqualIID(riid, &IID_IAudioStreamVolume)) {
         IAudioStreamVolume_AddRef(&This->IAudioStreamVolume_iface);
         *ppv = &This->IAudioStreamVolume_iface;
