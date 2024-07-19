@@ -356,6 +356,10 @@ NTSTATUS wg_transform_create(void *args)
     switch (input_format.major_type)
     {
         case WG_MAJOR_TYPE_VIDEO_H264:
+            if (!(element = create_element("h264parse", "bad"))
+                    || !append_element(transform->container, element, &first, &last))
+                goto out;
+        /* FALLTHROUGH */
         case WG_MAJOR_TYPE_AUDIO_MPEG1:
         case WG_MAJOR_TYPE_AUDIO_MPEG4:
         case WG_MAJOR_TYPE_AUDIO_WMA:
