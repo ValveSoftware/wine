@@ -1759,6 +1759,12 @@ static void udev_add_device(struct udev_device *dev, int fd)
         close(fd);
         return;
     }
+    else if (strcmp(subsystem, "hidraw"))
+    {
+        TRACE("evdev %s: deferring %s to a different backend\n", debugstr_a(devnode), debugstr_device_desc(&desc));
+        close(fd);
+        return;
+    }
 #ifdef HAS_PROPER_INPUT_HEADER
     else
         desc.is_gamepad = (axes == 6 && buttons >= 14);
