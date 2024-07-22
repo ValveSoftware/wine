@@ -6926,19 +6926,28 @@ NTSTATUS WINAPI NtReadVirtualMemory( HANDLE process, const void *addr, void *buf
 
     if (process == NtCurrentProcess())
     {
-        unix_pid = getpid();
-        status = STATUS_SUCCESS;
-    }
-    else
-    {
-        SERVER_START_REQ( read_process_memory )
+        __TRY
         {
-            req->handle = wine_server_obj_handle( process );
-            status = wine_server_call( req );
-            unix_pid = reply->unix_pid;
+            memmove( buffer, addr, size );
+            status = STATUS_SUCCESS;
         }
-        SERVER_END_REQ;
+        __EXCEPT
+        {
+            status = STATUS_PARTIAL_COPY;
+            size = 0;
+        }
+        __ENDTRY
+        if (bytes_read) *bytes_read = size;
+        return status;
     }
+
+    SERVER_START_REQ( read_process_memory )
+    {
+        req->handle = wine_server_obj_handle( process );
+        status = wine_server_call( req );
+        unix_pid = reply->unix_pid;
+    }
+    SERVER_END_REQ;
 
     if (status)
     {
