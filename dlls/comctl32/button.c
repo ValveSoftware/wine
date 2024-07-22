@@ -608,6 +608,7 @@ static LRESULT CALLBACK BUTTON_WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
 	    SendMessageW( hWnd, BM_SETSTATE, TRUE, 0 );
             infoPtr->state |= BUTTON_BTNPRESSED;
             SetCapture( hWnd );
+            NotifyWinEvent( EVENT_OBJECT_STATECHANGE, hWnd, OBJID_CLIENT, 0 );
 	}
         else if (wParam == VK_UP || wParam == VK_DOWN)
         {
@@ -637,6 +638,7 @@ static LRESULT CALLBACK BUTTON_WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
         SetCapture( hWnd );
         infoPtr->state |= BUTTON_BTNPRESSED;
         SendMessageW( hWnd, BM_SETSTATE, TRUE, 0 );
+        NotifyWinEvent( EVENT_OBJECT_STATECHANGE, hWnd, OBJID_CLIENT, 0 );
         break;
 
     case WM_KEYUP:
@@ -649,6 +651,7 @@ static LRESULT CALLBACK BUTTON_WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
             SendMessageW(hWnd, BCM_SETDROPDOWNSTATE, FALSE, 0);
         if (!(state & BUTTON_BTNPRESSED)) break;
         infoPtr->state &= BUTTON_NSTATES | BST_HOT;
+        NotifyWinEvent( EVENT_OBJECT_STATECHANGE, hWnd, OBJID_CLIENT, 0 );
         if (!(state & BST_PUSHED))
         {
             ReleaseCapture();
@@ -688,6 +691,7 @@ static LRESULT CALLBACK BUTTON_WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
             infoPtr->state &= BUTTON_NSTATES;
             if (infoPtr->state & BST_PUSHED)
                 SendMessageW( hWnd, BM_SETSTATE, FALSE, 0 );
+            NotifyWinEvent( EVENT_OBJECT_STATECHANGE, hWnd, OBJID_CLIENT, 0 );
         }
         break;
 
@@ -717,6 +721,7 @@ static LRESULT CALLBACK BUTTON_WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
     {
         infoPtr->state |= BST_HOT;
         InvalidateRect( hWnd, NULL, FALSE );
+        NotifyWinEvent( EVENT_OBJECT_STATECHANGE, hWnd, OBJID_CLIENT, 0 );
         break;
     }
 
@@ -724,6 +729,7 @@ static LRESULT CALLBACK BUTTON_WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
     {
         infoPtr->state &= ~BST_HOT;
         InvalidateRect( hWnd, NULL, FALSE );
+        NotifyWinEvent( EVENT_OBJECT_STATECHANGE, hWnd, OBJID_CLIENT, 0 );
         break;
     }
 
@@ -858,6 +864,7 @@ static LRESULT CALLBACK BUTTON_WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
     case WM_SETFOCUS:
         TRACE("WM_SETFOCUS %p\n",hWnd);
         infoPtr->state |= BST_FOCUS;
+        NotifyWinEvent( EVENT_OBJECT_STATECHANGE, hWnd, OBJID_CLIENT, 0 );
 
         if (btn_type == BS_OWNERDRAW)
             paint_button( infoPtr, btn_type, ODA_FOCUS );
@@ -871,6 +878,7 @@ static LRESULT CALLBACK BUTTON_WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
     case WM_KILLFOCUS:
         TRACE("WM_KILLFOCUS %p\n",hWnd);
         infoPtr->state &= ~BST_FOCUS;
+        NotifyWinEvent( EVENT_OBJECT_STATECHANGE, hWnd, OBJID_CLIENT, 0 );
 
         if ((infoPtr->state & BUTTON_BTNPRESSED) && GetCapture() == hWnd)
             ReleaseCapture();
@@ -994,6 +1002,7 @@ static LRESULT CALLBACK BUTTON_WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
         if ((infoPtr->state & 3) != wParam)
         {
             infoPtr->state = (infoPtr->state & ~3) | wParam;
+            NotifyWinEvent( EVENT_OBJECT_STATECHANGE, hWnd, OBJID_CLIENT, 0 );
             InvalidateRect( hWnd, NULL, FALSE );
         }
         if ((btn_type == BS_AUTORADIOBUTTON) && (wParam == BST_CHECKED) && (style & WS_CHILD))
@@ -1017,6 +1026,7 @@ static LRESULT CALLBACK BUTTON_WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
             if (btn_type == BS_USERBUTTON)
                 BUTTON_NOTIFY_PARENT( hWnd, (state & BST_PUSHED) ? BN_HILITE : BN_UNHILITE );
             infoPtr->state = state;
+            NotifyWinEvent( EVENT_OBJECT_STATECHANGE, hWnd, OBJID_CLIENT, 0 );
 
             InvalidateRect( hWnd, NULL, FALSE );
         }
@@ -1029,6 +1039,7 @@ static LRESULT CALLBACK BUTTON_WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
         {
             infoPtr->state &= ~BST_DROPDOWNPUSHED;
             infoPtr->state |= new_state;
+            NotifyWinEvent( EVENT_OBJECT_STATECHANGE, hWnd, OBJID_CLIENT, 0 );
             InvalidateRect(hWnd, NULL, FALSE);
         }
         break;
