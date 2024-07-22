@@ -420,14 +420,18 @@ static uint32_t d3dx_calculate_layer_pixels_size(enum d3dx_pixel_format_id forma
 static HRESULT d3dx_initialize_image_from_dds(const void *src_data, uint32_t src_data_size,
         struct d3dx_image *image, uint32_t starting_mip_level)
 {
+    uint32_t expected_src_data_size, header_size;
     const struct dds_header *header = src_data;
-    uint32_t expected_src_data_size;
+    BOOL is_indexed_fmt;
     HRESULT hr;
 
     if (src_data_size < sizeof(*header) || header->pixel_format.size != sizeof(header->pixel_format))
         return D3DXERR_INVALIDDATA;
 
     TRACE("File type is DDS.\n");
+    is_indexed_fmt = !!(header->pixel_format.flags & DDS_PF_INDEXED);
+    header_size = is_indexed_fmt ? sizeof(*header) + DDS_PALETTE_SIZE : sizeof(*header);
+
     set_volume_struct(&image->size, header->width, header->height, 1);
     image->mip_levels = header->miplevels ? header->miplevels : 1;
     image->format = dds_pixel_format_to_d3dx_pixel_format(&header->pixel_format);
@@ -461,9 +465,7 @@ static HRESULT d3dx_initialize_image_from_dds(const void *src_data, uint32_t src
     if (!image->layer_pitch)
         return D3DXERR_INVALIDDATA;
 
-    expected_src_data_size = (image->layer_pitch * image->layer_count) + sizeof(*header);
-    if (header->pixel_format.flags & DDS_PF_INDEXED)
-        expected_src_data_size += DDS_PALETTE_SIZE;
+    expected_src_data_size = (image->layer_pitch * image->layer_count) + header_size;
     if (src_data_size < expected_src_data_size)
     {
         WARN("File is too short %u, expected at least %u bytes.\n", src_data_size, expected_src_data_size);
@@ -471,16 +473,8 @@ static HRESULT d3dx_initialize_image_from_dds(const void *src_data, uint32_t src
     }
 
     image->image_file_format = D3DX_IMAGE_FILE_FORMAT_DDS;
-    if (header->pixel_format.flags & DDS_PF_INDEXED)
-    {
-        image->palette = (PALETTEENTRY *)(((BYTE *)src_data) + sizeof(*header));
-        image->pixels = ((BYTE *)image->palette) + DDS_PALETTE_SIZE;
-    }
-    else
-    {
-        image->palette = NULL;
-        image->pixels = ((BYTE *)src_data) + sizeof(*header);
-    }
+    image->palette = (is_indexed_fmt) ? (PALETTEENTRY *)(((BYTE *)src_data) + sizeof(*header)) : NULL;
+    image->pixels = ((BYTE *)src_data) + header_size;
 
     if (starting_mip_level && (image->mip_levels > 1))
     {
