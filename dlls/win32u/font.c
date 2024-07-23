@@ -5911,11 +5911,12 @@ BOOL WINAPI NtGdiExtTextOutW( HDC hdc, INT x, INT y, UINT flags, const RECT *lpr
     INT char_extra;
     SIZE sz;
     RECT rc;
-    POINT *deltas = NULL, width = {0, 0};
+    POINT *deltas = NULL, width = {0, 0}, text_box_dim[2] = {{ 0 }};
     DC * dc = get_dc_ptr( hdc );
     PHYSDEV physdev;
     INT breakRem;
     static int quietfixme = 0;
+    INT fill_extra_left = 0, fill_extra_right = 0;
 
     if (!dc) return FALSE;
     if (count > INT_MAX) return FALSE;
@@ -6068,12 +6069,22 @@ BOOL WINAPI NtGdiExtTextOutW( HDC hdc, INT x, INT y, UINT flags, const RECT *lpr
             deltas[i].y = desired[1].y - width.y;
 
             width = desired[1];
+            text_box_dim[1] = width;
         }
         flags |= ETO_PDY;
     }
     else
     {
         POINT desired[2];
+        ULONG abc_flags = NTGDI_GETCHARABCWIDTHS_INT;
+        BOOL mirror_x = FALSE, mirror_y = FALSE;
+        ABC abc;
+
+        if (dc->attr->graphics_mode == GM_COMPATIBLE && dc->vport2WorldValid)
+        {
+            mirror_x = dc->xformWorld2Vport.eM11 < 0;
+            mirror_y = dc->xformWorld2Vport.eM22 < 0;
+        }
 
         NtGdiGetTextExtentExW( hdc, str, count, 0, NULL, NULL, &sz, !!(flags & ETO_GLYPH_INDEX) );
         desired[0].x = desired[0].y = 0;
@@ -6083,13 +6094,31 @@ BOOL WINAPI NtGdiExtTextOutW( HDC hdc, INT x, INT y, UINT flags, const RECT *lpr
         desired[1].x -= desired[0].x;
         desired[1].y -= desired[0].y;
 
-        if (dc->attr->graphics_mode == GM_COMPATIBLE)
+        text_box_dim[1].x = sz.cx;
+        if (flags & ETO_GLYPH_INDEX)
+            abc_flags |= NTGDI_GETCHARABCWIDTHS_INDICES;
+
+        memset( &abc, 0, sizeof(abc) );
+        NtGdiGetCharABCWidthsW( hdc, 0, 1, (WCHAR *)str, abc_flags, &abc );
+        if (mirror_x && abc.abcC < 0)       text_box_dim[0].x += abc.abcC;
+        else if (!mirror_x && abc.abcA < 0) text_box_dim[0].x += abc.abcA;
+
+        memset( &abc, 0, sizeof(abc) );
+        NtGdiGetCharABCWidthsW( hdc, 0, 1, (WCHAR *)(str + count - 1), abc_flags, &abc );
+        if (mirror_x && abc.abcA < 0)       text_box_dim[1].x -= abc.abcA;
+        else if (!mirror_x && abc.abcC < 0) text_box_dim[1].x -= abc.abcC;
+
+        lp_to_dp(dc, text_box_dim, 2);
+
+        text_box_dim[0].x -= desired[0].x;
+        text_box_dim[1].x -= desired[0].x;
+        if (mirror_x)
         {
-            if (dc->vport2WorldValid && dc->xformWorld2Vport.eM11 < 0)
-                desired[1].x = -desired[1].x;
-            if (dc->vport2WorldValid && dc->xformWorld2Vport.eM22 < 0)
-                desired[1].y = -desired[1].y;
+            desired[1].x = -desired[1].x;
+            text_box_dim[0].x = -text_box_dim[0].x;
+            text_box_dim[1].x = -text_box_dim[1].x;
         }
+        if (mirror_y) desired[1].y = -desired[1].y;
         width = desired[1];
     }
 
@@ -6146,12 +6175,12 @@ BOOL WINAPI NtGdiExtTextOutW( HDC hdc, INT x, INT y, UINT flags, const RECT *lpr
         if(!((flags & ETO_CLIPPED) && (flags & ETO_OPAQUE)))
         {
             if(!(flags & ETO_OPAQUE) || !lprect ||
-               x < rc.left || x + width.x >= rc.right ||
+               x - fill_extra_left < rc.left || x + width.x + fill_extra_right >= rc.right ||
                y - tm.tmAscent < rc.top || y + tm.tmDescent >= rc.bottom)
             {
                 RECT text_box;
-                text_box.left = x;
-                text_box.right = x + width.x;
+                text_box.left = x + text_box_dim[0].x;
+                text_box.right = x + text_box_dim[1].x;
                 text_box.top = y - tm.tmAscent;
                 text_box.bottom = y + tm.tmDescent;
 
