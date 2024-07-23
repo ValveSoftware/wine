@@ -7931,14 +7931,14 @@ static void test_text_out_fill(void)
     ok(j < r.right, "Expected to find white pixel.\n");
     if (j == r.right)
         goto done;
-    todo_wine ok(j == 10 + neg_a.abcA - 1 || j == 10 + neg_a.abcA, "got %d, neg_a.abcA %d.\n", j, neg_a.abcA);
+    ok(j == 10 + neg_a.abcA - 1 || j == 10 + neg_a.abcA, "got %d, neg_a.abcA %d.\n", j, neg_a.abcA);
 
     for (i = ystart; i < yend; ++i)
     {
         if (data[i * r.right + j] == 0x808080)
             break;
     }
-    todo_wine ok(i == yend, "got i %d, expected %d.\n", i, yend);
+    ok(i == yend, "got i %d, expected %d.\n", i, yend);
 
     for (j = r.right - 1; j >= 0; --j)
     {
@@ -7948,7 +7948,7 @@ static void test_text_out_fill(void)
     ok(j >= 0, "Expected to find white pixel.\n");
     if (j < 0)
         goto done;
-    todo_wine ok(j == 10 + sz.cx - neg_c.abcC || j == 10 + sz.cx - neg_c.abcC - 1, "got %d, neg_c.abcC %ld.\n", j, 10 + sz.cx - neg_c.abcC);
+    ok(j == 10 + sz.cx - neg_c.abcC || j == 10 + sz.cx - neg_c.abcC - 1, "got %d, neg_c.abcC %ld.\n", j, 10 + sz.cx - neg_c.abcC);
     for (i = ystart; i < yend; ++i)
     {
         if (data[i * r.right + j] == 0x808080)
