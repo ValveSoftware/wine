@@ -3123,6 +3123,114 @@ static void test_async_cancel_on_handle_close(void)
     CloseHandle(process_handle);
 }
 
+static void test_pipe_directory_listing(void)
+{
+    HANDLE hdirectory, hdirectory2, hpipe;
+    FILE_DIRECTORY_INFORMATION *info;
+    DWORD length, context, size;
+    OBJECT_ATTRIBUTES attr;
+    LARGE_INTEGER timeout;
+    UNICODE_STRING name;
+    IO_STATUS_BLOCK io;
+    char buffer[1024];
+    NTSTATUS status;
+    BOOL found;
+
+    attr.Length                   = sizeof(attr);
+    attr.Attributes               = OBJ_CASE_INSENSITIVE;
+    attr.SecurityDescriptor       = NULL;
+    attr.SecurityQualityOfService = NULL;
+    attr.RootDirectory            = 0;
+    attr.ObjectName               = &name;
+
+    pRtlInitUnicodeString(&name, L"\\Device\\NamedPipe\\");
+    attr.RootDirectory            = 0;
+    attr.ObjectName               = &name;
+
+    status = pNtCreateDirectoryObject(&hdirectory, GENERIC_READ | SYNCHRONIZE, &attr);
+    todo_wine ok(status == STATUS_OBJECT_TYPE_MISMATCH, "Got unexpected status %#lx.\n", status);
+
+    status = NtCreateFile(&hdirectory, SYNCHRONIZE, &attr, &io, NULL, 0,
+            FILE_SHARE_READ|FILE_SHARE_WRITE, FILE_OPEN, 0, NULL, 0 );
+    ok(!status, "got %#lx.\n", status);
+    status = NtQueryDirectoryFile( hdirectory, 0, NULL, NULL, &io, buffer, sizeof(buffer),
+                                   FileDirectoryInformation, TRUE, NULL, FALSE );
+    ok(status == STATUS_ACCESS_DENIED, "got %#lx.\n", status);
+    CloseHandle( hdirectory );
+
+    status = NtCreateFile(&hdirectory, FILE_LIST_DIRECTORY | SYNCHRONIZE, &attr, &io, NULL, 0,
+            FILE_SHARE_READ|FILE_SHARE_WRITE, FILE_OPEN, 0, NULL, 0 );
+    ok(!status, "got %#lx.\n", status);
+
+    attr.RootDirectory = 0;
+    pRtlInitUnicodeString( &name, L"\\??\\pipe\\test_pipe" );
+    timeout.QuadPart = -(LONG64)10000000;
+    status = pNtCreateNamedPipeFile(&hpipe, GENERIC_READ | SYNCHRONIZE, &attr,
+            &io, FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_CREATE, FILE_SYNCHRONOUS_IO_NONALERT,
+            0, 0, 0, 3, 4096, 4096, &timeout);
+    ok(!status, "got %#lx.\n", status);
+
+    status = NtQueryDirectoryFile( hdirectory, 0, NULL, NULL, &io, buffer, 1,
+                                   FileDirectoryInformation, TRUE, NULL, FALSE );
+    ok(status == STATUS_INFO_LENGTH_MISMATCH, "got %#lx.\n", status);
+
+    memset( buffer, 0xcc, sizeof(buffer) );
+    status = NtQueryDirectoryFile( hdirectory, 0, NULL, NULL, &io, buffer, sizeof(buffer),
+                                   FileDirectoryInformation, TRUE, NULL, FALSE );
+    ok(!status, "got %#lx.\n", status);
+    info = (void *)buffer;
+    length = offsetof(FILE_DIRECTORY_INFORMATION, FileName) + info->FileNameLength;
+    ok( !io.Status, "got %#lx.\n", io.Status );
+    ok( io.Information == length, "got %Iu, expected %lu.\n", io.Information, length );
+    found = FALSE;
+    while (!status)
+    {
+        length = info->FileNameLength / sizeof(WCHAR);
+        ok(info->FileName[length] == 0xcccc, "got %#x.\n", info->FileName[length]);
+        if (!found && length == 9 && !wcsnicmp( L"test_pipe", info->FileName, 9 ))
+            found = TRUE;
+        memset( buffer, 0xcc, sizeof(buffer) );
+        status = NtQueryDirectoryFile( hdirectory, 0, NULL, NULL, &io, buffer, sizeof(buffer),
+                                       FileDirectoryInformation, TRUE, NULL, FALSE );
+        ok(!status || status == STATUS_NO_MORE_FILES, "got %#lx.\n", status);
+        ok( io.Status == status, "got %#lx.\n", io.Status);
+    }
+    ok( !io.Information, "got %Iu.\n", io.Information );
+    ok( found, "test_pipe not found.\n" );
+    status = NtQueryDirectoryFile( hdirectory, 0, NULL, NULL, &io, buffer, sizeof(buffer),
+                                   FileDirectoryInformation, TRUE, NULL, FALSE );
+    ok( status == STATUS_NO_MORE_FILES, "Got unexpected status %#lx.\n", status );
+
+    pRtlInitUnicodeString(&name, L"\\Device\\NamedPipe\\");
+    attr.RootDirectory            = 0;
+    attr.ObjectName               = &name;
+    status = NtCreateFile(&hdirectory2, FILE_LIST_DIRECTORY | SYNCHRONIZE, &attr, &io, NULL, 0,
+            FILE_SHARE_READ|FILE_SHARE_WRITE, FILE_OPEN, 0, NULL, 0 );
+    ok(!status, "got %#lx.\n", status);
+    status = NtQueryDirectoryFile( hdirectory2, 0, NULL, NULL, &io, buffer, sizeof(buffer),
+                                   FileDirectoryInformation, TRUE, NULL, FALSE );
+    ok( !status, "got %#lx.\n", status);
+    CloseHandle( hdirectory2 );
+
+    status = NtQueryDirectoryObject( hdirectory, (void *)buffer, sizeof(buffer), TRUE, TRUE, &context, &size );
+    ok( status == STATUS_OBJECT_TYPE_MISMATCH, "got %#lx\n", status );
+    CloseHandle( hdirectory );
+
+    pRtlInitUnicodeString(&name, L"\\Device\\NamedPipe\\");
+    attr.RootDirectory            = 0;
+    attr.ObjectName               = &name;
+    status = NtCreateFile(&hdirectory, FILE_LIST_DIRECTORY | SYNCHRONIZE, &attr, &io, NULL, 0,
+            FILE_SHARE_READ|FILE_SHARE_WRITE, FILE_OPEN, 0, NULL, 0 );
+    ok(!status, "got %#lx.\n", status);
+
+    status = NtQueryDirectoryFile( hdirectory, 0, NULL, NULL, &io, buffer, sizeof(buffer),
+                                   FileDirectoryInformation, TRUE, NULL, FALSE );
+    ok(!status, "got %#lx.\n", status);
+
+    CloseHandle( hpipe );
+    CloseHandle( hdirectory );
+}
+
 START_TEST(pipe)
 {
     char **argv;
@@ -3202,4 +3310,5 @@ START_TEST(pipe)
     pipe_for_each_state(create_pipe_server, connect_pipe, test_pipe_state);
     pipe_for_each_state(create_pipe_server, connect_and_write_pipe, test_pipe_with_data_state);
     pipe_for_each_state(create_local_info_test_pipe, connect_pipe_reader, test_pipe_local_info);
+    test_pipe_directory_listing();
 }
