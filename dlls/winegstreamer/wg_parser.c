@@ -633,7 +633,8 @@ static gboolean autoplug_continue_cb(GstElement * decodebin, GstPad *pad, GstCap
     gst_object_unref(element);
 
     name = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(factory));
-    if (!strcmp(name, "protonvideoconverter") || !strcmp(name, "protonaudioconverter"))
+    // proton converters and hls demux always need additional demuxing
+    if (!strcmp(name, "protonvideoconverter") || !strcmp(name, "protonaudioconverter") || !strcmp(name, "hlsdemux"))
         return true;
 
     GST_TRACE("factory %"GST_PTR_FORMAT" element %"GST_PTR_FORMAT" pad %"GST_PTR_FORMAT" caps %"GST_PTR_FORMAT"", factory, element, pad, caps);
