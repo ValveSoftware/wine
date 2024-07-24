@@ -2624,6 +2624,57 @@ static unsigned int get_cached_dir_data( HANDLE handle, struct dir_data **data_r
     return status;
 }
 
+static NTSTATUS server_query_directory_file( HANDLE handle, IO_STATUS_BLOCK *io, void *buffer, ULONG length,
+                                             FILE_INFORMATION_CLASS info_class, BOOLEAN single_entry,
+                                             BOOLEAN restart_scan )
+{
+    FILE_DIRECTORY_INFORMATION *info = (FILE_DIRECTORY_INFORMATION *)buffer;
+    struct directory_file_entry *entries;
+    unsigned int total_len;
+    NTSTATUS status;
+
+    if (!(entries = malloc( length ))) return STATUS_NO_MEMORY;
+
+    SERVER_START_REQ( query_directory_file )
+    {
+        req->handle = wine_server_obj_handle( handle );;
+        req->restart_scan = restart_scan;
+        wine_server_set_reply( req, entries, length );
+        status = wine_server_call( req );
+        total_len = reply->total_len;
+        if (status == STATUS_OBJECT_TYPE_MISMATCH) status = STATUS_BAD_DEVICE_TYPE;
+    }
+    SERVER_END_REQ;
+
+    if (!status && offsetof(FILE_DIRECTORY_INFORMATION, FileName) + total_len > length)
+        status = STATUS_INFO_LENGTH_MISMATCH;
+
+    io->Status = status;
+    io->Information = 0;
+    if (!status)
+    {
+        static int once;
+
+        if (info_class != FileDirectoryInformation)
+        {
+            FIXME( "Unsupprted info_class %d.\n", info_class );
+            free( entries );
+            return STATUS_NOT_SUPPORTED;
+        }
+        if (!single_entry) FIXME( "Multiple entries not supported.\n" );
+
+        memset( info, 0, sizeof(*info) );
+        if (!once++) FIXME( "Not filling attributes." );
+        info->FileNameLength = entries->name_len;
+        memcpy( info->FileName, entries + 1, entries->name_len );
+        io->Information = offsetof(FILE_DIRECTORY_INFORMATION, FileName) + total_len;
+        TRACE( "-> %s.\n", debugstr_wn(info->FileName, info->FileNameLength / 2) );
+    }
+    else TRACE( "-> status %#x.\n", (int)status );
+
+    free( entries );
+    return status;
+}
 
 /******************************************************************************
  *              NtQueryDirectoryFile   (NTDLL.@)
@@ -2674,7 +2725,11 @@ NTSTATUS WINAPI NtQueryDirectoryFile( HANDLE handle, HANDLE event, PIO_APC_ROUTI
     if (!buffer) return STATUS_ACCESS_VIOLATION;
 
     if ((status = server_get_unix_fd( handle, FILE_LIST_DIRECTORY, &fd, &needs_close, &type, NULL )))
+    {
+        if (status == STATUS_BAD_DEVICE_TYPE)
+            return server_query_directory_file( handle, io, buffer, length, info_class, single_entry, restart_scan);
         return status;
+    }
 
     if (type != FD_TYPE_DIR)
     {
