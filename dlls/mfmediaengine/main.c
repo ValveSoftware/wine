@@ -810,55 +810,41 @@ static unsigned int get_gcd(unsigned int a, unsigned int b)
     return a;
 }
 
-static void media_engine_get_frame_size(struct media_engine *engine, IMFTopology *topology)
+static void media_engine_get_frame_size(struct media_engine *engine)
 {
     IMFMediaTypeHandler *handler;
     IMFMediaType *media_type;
-    IMFStreamDescriptor *sd;
-    IMFTopologyNode *node;
-    unsigned int gcd;
-    UINT64 size;
-    HRESULT hr;
 
     engine->video_frame.size.cx = 0;
     engine->video_frame.size.cy = 0;
     engine->video_frame.ratio.cx = 1;
     engine->video_frame.ratio.cy = 1;
 
-    if (FAILED(IMFTopology_GetNodeByID(topology, engine->video_frame.node_id, &node)))
-        return;
+    video_frame_sink_query_iface(engine->presentation.frame_sink, &IID_IMFMediaTypeHandler, (void**)&handler);
+    if (SUCCEEDED(IMFMediaTypeHandler_GetCurrentMediaType(handler, &media_type)))
+    {
+        UINT64 size;
+        HRESULT hr = IMFMediaType_GetUINT64(media_type, &MF_MT_FRAME_SIZE, &size);
+        if (SUCCEEDED(hr))
+        {
+            unsigned int gcd;
+            engine->video_frame.size.cx = size >> 32;
+            engine->video_frame.size.cy = size;
 
-    hr = IMFTopologyNode_GetUnknown(node, &MF_TOPONODE_STREAM_DESCRIPTOR,
-            &IID_IMFStreamDescriptor, (void **)&sd);
-    IMFTopologyNode_Release(node);
-    if (FAILED(hr))
-        return;
+            if ((gcd = get_gcd(engine->video_frame.size.cx, engine->video_frame.size.cy)))
+            {
+                engine->video_frame.ratio.cx = engine->video_frame.size.cx / gcd;
+                engine->video_frame.ratio.cy = engine->video_frame.size.cy / gcd;
+            }
+        }
+        else
+        {
+            WARN("Failed to get frame size %#lx.\n", hr);
+        }
 
-    hr = IMFStreamDescriptor_GetMediaTypeHandler(sd, &handler);
-    IMFStreamDescriptor_Release(sd);
-    if (FAILED(hr))
-        return;
-
-    hr = IMFMediaTypeHandler_GetCurrentMediaType(handler, &media_type);
+        IMFMediaType_Release(media_type);
+    }
     IMFMediaTypeHandler_Release(handler);
-    if (FAILED(hr))
-    {
-        WARN("Failed to get current media type %#lx.\n", hr);
-        return;
-    }
-
-    IMFMediaType_GetUINT64(media_type, &MF_MT_FRAME_SIZE, &size);
-
-    engine->video_frame.size.cx = size >> 32;
-    engine->video_frame.size.cy = size;
-
-    if ((gcd = get_gcd(engine->video_frame.size.cx, engine->video_frame.size.cy)))
-    {
-        engine->video_frame.ratio.cx = engine->video_frame.size.cx / gcd;
-        engine->video_frame.ratio.cy = engine->video_frame.size.cy / gcd;
-    }
-
-    IMFMediaType_Release(media_type);
 }
 
 static void media_engine_apply_volume(const struct media_engine *engine)
@@ -940,24 +926,11 @@ static HRESULT WINAPI media_engine_session_events_Invoke(IMFAsyncCallback *iface
         case MESessionTopologyStatus:
         {
             UINT32 topo_status = 0;
-            IMFTopology *topology;
             PROPVARIANT value;
 
             IMFMediaEvent_GetUINT32(event, &MF_EVENT_TOPOLOGY_STATUS, &topo_status);
             if (topo_status != MF_TOPOSTATUS_READY)
                 break;
-
-            value.vt = VT_EMPTY;
-            if (FAILED(IMFMediaEvent_GetValue(event, &value)))
-                break;
-
-            if (value.vt != VT_UNKNOWN)
-            {
-                PropVariantClear(&value);
-                break;
-            }
-
-            topology = (IMFTopology *)value.punkVal;
 
             EnterCriticalSection(&engine->cs);
 
@@ -965,7 +938,7 @@ static HRESULT WINAPI media_engine_session_events_Invoke(IMFAsyncCallback *iface
 
             engine->ready_state = MF_MEDIA_ENGINE_READY_HAVE_METADATA;
 
-            media_engine_get_frame_size(engine, topology);
+            media_engine_get_frame_size(engine);
 
             IMFMediaEngineNotify_EventNotify(engine->callback, MF_MEDIA_ENGINE_EVENT_DURATIONCHANGE, 0, 0);
             IMFMediaEngineNotify_EventNotify(engine->callback, MF_MEDIA_ENGINE_EVENT_LOADEDMETADATA, 0, 0);
