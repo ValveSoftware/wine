@@ -993,6 +993,12 @@ struct obj_locator
 #define WH_WINEVENT      (WH_MAXHOOK + 1)
 #define NB_HOOKS         (WH_WINEVENT - WH_MINHOOK + 1)
 
+struct directory_file_entry
+{
+    data_size_t name_len;
+    /* VARARG(name,unicode_str,name_len); */
+};
+
 struct shared_cursor
 {
     int                  x;                /* cursor position */
@@ -3696,6 +3702,13 @@ struct handle_info
     VARARG(entries,directory_entries);
 @END
 
+@REQ(query_directory_file)
+    obj_handle_t   handle;
+    unsigned int   restart_scan;
+@REPLY
+    data_size_t    total_len;          /* total length needed for strings */
+    VARARG(entries,directory_file_entries);
+@END
 
 /* Create a symbolic link object */
 @REQ(create_symlink)

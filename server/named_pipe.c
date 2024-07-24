@@ -34,6 +34,7 @@
 #include "windef.h"
 #include "winternl.h"
 #include "winioctl.h"
+#include "ddk/wdm.h"
 
 #include "file.h"
 #include "handle.h"
@@ -101,6 +102,8 @@ struct named_pipe_device_file
     struct object             obj;         /* object header */
     struct fd                *fd;          /* pseudo-fd for ioctls */
     struct named_pipe_device *device;      /* named pipe device */
+    struct process     *enum_client_process;
+    unsigned int        enum_index;
 };
 
 static void named_pipe_dump( struct object *obj, int verbose );
@@ -335,6 +338,7 @@ static struct object *named_pipe_dir_lookup_name( struct object *obj, struct uni
                                                   unsigned int attr, struct object *root );
 static struct object *named_pipe_dir_open_file( struct object *obj, unsigned int access,
                                                 unsigned int sharing, unsigned int options );
+static int named_pipe_dir_close_handle( struct object *obj, struct process *process, obj_handle_t handle );
 static void named_pipe_dir_destroy( struct object *obj );
 
 static const struct object_ops named_pipe_dir_ops =
@@ -358,7 +362,7 @@ static const struct object_ops named_pipe_dir_ops =
     NULL,                                    /* unlink_name */
     named_pipe_dir_open_file,                /* open_file */
     no_kernel_obj_list,                      /* get_kernel_obj_list */
-    no_close_handle,                         /* close_handle */
+    named_pipe_dir_close_handle,             /* close_handle */
     named_pipe_dir_destroy                   /* destroy */
 };
 
@@ -576,6 +580,8 @@ static struct object *named_pipe_device_lookup_name( struct object *obj, struct 
 
         dir->fd = NULL;  /* defer alloc_pseudo_fd() until after we have options */
         dir->device = (struct named_pipe_device *)grab_object( obj );
+        dir->enum_client_process = NULL;
+        dir->enum_index = 0;
 
         return &dir->obj;
     }
@@ -593,6 +599,8 @@ static struct object *named_pipe_device_open_file( struct object *obj, unsigned 
 
     if (!(file = alloc_object( &named_pipe_device_file_ops ))) return NULL;
     file->device = (struct named_pipe_device *)grab_object( obj );
+    file->enum_client_process = NULL;
+    file->enum_index = 0;
     if (!(file->fd = alloc_pseudo_fd( &named_pipe_device_fd_ops, obj, options )))
     {
         release_object( file );
@@ -651,10 +659,18 @@ static enum server_fd_type named_pipe_device_file_get_fd_type( struct fd *fd )
     return FD_TYPE_DEVICE;
 }
 
+static void release_enum( struct named_pipe_device_file *file )
+{
+    if (!file->enum_client_process) return;
+    release_object( file->enum_client_process );
+    file->enum_client_process = NULL;
+}
+
 static void named_pipe_device_file_destroy( struct object *obj )
 {
     struct named_pipe_device_file *file = (struct named_pipe_device_file*)obj;
     assert( obj->ops == &named_pipe_device_file_ops );
+    release_enum( file );
     if (file->fd) release_object( file->fd );
     release_object( file->device );
 }
@@ -723,10 +739,20 @@ static struct object *named_pipe_dir_open_file( struct object *obj, unsigned int
     return grab_object( obj );
 }
 
+static int named_pipe_dir_close_handle( struct object *obj, struct process *process, obj_handle_t handle )
+{
+    struct named_pipe_device_file *file = (struct named_pipe_device_file *)obj;
+    assert( obj->ops == &named_pipe_dir_ops );
+
+    release_enum( file );
+    return 1;
+}
+
 static void named_pipe_dir_destroy( struct object *obj )
 {
     struct named_pipe_device_file *file = (struct named_pipe_device_file *)obj;
     assert( obj->ops == &named_pipe_dir_ops );
+    release_enum( file );
     if (file->fd) release_object( file->fd );
     release_object( file->device );
 }
@@ -1719,4 +1745,61 @@ DECL_HANDLER(set_named_pipe_info)
     }
 
     release_object( pipe_end );
+}
+
+DECL_HANDLER(query_directory_file)
+{
+    struct named_pipe_device_file *file;
+    struct directory_file_entry entry;
+    struct unicode_str name;
+    struct named_pipe *pipe;
+    size_t entry_size;
+    char *buffer;
+
+    file = (struct named_pipe_device_file *)get_handle_obj( current->process, req->handle,
+                                                            DIRECTORY_QUERY, &named_pipe_dir_ops );
+    if (!file) return;
+
+    reply->total_len = 0;
+    if (!file->enum_client_process)
+    {
+        file->enum_client_process = (struct process *)grab_object( current->process );
+        file->enum_index = 0;
+    }
+
+    if (file->enum_client_process != current->process)
+    {
+        release_object( file );
+        set_error( STATUS_SHARING_VIOLATION );
+        return;
+    }
+
+    if (req->restart_scan) file->enum_index = 0;
+    if (!(pipe = (struct named_pipe *)find_object_index( file->device->pipes, file->enum_index )))
+    {
+        release_object( file );
+        set_error( STATUS_NO_MORE_FILES );
+        return;
+    }
+
+    assert( pipe->obj.ops == &named_pipe_ops );
+
+    name.str = get_object_name( &pipe->obj, &name.len );
+    entry_size = (sizeof(entry) + name.len + 3) & ~3;
+    if (entry_size > get_reply_max_size())
+    {
+        set_error( STATUS_INFO_LENGTH_MISMATCH );
+        goto done;
+    }
+    entry.name_len = name.len;
+    reply->total_len = entry.name_len;
+
+    if (!(buffer = set_reply_data_size( entry_size ))) goto done;
+    memcpy( buffer, &entry, sizeof(entry) );
+    memcpy( buffer + sizeof(entry), name.str, name.len );
+
+    ++file->enum_index;
+done:
+    release_object( &pipe->obj );
+    release_object( file );
 }

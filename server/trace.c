@@ -1439,6 +1439,29 @@ static void dump_varargs_cpu_topology_override( const char *prefix, data_size_t 
     remove_data( size );
 }
 
+static void dump_varargs_directory_file_entries( const char *prefix, data_size_t size )
+{
+    const struct directory_file_entry *entry = cur_data;
+    const WCHAR *str;
+
+    fprintf( stderr, "%s{", prefix );
+    if (size)
+    {
+        if (size < sizeof(*entry) || size - sizeof(*entry) < entry->name_len)
+        {
+            fprintf( stderr, "***invalid***}" );
+            remove_data( size );
+            return;
+        }
+        str = (const WCHAR *)(entry + 1);
+        fprintf( stderr, "{name=L\"" );
+        dump_strW( str, entry->name_len, stderr, "\"\"" );
+        fprintf( stderr, "\"}" );
+        remove_data( size );
+    }
+    fputc( '}', stderr );
+}
+
 static void dump_varargs_tcp_connections( const char *prefix, data_size_t size )
 {
     static const char * const state_names[] = {
