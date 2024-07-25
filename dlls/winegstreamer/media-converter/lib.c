@@ -100,7 +100,7 @@ static bool create_all_dir(const char *dir)
     return true;
 }
 
-static int create_file(const char *file_name)
+int create_file(const char *file_name)
 {
     int fd, ret = CONV_OK;
     char dir[4096];
