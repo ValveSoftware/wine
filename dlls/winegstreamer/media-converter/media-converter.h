@@ -166,6 +166,7 @@ struct fozdb
 
 /* lib.c. */
 extern bool open_file(const char *file_name, int open_flags, int *out_fd);
+extern int create_file(const char *file_name);
 extern bool get_file_size(int fd, uint64_t *file_size);
 extern bool complete_read(int file, void *buffer, size_t size);
 extern bool complete_write(int file, const void *buffer, size_t size);
