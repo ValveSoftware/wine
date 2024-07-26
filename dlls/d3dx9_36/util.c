@@ -24,6 +24,8 @@ WINE_DEFAULT_DEBUG_CHANNEL(d3dx);
 
 D3DFORMAT d3dformat_from_d3dx_pixel_format_id(enum d3dx_pixel_format_id format)
 {
+    const struct pixel_format_desc *fmt_desc = get_d3dx_pixel_format_info(format);
+
     switch (format)
     {
     case D3DX_PIXEL_FORMAT_B8G8R8_UNORM:             return D3DFMT_R8G8B8;
@@ -71,7 +73,9 @@ D3DFORMAT d3dformat_from_d3dx_pixel_format_id(enum d3dx_pixel_format_id format)
     case D3DX_PIXEL_FORMAT_UYVY:                     return D3DFMT_UYVY;
     case D3DX_PIXEL_FORMAT_YUY2:                     return D3DFMT_YUY2;
     default:
-        FIXME("Unknown d3dx_pixel_format_id %#x.\n", format);
+        /* Don't print the FIXME for formats that are DXGI only. */
+        if (!(fmt_desc->fmt_type_desc.fmt_flags & FMT_FLAG_DXGI))
+            FIXME("Unknown d3dx_pixel_format_id %#x.\n", format);
         return D3DFMT_UNKNOWN;
     }
 }

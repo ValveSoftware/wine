@@ -78,6 +78,10 @@ static DXGI_FORMAT dxgi_format_from_dds_d3dx_pixel_format_id(enum d3dx_pixel_for
     case D3DX_PIXEL_FORMAT_DXT3_UNORM:               return DXGI_FORMAT_BC2_UNORM;
     case D3DX_PIXEL_FORMAT_DXT4_UNORM:               return DXGI_FORMAT_BC3_UNORM;
     case D3DX_PIXEL_FORMAT_DXT5_UNORM:               return DXGI_FORMAT_BC3_UNORM;
+    case D3DX_PIXEL_FORMAT_BC4_UNORM:                return DXGI_FORMAT_BC4_UNORM;
+    case D3DX_PIXEL_FORMAT_BC4_SNORM:                return DXGI_FORMAT_BC4_SNORM;
+    case D3DX_PIXEL_FORMAT_BC5_UNORM:                return DXGI_FORMAT_BC5_UNORM;
+    case D3DX_PIXEL_FORMAT_BC5_SNORM:                return DXGI_FORMAT_BC5_SNORM;
 
     /* These formats are known and explicitly unsupported. */
     case D3DX_PIXEL_FORMAT_U8V8W8Q8_SNORM:
@@ -104,6 +108,9 @@ static DXGI_FORMAT dxgi_format_from_d3dx_pixel_format_id(enum d3dx_pixel_format_
     case D3DX_PIXEL_FORMAT_B8G8R8X8_UNORM:          return DXGI_FORMAT_B8G8R8X8_UNORM;
     case D3DX_PIXEL_FORMAT_R10G10B10A2_UNORM:       return DXGI_FORMAT_R10G10B10A2_UNORM;
     case D3DX_PIXEL_FORMAT_R16G16B16A16_UNORM:      return DXGI_FORMAT_R16G16B16A16_UNORM;
+    case D3DX_PIXEL_FORMAT_R8_UNORM:                return DXGI_FORMAT_R8_UNORM;
+    case D3DX_PIXEL_FORMAT_R8G8_UNORM:              return DXGI_FORMAT_R8G8_UNORM;
+    case D3DX_PIXEL_FORMAT_R16_UNORM:               return DXGI_FORMAT_R16_UNORM;
     case D3DX_PIXEL_FORMAT_R16G16_UNORM:            return DXGI_FORMAT_R16G16_UNORM;
     case D3DX_PIXEL_FORMAT_A8_UNORM:                return DXGI_FORMAT_A8_UNORM;
     case D3DX_PIXEL_FORMAT_R16_FLOAT:               return DXGI_FORMAT_R16_FLOAT;
@@ -111,12 +118,17 @@ static DXGI_FORMAT dxgi_format_from_d3dx_pixel_format_id(enum d3dx_pixel_format_
     case D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT:      return DXGI_FORMAT_R16G16B16A16_FLOAT;
     case D3DX_PIXEL_FORMAT_R32_FLOAT:               return DXGI_FORMAT_R32_FLOAT;
     case D3DX_PIXEL_FORMAT_R32G32_FLOAT:            return DXGI_FORMAT_R32G32_FLOAT;
+    case D3DX_PIXEL_FORMAT_R32G32B32_FLOAT:         return DXGI_FORMAT_R32G32B32_FLOAT;
     case D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT:      return DXGI_FORMAT_R32G32B32A32_FLOAT;
     case D3DX_PIXEL_FORMAT_G8R8_G8B8_UNORM:         return DXGI_FORMAT_G8R8_G8B8_UNORM;
     case D3DX_PIXEL_FORMAT_R8G8_B8G8_UNORM:         return DXGI_FORMAT_R8G8_B8G8_UNORM;
     case D3DX_PIXEL_FORMAT_DXT1_UNORM:              return DXGI_FORMAT_BC1_UNORM;
     case D3DX_PIXEL_FORMAT_DXT3_UNORM:              return DXGI_FORMAT_BC2_UNORM;
     case D3DX_PIXEL_FORMAT_DXT5_UNORM:              return DXGI_FORMAT_BC3_UNORM;
+    case D3DX_PIXEL_FORMAT_BC4_UNORM:               return DXGI_FORMAT_BC4_UNORM;
+    case D3DX_PIXEL_FORMAT_BC4_SNORM:               return DXGI_FORMAT_BC4_SNORM;
+    case D3DX_PIXEL_FORMAT_BC5_UNORM:               return DXGI_FORMAT_BC5_UNORM;
+    case D3DX_PIXEL_FORMAT_BC5_SNORM:               return DXGI_FORMAT_BC5_SNORM;
     case D3DX_PIXEL_FORMAT_R16G16B16A16_SNORM:      return DXGI_FORMAT_R16G16B16A16_SNORM;
     case D3DX_PIXEL_FORMAT_R8G8B8A8_SNORM:          return DXGI_FORMAT_R8G8B8A8_SNORM;
     case D3DX_PIXEL_FORMAT_R8G8_SNORM:              return DXGI_FORMAT_R8G8_SNORM;
@@ -605,7 +617,6 @@ HRESULT get_image_info(const void *data, SIZE_T size, D3DX10_IMAGE_INFO *img_inf
     IWICImagingFactory *factory = NULL;
     IWICDdsDecoder *dds_decoder = NULL;
     IWICBitmapDecoder *decoder = NULL;
-    WICDdsParameters dds_params;
     IWICStream *stream = NULL;
     unsigned int frame_count;
     struct d3dx_image image;
@@ -617,11 +628,9 @@ HRESULT get_image_info(const void *data, SIZE_T size, D3DX10_IMAGE_INFO *img_inf
 
     if (SUCCEEDED(d3dx_image_init(data, size, &image, 0, D3DX_IMAGE_INFO_ONLY | D3DX_IMAGE_SUPPORT_DXT10)))
     {
-        if (SUCCEEDED(d3dx10_image_info_from_d3dx_image(img_info, &image)))
-        {
-            TRACE("Successfully retrieved image info from shared code.\n");
-            return S_OK;
-        }
+        if (image.image_file_format == D3DX_IMAGE_FILE_FORMAT_DDS ||
+                image.image_file_format == D3DX_IMAGE_FILE_FORMAT_DDS_DXT10)
+            return d3dx10_image_info_from_d3dx_image(img_info, &image);
     }
 
     WICCreateImagingFactory_Proxy(WINCODEC_SDK_VERSION, &factory);
@@ -659,33 +668,16 @@ HRESULT get_image_info(const void *data, SIZE_T size, D3DX10_IMAGE_INFO *img_inf
 
     if (img_info->ImageFileFormat == D3DX10_IFF_DDS)
     {
-        hr = IWICBitmapDecoder_QueryInterface(decoder, &IID_IWICDdsDecoder, (void **)&dds_decoder);
-        if (FAILED(hr))
-            goto end;
-        hr = IWICDdsDecoder_GetParameters(dds_decoder, &dds_params);
-        if (FAILED(hr))
-            goto end;
-        img_info->ArraySize = dds_params.ArraySize;
-        img_info->Depth = dds_params.Depth;
-        img_info->MipLevels = dds_params.MipLevels;
-        img_info->ResourceDimension = wic_dimension_to_d3dx10_dimension(dds_params.Dimension);
-        img_info->Format = get_d3dx10_dds_format(dds_params.DxgiFormat);
-        img_info->MiscFlags = 0;
-        if (dds_params.Dimension == WICDdsTextureCube)
-        {
-            img_info->MiscFlags = D3D10_RESOURCE_MISC_TEXTURECUBE;
-            img_info->ArraySize *= 6;
-        }
+        hr = E_FAIL;
+        goto end;
     }
-    else
-    {
-        img_info->ArraySize = 1;
-        img_info->Depth = 1;
-        img_info->MipLevels = 1;
-        img_info->ResourceDimension = D3D10_RESOURCE_DIMENSION_TEXTURE2D;
-        img_info->Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        img_info->MiscFlags = 0;
-    }
+
+    img_info->ArraySize = 1;
+    img_info->Depth = 1;
+    img_info->MipLevels = 1;
+    img_info->ResourceDimension = D3D10_RESOURCE_DIMENSION_TEXTURE2D;
+    img_info->Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    img_info->MiscFlags = 0;
 
 end:
     if (dds_decoder)
