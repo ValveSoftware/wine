@@ -727,19 +727,25 @@ static BOOL image_is_argb(IWICBitmapFrameDecode *frame, struct d3dx_image *image
     return FALSE;
 }
 
+#define FILE_FORMAT_FLAG_DX9 1
+#define FILE_FORMAT_FLAG_DX10 2
 struct d3dx_wic_file_format
 {
     const GUID *wic_container_guid;
     enum d3dx_image_file_format d3dx_file_format;
+    uint32_t file_format_flag;
 };
 
 /* Sorted by GUID. */
 static const struct d3dx_wic_file_format file_formats[] =
 {
-    { &GUID_ContainerFormatBmp,     D3DX_IMAGE_FILE_FORMAT_BMP },
-    { &GUID_WineContainerFormatTga, D3DX_IMAGE_FILE_FORMAT_TGA },
-    { &GUID_ContainerFormatJpeg,    D3DX_IMAGE_FILE_FORMAT_JPG },
-    { &GUID_ContainerFormatPng,     D3DX_IMAGE_FILE_FORMAT_PNG },
+    { &GUID_ContainerFormatGif,     D3DX_IMAGE_FILE_FORMAT_GIF,  (FILE_FORMAT_FLAG_DX10) },
+    { &GUID_ContainerFormatTiff,    D3DX_IMAGE_FILE_FORMAT_TIFF, (FILE_FORMAT_FLAG_DX10) },
+    { &GUID_ContainerFormatBmp,     D3DX_IMAGE_FILE_FORMAT_BMP,  (FILE_FORMAT_FLAG_DX9 | FILE_FORMAT_FLAG_DX10) },
+    { &GUID_WineContainerFormatTga, D3DX_IMAGE_FILE_FORMAT_TGA,  (FILE_FORMAT_FLAG_DX9)  },
+    { &GUID_ContainerFormatWmp,     D3DX_IMAGE_FILE_FORMAT_WMP,  (FILE_FORMAT_FLAG_DX10) },
+    { &GUID_ContainerFormatJpeg,    D3DX_IMAGE_FILE_FORMAT_JPG,  (FILE_FORMAT_FLAG_DX9 | FILE_FORMAT_FLAG_DX10) },
+    { &GUID_ContainerFormatPng,     D3DX_IMAGE_FILE_FORMAT_PNG,  (FILE_FORMAT_FLAG_DX9 | FILE_FORMAT_FLAG_DX10) },
 };
 
 static int __cdecl d3dx_wic_file_format_guid_compare(const void *a, const void *b)
@@ -750,12 +756,13 @@ static int __cdecl d3dx_wic_file_format_guid_compare(const void *a, const void *
     return memcmp(guid, format->wic_container_guid, sizeof(*guid));
 }
 
-static enum d3dx_image_file_format wic_container_guid_to_d3dx_image_file_format(GUID *container_format)
+static enum d3dx_image_file_format wic_container_guid_to_d3dx_image_file_format(GUID *container_format, uint32_t flags)
 {
+    const uint32_t fmt_support_flag = (flags & D3DX_IMAGE_SUPPORT_DXT10) ? FILE_FORMAT_FLAG_DX10 : FILE_FORMAT_FLAG_DX9;
     struct d3dx_wic_file_format *format;
 
     if ((format = bsearch(container_format, file_formats, ARRAY_SIZE(file_formats), sizeof(*format),
-            d3dx_wic_file_format_guid_compare)))
+            d3dx_wic_file_format_guid_compare)) && (format->file_format_flag & fmt_support_flag))
         return format->d3dx_file_format;
     return D3DX_IMAGE_FILE_FORMAT_FORCE_DWORD;
 }
@@ -774,6 +781,9 @@ static const char *debug_d3dx_image_file_format(enum d3dx_image_file_format form
         FMT_TO_STR(D3DX_IMAGE_FILE_FORMAT_DIB);
         FMT_TO_STR(D3DX_IMAGE_FILE_FORMAT_HDR);
         FMT_TO_STR(D3DX_IMAGE_FILE_FORMAT_PFM);
+        FMT_TO_STR(D3DX_IMAGE_FILE_FORMAT_TIFF);
+        FMT_TO_STR(D3DX_IMAGE_FILE_FORMAT_GIF);
+        FMT_TO_STR(D3DX_IMAGE_FILE_FORMAT_WMP);
 #undef FMT_TO_STR
         default:
             return "unrecognized";
@@ -904,7 +914,7 @@ static HRESULT d3dx_initialize_image_from_wic(const void *src_data, uint32_t src
     if (FAILED(hr))
         goto exit;
 
-    image->image_file_format = wic_container_guid_to_d3dx_image_file_format(&container_format);
+    image->image_file_format = wic_container_guid_to_d3dx_image_file_format(&container_format, flags);
     if (is_dib && image->image_file_format == D3DX_IMAGE_FILE_FORMAT_BMP)
     {
         image->image_file_format = D3DX_IMAGE_FILE_FORMAT_DIB;
