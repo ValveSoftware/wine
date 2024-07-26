@@ -943,8 +943,8 @@ static void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_sl
 
     if (color_key)
     {
-        /* Color keys are always represented in D3DFMT_A8R8G8B8 format. */
-        ck_format = get_format_info(D3DFMT_A8R8G8B8);
+        /* Color keys are always represented in D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM format. */
+        ck_format = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM);
         init_argb_conversion_info(src_format, ck_format, &ck_conv_info);
     }
 
@@ -1045,8 +1045,8 @@ static void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT s
 
     if (color_key)
     {
-        /* Color keys are always represented in D3DFMT_A8R8G8B8 format. */
-        ck_format = get_format_info(D3DFMT_A8R8G8B8);
+        /* Color keys are always represented in D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM format. */
+        ck_format = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM);
         init_argb_conversion_info(src_format, ck_format, &ck_conv_info);
     }
 
@@ -1126,17 +1126,17 @@ static HRESULT d3dx_pixels_decompress(struct d3dx_pixels *pixels, const struct p
     switch (desc->format)
     {
         case D3DX_PIXEL_FORMAT_DXT1_UNORM:
-            uncompressed_desc = get_format_info(D3DFMT_A8B8G8R8);
+            uncompressed_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM);
             fetch_dxt_texel = fetch_2d_texel_rgba_dxt1;
             break;
         case D3DX_PIXEL_FORMAT_DXT2_UNORM:
         case D3DX_PIXEL_FORMAT_DXT3_UNORM:
-            uncompressed_desc = get_format_info(D3DFMT_A8B8G8R8);
+            uncompressed_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM);
             fetch_dxt_texel = fetch_2d_texel_rgba_dxt3;
             break;
         case D3DX_PIXEL_FORMAT_DXT4_UNORM:
         case D3DX_PIXEL_FORMAT_DXT5_UNORM:
-            uncompressed_desc = get_format_info(D3DFMT_A8B8G8R8);
+            uncompressed_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM);
             fetch_dxt_texel = fetch_2d_texel_rgba_dxt5;
             break;
         default:
