@@ -124,7 +124,7 @@ static inline void touch_h264_used_tag(void)
 
     GST_LOG("h264 is used");
 
-    if ((e = getenv("STEAM_COMPAT_SHADER_PATH")))
+    if ((e = getenv("STEAM_COMPAT_TRANSCODED_MEDIA_PATH")))
     {
         char buffer[PATH_MAX];
         int fd;
@@ -144,7 +144,7 @@ static inline void touch_h264_used_tag(void)
     }
     else
     {
-        GST_WARNING("STEAM_COMPAT_SHADER_PATH not set, cannot create h264-used file");
+        GST_WARNING("STEAM_COMPAT_TRANSCODED_MEDIA_PATH not set, cannot create h264-used file");
     }
 }
 
