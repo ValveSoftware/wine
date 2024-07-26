@@ -259,7 +259,7 @@ int create_placeholder_file(const char *file_name)
     char path[1024];
     int ret;
 
-    if ((shader_path = getenv("STEAM_COMPAT_SHADER_PATH")))
+    if ((shader_path = getenv("STEAM_COMPAT_TRANSCODED_MEDIA_PATH")))
     {
         path_concat(path, shader_path, file_name);
         if ((ret = create_file(path)) < 0)
@@ -267,7 +267,7 @@ int create_placeholder_file(const char *file_name)
     }
     else
     {
-        GST_ERROR("Env STEAM_COMPAT_SHADER_PATH not set.");
+        GST_ERROR("Env STEAM_COMPAT_TRANSCODED_MEDIA_PATH not set.");
         ret = CONV_ERROR_ENV_NOT_SET;
     }
 
