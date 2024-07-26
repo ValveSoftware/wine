@@ -3004,7 +3004,7 @@ static void test_dds_header_image_info(void)
     } tests[] = {
         /* File size validation isn't done on d3dx10. */
         { (DDS_CAPS | DDS_WIDTH | DDS_HEIGHT | DDS_PIXELFORMAT), 4, 4, 1, (4 * 4), 3, 0, 0,
-          { S_OK, 4, 4, 1, 1, 3, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D, }, 0, .todo_hr = TRUE },
+          { S_OK, 4, 4, 1, 1, 3, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D, }, 0, },
         /* Depth value set to 4, but no caps bits are set. Depth is ignored. */
         { (DDS_CAPS | DDS_WIDTH | DDS_HEIGHT | DDS_PIXELFORMAT), 4, 4, 4, (4 * 4), 3, 0, 0,
           { S_OK, 4, 4, 1, 1, 3, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D, }, 292 },
@@ -3055,7 +3055,7 @@ static void test_dds_header_image_info(void)
         /* File size validation isn't done on d3dx10. */
         { 0, 4, 4, 0, (4 * 4), 1, 0, 0,
           { DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0, },
-          { S_OK, 4, 4, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D, }, 0, .todo_hr = TRUE },
+          { S_OK, 4, 4, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D, }, 0, },
         /*
          * Setting the misc_flags2 field to anything other than 0 results in
          * E_FAIL.
@@ -3081,7 +3081,7 @@ static void test_dds_header_image_info(void)
         /* Depth field value is ignored if DDS_DEPTH isn't set. */
         { 0, 4, 4, 2, (4 * 4), 1, 0, 0,
           { DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0, },
-          { S_OK, 4, 4, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE3D, }, (4 * 4 * 4 * 2), .todo_info = TRUE },
+          { S_OK, 4, 4, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE3D, }, (4 * 4 * 4 * 2), },
         /*
          * 3D texture with an array size larger than 1. Technically there's no
          * such thing as a 3D texture array, but it succeeds.
@@ -3181,7 +3181,7 @@ static void test_dds_header_image_info(void)
     ok(hr == E_FAIL, "Unexpected hr %#lx.\n", hr);
 
     hr = D3DX10GetImageInfoFromMemory(&dds, sizeof(dds), NULL, &info, NULL);
-    todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
     /* Non DXT10 header. */
     dds.magic = MAKEFOURCC('D','D','S',' ');
@@ -3191,7 +3191,7 @@ static void test_dds_header_image_info(void)
     ok(hr == E_FAIL, "Unexpected hr %#lx.\n", hr);
 
     hr = D3DX10GetImageInfoFromMemory(&dds, sizeof(dds) - sizeof(dds.dxt10), NULL, &info, NULL);
-    todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 }
 
 static void test_get_image_info(void)
@@ -3377,8 +3377,8 @@ static void test_get_image_info(void)
     check_dds_dx10_format(DXGI_FORMAT_R8_UNORM, DXGI_FORMAT_R8_UNORM, TRUE);
     check_dds_dx10_format(DXGI_FORMAT_R16_UNORM, DXGI_FORMAT_R16_UNORM, TRUE);
     check_dds_dx10_format(DXGI_FORMAT_R8G8_UNORM, DXGI_FORMAT_R8G8_UNORM, TRUE);
-    check_dds_dx10_format(DXGI_FORMAT_B8G8R8X8_UNORM, DXGI_FORMAT_B8G8R8X8_UNORM, TRUE);
-    check_dds_dx10_format(DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM, TRUE);
+    check_dds_dx10_format(DXGI_FORMAT_B8G8R8X8_UNORM, DXGI_FORMAT_B8G8R8X8_UNORM, FALSE);
+    check_dds_dx10_format(DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM, FALSE);
 
     test_dds_header_image_info();
 
