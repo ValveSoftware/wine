@@ -89,7 +89,16 @@ enum d3dx_pixel_format_id {
     D3DX_PIXEL_FORMAT_COUNT,
 };
 
+/* These are aliases. */
+#define D3DX_PIXEL_FORMAT_R16G16B16A16_SNORM D3DX_PIXEL_FORMAT_U16V16W16Q16_SNORM
+#define D3DX_PIXEL_FORMAT_R16G16_SNORM       D3DX_PIXEL_FORMAT_U16V16_SNORM
+#define D3DX_PIXEL_FORMAT_R8G8B8A8_SNORM     D3DX_PIXEL_FORMAT_U8V8W8Q8_SNORM
+#define D3DX_PIXEL_FORMAT_R8G8_SNORM         D3DX_PIXEL_FORMAT_U8V8_SNORM
+
+
 enum d3dx_resource_type {
+    D3DX_RESOURCE_TYPE_UNKNOWN,
+    D3DX_RESOURCE_TYPE_TEXTURE_1D,
     D3DX_RESOURCE_TYPE_TEXTURE_2D,
     D3DX_RESOURCE_TYPE_TEXTURE_3D,
     D3DX_RESOURCE_TYPE_CUBE_TEXTURE,
@@ -106,6 +115,8 @@ enum d3dx_image_file_format
     D3DX_IMAGE_FILE_FORMAT_DIB  = 6,
     D3DX_IMAGE_FILE_FORMAT_HDR  = 7,
     D3DX_IMAGE_FILE_FORMAT_PFM  = 8,
+    /* This is a Wine only file format value. */
+    D3DX_IMAGE_FILE_FORMAT_DDS_DXT10 = 100,
     D3DX_IMAGE_FILE_FORMAT_FORCE_DWORD = 0x7fffffff
 };
 
@@ -168,6 +179,7 @@ static inline void set_d3dx_pixels(struct d3dx_pixels *pixels, const void *data,
 }
 
 #define D3DX_IMAGE_INFO_ONLY 1
+#define D3DX_IMAGE_SUPPORT_DXT10 2
 struct d3dx_image
 {
     enum d3dx_resource_type resource_type;
