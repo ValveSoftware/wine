@@ -3034,7 +3034,7 @@ static void test_dds_header_image_info(void)
         /* Partial cubemaps are not supported. */
         { (DDS_CAPS | DDS_WIDTH | DDS_HEIGHT | DDS_PIXELFORMAT), 4, 4, 1, (4 * 4), 1,
           (DDS_CAPS_TEXTURE | DDS_CAPS_COMPLEX), (DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_POSITIVEX),
-          { E_FAIL, }, (64 * 6), .todo_hr = TRUE },
+          { E_FAIL, }, (64 * 6), },
     };
     static const struct
     {
@@ -3062,7 +3062,7 @@ static void test_dds_header_image_info(void)
          */
         { 0, 4, 4, 0, (4 * 4), 1, 0, 0,
           { DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 1, },
-          { E_FAIL }, (4 * 4 * 4), .todo_hr = TRUE },
+          { E_FAIL }, (4 * 4 * 4), },
         /*
          * The misc_flags field isn't passed through directly, only the
          * cube texture flag is (if it's set).
@@ -3073,7 +3073,7 @@ static void test_dds_header_image_info(void)
         /* Resource dimension field of the header isn't validated. */
         { 0, 4, 4, 0, (4 * 4), 1, 0, 0,
           { DXGI_FORMAT_R8G8B8A8_UNORM, 500, 0, 1, 0, },
-          { S_OK, 4, 4, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, 500, }, (4 * 4 * 4), .todo_info = TRUE },
+          { S_OK, 4, 4, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, 500, }, (4 * 4 * 4), .todo_hr = TRUE },
         /* Depth value of 2, but D3D10_RESOURCE_DIMENSION_TEXTURE2D. */
         { DDS_DEPTH, 4, 4, 2, (4 * 4), 1, 0, 0,
           { DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0, },
@@ -3100,11 +3100,11 @@ static void test_dds_header_image_info(void)
         /* Resource dimension is validated for cube textures. */
         { 0, 4, 4, 1, (4 * 4), 1, 0, 0,
           { DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE3D, DDS_RESOURCE_MISC_TEXTURECUBE, 2, 0, },
-          { E_FAIL }, (4 * 4 * 4 * 12), .todo_hr = TRUE },
+          { E_FAIL }, (4 * 4 * 4 * 12), },
         /* 1D Texture cube, invalid. */
         { 0, 4, 4, 1, (4 * 4), 1, 0, 0,
           { DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE1D, DDS_RESOURCE_MISC_TEXTURECUBE, 2, 0, },
-          { E_FAIL }, (4 * 4 * 4 * 12), .todo_hr = TRUE },
+          { E_FAIL }, (4 * 4 * 4 * 12), },
     };
     D3DX10_IMAGE_INFO info;
     uint32_t i, file_size;
@@ -3348,13 +3348,13 @@ static void test_get_image_info(void)
     check_dds_pixel_format(DDS_PF_FOURCC, 0x74, 0, 0, 0, 0, 0, DXGI_FORMAT_R32G32B32A32_FLOAT); /* D3DFMT_A32B32G32R32F */
 
     /* Test for DDS pixel formats that are valid on d3dx9, but not d3dx10. */
-    todo_wine check_dds_pixel_format_unsupported(DDS_PF_FOURCC, MAKEFOURCC('U','Y','V','Y'), 0, 0, 0, 0, 0, E_FAIL);
-    todo_wine check_dds_pixel_format_unsupported(DDS_PF_FOURCC, MAKEFOURCC('Y','U','Y','2'), 0, 0, 0, 0, 0, E_FAIL);
+    check_dds_pixel_format_unsupported(DDS_PF_FOURCC, MAKEFOURCC('U','Y','V','Y'), 0, 0, 0, 0, 0, E_FAIL);
+    check_dds_pixel_format_unsupported(DDS_PF_FOURCC, MAKEFOURCC('Y','U','Y','2'), 0, 0, 0, 0, 0, E_FAIL);
     /* Bumpmap formats aren't supported. */
-    todo_wine check_dds_pixel_format_unsupported(DDS_PF_BUMPDUDV, 0, 16, 0x00ff, 0xff00, 0, 0, E_FAIL);
-    todo_wine check_dds_pixel_format_unsupported(DDS_PF_BUMPDUDV, 0, 32, 0x0000ffff, 0xffff0000, 0, 0, E_FAIL);
-    todo_wine check_dds_pixel_format_unsupported(DDS_PF_BUMPDUDV, 0, 32, 0xff, 0xff00, 0x00ff0000, 0xff000000, E_FAIL);
-    todo_wine check_dds_pixel_format_unsupported(DDS_PF_BUMPLUMINANCE, 0, 32, 0x0000ff, 0x00ff00, 0xff0000, 0, E_FAIL);
+    check_dds_pixel_format_unsupported(DDS_PF_BUMPDUDV, 0, 16, 0x00ff, 0xff00, 0, 0, E_FAIL);
+    check_dds_pixel_format_unsupported(DDS_PF_BUMPDUDV, 0, 32, 0x0000ffff, 0xffff0000, 0, 0, E_FAIL);
+    check_dds_pixel_format_unsupported(DDS_PF_BUMPDUDV, 0, 32, 0xff, 0xff00, 0x00ff0000, 0xff000000, E_FAIL);
+    check_dds_pixel_format_unsupported(DDS_PF_BUMPLUMINANCE, 0, 32, 0x0000ff, 0x00ff00, 0xff0000, 0, E_FAIL);
 
     /* Newer fourCC formats. */
     check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('B','C','4','U'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC4_UNORM);
@@ -3362,21 +3362,21 @@ static void test_get_image_info(void)
     check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('B','C','4','S'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC4_SNORM);
     check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('B','C','5','S'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC5_SNORM);
 
-    todo_wine check_dds_dx10_format_unsupported(DXGI_FORMAT_B5G6R5_UNORM, E_FAIL);
-    todo_wine check_dds_dx10_format_unsupported(DXGI_FORMAT_B5G5R5A1_UNORM, E_FAIL);
+    check_dds_dx10_format_unsupported(DXGI_FORMAT_B5G6R5_UNORM, E_FAIL);
+    check_dds_dx10_format_unsupported(DXGI_FORMAT_B5G5R5A1_UNORM, E_FAIL);
     /* Formats that are newer than d3d10. */
-    todo_wine check_dds_dx10_format_unsupported(DXGI_FORMAT_BC6H_UF16, E_FAIL);
-    todo_wine check_dds_dx10_format_unsupported(DXGI_FORMAT_BC6H_SF16, E_FAIL);
-    todo_wine check_dds_dx10_format_unsupported(DXGI_FORMAT_BC7_UNORM, E_FAIL);
-    todo_wine check_dds_dx10_format_unsupported(DXGI_FORMAT_B4G4R4A4_UNORM, E_FAIL);
+    check_dds_dx10_format_unsupported(DXGI_FORMAT_BC6H_UF16, E_FAIL);
+    check_dds_dx10_format_unsupported(DXGI_FORMAT_BC6H_SF16, E_FAIL);
+    check_dds_dx10_format_unsupported(DXGI_FORMAT_BC7_UNORM, E_FAIL);
+    check_dds_dx10_format_unsupported(DXGI_FORMAT_B4G4R4A4_UNORM, E_FAIL);
 
     /*
      * These formats should map 1:1 from the DXT10 header, unlike legacy DDS
      * file equivalents.
      */
-    check_dds_dx10_format(DXGI_FORMAT_R8_UNORM, DXGI_FORMAT_R8_UNORM, TRUE);
-    check_dds_dx10_format(DXGI_FORMAT_R16_UNORM, DXGI_FORMAT_R16_UNORM, TRUE);
-    check_dds_dx10_format(DXGI_FORMAT_R8G8_UNORM, DXGI_FORMAT_R8G8_UNORM, TRUE);
+    check_dds_dx10_format(DXGI_FORMAT_R8_UNORM, DXGI_FORMAT_R8_UNORM, FALSE);
+    check_dds_dx10_format(DXGI_FORMAT_R16_UNORM, DXGI_FORMAT_R16_UNORM, FALSE);
+    check_dds_dx10_format(DXGI_FORMAT_R8G8_UNORM, DXGI_FORMAT_R8G8_UNORM, FALSE);
     check_dds_dx10_format(DXGI_FORMAT_B8G8R8X8_UNORM, DXGI_FORMAT_B8G8R8X8_UNORM, FALSE);
     check_dds_dx10_format(DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM, FALSE);
 
