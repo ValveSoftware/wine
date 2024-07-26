@@ -26,6 +26,8 @@
 #include "wincodec.h"
 #include <assert.h>
 
+#define BCDEC_IMPLEMENTATION
+#include "bcdec.h"
 #include "txc_dxtn.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(d3dx);
@@ -1113,13 +1115,86 @@ static void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT s
     }
 }
 
+struct d3dx_bcn_decompression_context
+{
+    void (*decompress_bcn_block)(const void *, void *, int);
+    const struct pixel_format_desc *compressed_format_desc;
+    struct d3dx_pixels *compressed_pixels;
+
+    const struct pixel_format_desc *decompressed_format_desc;
+    uint8_t cur_block_decompressed[192];
+    uint32_t cur_block_row_pitch;
+    int32_t cur_block_x;
+    int32_t cur_block_y;
+    int32_t cur_block_z;
+};
+
+static void d3dx_init_bcn_decompression_context(struct d3dx_bcn_decompression_context *context,
+        struct d3dx_pixels *pixels, const struct pixel_format_desc *desc, const struct pixel_format_desc *dst_desc)
+{
+    memset(context, 0, sizeof(*context));
+    switch (desc->format)
+    {
+    case D3DX_PIXEL_FORMAT_DXT1_UNORM:
+        context->decompress_bcn_block = bcdec_bc1;
+        break;
+
+    case D3DX_PIXEL_FORMAT_DXT2_UNORM:
+    case D3DX_PIXEL_FORMAT_DXT3_UNORM:
+        context->decompress_bcn_block = bcdec_bc2;
+        break;
+
+    case D3DX_PIXEL_FORMAT_DXT4_UNORM:
+    case D3DX_PIXEL_FORMAT_DXT5_UNORM:
+        context->decompress_bcn_block = bcdec_bc3;
+        break;
+
+    default:
+        assert(0);
+        break;
+    }
+
+    context->compressed_format_desc = desc;
+    context->compressed_pixels = pixels;
+
+    context->decompressed_format_desc = dst_desc;
+    context->cur_block_row_pitch = dst_desc->bytes_per_pixel * desc->block_width;
+    context->cur_block_x = context->cur_block_y = context->cur_block_z = -1;
+}
+
+static void d3dx_fetch_bcn_texel(struct d3dx_bcn_decompression_context *context, int32_t x, int32_t y, int32_t z, void *texel)
+{
+    const struct pixel_format_desc *decomp_fmt_desc = context->decompressed_format_desc;
+    const struct pixel_format_desc *comp_fmt_desc = context->compressed_format_desc;
+    const int32_t y_aligned = (y & ~(comp_fmt_desc->block_height - 1));
+    const int32_t x_aligned = (x & ~(comp_fmt_desc->block_width - 1));
+    uint32_t pixel_offset;
+
+    if (z != context->cur_block_z || (x_aligned != context->cur_block_x) || (y_aligned != context->cur_block_y))
+    {
+        const BYTE *block_ptr = context->compressed_pixels->data;
+
+        block_ptr += z * context->compressed_pixels->slice_pitch;
+        block_ptr += (y / comp_fmt_desc->block_height) * context->compressed_pixels->row_pitch;
+        block_ptr += (x / comp_fmt_desc->block_width) * comp_fmt_desc->block_byte_count;
+        context->decompress_bcn_block(block_ptr, context->cur_block_decompressed, context->cur_block_row_pitch);
+        context->cur_block_x = (x & (comp_fmt_desc->block_width));
+        context->cur_block_y = (y & (comp_fmt_desc->block_height));
+        context->cur_block_z = z;
+    }
+
+    pixel_offset = (y & (comp_fmt_desc->block_height - 1)) * context->cur_block_row_pitch;
+    pixel_offset += (x & (comp_fmt_desc->block_width - 1)) * decomp_fmt_desc->bytes_per_pixel;
+    memcpy(texel, context->cur_block_decompressed + pixel_offset, decomp_fmt_desc->bytes_per_pixel);
+}
+
 static HRESULT d3dx_pixels_decompress(struct d3dx_pixels *pixels, const struct pixel_format_desc *desc,
         BOOL is_dst, void **out_memory, uint32_t *out_row_pitch, uint32_t *out_slice_pitch,
         const struct pixel_format_desc **out_desc)
 {
-    void (*fetch_dxt_texel)(int srcRowStride, const BYTE *pixdata, int i, int j, void *texel);
-    uint32_t x, y, z, tmp_pitch, uncompressed_slice_pitch, uncompressed_row_pitch;
+    uint32_t x, y, z, uncompressed_slice_pitch, uncompressed_row_pitch;
     const struct pixel_format_desc *uncompressed_desc = NULL;
+    struct d3dx_bcn_decompression_context context;
     const struct volume *size = &pixels->size;
     BYTE *uncompressed_mem;
 
@@ -1127,17 +1202,14 @@ static HRESULT d3dx_pixels_decompress(struct d3dx_pixels *pixels, const struct p
     {
         case D3DX_PIXEL_FORMAT_DXT1_UNORM:
             uncompressed_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM);
-            fetch_dxt_texel = fetch_2d_texel_rgba_dxt1;
             break;
         case D3DX_PIXEL_FORMAT_DXT2_UNORM:
         case D3DX_PIXEL_FORMAT_DXT3_UNORM:
             uncompressed_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM);
-            fetch_dxt_texel = fetch_2d_texel_rgba_dxt3;
             break;
         case D3DX_PIXEL_FORMAT_DXT4_UNORM:
         case D3DX_PIXEL_FORMAT_DXT5_UNORM:
             uncompressed_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM);
-            fetch_dxt_texel = fetch_2d_texel_rgba_dxt5;
             break;
         default:
             FIXME("Unexpected compressed texture format %u.\n", desc->format);
@@ -1168,11 +1240,9 @@ static HRESULT d3dx_pixels_decompress(struct d3dx_pixels *pixels, const struct p
     }
 
     TRACE("Decompressing pixels.\n");
-    tmp_pitch = pixels->row_pitch * desc->block_width / desc->block_byte_count;
+    d3dx_init_bcn_decompression_context(&context, pixels, desc, uncompressed_desc);
     for (z = 0; z < size->depth; ++z)
     {
-        const BYTE *slice_data = ((BYTE *)pixels->data) + (pixels->slice_pitch * z);
-
         for (y = 0; y < size->height; ++y)
         {
             BYTE *ptr = &uncompressed_mem[(z * uncompressed_slice_pitch) + (y * uncompressed_row_pitch)];
@@ -1181,10 +1251,9 @@ static HRESULT d3dx_pixels_decompress(struct d3dx_pixels *pixels, const struct p
                 const POINT pt = { x, y };
 
                 if (!is_dst)
-                    fetch_dxt_texel(tmp_pitch, slice_data, x + pixels->unaligned_rect.left,
-                            y + pixels->unaligned_rect.top, ptr);
+                    d3dx_fetch_bcn_texel(&context, x + pixels->unaligned_rect.left, y + pixels->unaligned_rect.top, z, ptr);
                 else if (!PtInRect(&pixels->unaligned_rect, pt))
-                    fetch_dxt_texel(tmp_pitch, slice_data, x, y, ptr);
+                    d3dx_fetch_bcn_texel(&context, x, y, z, ptr);
                 ptr += uncompressed_desc->bytes_per_pixel;
             }
         }
