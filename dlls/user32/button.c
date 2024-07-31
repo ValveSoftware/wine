@@ -376,6 +376,11 @@ LRESULT ButtonWndProc_common(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
     case WM_GETFONT:
         return (LRESULT)get_button_font( hWnd );
 
+    case WM_GETOBJECT:
+      if ((LONG)lParam == OBJID_QUERYCLASSNAMEIDX)
+        return 0x10002;
+      break;
+
     case WM_SETFOCUS:
         TRACE("WM_SETFOCUS %p\n",hWnd);
         set_button_state( hWnd, get_button_state(hWnd) | BST_FOCUS );
