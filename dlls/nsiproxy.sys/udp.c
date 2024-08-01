@@ -229,7 +229,7 @@ static NTSTATUS udp_endpoint_enumerate_all( void *key_data, UINT key_size, void 
 
         memset( &key, 0, sizeof(key) );
         memset( &stat, 0, sizeof(stat) );
-        pid_map = get_pid_map( &pid_map_size );
+        if (stat_out) pid_map = get_pid_map( &pid_map_size );
 
         /* skip header line */
         ptr = fgets( buf, sizeof(buf), fp );
@@ -243,10 +243,13 @@ static NTSTATUS udp_endpoint_enumerate_all( void *key_data, UINT key_size, void 
             key.local.Ipv4.sin_addr.WS_s_addr = addr;
             key.local.Ipv4.sin_port = htons( key.local.Ipv4.sin_port );
 
-            stat.pid = find_owning_pid( pid_map, pid_map_size, inode );
-            stat.create_time = 0; /* FIXME */
-            stat.flags = 0; /* FIXME */
-            stat.mod_info = 0; /* FIXME */
+            if (stat_out)
+            {
+                stat.pid = find_owning_pid( pid_map, pid_map_size, inode );
+                stat.create_time = 0; /* FIXME */
+                stat.flags = 0; /* FIXME */
+                stat.mod_info = 0; /* FIXME */
+            }
 
             if (num < *count)
             {
@@ -279,10 +282,13 @@ static NTSTATUS udp_endpoint_enumerate_all( void *key_data, UINT key_size, void 
                 key.local.Ipv6.sin6_scope_id = find_ipv6_addr_scope( &key.local.Ipv6.sin6_addr, addr_scopes,
                                                                      addr_scopes_size );
 
-                stat.pid = find_owning_pid( pid_map, pid_map_size, inode );
-                stat.create_time = 0; /* FIXME */
-                stat.flags = 0; /* FIXME */
-                stat.mod_info = 0; /* FIXME */
+                if (stat_out)
+                {
+                    stat.pid = find_owning_pid( pid_map, pid_map_size, inode );
+                    stat.create_time = 0; /* FIXME */
+                    stat.flags = 0; /* FIXME */
+                    stat.mod_info = 0; /* FIXME */
+                }
 
                 if (num < *count)
                 {
@@ -326,7 +332,7 @@ static NTSTATUS udp_endpoint_enumerate_all( void *key_data, UINT key_size, void 
         if (len <= sizeof(struct xinpgen)) goto err;
 
         addr_scopes = get_ipv6_addr_scope_table( &addr_scopes_size );
-        pid_map = get_pid_map( &pid_map_size );
+        if (stat_out) pid_map = get_pid_map( &pid_map_size );
 
         orig_xig = (struct xinpgen *)buf;
         xig = orig_xig;
@@ -372,10 +378,13 @@ static NTSTATUS udp_endpoint_enumerate_all( void *key_data, UINT key_size, void 
                                                                      addr_scopes_size );
             }
 
-            stat.pid = find_owning_pid( pid_map, pid_map_size, (UINT_PTR)sock->so_pcb );
-            stat.create_time = 0; /* FIXME */
-            stat.flags = !(in->inp_flags & INP_ANONPORT);
-            stat.mod_info = 0; /* FIXME */
+            if (stat_out)
+            {
+                stat.pid = find_owning_pid( pid_map, pid_map_size, (UINT_PTR)sock->so_pcb );
+                stat.create_time = 0; /* FIXME */
+                stat.flags = !(in->inp_flags & INP_ANONPORT);
+                stat.mod_info = 0; /* FIXME */
+            }
 
             if (num < *count)
             {
