@@ -24,6 +24,12 @@
 #include "assert.h"
 #include "initguid.h"
 
+#define BCDEC_IMPLEMENTATION
+#include "bcdec.h"
+#define STB_DXT_IMPLEMENTATION
+#include "stb_dxt.h"
+
+
 WINE_DEFAULT_DEBUG_CHANNEL(d3dx);
 
 HRESULT WINAPI WICCreateImagingFactory_Proxy(UINT, IWICImagingFactory**);
@@ -1042,4 +1048,1134 @@ HRESULT d3dx_image_get_pixels(struct d3dx_image *image, uint32_t layer, uint32_t
             mip_level_size.height, mip_level_size.depth, &unaligned_rect);
 
     return D3D_OK;
+}
+
+/*
+ * Pixel filtering/format conversion functions.
+ */
+unsigned short float_32_to_16(const float in)
+{
+    int exp = 0, origexp;
+    float tmp = fabsf(in);
+    int sign = (copysignf(1, in) < 0);
+    unsigned int mantissa;
+    unsigned short ret;
+
+    /* Deal with special numbers */
+    if (isinf(in)) return (sign ? 0xffff : 0x7fff);
+    if (isnan(in)) return (sign ? 0xffff : 0x7fff);
+    if (in == 0.0f) return (sign ? 0x8000 : 0x0000);
+
+    if (tmp < (float)(1u << 10))
+    {
+        do
+        {
+            tmp *= 2.0f;
+            exp--;
+        } while (tmp < (float)(1u << 10));
+    }
+    else if (tmp >= (float)(1u << 11))
+    {
+        do
+        {
+            tmp /= 2.0f;
+            exp++;
+        } while (tmp >= (float)(1u << 11));
+    }
+
+    exp += 10;  /* Normalize the mantissa */
+    exp += 15;  /* Exponent is encoded with excess 15 */
+
+    origexp = exp;
+
+    mantissa = (unsigned int) tmp;
+    if ((tmp - mantissa == 0.5f && mantissa % 2 == 1) || /* round half to even */
+        (tmp - mantissa > 0.5f))
+    {
+        mantissa++; /* round to nearest, away from zero */
+    }
+    if (mantissa == 2048)
+    {
+        mantissa = 1024;
+        exp++;
+    }
+
+    if (exp > 31)
+    {
+        /* too big */
+        ret = 0x7fff; /* INF */
+    }
+    else if (exp <= 0)
+    {
+        unsigned int rounding = 0;
+
+        /* Denormalized half float */
+
+        /* return 0x0000 (=0.0) for numbers too small to represent in half floats */
+        if (exp < -11)
+            return (sign ? 0x8000 : 0x0000);
+
+        exp = origexp;
+
+        /* the 13 extra bits from single precision are used for rounding */
+        mantissa = (unsigned int)(tmp * (1u << 13));
+        mantissa >>= 1 - exp; /* denormalize */
+
+        mantissa -= ~(mantissa >> 13) & 1; /* round half to even */
+        /* remove 13 least significant bits to get half float precision */
+        mantissa >>= 12;
+        rounding = mantissa & 1;
+        mantissa >>= 1;
+
+        ret = mantissa + rounding;
+    }
+    else
+    {
+        ret = (exp << 10) | (mantissa & 0x3ff);
+    }
+
+    ret |= ((sign ? 1 : 0) << 15); /* Add the sign */
+    return ret;
+}
+
+/* Native d3dx9's D3DXFloat16to32Array lacks support for NaN and Inf. Specifically, e = 16 is treated as a
+ * regular number - e.g., 0x7fff is converted to 131008.0 and 0xffff to -131008.0. */
+float float_16_to_32(const unsigned short in)
+{
+    const unsigned short s = (in & 0x8000);
+    const unsigned short e = (in & 0x7C00) >> 10;
+    const unsigned short m = in & 0x3FF;
+    const float sgn = (s ? -1.0f : 1.0f);
+
+    if (e == 0)
+    {
+        if (m == 0) return sgn * 0.0f; /* +0.0 or -0.0 */
+        else return sgn * powf(2, -14.0f) * (m / 1024.0f);
+    }
+    else
+    {
+        return sgn * powf(2, e - 15.0f) * (1.0f + (m / 1024.0f));
+    }
+}
+
+struct argb_conversion_info
+{
+    const struct pixel_format_desc *srcformat;
+    const struct pixel_format_desc *destformat;
+    DWORD srcshift[4], destshift[4];
+    DWORD srcmask[4], destmask[4];
+    BOOL process_channel[4];
+    DWORD channelmask;
+};
+
+static void init_argb_conversion_info(const struct pixel_format_desc *srcformat, const struct pixel_format_desc *destformat, struct argb_conversion_info *info)
+{
+    UINT i;
+    ZeroMemory(info->process_channel, 4 * sizeof(BOOL));
+    info->channelmask = 0;
+
+    info->srcformat  =  srcformat;
+    info->destformat = destformat;
+
+    for(i = 0;i < 4;i++) {
+        /* srcshift is used to extract the _relevant_ components */
+        info->srcshift[i]  =  srcformat->shift[i] + max( srcformat->bits[i] - destformat->bits[i], 0);
+
+        /* destshift is used to move the components to the correct position */
+        info->destshift[i] = destformat->shift[i] + max(destformat->bits[i] -  srcformat->bits[i], 0);
+
+        info->srcmask[i]  = ((1 <<  srcformat->bits[i]) - 1) <<  srcformat->shift[i];
+        info->destmask[i] = ((1 << destformat->bits[i]) - 1) << destformat->shift[i];
+
+        /* channelmask specifies bits which aren't used in the source format but in the destination one */
+        if(destformat->bits[i]) {
+            if(srcformat->bits[i]) info->process_channel[i] = TRUE;
+            else info->channelmask |= info->destmask[i];
+        }
+    }
+}
+
+/************************************************************
+ * get_relevant_argb_components
+ *
+ * Extracts the relevant components from the source color and
+ * drops the less significant bits if they aren't used by the destination format.
+ */
+static void get_relevant_argb_components(const struct argb_conversion_info *info, const BYTE *col, DWORD *out)
+{
+    unsigned int i, j;
+    unsigned int component, mask;
+
+    for (i = 0; i < 4; ++i)
+    {
+        if (!info->process_channel[i])
+            continue;
+
+        component = 0;
+        mask = info->srcmask[i];
+        for (j = 0; j < 4 && mask; ++j)
+        {
+            if (info->srcshift[i] < j * 8)
+                component |= (col[j] & mask) << (j * 8 - info->srcshift[i]);
+            else
+                component |= (col[j] & mask) >> (info->srcshift[i] - j * 8);
+            mask >>= 8;
+        }
+        out[i] = component;
+    }
+}
+
+static float d3dx_clamp(float value, float min_value, float max_value)
+{
+    return value < min_value ? min_value : value > max_value ? max_value : value;
+}
+
+/************************************************************
+ * make_argb_color
+ *
+ * Recombines the output of get_relevant_argb_components and converts
+ * it to the destination format.
+ */
+static DWORD make_argb_color(const struct argb_conversion_info *info, const DWORD *in)
+{
+    UINT i;
+    DWORD val = 0;
+
+    for(i = 0;i < 4;i++) {
+        if(info->process_channel[i]) {
+            /* necessary to make sure that e.g. an X4R4G4B4 white maps to an R8G8B8 white instead of 0xf0f0f0 */
+            signed int shift;
+            for(shift = info->destshift[i]; shift > info->destformat->shift[i]; shift -= info->srcformat->bits[i]) val |= in[i] << shift;
+            val |= (in[i] >> (info->destformat->shift[i] - shift)) << info->destformat->shift[i];
+        }
+    }
+    val |= info->channelmask;   /* new channels are set to their maximal value */
+    return val;
+}
+
+static BYTE get_channel_from_palette_entry(const PALETTEENTRY *entry, uint32_t channel)
+{
+    switch (channel)
+    {
+    case 0: /* Alpha. */
+        return entry->peFlags;
+    case 1: /* Red. */
+        return entry->peRed;
+    case 2: /* Green. */
+        return entry->peGreen;
+    case 3: /* Blue. */
+        return entry->peBlue;
+    default:
+        assert(0);
+        return 0;
+    }
+}
+
+static void premultiply_alpha(struct vec4 *vec)
+{
+    vec->x *= vec->w;
+    vec->y *= vec->w;
+    vec->z *= vec->w;
+}
+
+static void demultiply_alpha(struct vec4 *vec)
+{
+    vec->x = (vec->w == 0.0f) ? 0.0f : vec->x / vec->w;
+    vec->y = (vec->w == 0.0f) ? 0.0f : vec->y / vec->w;
+    vec->z = (vec->w == 0.0f) ? 0.0f : vec->z / vec->w;
+}
+
+/* It doesn't work for components bigger than 32 bits (or somewhat smaller but unaligned). */
+void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, const PALETTEENTRY *palette,
+        struct vec4 *dst)
+{
+    const struct pixel_format_type_desc *type = &format->fmt_type_desc;
+    DWORD mask, tmp;
+    unsigned int c;
+
+    for (c = 0; c < 4; ++c)
+    {
+        const enum component_type dst_ctype = !c ? type->a_type : type->rgb_type;
+        static const unsigned int component_offsets[4] = {3, 0, 1, 2};
+        float *dst_component = (float *)dst + component_offsets[c];
+
+        if (format->bits[c])
+        {
+            mask = ~0u >> (32 - format->bits[c]);
+
+            memcpy(&tmp, src + format->shift[c] / 8,
+                    min(sizeof(DWORD), (format->shift[c] % 8 + format->bits[c] + 7) / 8));
+
+            switch (dst_ctype)
+            {
+            case CTYPE_FLOAT:
+                if (format->bits[c] == 16)
+                    *dst_component = float_16_to_32(tmp);
+                else
+                    *dst_component = *(float *)&tmp;
+                break;
+
+            case CTYPE_INDEX:
+                *dst_component = get_channel_from_palette_entry(&palette[(tmp >> format->shift[c] % 8) & mask], c);
+                *dst_component /= 255.0f;
+                break;
+
+            case CTYPE_LUMA:
+            case CTYPE_UNORM:
+                *dst_component = (float)((tmp >> format->shift[c] % 8) & mask) / mask;
+                break;
+
+            case CTYPE_SNORM:
+            {
+                const uint32_t sign_bit = (1 << (format->bits[c] - 1));
+                uint32_t tmp_extended, tmp_masked = (tmp >> format->shift[c] % 8) & mask;
+
+                tmp_extended = tmp_masked;
+                if (tmp_masked & sign_bit)
+                {
+                    tmp_extended |= ~(sign_bit - 1);
+
+                    /*
+                     * In order to clamp to an even range, we need to ignore
+                     * the maximum negative value.
+                     */
+                    if (tmp_masked == sign_bit)
+                        tmp_extended |= 1;
+                }
+
+                *dst_component = (float)(((int32_t)tmp_extended)) / (sign_bit - 1);
+                break;
+            }
+
+            default:
+                break;
+            }
+        }
+        else if (dst_ctype == CTYPE_LUMA)
+        {
+            *dst_component = dst->x;
+        }
+        else
+        {
+            *dst_component = 1.0f;
+        }
+    }
+}
+
+/* It doesn't work for components bigger than 32 bits. */
+void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 *src,
+        const struct pixel_format_type_desc *src_type, BYTE *dst)
+{
+    const struct pixel_format_type_desc *dst_type = &format->fmt_type_desc;
+    DWORD v, mask32;
+    unsigned int c, i;
+
+    memset(dst, 0, format->bytes_per_pixel);
+
+    for (c = 0; c < 4; ++c)
+    {
+        const enum component_type src_ctype = !c ? src_type->a_type : src_type->rgb_type;
+        const enum component_type dst_ctype = !c ? dst_type->a_type : dst_type->rgb_type;
+        static const unsigned int component_offsets[4] = {3, 0, 1, 2};
+        const float src_component = *((const float *)src + component_offsets[c]);
+
+        if (!format->bits[c])
+            continue;
+
+        mask32 = ~0u >> (32 - format->bits[c]);
+
+        switch (dst_ctype)
+        {
+        case CTYPE_FLOAT:
+            if (format->bits[c] == 16)
+                v = float_32_to_16(src_component);
+            else
+                v = *(DWORD *)&src_component;
+            break;
+
+        case CTYPE_LUMA:
+        {
+            float val = src->x * 0.2125f + src->y * 0.7154f + src->z * 0.0721f;
+
+            if (src_ctype == CTYPE_SNORM)
+                val = (val + 1.0f) / 2.0f;
+
+            v = d3dx_clamp(val, 0.0f, 1.0f) * ((1 << format->bits[c]) - 1) + 0.5f;
+            break;
+        }
+
+        case CTYPE_UNORM:
+        {
+            float val = src_component;
+
+            if (src_ctype == CTYPE_SNORM)
+                val = (val + 1.0f) / 2.0f;
+
+            v = d3dx_clamp(val, 0.0f, 1.0f) * ((1 << format->bits[c]) - 1) + 0.5f;
+            break;
+        }
+
+        case CTYPE_SNORM:
+        {
+            const uint32_t max_value = (1 << (format->bits[c] - 1)) - 1;
+            float val = src_component;
+
+            if (src_ctype == CTYPE_UNORM || src_ctype == CTYPE_LUMA || src_ctype == CTYPE_INDEX)
+                val = (val * 2.0f) - 1.0f;
+
+            v = d3dx_clamp(val, -1.0f, 1.0f) * max_value + 0.5f;
+            break;
+        }
+
+        /* We shouldn't be trying to convert to CTYPE_INDEX. */
+        case CTYPE_INDEX:
+            assert(0);
+            break;
+
+        default:
+            v = 0;
+            break;
+        }
+
+        for (i = format->shift[c] / 8 * 8; i < format->shift[c] + format->bits[c]; i += 8)
+        {
+            BYTE mask, byte;
+
+            if (format->shift[c] > i)
+            {
+                mask = mask32 << (format->shift[c] - i);
+                byte = (v << (format->shift[c] - i)) & mask;
+            }
+            else
+            {
+                mask = mask32 >> (i - format->shift[c]);
+                byte = (v >> (i - format->shift[c])) & mask;
+            }
+            dst[i / 8] |= byte;
+        }
+    }
+}
+
+/************************************************************
+ * copy_pixels
+ *
+ * Copies the source buffer to the destination buffer.
+ * Works for any pixel format.
+ * The source and the destination must be block-aligned.
+ */
+void copy_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch,
+        BYTE *dst, UINT dst_row_pitch, UINT dst_slice_pitch, const struct volume *size,
+        const struct pixel_format_desc *format)
+{
+    UINT row, slice;
+    BYTE *dst_addr;
+    const BYTE *src_addr;
+    UINT row_block_count = (size->width + format->block_width - 1) / format->block_width;
+    UINT row_count = (size->height + format->block_height - 1) / format->block_height;
+
+    for (slice = 0; slice < size->depth; slice++)
+    {
+        src_addr = src + slice * src_slice_pitch;
+        dst_addr = dst + slice * dst_slice_pitch;
+
+        for (row = 0; row < row_count; row++)
+        {
+            memcpy(dst_addr, src_addr, row_block_count * format->block_byte_count);
+            src_addr += src_row_pitch;
+            dst_addr += dst_row_pitch;
+        }
+    }
+}
+
+/************************************************************
+ * convert_argb_pixels
+ *
+ * Copies the source buffer to the destination buffer, performing
+ * any necessary format conversion and color keying.
+ * Pixels outsize the source rect are blacked out.
+ */
+void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch, const struct volume *src_size,
+        const struct pixel_format_desc *src_format, BYTE *dst, UINT dst_row_pitch, UINT dst_slice_pitch,
+        const struct volume *dst_size, const struct pixel_format_desc *dst_format, D3DCOLOR color_key,
+        const PALETTEENTRY *palette, uint32_t filter_flags)
+{
+    struct argb_conversion_info conv_info, ck_conv_info;
+    const struct pixel_format_desc *ck_format = NULL;
+    DWORD channels[4];
+    BOOL src_pma, dst_pma;
+    UINT min_width, min_height, min_depth;
+    UINT x, y, z;
+
+    TRACE("src %p, src_row_pitch %u, src_slice_pitch %u, src_size %p, src_format %p, dst %p, "
+            "dst_row_pitch %u, dst_slice_pitch %u, dst_size %p, dst_format %p, color_key 0x%08lx, palette %p.\n",
+            src, src_row_pitch, src_slice_pitch, src_size, src_format, dst, dst_row_pitch, dst_slice_pitch, dst_size,
+            dst_format, color_key, palette);
+
+    ZeroMemory(channels, sizeof(channels));
+    init_argb_conversion_info(src_format, dst_format, &conv_info);
+
+    src_pma = !!(filter_flags & D3DX_FILTER_PMA_IN);
+    dst_pma = !!(filter_flags & D3DX_FILTER_PMA_OUT);
+    min_width = min(src_size->width, dst_size->width);
+    min_height = min(src_size->height, dst_size->height);
+    min_depth = min(src_size->depth, dst_size->depth);
+
+    if (color_key)
+    {
+        /* Color keys are always represented in D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM format. */
+        ck_format = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM);
+        init_argb_conversion_info(src_format, ck_format, &ck_conv_info);
+    }
+
+    for (z = 0; z < min_depth; z++) {
+        const BYTE *src_slice_ptr = src + z * src_slice_pitch;
+        BYTE *dst_slice_ptr = dst + z * dst_slice_pitch;
+
+        for (y = 0; y < min_height; y++) {
+            const BYTE *src_ptr = src_slice_ptr + y * src_row_pitch;
+            BYTE *dst_ptr = dst_slice_ptr + y * dst_row_pitch;
+
+            for (x = 0; x < min_width; x++) {
+                if (format_types_match(src_format, dst_format) && filter_flags_match(filter_flags)
+                        && src_format->bytes_per_pixel <= 4 && dst_format->bytes_per_pixel <= 4)
+                {
+                    DWORD val;
+
+                    get_relevant_argb_components(&conv_info, src_ptr, channels);
+                    val = make_argb_color(&conv_info, channels);
+
+                    if (color_key)
+                    {
+                        DWORD ck_pixel;
+
+                        get_relevant_argb_components(&ck_conv_info, src_ptr, channels);
+                        ck_pixel = make_argb_color(&ck_conv_info, channels);
+                        if (ck_pixel == color_key)
+                            val &= ~conv_info.destmask[0];
+                    }
+                    memcpy(dst_ptr, &val, dst_format->bytes_per_pixel);
+                }
+                else
+                {
+                    struct vec4 color, tmp;
+
+                    format_to_vec4(src_format, src_ptr, palette, &color);
+                    if (src_pma && src_pma != dst_pma)
+                        demultiply_alpha(&color);
+                    tmp = color;
+
+                    if (ck_format)
+                    {
+                        DWORD ck_pixel;
+
+                        format_from_vec4(ck_format, &tmp, &src_format->fmt_type_desc, (BYTE *)&ck_pixel);
+                        if (ck_pixel == color_key)
+                            tmp.w = 0.0f;
+                    }
+
+                    color = tmp;
+                    if (dst_pma && src_pma != dst_pma)
+                        premultiply_alpha(&color);
+                    format_from_vec4(dst_format, &color, &src_format->fmt_type_desc, dst_ptr);
+                }
+
+                src_ptr += src_format->bytes_per_pixel;
+                dst_ptr += dst_format->bytes_per_pixel;
+            }
+
+            if (src_size->width < dst_size->width) /* black out remaining pixels */
+                memset(dst_ptr, 0, dst_format->bytes_per_pixel * (dst_size->width - src_size->width));
+        }
+
+        if (src_size->height < dst_size->height) /* black out remaining pixels */
+            memset(dst + src_size->height * dst_row_pitch, 0, dst_row_pitch * (dst_size->height - src_size->height));
+    }
+    if (src_size->depth < dst_size->depth) /* black out remaining pixels */
+        memset(dst + src_size->depth * dst_slice_pitch, 0, dst_slice_pitch * (dst_size->depth - src_size->depth));
+}
+
+/************************************************************
+ * point_filter_argb_pixels
+ *
+ * Copies the source buffer to the destination buffer, performing
+ * any necessary format conversion, color keying and stretching
+ * using a point filter.
+ */
+static void point_filter_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch, const struct volume *src_size,
+        const struct pixel_format_desc *src_format, BYTE *dst, UINT dst_row_pitch, UINT dst_slice_pitch,
+        const struct volume *dst_size, const struct pixel_format_desc *dst_format, D3DCOLOR color_key,
+        const PALETTEENTRY *palette, uint32_t filter_flags)
+{
+    struct argb_conversion_info conv_info, ck_conv_info;
+    const struct pixel_format_desc *ck_format = NULL;
+    BOOL src_pma, dst_pma;
+    DWORD channels[4];
+    UINT x, y, z;
+
+    TRACE("src %p, src_row_pitch %u, src_slice_pitch %u, src_size %p, src_format %p, dst %p, "
+            "dst_row_pitch %u, dst_slice_pitch %u, dst_size %p, dst_format %p, color_key 0x%08lx, palette %p.\n",
+            src, src_row_pitch, src_slice_pitch, src_size, src_format, dst, dst_row_pitch, dst_slice_pitch, dst_size,
+            dst_format, color_key, palette);
+
+    src_pma = !!(filter_flags & D3DX_FILTER_PMA_IN);
+    dst_pma = !!(filter_flags & D3DX_FILTER_PMA_OUT);
+    ZeroMemory(channels, sizeof(channels));
+    init_argb_conversion_info(src_format, dst_format, &conv_info);
+
+    if (color_key)
+    {
+        /* Color keys are always represented in D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM format. */
+        ck_format = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM);
+        init_argb_conversion_info(src_format, ck_format, &ck_conv_info);
+    }
+
+    for (z = 0; z < dst_size->depth; z++)
+    {
+        BYTE *dst_slice_ptr = dst + z * dst_slice_pitch;
+        const BYTE *src_slice_ptr = src + src_slice_pitch * (z * src_size->depth / dst_size->depth);
+
+        for (y = 0; y < dst_size->height; y++)
+        {
+            BYTE *dst_ptr = dst_slice_ptr + y * dst_row_pitch;
+            const BYTE *src_row_ptr = src_slice_ptr + src_row_pitch * (y * src_size->height / dst_size->height);
+
+            for (x = 0; x < dst_size->width; x++)
+            {
+                const BYTE *src_ptr = src_row_ptr + (x * src_size->width / dst_size->width) * src_format->bytes_per_pixel;
+
+                if (format_types_match(src_format, dst_format) && filter_flags_match(filter_flags)
+                        && src_format->bytes_per_pixel <= 4 && dst_format->bytes_per_pixel <= 4)
+                {
+                    DWORD val;
+
+                    get_relevant_argb_components(&conv_info, src_ptr, channels);
+                    val = make_argb_color(&conv_info, channels);
+
+                    if (color_key)
+                    {
+                        DWORD ck_pixel;
+
+                        get_relevant_argb_components(&ck_conv_info, src_ptr, channels);
+                        ck_pixel = make_argb_color(&ck_conv_info, channels);
+                        if (ck_pixel == color_key)
+                            val &= ~conv_info.destmask[0];
+                    }
+                    memcpy(dst_ptr, &val, dst_format->bytes_per_pixel);
+                }
+                else
+                {
+                    struct vec4 color, tmp;
+
+                    format_to_vec4(src_format, src_ptr, palette, &color);
+                    if (src_pma && src_pma != dst_pma)
+                        demultiply_alpha(&color);
+                    tmp = color;
+
+                    if (ck_format)
+                    {
+                        DWORD ck_pixel;
+
+                        format_from_vec4(ck_format, &tmp, &src_format->fmt_type_desc, (BYTE *)&ck_pixel);
+                        if (ck_pixel == color_key)
+                            tmp.w = 0.0f;
+                    }
+
+                    color = tmp;
+                    if (dst_pma && src_pma != dst_pma)
+                        premultiply_alpha(&color);
+                    format_from_vec4(dst_format, &color, &src_format->fmt_type_desc, dst_ptr);
+                }
+
+                dst_ptr += dst_format->bytes_per_pixel;
+            }
+        }
+    }
+}
+
+struct d3dx_bcn_decompression_context
+{
+    void (*decompress_bcn_block)(const void *, void *, int);
+    const struct pixel_format_desc *compressed_format_desc;
+    struct d3dx_pixels *compressed_pixels;
+
+    const struct pixel_format_desc *decompressed_format_desc;
+    uint8_t cur_block_decompressed[192];
+    uint32_t cur_block_row_pitch;
+    int32_t cur_block_x;
+    int32_t cur_block_y;
+    int32_t cur_block_z;
+};
+
+static void d3dx_init_bcn_decompression_context(struct d3dx_bcn_decompression_context *context,
+        struct d3dx_pixels *pixels, const struct pixel_format_desc *desc, const struct pixel_format_desc *dst_desc)
+{
+    memset(context, 0, sizeof(*context));
+    switch (desc->format)
+    {
+    case D3DX_PIXEL_FORMAT_DXT1_UNORM:
+        context->decompress_bcn_block = bcdec_bc1;
+        break;
+
+    case D3DX_PIXEL_FORMAT_DXT2_UNORM:
+    case D3DX_PIXEL_FORMAT_DXT3_UNORM:
+        context->decompress_bcn_block = bcdec_bc2;
+        break;
+
+    case D3DX_PIXEL_FORMAT_DXT4_UNORM:
+    case D3DX_PIXEL_FORMAT_DXT5_UNORM:
+        context->decompress_bcn_block = bcdec_bc3;
+        break;
+
+    default:
+        assert(0);
+        break;
+    }
+
+    context->compressed_format_desc = desc;
+    context->compressed_pixels = pixels;
+
+    context->decompressed_format_desc = dst_desc;
+    context->cur_block_row_pitch = dst_desc->bytes_per_pixel * desc->block_width;
+    context->cur_block_x = context->cur_block_y = context->cur_block_z = -1;
+}
+
+static void d3dx_fetch_bcn_texel(struct d3dx_bcn_decompression_context *context, int32_t x, int32_t y, int32_t z, void *texel)
+{
+    const struct pixel_format_desc *decomp_fmt_desc = context->decompressed_format_desc;
+    const struct pixel_format_desc *comp_fmt_desc = context->compressed_format_desc;
+    const int32_t y_aligned = (y & ~(comp_fmt_desc->block_height - 1));
+    const int32_t x_aligned = (x & ~(comp_fmt_desc->block_width - 1));
+    uint32_t pixel_offset;
+
+    if (z != context->cur_block_z || (x_aligned != context->cur_block_x) || (y_aligned != context->cur_block_y))
+    {
+        const BYTE *block_ptr = context->compressed_pixels->data;
+
+        block_ptr += z * context->compressed_pixels->slice_pitch;
+        block_ptr += (y / comp_fmt_desc->block_height) * context->compressed_pixels->row_pitch;
+        block_ptr += (x / comp_fmt_desc->block_width) * comp_fmt_desc->block_byte_count;
+        context->decompress_bcn_block(block_ptr, context->cur_block_decompressed, context->cur_block_row_pitch);
+        context->cur_block_x = (x & (comp_fmt_desc->block_width));
+        context->cur_block_y = (y & (comp_fmt_desc->block_height));
+        context->cur_block_z = z;
+    }
+
+    pixel_offset = (y & (comp_fmt_desc->block_height - 1)) * context->cur_block_row_pitch;
+    pixel_offset += (x & (comp_fmt_desc->block_width - 1)) * decomp_fmt_desc->bytes_per_pixel;
+    memcpy(texel, context->cur_block_decompressed + pixel_offset, decomp_fmt_desc->bytes_per_pixel);
+}
+
+static HRESULT d3dx_pixels_decompress(struct d3dx_pixels *pixels, const struct pixel_format_desc *desc,
+        BOOL is_dst, void **out_memory, uint32_t *out_row_pitch, uint32_t *out_slice_pitch,
+        const struct pixel_format_desc **out_desc)
+{
+    uint32_t x, y, z, uncompressed_slice_pitch, uncompressed_row_pitch;
+    const struct pixel_format_desc *uncompressed_desc = NULL;
+    struct d3dx_bcn_decompression_context context;
+    const struct volume *size = &pixels->size;
+    BYTE *uncompressed_mem;
+
+    switch (desc->format)
+    {
+        case D3DX_PIXEL_FORMAT_DXT1_UNORM:
+            uncompressed_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM);
+            break;
+        case D3DX_PIXEL_FORMAT_DXT2_UNORM:
+        case D3DX_PIXEL_FORMAT_DXT3_UNORM:
+            uncompressed_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM);
+            break;
+        case D3DX_PIXEL_FORMAT_DXT4_UNORM:
+        case D3DX_PIXEL_FORMAT_DXT5_UNORM:
+            uncompressed_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM);
+            break;
+        default:
+            FIXME("Unexpected compressed texture format %u.\n", desc->format);
+            return E_NOTIMPL;
+    }
+
+    uncompressed_row_pitch = size->width * uncompressed_desc->bytes_per_pixel;
+    uncompressed_slice_pitch = uncompressed_row_pitch * size->height;
+    if (!(uncompressed_mem = malloc(size->depth * uncompressed_slice_pitch)))
+        return E_OUTOFMEMORY;
+
+    /*
+     * For compressed destination pixels, width/height will represent
+     * the entire set of compressed blocks our destination rectangle touches.
+     * If we're only updating a sub-area of any blocks, we need to decompress
+     * the pixels outside of the sub-area.
+     */
+    if (is_dst)
+    {
+        const RECT aligned_rect = { 0, 0, size->width, size->height };
+
+        /*
+         * If our destination covers the entire set of blocks, no
+         * decompression needs to be done, just return the allocated memory.
+         */
+        if (EqualRect(&aligned_rect, &pixels->unaligned_rect))
+            goto exit;
+    }
+
+    TRACE("Decompressing pixels.\n");
+    d3dx_init_bcn_decompression_context(&context, pixels, desc, uncompressed_desc);
+    for (z = 0; z < size->depth; ++z)
+    {
+        for (y = 0; y < size->height; ++y)
+        {
+            BYTE *ptr = &uncompressed_mem[(z * uncompressed_slice_pitch) + (y * uncompressed_row_pitch)];
+            for (x = 0; x < size->width; ++x)
+            {
+                const POINT pt = { x, y };
+
+                if (!is_dst)
+                    d3dx_fetch_bcn_texel(&context, x + pixels->unaligned_rect.left, y + pixels->unaligned_rect.top, z, ptr);
+                else if (!PtInRect(&pixels->unaligned_rect, pt))
+                    d3dx_fetch_bcn_texel(&context, x, y, z, ptr);
+                ptr += uncompressed_desc->bytes_per_pixel;
+            }
+        }
+    }
+
+exit:
+    *out_memory = uncompressed_mem;
+    *out_row_pitch = uncompressed_row_pitch;
+    *out_slice_pitch = uncompressed_slice_pitch;
+    *out_desc = uncompressed_desc;
+
+    return S_OK;
+}
+
+static void d3dx_init_bcn_block_buffer(const void *src_data, uint32_t src_row_pitch, uint8_t src_width, uint8_t src_height,
+        const struct pixel_format_desc *src_desc, uint8_t *block_buf)
+{
+    uint8_t x, y;
+
+    for (y = 0; y < 4; ++y)
+    {
+        const uint8_t *src_row = ((const uint8_t *)src_data) + ((y % src_height) * src_row_pitch);
+
+        for (x = 0; x < 4; ++x)
+        {
+            uint8_t *dst_pixel = &block_buf[(y * 4 * src_desc->bytes_per_pixel) + (x * src_desc->bytes_per_pixel)];
+            const uint8_t *src_pixel = src_row + (((x % src_width)) * src_desc->bytes_per_pixel);
+
+            memcpy(dst_pixel, src_pixel, src_desc->bytes_per_pixel);
+        }
+    }
+}
+
+static void d3dx_compress_bc1_block(const void *src_data, uint32_t src_row_pitch, uint8_t src_width, uint8_t src_height,
+        void *dst_data)
+{
+    const struct pixel_format_desc *fmt_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM);
+    uint8_t tmp_buf[4 * 4 * 4];
+
+    d3dx_init_bcn_block_buffer(src_data, src_row_pitch, src_width, src_height, fmt_desc, tmp_buf);
+
+    stb_compress_dxt_block(dst_data, (const uint8_t *)tmp_buf, FALSE, 0);
+}
+
+static void d3dx_compress_bc2_block(const void *src_data, uint32_t src_row_pitch, uint8_t src_width, uint8_t src_height,
+        void *dst_data)
+{
+    const struct pixel_format_desc *fmt_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM);
+    uint8_t *dst_data_offset = dst_data;
+    uint8_t tmp_buf[4 * 4 * 4], y;
+
+    d3dx_init_bcn_block_buffer(src_data, src_row_pitch, src_width, src_height, fmt_desc, tmp_buf);
+    for (y = 0; y < 4; ++y)
+    {
+        uint8_t *tmp_row = &tmp_buf[y * 4 * fmt_desc->bytes_per_pixel];
+
+        dst_data_offset[0]  = (tmp_row[7] & 0xf0);
+        dst_data_offset[0] |= (tmp_row[3] >> 4);
+        dst_data_offset[1]  = (tmp_row[15] & 0xf0);
+        dst_data_offset[1] |= (tmp_row[11] >> 4);
+
+        /*
+         * Set all alpha values to 0xff so they aren't considered during
+         * compression.
+         */
+        tmp_row[3] = tmp_row[7] = tmp_row[11] = tmp_row[15] = 0xff;
+        dst_data_offset += 2;
+    }
+
+    stb_compress_dxt_block(dst_data_offset, (const unsigned char *)tmp_buf, FALSE, 0);
+}
+
+static void d3dx_compress_bc3_block(const void *src_data, uint32_t src_row_pitch, uint8_t src_width, uint8_t src_height,
+        void *dst_data)
+{
+    const struct pixel_format_desc *fmt_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM);
+    uint8_t tmp_buf[4 * 4 * 4];
+
+    d3dx_init_bcn_block_buffer(src_data, src_row_pitch, src_width, src_height, fmt_desc, tmp_buf);
+
+    stb_compress_dxt_block(dst_data, (const uint8_t *)tmp_buf, TRUE, 0);
+}
+
+static HRESULT d3dx_pixels_compress(struct d3dx_pixels *src_pixels,
+        const struct pixel_format_desc *src_desc, struct d3dx_pixels *dst_pixels,
+        const struct pixel_format_desc *dst_desc)
+{
+    void (*compress_bcn_block)(const void *, uint32_t, uint8_t, uint8_t, void *) = NULL;
+    uint32_t x, y, z;
+
+    /* Pick a compression function. */
+    switch (dst_desc->format)
+    {
+        case D3DX_PIXEL_FORMAT_DXT1_UNORM:
+            compress_bcn_block = d3dx_compress_bc1_block;
+            break;
+
+        case D3DX_PIXEL_FORMAT_DXT2_UNORM:
+        case D3DX_PIXEL_FORMAT_DXT3_UNORM:
+            compress_bcn_block = d3dx_compress_bc2_block;
+            break;
+
+        case D3DX_PIXEL_FORMAT_DXT4_UNORM:
+        case D3DX_PIXEL_FORMAT_DXT5_UNORM:
+            compress_bcn_block = d3dx_compress_bc3_block;
+            break;
+
+        default:
+            FIXME("Unexpected compressed texture format %u.\n", dst_desc->format);
+            return E_NOTIMPL;
+    }
+
+    assert(compress_bcn_block);
+
+    TRACE("Compressing pixels.\n");
+    for (z = 0; z < src_pixels->size.depth; ++z)
+    {
+        const BYTE *src_slice = ((const BYTE *)src_pixels->data) + (z * src_pixels->slice_pitch);
+        BYTE *dst_slice = ((BYTE *)dst_pixels->data) + (z * dst_pixels->slice_pitch);
+
+        for (y = 0; y < src_pixels->size.height; y += dst_desc->block_height)
+        {
+            BYTE *dst_ptr = &dst_slice[(y / dst_desc->block_height) * dst_pixels->row_pitch];
+            uint8_t tmp_src_height = min(dst_desc->block_height, src_pixels->size.height - y);
+            const BYTE *src_ptr = &src_slice[y * src_pixels->row_pitch];
+
+            for (x = 0; x < src_pixels->size.width; x += dst_desc->block_width)
+            {
+                uint8_t tmp_src_width = min(dst_desc->block_width, src_pixels->size.width - x);
+
+                compress_bcn_block(src_ptr, src_pixels->row_pitch, tmp_src_width, tmp_src_height, dst_ptr);
+                src_ptr += (src_desc->bytes_per_pixel * dst_desc->block_width);
+                dst_ptr += dst_desc->block_byte_count;
+            }
+        }
+    }
+
+    return S_OK;
+}
+
+HRESULT d3dx_pixels_init(const void *data, uint32_t row_pitch, uint32_t slice_pitch,
+        const PALETTEENTRY *palette, enum d3dx_pixel_format_id format, uint32_t left, uint32_t top, uint32_t right,
+        uint32_t bottom, uint32_t front, uint32_t back, struct d3dx_pixels *pixels)
+{
+    const struct pixel_format_desc *fmt_desc = get_d3dx_pixel_format_info(format);
+    const BYTE *ptr = data;
+    RECT unaligned_rect;
+
+    memset(pixels, 0, sizeof(*pixels));
+    if (is_unknown_format(fmt_desc))
+    {
+        FIXME("Unsupported format %#x.\n", format);
+        return E_NOTIMPL;
+    }
+
+    ptr += front * slice_pitch;
+    ptr += (top / fmt_desc->block_height) * row_pitch;
+    ptr += (left / fmt_desc->block_width) * fmt_desc->block_byte_count;
+
+    if (is_compressed_format(fmt_desc))
+    {
+        uint32_t left_aligned, top_aligned;
+
+        top_aligned = top & ~(fmt_desc->block_height - 1);
+        left_aligned = left & ~(fmt_desc->block_width - 1);
+        SetRect(&unaligned_rect, left, top, right, bottom);
+        OffsetRect(&unaligned_rect, -left_aligned, -top_aligned);
+    }
+    else
+    {
+        SetRect(&unaligned_rect, 0, 0, (right - left), (bottom - top));
+    }
+
+    set_d3dx_pixels(pixels, ptr, row_pitch, slice_pitch, palette, (right - left), (bottom - top), (back - front),
+            &unaligned_rect);
+
+    return S_OK;
+}
+
+static const char *debug_d3dx_pixels(struct d3dx_pixels *pixels)
+{
+    if (!pixels)
+        return "(null)";
+    return wine_dbg_sprintf("(data %p, row_pitch %d, slice_pitch %d, palette %p, width %d, height %d, depth %d, "
+            "unaligned_rect %s)", pixels->data, pixels->row_pitch, pixels->slice_pitch, pixels->palette,
+            pixels->size.width, pixels->size.height, pixels->size.depth, wine_dbgstr_rect(&pixels->unaligned_rect));
+}
+
+HRESULT d3dx_load_pixels_from_pixels(struct d3dx_pixels *dst_pixels,
+       const struct pixel_format_desc *dst_desc, struct d3dx_pixels *src_pixels,
+       const struct pixel_format_desc *src_desc, uint32_t filter_flags, uint32_t color_key)
+{
+    struct volume src_size, dst_size, dst_size_aligned;
+    BOOL src_pma, dst_pma;
+    HRESULT hr = S_OK;
+
+    TRACE("dst_pixels %s, dst_desc %p, src_pixels %s, src_desc %p, filter_flags %#x, color_key %#x.\n",
+            debug_d3dx_pixels(dst_pixels), dst_desc, debug_d3dx_pixels(src_pixels), src_desc,
+            filter_flags, color_key);
+
+    if (src_desc->fmt_type_desc.fmt_flags & FMT_FLAG_PM_ALPHA)
+        filter_flags |= D3DX_FILTER_PMA_IN;
+
+    if (dst_desc->fmt_type_desc.fmt_flags & FMT_FLAG_PM_ALPHA)
+        filter_flags |= D3DX_FILTER_PMA_OUT;
+
+    src_pma = !!(filter_flags & D3DX_FILTER_PMA_IN);
+    dst_pma = !!(filter_flags & D3DX_FILTER_PMA_OUT);
+
+    if (is_compressed_format(src_desc))
+        set_volume_struct(&src_size, (src_pixels->unaligned_rect.right - src_pixels->unaligned_rect.left),
+                (src_pixels->unaligned_rect.bottom - src_pixels->unaligned_rect.top), src_pixels->size.depth);
+    else
+        src_size = src_pixels->size;
+
+    dst_size_aligned = dst_pixels->size;
+    if (is_compressed_format(dst_desc))
+        set_volume_struct(&dst_size, (dst_pixels->unaligned_rect.right - dst_pixels->unaligned_rect.left),
+                (dst_pixels->unaligned_rect.bottom - dst_pixels->unaligned_rect.top), dst_pixels->size.depth);
+    else
+        dst_size = dst_size_aligned;
+
+    /* Everything matches, simply copy the pixels. */
+    if (src_desc->format == dst_desc->format
+            && (dst_size.width == src_size.width && !(dst_size.width % dst_desc->block_width))
+            && (dst_size.height == src_size.height && !(dst_size.height % dst_desc->block_height))
+            && (dst_size.depth == src_size.depth)
+            && (src_pma == dst_pma)
+            && color_key == 0
+            && !(src_pixels->unaligned_rect.left & (src_desc->block_width - 1))
+            && !(src_pixels->unaligned_rect.top & (src_desc->block_height - 1))
+            && !(dst_pixels->unaligned_rect.left & (dst_desc->block_width - 1))
+            && !(dst_pixels->unaligned_rect.top & (dst_desc->block_height - 1)))
+    {
+        TRACE("Simple copy.\n");
+        copy_pixels(src_pixels->data, src_pixels->row_pitch, src_pixels->slice_pitch, (void *)dst_pixels->data,
+                dst_pixels->row_pitch, dst_pixels->slice_pitch, &src_size, src_desc);
+        return S_OK;
+    }
+
+    /* Stretching or format conversion. */
+    if (!is_conversion_from_supported(src_desc)
+            || !is_conversion_to_supported(dst_desc))
+    {
+        FIXME("Unsupported format conversion %#x -> %#x.\n", src_desc->format, dst_desc->format);
+        return E_NOTIMPL;
+    }
+
+    /*
+     * If the source is a compressed image, we need to decompress it first
+     * before doing any modifications.
+     */
+    if (is_compressed_format(src_desc))
+    {
+        uint32_t uncompressed_row_pitch, uncompressed_slice_pitch;
+        const struct pixel_format_desc *uncompressed_desc;
+        void *uncompressed_mem = NULL;
+
+        hr = d3dx_pixels_decompress(src_pixels, src_desc, FALSE, &uncompressed_mem, &uncompressed_row_pitch,
+                &uncompressed_slice_pitch, &uncompressed_desc);
+        if (SUCCEEDED(hr))
+        {
+            struct d3dx_pixels uncompressed_pixels;
+
+            d3dx_pixels_init(uncompressed_mem, uncompressed_row_pitch, uncompressed_slice_pitch, NULL,
+                    uncompressed_desc->format, 0, 0, src_pixels->size.width, src_pixels->size.height,
+                    0, src_pixels->size.depth, &uncompressed_pixels);
+
+            hr = d3dx_load_pixels_from_pixels(dst_pixels, dst_desc, &uncompressed_pixels, uncompressed_desc,
+                    filter_flags, color_key);
+        }
+        free(uncompressed_mem);
+        goto exit;
+    }
+
+    /* Same as the above, need to decompress the destination prior to modifying. */
+    if (is_compressed_format(dst_desc))
+    {
+        uint32_t uncompressed_row_pitch, uncompressed_slice_pitch;
+        const struct pixel_format_desc *uncompressed_desc;
+        struct d3dx_pixels uncompressed_pixels;
+        void *uncompressed_mem = NULL;
+
+        hr = d3dx_pixels_decompress(dst_pixels, dst_desc, TRUE, &uncompressed_mem, &uncompressed_row_pitch,
+                &uncompressed_slice_pitch, &uncompressed_desc);
+        if (FAILED(hr))
+            goto exit;
+
+        d3dx_pixels_init(uncompressed_mem, uncompressed_row_pitch, uncompressed_slice_pitch, NULL,
+                uncompressed_desc->format, dst_pixels->unaligned_rect.left, dst_pixels->unaligned_rect.top,
+                dst_pixels->unaligned_rect.right, dst_pixels->unaligned_rect.bottom, 0, dst_pixels->size.depth,
+                &uncompressed_pixels);
+
+        hr = d3dx_load_pixels_from_pixels(&uncompressed_pixels, uncompressed_desc, src_pixels, src_desc, filter_flags,
+                color_key);
+        if (SUCCEEDED(hr))
+        {
+            d3dx_pixels_init(uncompressed_mem, uncompressed_row_pitch, uncompressed_slice_pitch, NULL,
+                    uncompressed_desc->format, 0, 0, dst_size_aligned.width, dst_size_aligned.height, 0,
+                    dst_pixels->size.depth, &uncompressed_pixels);
+
+            hr = d3dx_pixels_compress(&uncompressed_pixels, uncompressed_desc, dst_pixels, dst_desc);
+            if (FAILED(hr))
+                WARN("Failed to compress pixels, hr %#lx.\n", hr);
+        }
+        free(uncompressed_mem);
+        goto exit;
+    }
+
+    if ((filter_flags & 0xf) == D3DX_FILTER_NONE)
+    {
+        convert_argb_pixels(src_pixels->data, src_pixels->row_pitch, src_pixels->slice_pitch, &src_size, src_desc,
+                (BYTE *)dst_pixels->data, dst_pixels->row_pitch, dst_pixels->slice_pitch, &dst_size, dst_desc,
+                color_key, src_pixels->palette, filter_flags);
+    }
+    else /* if ((filter & 0xf) == D3DX_FILTER_POINT) */
+    {
+        if ((filter_flags & 0xf) != D3DX_FILTER_POINT)
+            FIXME("Unhandled filter %#x.\n", filter_flags);
+
+        /* Always apply a point filter until D3DX_FILTER_LINEAR,
+         * D3DX_FILTER_TRIANGLE and D3DX_FILTER_BOX are implemented. */
+        point_filter_argb_pixels(src_pixels->data, src_pixels->row_pitch, src_pixels->slice_pitch, &src_size,
+                src_desc, (BYTE *)dst_pixels->data, dst_pixels->row_pitch, dst_pixels->slice_pitch, &dst_size,
+                dst_desc, color_key, src_pixels->palette, filter_flags);
+    }
+
+exit:
+    if (FAILED(hr))
+        WARN("Failed to load pixels, hr %#lx.\n", hr);
+    return hr;
+}
+
+void get_aligned_rect(uint32_t left, uint32_t top, uint32_t right, uint32_t bottom, uint32_t width, uint32_t height,
+        const struct pixel_format_desc *fmt_desc, RECT *aligned_rect)
+{
+    SetRect(aligned_rect, left, top, right, bottom);
+    if (aligned_rect->left & (fmt_desc->block_width - 1))
+        aligned_rect->left = aligned_rect->left & ~(fmt_desc->block_width - 1);
+    if (aligned_rect->top & (fmt_desc->block_height - 1))
+        aligned_rect->top = aligned_rect->top & ~(fmt_desc->block_height - 1);
+    if (aligned_rect->right & (fmt_desc->block_width - 1) && aligned_rect->right != width)
+        aligned_rect->right = min((aligned_rect->right + fmt_desc->block_width - 1)
+                & ~(fmt_desc->block_width - 1), width);
+    if (aligned_rect->bottom & (fmt_desc->block_height - 1) && aligned_rect->bottom != height)
+        aligned_rect->bottom = min((aligned_rect->bottom + fmt_desc->block_height - 1)
+                & ~(fmt_desc->block_height - 1), height);
 }
