@@ -326,6 +326,7 @@ NTSTATUS WINAPI wow64_NtQuerySystemInformation( UINT *args )
     case SystemCurrentTimeZoneInformation:   /* RTL_TIME_ZONE_INFORMATION */
     case SystemRecommendedSharedDataAlignment:  /* ULONG */
     case SystemFirmwareTableInformation:  /* SYSTEM_FIRMWARE_TABLE_INFORMATION */
+    case SystemProcessorIdleCycleTimeInformation:  /* ULONG64[] */
     case SystemDynamicTimeZoneInformation:  /* RTL_DYNAMIC_TIME_ZONE_INFORMATION */
     case SystemCodeIntegrityInformation:  /* SYSTEM_CODEINTEGRITY_INFORMATION */
     case SystemKernelDebuggerInformationEx:  /* SYSTEM_KERNEL_DEBUGGER_INFORMATION_EX */
@@ -627,6 +628,9 @@ NTSTATUS WINAPI wow64_NtQuerySystemInformationEx( UINT *args )
 
     switch (class)
     {
+    case SystemProcessorIdleCycleTimeInformation:
+        return NtQuerySystemInformationEx( class, query, query_len, ptr, len, retlen );
+
     case SystemLogicalProcessorInformationEx:  /* SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX */
     {
         SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX32 *ex32, *info32 = ptr;
