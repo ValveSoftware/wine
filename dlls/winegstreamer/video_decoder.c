@@ -1126,7 +1126,7 @@ static HRESULT WINAPI media_object_SetInputType(IMediaObject *iface, DWORD index
         if (IsEqualGUID(&type->subtype, get_dmo_subtype(decoder->input_types[i])))
             break;
     if (i == decoder->input_type_count)
-        return DMO_E_TYPE_NOT_ACCEPTED;
+        FIXME("HACK: Using a type which is not an available input type of this decoder.\n");
 
     if (FAILED(MFCreateMediaTypeFromRepresentation(AM_MEDIA_TYPE_REPRESENTATION,
             (void *)type, &media_type)))
