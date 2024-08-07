@@ -326,7 +326,7 @@ int pad_reader_read(void *data_src, uint8_t *buffer, size_t size, size_t *read_s
         }
         else
         {
-            GST_WARNING("Failed to pull data from %"GST_PTR_FORMAT", reason %s.",
+            GST_ERROR("Failed to pull data from %"GST_PTR_FORMAT", reason %s.",
                     reader->pad, gst_flow_get_name(gst_ret));
             return CONV_ERROR;
         }
@@ -700,7 +700,7 @@ static void video_conv_init_transcode(VideoConv *conv)
     }
     else
     {
-        GST_WARNING("Failed to hash upstream data.");
+        GST_ERROR("Failed to hash upstream data.");
     }
 
     if (!(state->state_flags & VIDEO_CONV_IS_DUMPING))
