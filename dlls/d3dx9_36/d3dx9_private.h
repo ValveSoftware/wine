@@ -202,12 +202,9 @@ enum d3dx_pixel_format_id wic_guid_to_d3dx_pixel_format_id(const GUID *guid);
 const GUID *d3dx_pixel_format_id_to_wic_guid(enum d3dx_pixel_format_id format);
 HRESULT d3dx_pixel_format_to_dds_pixel_format(struct dds_pixel_format *pixel_format,
         enum d3dx_pixel_format_id format);
-HRESULT d3dx_calculate_pixels_size(enum d3dx_pixel_format_id format, uint32_t width, uint32_t height,
-    uint32_t *pitch, uint32_t *size);
 
 D3DFORMAT d3dformat_from_d3dx_pixel_format_id(enum d3dx_pixel_format_id format);
 enum d3dx_pixel_format_id d3dx_pixel_format_id_from_d3dformat(D3DFORMAT format);
-const struct pixel_format_desc *get_d3dx_pixel_format_info(enum d3dx_pixel_format_id format);
 const struct pixel_format_desc *get_format_info(D3DFORMAT format);
 const struct pixel_format_desc *get_format_info_idx(int idx);
 
@@ -230,9 +227,6 @@ void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pit
 HRESULT d3dx_pixels_init(const void *data, uint32_t row_pitch, uint32_t slice_pitch,
         const PALETTEENTRY *palette, enum d3dx_pixel_format_id format, uint32_t left, uint32_t top, uint32_t right,
         uint32_t bottom, uint32_t front, uint32_t back, struct d3dx_pixels *pixels);
-HRESULT d3dx_load_pixels_from_pixels(struct d3dx_pixels *dst_pixels,
-       const struct pixel_format_desc *dst_desc, struct d3dx_pixels *src_pixels,
-       const struct pixel_format_desc *src_desc, uint32_t filter_flags, uint32_t color_key);
 void get_aligned_rect(uint32_t left, uint32_t top, uint32_t right, uint32_t bottom, uint32_t width, uint32_t height,
         const struct pixel_format_desc *fmt_desc, RECT *aligned_rect);
 

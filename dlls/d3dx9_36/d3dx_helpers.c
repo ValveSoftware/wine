@@ -377,7 +377,7 @@ HRESULT d3dx_pixel_format_to_dds_pixel_format(struct dds_pixel_format *pixel_for
 
 }
 
-static enum d3dx_pixel_format_id d3dx_pixel_format_id_from_dxgi_format(DXGI_FORMAT format)
+enum d3dx_pixel_format_id d3dx_pixel_format_id_from_dxgi_format(uint32_t format)
 {
     switch (format)
     {
@@ -421,7 +421,7 @@ static enum d3dx_pixel_format_id d3dx_pixel_format_id_from_dxgi_format(DXGI_FORM
     }
 }
 
-static void d3dx_get_next_mip_level_size(struct volume *size)
+void d3dx_get_next_mip_level_size(struct volume *size)
 {
     size->width  = max(size->width  / 2, 1);
     size->height = max(size->height / 2, 1);
@@ -460,7 +460,7 @@ HRESULT d3dx_calculate_pixels_size(enum d3dx_pixel_format_id format, uint32_t wi
     return D3D_OK;
 }
 
-static uint32_t d3dx_calculate_layer_pixels_size(enum d3dx_pixel_format_id format, uint32_t width, uint32_t height, uint32_t depth,
+uint32_t d3dx_calculate_layer_pixels_size(enum d3dx_pixel_format_id format, uint32_t width, uint32_t height, uint32_t depth,
         uint32_t mip_levels)
 {
     uint32_t layer_size, row_pitch, slice_pitch, i;
