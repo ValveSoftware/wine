@@ -1938,6 +1938,28 @@ static void d3dx_compress_bc3_block(const void *src_data, uint32_t src_row_pitch
     stb_compress_dxt_block(dst_data, (const uint8_t *)tmp_buf, TRUE, 0);
 }
 
+static void d3dx_compress_bc4_block(const void *src_data, uint32_t src_row_pitch, uint8_t src_width, uint8_t src_height,
+        void *dst_data)
+{
+    const struct pixel_format_desc *fmt_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8_UNORM);
+    uint8_t tmp_buf[4 * 4];
+
+    d3dx_init_bcn_block_buffer(src_data, src_row_pitch, src_width, src_height, fmt_desc, tmp_buf);
+
+    stb_compress_bc4_block(dst_data, (const unsigned char *)tmp_buf);
+}
+
+static void d3dx_compress_bc5_block(const void *src_data, uint32_t src_row_pitch, uint8_t src_width, uint8_t src_height,
+        void *dst_data)
+{
+    const struct pixel_format_desc *fmt_desc = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_R8G8_UNORM);
+    uint8_t tmp_buf[4 * 4 * 2];
+
+    d3dx_init_bcn_block_buffer(src_data, src_row_pitch, src_width, src_height, fmt_desc, tmp_buf);
+
+    stb_compress_bc5_block(dst_data, (const unsigned char *)tmp_buf);
+}
+
 static HRESULT d3dx_pixels_compress(struct d3dx_pixels *src_pixels,
         const struct pixel_format_desc *src_desc, struct d3dx_pixels *dst_pixels,
         const struct pixel_format_desc *dst_desc)
@@ -1960,6 +1982,16 @@ static HRESULT d3dx_pixels_compress(struct d3dx_pixels *src_pixels,
         case D3DX_PIXEL_FORMAT_DXT4_UNORM:
         case D3DX_PIXEL_FORMAT_DXT5_UNORM:
             compress_bcn_block = d3dx_compress_bc3_block;
+            break;
+
+        case D3DX_PIXEL_FORMAT_BC4_UNORM:
+        case D3DX_PIXEL_FORMAT_BC4_SNORM:
+            compress_bcn_block = d3dx_compress_bc4_block;
+            break;
+
+        case D3DX_PIXEL_FORMAT_BC5_UNORM:
+        case D3DX_PIXEL_FORMAT_BC5_SNORM:
+            compress_bcn_block = d3dx_compress_bc5_block;
             break;
 
         default:
