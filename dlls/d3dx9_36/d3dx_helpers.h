@@ -169,6 +169,13 @@ struct pixel_format_desc {
     struct pixel_format_type_desc fmt_type_desc;
 };
 
+const struct pixel_format_desc *get_d3dx_pixel_format_info(enum d3dx_pixel_format_id format);
+enum d3dx_pixel_format_id d3dx_pixel_format_id_from_dxgi_format(uint32_t format);
+HRESULT d3dx_calculate_pixels_size(enum d3dx_pixel_format_id format, uint32_t width, uint32_t height,
+    uint32_t *pitch, uint32_t *size);
+uint32_t d3dx_calculate_layer_pixels_size(enum d3dx_pixel_format_id format, uint32_t width, uint32_t height, uint32_t depth,
+        uint32_t mip_levels);
+
 struct d3dx_pixels
 {
     const void *data;
@@ -191,6 +198,11 @@ static inline void set_d3dx_pixels(struct d3dx_pixels *pixels, const void *data,
     set_volume_struct(&pixels->size, width, height, depth);
     pixels->unaligned_rect = *unaligned_rect;
 }
+
+HRESULT d3dx_load_pixels_from_pixels(struct d3dx_pixels *dst_pixels,
+       const struct pixel_format_desc *dst_desc, struct d3dx_pixels *src_pixels,
+       const struct pixel_format_desc *src_desc, uint32_t filter_flags, uint32_t color_key);
+void d3dx_get_next_mip_level_size(struct volume *size);
 
 #define D3DX_IMAGE_INFO_ONLY 1
 #define D3DX_IMAGE_SUPPORT_DXT10 2

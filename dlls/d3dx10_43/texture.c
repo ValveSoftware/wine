@@ -854,6 +854,141 @@ static HRESULT convert_image(IWICImagingFactory *factory, IWICBitmapFrameDecode 
     return hr;
 }
 
+#define D3DERR_INVALIDCALL 0x8876086c
+#define D3DX_FILTER_INVALID_BITS 0xff80fff8
+static inline HRESULT d3dx_validate_filter(uint32_t filter)
+{
+    if ((filter & D3DX_FILTER_INVALID_BITS) || !(filter & 0x7) || ((filter & 0x7) > D3DX10_FILTER_BOX))
+        return D3DERR_INVALIDCALL;
+
+    return S_OK;
+}
+
+static HRESULT d3dx_handle_filter(uint32_t *filter)
+{
+    if (*filter == D3DX10_DEFAULT || !(*filter))
+        *filter = D3DX10_FILTER_TRIANGLE | D3DX10_FILTER_DITHER;
+
+    return d3dx_validate_filter(*filter);
+}
+
+static HRESULT d3dx_load_texture_data(struct d3dx_image *image, D3DX10_IMAGE_LOAD_INFO *load_info,
+        const D3DX10_IMAGE_INFO *img_info, D3D10_SUBRESOURCE_DATA **resource_data)
+{
+    const struct pixel_format_desc *fmt_desc, *src_desc;
+    D3DX10_IMAGE_LOAD_INFO tmp_load_info = *load_info;
+    uint32_t i, j, pixels_size, pixels_offset;
+    uint8_t *res_data = NULL, *pixels_buffer;
+    HRESULT hr = S_OK;
+
+    if (img_info->ImageFileFormat == D3DX10_IFF_BMP)
+        return E_NOTIMPL;
+
+    if (FAILED(hr = d3dx_handle_filter(&tmp_load_info.Filter)))
+    {
+        FIXME("Invalid filter argument.\n");
+        return hr;
+    }
+
+    if (tmp_load_info.Format == D3DX10_DEFAULT || tmp_load_info.Format == DXGI_FORMAT_FROM_FILE)
+        tmp_load_info.Format = img_info->Format;
+    fmt_desc = get_d3dx_pixel_format_info(d3dx_pixel_format_id_from_dxgi_format(tmp_load_info.Format));
+    if (fmt_desc->format == D3DX_PIXEL_FORMAT_COUNT)
+    {
+        FIXME("Unknown DXGI format supplied, %#x.\n", tmp_load_info.Format);
+        return E_NOTIMPL;
+    }
+
+    /* Potentially round up width/height to align with block size. */
+    if (!tmp_load_info.Width || tmp_load_info.Width == D3DX10_FROM_FILE || tmp_load_info.Width == D3DX10_DEFAULT)
+        tmp_load_info.Width = (img_info->Width + fmt_desc->block_width - 1) & ~(fmt_desc->block_width - 1);
+    if (!tmp_load_info.Height || tmp_load_info.Height == D3DX10_FROM_FILE || tmp_load_info.Height == D3DX10_DEFAULT)
+        tmp_load_info.Height = (img_info->Height + fmt_desc->block_height - 1) & ~(fmt_desc->block_height - 1);
+
+    if (!tmp_load_info.Depth || tmp_load_info.Depth == D3DX10_FROM_FILE || tmp_load_info.Depth == D3DX10_DEFAULT)
+        tmp_load_info.Depth = img_info->Depth;
+    if ((tmp_load_info.Depth > 1) && (img_info->ResourceDimension != D3D10_RESOURCE_DIMENSION_TEXTURE3D))
+        return E_FAIL;
+
+    if (load_info->MipLevels != D3DX10_DEFAULT)
+        FIXME("load_info->MipLevels argument ignored.\n");
+    tmp_load_info.MipLevels = img_info->MipLevels;
+
+    pixels_size = d3dx_calculate_layer_pixels_size(fmt_desc->format, tmp_load_info.Width, tmp_load_info.Height,
+            tmp_load_info.Depth, tmp_load_info.MipLevels) * img_info->ArraySize;
+    pixels_offset = (sizeof(**resource_data) * tmp_load_info.MipLevels * img_info->ArraySize);
+    if (!(res_data = malloc(pixels_size + pixels_offset)))
+        return E_FAIL;
+
+    pixels_buffer = res_data + pixels_offset;
+    *resource_data = (D3D10_SUBRESOURCE_DATA *)res_data;
+
+    src_desc = get_d3dx_pixel_format_info(image->format);
+    for (i = 0; i < img_info->ArraySize; ++i)
+    {
+        struct volume dst_size = { tmp_load_info.Width, tmp_load_info.Height, tmp_load_info.Depth };
+
+        for (j = 0; j < tmp_load_info.MipLevels; ++j)
+        {
+            const RECT unaligned_rect = { 0, 0, dst_size.width, dst_size.height };
+            struct d3dx_pixels src_pixels, dst_pixels;
+            uint32_t dst_row_pitch, dst_slice_pitch;
+
+            hr = d3dx_image_get_pixels(image, i, j, &src_pixels);
+            if (FAILED(hr))
+                break;
+
+            hr = d3dx_calculate_pixels_size(fmt_desc->format, dst_size.width, dst_size.height, &dst_row_pitch,
+                    &dst_slice_pitch);
+            if (FAILED(hr))
+                break;
+
+            set_d3dx_pixels(&dst_pixels, pixels_buffer, dst_row_pitch, dst_slice_pitch, NULL, dst_size.width,
+                    dst_size.height, dst_size.depth, &unaligned_rect);
+
+            hr = d3dx_load_pixels_from_pixels(&dst_pixels, fmt_desc, &src_pixels, src_desc, tmp_load_info.Filter, 0);
+            if (FAILED(hr))
+                break;
+
+            (*resource_data)[i * tmp_load_info.MipLevels + j].pSysMem = pixels_buffer;
+            (*resource_data)[i * tmp_load_info.MipLevels + j].SysMemPitch = dst_row_pitch;
+            (*resource_data)[i * tmp_load_info.MipLevels + j].SysMemSlicePitch = dst_slice_pitch;
+
+            pixels_buffer += dst_slice_pitch * dst_size.depth;
+            d3dx_get_next_mip_level_size(&dst_size);
+        }
+    }
+
+    if (FAILED(hr))
+    {
+        *resource_data = NULL;
+        free(res_data);
+        return hr;
+    }
+
+    if (load_info->FirstMipLevel != D3DX10_DEFAULT && load_info->FirstMipLevel)
+        FIXME("load_info->FirstMipLevel is ignored.\n");
+    if (load_info->Usage != D3DX10_DEFAULT)
+        FIXME("load_info->Usage is ignored.\n");
+    if (load_info->BindFlags != D3DX10_DEFAULT)
+        FIXME("load_info->BindFlags is ignored.\n");
+    if (load_info->CpuAccessFlags != D3DX10_DEFAULT)
+        FIXME("load_info->CpuAccessFlags is ignored.\n");
+    if (load_info->MiscFlags != D3DX10_DEFAULT)
+        FIXME("load_info->MiscFlags is ignored.\n");
+    if (load_info->MipFilter != D3DX10_DEFAULT)
+        FIXME("load_info->MipFilter is ignored.\n");
+    if (load_info->pSrcInfo)
+        FIXME("load_info->pSrcInfo is ignored.\n");
+    *load_info = tmp_load_info;
+    load_info->Usage = D3D10_USAGE_DEFAULT;
+    load_info->BindFlags = D3D10_BIND_SHADER_RESOURCE;
+    load_info->CpuAccessFlags = 0;
+    load_info->MiscFlags = img_info->MiscFlags;
+
+    return S_OK;
+}
+
 HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO *load_info,
         D3D10_SUBRESOURCE_DATA **resource_data)
 {
@@ -866,8 +1001,39 @@ HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO 
     BYTE *res_data = NULL, *buffer;
     D3DX10_IMAGE_INFO img_info;
     IWICStream *stream = NULL;
+    struct d3dx_image image;
     const GUID *dst_format;
     HRESULT hr;
+
+    if (!data || !size)
+        return E_FAIL;
+
+    hr = d3dx_image_init(data, size, &image, 0, D3DX_IMAGE_SUPPORT_DXT10);
+    if (FAILED(hr))
+        return E_FAIL;
+
+    hr = d3dx10_image_info_from_d3dx_image(&img_info, &image);
+    if (FAILED(hr))
+    {
+        WARN("Invalid or unsupported image file, hr %#lx.\n", hr);
+        hr = E_FAIL;
+        goto end;
+    }
+
+    if ((!(img_info.MiscFlags & D3D10_RESOURCE_MISC_TEXTURECUBE) || img_info.ArraySize != 6)
+            && img_info.ArraySize != 1)
+    {
+        FIXME("img_info.ArraySize = %u not supported.\n", img_info.ArraySize);
+        hr = E_NOTIMPL;
+        goto end;
+    }
+
+    if (SUCCEEDED(hr = d3dx_load_texture_data(&image, load_info, &img_info, resource_data)))
+    {
+        TRACE("Successfully used shared code to load texture data.\n");
+        res_data = NULL;
+        goto end;
+    }
 
     if (load_info->Width != D3DX10_DEFAULT)
         FIXME("load_info->Width is ignored.\n");
@@ -895,16 +1061,6 @@ HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO 
         FIXME("load_info->MipFilter is ignored.\n");
     if (load_info->pSrcInfo)
         FIXME("load_info->pSrcInfo is ignored.\n");
-
-    if (FAILED(D3DX10GetImageInfoFromMemory(data, size, NULL, &img_info, NULL)))
-        return E_FAIL;
-    if ((!(img_info.MiscFlags & D3D10_RESOURCE_MISC_TEXTURECUBE) || img_info.ArraySize != 6)
-            && img_info.ArraySize != 1)
-    {
-        FIXME("img_info.ArraySize = %u not supported.\n", img_info.ArraySize);
-        return E_NOTIMPL;
-    }
-
 
     if (FAILED(hr = WICCreateImagingFactory_Proxy(WINCODEC_SDK_VERSION, &factory)))
         goto end;
@@ -1043,6 +1199,7 @@ HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO 
     hr = S_OK;
 
 end:
+    d3dx_image_cleanup(&image);
     if (dds_decoder)
         IWICDdsDecoder_Release(dds_decoder);
     if (dds_frame)
