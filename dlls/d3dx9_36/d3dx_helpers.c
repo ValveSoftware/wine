@@ -430,6 +430,28 @@ void d3dx_get_next_mip_level_size(struct volume *size)
     size->depth  = max(size->depth  / 2, 1);
 }
 
+void d3dx_get_mip_level_size(struct volume *size, uint32_t level)
+{
+    uint32_t i;
+
+    for (i = 0; i < level; ++i)
+        d3dx_get_next_mip_level_size(size);
+}
+
+uint32_t d3dx_get_max_mip_levels_for_size(uint32_t width, uint32_t height, uint32_t depth)
+{
+    struct volume tmp = { width, height, depth };
+    uint32_t mip_levels = 1;
+
+    while (!(tmp.width == 1 && tmp.height == 1 && tmp.depth == 1))
+    {
+        d3dx_get_next_mip_level_size(&tmp);
+        mip_levels++;
+    }
+
+    return mip_levels;
+}
+
 static const char *debug_volume(const struct volume *volume)
 {
     if (!volume)

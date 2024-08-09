@@ -204,6 +204,8 @@ HRESULT d3dx_load_pixels_from_pixels(struct d3dx_pixels *dst_pixels,
        const struct pixel_format_desc *dst_desc, struct d3dx_pixels *src_pixels,
        const struct pixel_format_desc *src_desc, uint32_t filter_flags, uint32_t color_key);
 void d3dx_get_next_mip_level_size(struct volume *size);
+void d3dx_get_mip_level_size(struct volume *size, uint32_t level);
+uint32_t d3dx_get_max_mip_levels_for_size(uint32_t width, uint32_t height, uint32_t depth);
 
 #define D3DX_IMAGE_INFO_ONLY 1
 #define D3DX_IMAGE_SUPPORT_DXT10 2

@@ -1468,7 +1468,6 @@ static void check_resource_info(ID3D10Resource *resource, const struct test_imag
             ok_(__FILE__, line)(desc_2d.Height == expected_height,
                     "Got unexpected Height %u, expected %u.\n",
                      desc_2d.Height, expected_height);
-            todo_wine_if(expected_mip_levels != image->expected_info.MipLevels)
             ok_(__FILE__, line)(desc_2d.MipLevels == expected_mip_levels,
                     "Got unexpected MipLevels %u, expected %u.\n",
                      desc_2d.MipLevels, expected_mip_levels);
