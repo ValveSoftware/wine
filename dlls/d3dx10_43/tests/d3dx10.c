@@ -4136,7 +4136,7 @@ static void test_create_texture(void)
         for (mip_level = 0; mip_level < 4; ++mip_level)
         {
             winetest_push_context("MipLevel %u", mip_level);
-            todo_wine_if(i && mip_level != 3) check_texture_sub_resource_color(tex_2d, mip_level, NULL,
+            check_texture_sub_resource_color(tex_2d, mip_level, NULL,
                     dds_24bit_8_8_mip_level_expected[min(3, mip_level + i)], 0);
             winetest_pop_context();
         }
