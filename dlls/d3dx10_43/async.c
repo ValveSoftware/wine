@@ -322,6 +322,7 @@ struct texture_processor
 {
     ID3DX10DataProcessor ID3DX10DataProcessor_iface;
     ID3D10Device *device;
+    D3DX10_IMAGE_INFO img_info;
     D3DX10_IMAGE_LOAD_INFO load_info;
     D3D10_SUBRESOURCE_DATA *resource_data;
 };
@@ -595,6 +596,8 @@ HRESULT WINAPI D3DX10CreateAsyncTextureProcessor(ID3D10Device *device,
     object->device = device;
     ID3D10Device_AddRef(device);
     init_load_info(load_info, &object->load_info);
+    if (!object->load_info.pSrcInfo)
+        object->load_info.pSrcInfo = &object->img_info;
 
     *processor = &object->ID3DX10DataProcessor_iface;
     return S_OK;

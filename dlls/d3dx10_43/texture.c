@@ -420,9 +420,12 @@ static HRESULT create_texture(ID3D10Device *device, const void *data, SIZE_T siz
 {
     D3D10_SUBRESOURCE_DATA *resource_data;
     D3DX10_IMAGE_LOAD_INFO load_info_copy;
+    D3DX10_IMAGE_INFO img_info;
     HRESULT hr;
 
     init_load_info(load_info, &load_info_copy);
+    if (load_info_copy.pSrcInfo == NULL)
+        load_info_copy.pSrcInfo = &img_info;
 
     if (FAILED((hr = load_texture_data(data, size, &load_info_copy, &resource_data))))
         return hr;
@@ -831,7 +834,7 @@ HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO 
     if (load_info->MiscFlags != D3DX10_DEFAULT)
         FIXME("load_info->MiscFlags is ignored.\n");
     if (load_info->pSrcInfo)
-        FIXME("load_info->pSrcInfo is ignored.\n");
+       *load_info->pSrcInfo = img_info;
     load_info->Usage = D3D10_USAGE_DEFAULT;
     load_info->BindFlags = D3D10_BIND_SHADER_RESOURCE;
     load_info->CpuAccessFlags = 0;
@@ -848,25 +851,59 @@ end:
 HRESULT create_d3d_texture(ID3D10Device *device, D3DX10_IMAGE_LOAD_INFO *load_info,
         D3D10_SUBRESOURCE_DATA *resource_data, ID3D10Resource **texture)
 {
-    D3D10_TEXTURE2D_DESC texture_2d_desc;
-    ID3D10Texture2D *texture_2d;
     HRESULT hr;
 
-    memset(&texture_2d_desc, 0, sizeof(texture_2d_desc));
-    texture_2d_desc.Width = load_info->Width;
-    texture_2d_desc.Height = load_info->Height;
-    texture_2d_desc.MipLevels = load_info->MipLevels;
-    texture_2d_desc.ArraySize = load_info->MiscFlags & D3D10_RESOURCE_MISC_TEXTURECUBE ? 6 : 1;
-    texture_2d_desc.Format = load_info->Format;
-    texture_2d_desc.SampleDesc.Count = 1;
-    texture_2d_desc.Usage = load_info->Usage;
-    texture_2d_desc.BindFlags = load_info->BindFlags;
-    texture_2d_desc.MiscFlags = load_info->MiscFlags;
+    *texture = NULL;
+    switch (load_info->pSrcInfo->ResourceDimension)
+    {
+    case D3D10_RESOURCE_DIMENSION_TEXTURE2D:
+    {
+        D3D10_TEXTURE2D_DESC texture_2d_desc = { 0 };
+        ID3D10Texture2D *texture_2d;
 
-    if (FAILED(hr = ID3D10Device_CreateTexture2D(device, &texture_2d_desc, resource_data, &texture_2d)))
-        return hr;
+        texture_2d_desc.Width = load_info->Width;
+        texture_2d_desc.Height = load_info->Height;
+        texture_2d_desc.MipLevels = load_info->MipLevels;
+        texture_2d_desc.ArraySize = load_info->pSrcInfo->ArraySize;
+        texture_2d_desc.Format = load_info->Format;
+        texture_2d_desc.SampleDesc.Count = 1;
+        texture_2d_desc.Usage = load_info->Usage;
+        texture_2d_desc.BindFlags = load_info->BindFlags;
+        texture_2d_desc.CPUAccessFlags = load_info->CpuAccessFlags;
+        texture_2d_desc.MiscFlags = load_info->MiscFlags;
 
-    *texture = (ID3D10Resource *)texture_2d;
+        if (FAILED(hr = ID3D10Device_CreateTexture2D(device, &texture_2d_desc, resource_data, &texture_2d)))
+            return hr;
+        *texture = (ID3D10Resource *)texture_2d;
+        break;
+    }
+
+    case D3D10_RESOURCE_DIMENSION_TEXTURE3D:
+    {
+        D3D10_TEXTURE3D_DESC texture_3d_desc = { 0 };
+        ID3D10Texture3D *texture_3d;
+
+        texture_3d_desc.Width = load_info->Width;
+        texture_3d_desc.Height = load_info->Height;
+        texture_3d_desc.Depth = load_info->Depth;
+        texture_3d_desc.MipLevels = load_info->MipLevels;
+        texture_3d_desc.Format = load_info->Format;
+        texture_3d_desc.Usage = load_info->Usage;
+        texture_3d_desc.BindFlags = load_info->BindFlags;
+        texture_3d_desc.CPUAccessFlags = load_info->CpuAccessFlags;
+        texture_3d_desc.MiscFlags = load_info->MiscFlags;
+
+        if (FAILED(hr = ID3D10Device_CreateTexture3D(device, &texture_3d_desc, resource_data, &texture_3d)))
+            return hr;
+        *texture = (ID3D10Resource *)texture_3d;
+        break;
+    }
+
+    default:
+        FIXME("Unhandled resource dimension %d.\n", load_info->pSrcInfo->ResourceDimension);
+        return E_NOTIMPL;
+    }
+
     return S_OK;
 }
 
