@@ -628,15 +628,67 @@ static HRESULT d3dx_handle_filter(uint32_t *filter)
     return d3dx_validate_filter(*filter);
 }
 
+static HRESULT d3dx_create_subresource_data_for_texture(uint32_t width, uint32_t height, uint32_t depth,
+        uint32_t mip_levels, uint32_t layer_count, const struct pixel_format_desc *fmt_desc,
+        D3D10_SUBRESOURCE_DATA **out_sub_rsrc_data, uint8_t **pixel_data)
+{
+    uint8_t *sub_rsrc_data = NULL, *pixels_ptr;
+    uint32_t i, j, pixels_size, pixels_offset;
+    D3D10_SUBRESOURCE_DATA *sub_rsrcs = NULL;
+    HRESULT hr = S_OK;
+
+    *pixel_data = NULL;
+    *out_sub_rsrc_data = NULL;
+
+    pixels_offset = (sizeof(*sub_rsrcs) * mip_levels * layer_count);
+    pixels_size = d3dx_calculate_layer_pixels_size(fmt_desc->format, width, height, depth, mip_levels) * layer_count;
+    if (!(sub_rsrc_data = malloc(pixels_size + pixels_offset)))
+        return E_FAIL;
+
+    sub_rsrcs = (D3D10_SUBRESOURCE_DATA *)sub_rsrc_data;
+    pixels_ptr = sub_rsrc_data + pixels_offset;
+    for (i = 0; i < layer_count; ++i)
+    {
+        struct volume size = { width, height, depth };
+
+        for (j = 0; j < mip_levels; ++j)
+        {
+            uint32_t row_pitch, slice_pitch;
+
+            hr = d3dx_calculate_pixels_size(fmt_desc->format, size.width, size.height, &row_pitch, &slice_pitch);
+            if (FAILED(hr))
+                break;
+
+            sub_rsrcs[i * mip_levels + j].pSysMem = pixels_ptr;
+            sub_rsrcs[i * mip_levels + j].SysMemPitch = row_pitch;
+            sub_rsrcs[i * mip_levels + j].SysMemSlicePitch = slice_pitch;
+
+            pixels_ptr += slice_pitch * size.depth;
+            d3dx_get_next_mip_level_size(&size);
+        }
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        *pixel_data = sub_rsrc_data + pixels_offset;
+        *out_sub_rsrc_data = sub_rsrcs;
+        sub_rsrc_data = NULL;
+    }
+
+    free(sub_rsrc_data);
+    return hr;
+}
+
 HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO *load_info,
         D3D10_SUBRESOURCE_DATA **resource_data)
 {
     const struct pixel_format_desc *fmt_desc, *src_desc;
-    uint32_t i, j, pixels_size, pixels_offset;
-    uint8_t *res_data = NULL, *pixels_buffer;
+    uint32_t i, j, loaded_mip_levels, max_mip_levels;
+    D3D10_SUBRESOURCE_DATA *sub_rsrcs = NULL;
     D3DX10_IMAGE_INFO img_info;
     struct d3dx_image image;
-    HRESULT hr = S_OK;
+    uint8_t *pixels_ptr;
+    HRESULT hr;
 
     if (!data || !size)
         return E_FAIL;
@@ -691,62 +743,81 @@ HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO 
         goto end;
     }
 
-    if (load_info->MipLevels != D3DX10_DEFAULT)
-        FIXME("load_info->MipLevels argument ignored.\n");
-    load_info->MipLevels = img_info.MipLevels;
+    max_mip_levels = d3dx_get_max_mip_levels_for_size(load_info->Width, load_info->Height, load_info->Depth);
+    if (!load_info->MipLevels || load_info->MipLevels == D3DX10_DEFAULT || load_info->MipLevels == D3DX10_FROM_FILE)
+        load_info->MipLevels = (load_info->MipLevels == D3DX10_FROM_FILE) ? img_info.MipLevels : max_mip_levels;
+    load_info->MipLevels = min(max_mip_levels, load_info->MipLevels);
 
-    pixels_size = d3dx_calculate_layer_pixels_size(fmt_desc->format, load_info->Width, load_info->Height,
-            load_info->Depth, load_info->MipLevels) * img_info.ArraySize;
-    pixels_offset = (sizeof(**resource_data) * load_info->MipLevels * img_info.ArraySize);
-    if (!(res_data = malloc(pixels_size + pixels_offset)))
-    {
-        hr = E_FAIL;
+    hr = d3dx_create_subresource_data_for_texture(load_info->Width, load_info->Height, load_info->Depth,
+            load_info->MipLevels, img_info.ArraySize, fmt_desc, &sub_rsrcs, &pixels_ptr);
+    if (FAILED(hr))
         goto end;
-    }
-
-    pixels_buffer = res_data + pixels_offset;
-    *resource_data = (D3D10_SUBRESOURCE_DATA *)res_data;
 
     src_desc = get_d3dx_pixel_format_info(image.format);
+    loaded_mip_levels = min(img_info.MipLevels, load_info->MipLevels);
     for (i = 0; i < img_info.ArraySize; ++i)
     {
         struct volume dst_size = { load_info->Width, load_info->Height, load_info->Depth };
 
-        for (j = 0; j < load_info->MipLevels; ++j)
+        for (j = 0; j < loaded_mip_levels; ++j)
         {
+            D3D10_SUBRESOURCE_DATA *sub_rsrc = &sub_rsrcs[i * load_info->MipLevels + j];
             const RECT unaligned_rect = { 0, 0, dst_size.width, dst_size.height };
             struct d3dx_pixels src_pixels, dst_pixels;
-            uint32_t dst_row_pitch, dst_slice_pitch;
 
             hr = d3dx_image_get_pixels(&image, i, j, &src_pixels);
             if (FAILED(hr))
-                break;
+                goto end;
 
-            hr = d3dx_calculate_pixels_size(fmt_desc->format, dst_size.width, dst_size.height, &dst_row_pitch,
-                    &dst_slice_pitch);
-            if (FAILED(hr))
-                break;
-
-            set_d3dx_pixels(&dst_pixels, pixels_buffer, dst_row_pitch, dst_slice_pitch, NULL, dst_size.width,
-                    dst_size.height, dst_size.depth, &unaligned_rect);
+            set_d3dx_pixels(&dst_pixels, sub_rsrc->pSysMem, sub_rsrc->SysMemPitch, sub_rsrc->SysMemSlicePitch, NULL,
+                    dst_size.width, dst_size.height, dst_size.depth, &unaligned_rect);
 
             hr = d3dx_load_pixels_from_pixels(&dst_pixels, fmt_desc, &src_pixels, src_desc, load_info->Filter, 0);
             if (FAILED(hr))
-                break;
+                goto end;
 
-            (*resource_data)[i * load_info->MipLevels + j].pSysMem = pixels_buffer;
-            (*resource_data)[i * load_info->MipLevels + j].SysMemPitch = dst_row_pitch;
-            (*resource_data)[i * load_info->MipLevels + j].SysMemSlicePitch = dst_slice_pitch;
-
-            pixels_buffer += dst_slice_pitch * dst_size.depth;
             d3dx_get_next_mip_level_size(&dst_size);
         }
     }
 
-    if (FAILED(hr))
+    if (loaded_mip_levels < load_info->MipLevels)
     {
-        *resource_data = NULL;
-        goto end;
+        struct volume base_level_size = { load_info->Width, load_info->Height, load_info->Depth };
+
+        if (FAILED(hr = d3dx_handle_filter(&load_info->MipFilter)))
+        {
+            FIXME("Invalid mip filter argument.\n");
+            goto end;
+        }
+
+        d3dx_get_mip_level_size(&base_level_size, loaded_mip_levels - 1);
+        for (i = 0; i < img_info.ArraySize; ++i)
+        {
+            struct volume src_size, dst_size;
+
+            src_size = dst_size = base_level_size;
+            for (j = (loaded_mip_levels - 1); j < (load_info->MipLevels - 1); ++j)
+            {
+                D3D10_SUBRESOURCE_DATA *dst_data = &sub_rsrcs[i * load_info->MipLevels + j + 1];
+                D3D10_SUBRESOURCE_DATA *src_data = &sub_rsrcs[i * load_info->MipLevels + j];
+                const RECT src_unaligned_rect = { 0, 0, src_size.width, src_size.height };
+                struct d3dx_pixels src_pixels, dst_pixels;
+                RECT dst_unaligned_rect;
+
+                d3dx_get_next_mip_level_size(&dst_size);
+                SetRect(&dst_unaligned_rect, 0, 0, dst_size.width, dst_size.height);
+                set_d3dx_pixels(&dst_pixels, dst_data->pSysMem, dst_data->SysMemPitch, dst_data->SysMemSlicePitch, NULL,
+                        dst_size.width, dst_size.height, dst_size.depth, &dst_unaligned_rect);
+                set_d3dx_pixels(&src_pixels, src_data->pSysMem, src_data->SysMemPitch, src_data->SysMemSlicePitch, NULL,
+                        src_size.width, src_size.height, src_size.depth, &src_unaligned_rect);
+
+                hr = d3dx_load_pixels_from_pixels(&dst_pixels, fmt_desc, &src_pixels, fmt_desc, load_info->MipFilter, 0);
+                if (FAILED(hr))
+                    goto end;
+
+                src_size = dst_size;
+            }
+        }
     }
 
     if (load_info->FirstMipLevel != D3DX10_DEFAULT && load_info->FirstMipLevel)
@@ -759,19 +830,18 @@ HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO 
         FIXME("load_info->CpuAccessFlags is ignored.\n");
     if (load_info->MiscFlags != D3DX10_DEFAULT)
         FIXME("load_info->MiscFlags is ignored.\n");
-    if (load_info->MipFilter != D3DX10_DEFAULT)
-        FIXME("load_info->MipFilter is ignored.\n");
     if (load_info->pSrcInfo)
         FIXME("load_info->pSrcInfo is ignored.\n");
     load_info->Usage = D3D10_USAGE_DEFAULT;
     load_info->BindFlags = D3D10_BIND_SHADER_RESOURCE;
     load_info->CpuAccessFlags = 0;
     load_info->MiscFlags = img_info.MiscFlags;
-    res_data = NULL;
+    *resource_data = sub_rsrcs;
+    sub_rsrcs = NULL;
 
 end:
     d3dx_image_cleanup(&image);
-    free(res_data);
+    free(sub_rsrcs);
     return hr;
 }
 
