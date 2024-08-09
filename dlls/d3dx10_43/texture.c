@@ -722,6 +722,8 @@ HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO 
         goto end;
     }
 
+    if (load_info->FirstMipLevel == D3DX10_DEFAULT || (load_info->FirstMipLevel >= img_info.MipLevels))
+        load_info->FirstMipLevel = 0;
     if (load_info->Format == D3DX10_DEFAULT || load_info->Format == DXGI_FORMAT_FROM_FILE)
         load_info->Format = img_info.Format;
     fmt_desc = get_d3dx_pixel_format_info(d3dx_pixel_format_id_from_dxgi_format(load_info->Format));
@@ -757,7 +759,7 @@ HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO 
         goto end;
 
     src_desc = get_d3dx_pixel_format_info(image.format);
-    loaded_mip_levels = min(img_info.MipLevels, load_info->MipLevels);
+    loaded_mip_levels = min((img_info.MipLevels - load_info->FirstMipLevel), load_info->MipLevels);
     for (i = 0; i < img_info.ArraySize; ++i)
     {
         struct volume dst_size = { load_info->Width, load_info->Height, load_info->Depth };
@@ -768,7 +770,7 @@ HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO 
             const RECT unaligned_rect = { 0, 0, dst_size.width, dst_size.height };
             struct d3dx_pixels src_pixels, dst_pixels;
 
-            hr = d3dx_image_get_pixels(&image, i, j, &src_pixels);
+            hr = d3dx_image_get_pixels(&image, i, j + load_info->FirstMipLevel, &src_pixels);
             if (FAILED(hr))
                 goto end;
 
@@ -823,8 +825,6 @@ HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO 
         }
     }
 
-    if (load_info->FirstMipLevel != D3DX10_DEFAULT && load_info->FirstMipLevel)
-        FIXME("load_info->FirstMipLevel is ignored.\n");
     if (load_info->Usage != D3DX10_DEFAULT)
         FIXME("load_info->Usage is ignored.\n");
     if (load_info->BindFlags != D3DX10_DEFAULT)
