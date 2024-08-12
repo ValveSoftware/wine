@@ -302,7 +302,7 @@ static void init_caps_from_video_h264(GstCaps *caps, const MFVIDEOFORMAT *format
 
     gst_structure_remove_field(gst_caps_get_structure(caps, 0), "format");
     gst_structure_set_name(gst_caps_get_structure(caps, 0), "video/x-h264");
-    gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, "byte-stream", NULL);
+    gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, format_size - sizeof(*format) ? "avc" : "byte-stream", NULL);
 }
 
 static void init_caps_from_video_wmv(GstCaps *caps, const MFVIDEOFORMAT *format, UINT format_size,
