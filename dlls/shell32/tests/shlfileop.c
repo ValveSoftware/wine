@@ -3205,7 +3205,7 @@ static void test_file_operation(void)
     ok(hr == S_OK, "got %#lx.\n", hr);
 
     hr = IFileOperation_PerformOperations(operation);
-    todo_wine ok(hr == E_UNEXPECTED, "got %#lx.\n", hr);
+    ok(hr == E_UNEXPECTED, "got %#lx.\n", hr);
 
     hr = CoCreateInstance(&CLSID_ShellItem, NULL, CLSCTX_INPROC_SERVER, &IID_IShellItem, (void **)&item);
     ok(hr == S_OK, "got %#lx.\n", hr);
@@ -3213,7 +3213,7 @@ static void test_file_operation(void)
     ok(hr == S_OK, "got %#lx.\n", hr);
 
     hr = IFileOperation_MoveItem(operation, item, folder, L"test", NULL);
-    todo_wine ok(hr == E_INVALIDARG, "got %#lx.\n", hr);
+    ok(hr == E_INVALIDARG, "got %#lx.\n", hr);
 
     GetTempPathW(ARRAY_SIZE(dirpath), dirpath);
     PathCombineW(tmpfile, dirpath, L"testfile1");
@@ -3229,7 +3229,7 @@ static void test_file_operation(void)
     progress_init_check_notifications(progress, ARRAY_SIZE(notifications1), notifications1, dirpath, &expected_notif);
     progress_init_check_notifications(progress2, ARRAY_SIZE(notifications1), notifications1, dirpath, &expected_notif);
     hr = IFileOperation_MoveItem(operation, item, folder, L"test", progress2);
-    todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
+    ok(hr == S_OK, "got %#lx.\n", hr);
     hr = IFileOperation_SetOperationFlags(operation, FOF_NO_UI);
     todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
     hr = IFileOperation_PerformOperations(operation);
@@ -3241,11 +3241,11 @@ static void test_file_operation(void)
     progress_end_check_notifications(progress);
 
     hr = IFileOperation_PerformOperations(operation);
-    todo_wine ok(hr == E_UNEXPECTED, "got %#lx.\n", hr);
+    ok(hr == E_UNEXPECTED, "got %#lx.\n", hr);
 
     /* Input file does not exist: PerformOperations succeeds, 'aborted' is set. */
     hr = IFileOperation_MoveItem(operation, item, folder, L"test2", NULL);
-    todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
+    ok(hr == S_OK, "got %#lx.\n", hr);
     progress_init_check_notifications(progress, ARRAY_SIZE(notifications2), notifications2, dirpath, &expected_notif);
     hr = IFileOperation_PerformOperations(operation);
     todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
@@ -3263,7 +3263,7 @@ static void test_file_operation(void)
     PathCombineW(path, dirpath, L"test");
     set_shell_item_path(item, path, TRUE);
     hr = IFileOperation_MoveItem(operation, item, folder, L"test2", NULL);
-    todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
+    ok(hr == S_OK, "got %#lx.\n", hr);
     PathCombineW(tmpfile, dirpath, L"testfile2");
     /* Actual paths are fetched at _MoveItem and not at _Perform operation: changing item after doesn't matter. */
     createTestFileW(tmpfile);
@@ -3334,7 +3334,7 @@ static void test_file_operation(void)
 
     /* Source is directory, destination test2 is file. */
     hr = IFileOperation_MoveItem(operation, item, folder, L"test2", NULL);
-    todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
+    ok(hr == S_OK, "got %#lx.\n", hr);
     progress_init_check_notifications(progress, ARRAY_SIZE(notifications4), notifications4, dirpath, &expected_notif);
     hr = IFileOperation_PerformOperations(operation);
     todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
@@ -3357,7 +3357,7 @@ static void test_file_operation(void)
     todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
 
     hr = IFileOperation_MoveItem(operation, item, folder, L"test2", NULL);
-    todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
+    ok(hr == S_OK, "got %#lx.\n", hr);
     progress_init_check_notifications(progress, ARRAY_SIZE(notifications5), notifications5, dirpath, &expected_notif);
     hr = IFileOperation_PerformOperations(operation);
     todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
@@ -3392,9 +3392,9 @@ static void test_file_operation(void)
     ok(hr == S_OK, "got %#lx.\n", hr);
 
     hr = IFileOperation_MoveItem(operation, item, folder, L"test2", progress2);
-    todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
+    ok(hr == S_OK, "got %#lx.\n", hr);
     hr = IFileOperation_MoveItem(operation, item2, folder, NULL, NULL);
-    todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
+    ok(hr == S_OK, "got %#lx.\n", hr);
     refcount = IShellItem_Release(item2);
     ok(!refcount, "got %ld.\n", refcount);
     progress_init_check_notifications(progress, ARRAY_SIZE(notifications6), notifications6, dirpath, &expected_notif);

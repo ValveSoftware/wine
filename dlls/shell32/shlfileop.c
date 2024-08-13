@@ -1799,6 +1799,21 @@ HRESULT WINAPI SHMultiFileProperties(IDataObject *pdtobj, DWORD flags)
     return E_NOTIMPL;
 }
 
+enum copy_engine_opcode
+{
+    COPY_ENGINE_MOVE,
+};
+
+struct copy_engine_operation
+{
+    struct list entry;
+    IFileOperationProgressSink *sink;
+    enum copy_engine_opcode opcode;
+    IShellItem *folder;
+    PIDLIST_ABSOLUTE item_pidl;
+    WCHAR *name;
+};
+
 struct file_operation_sink
 {
     struct list entry;
@@ -1812,7 +1827,73 @@ struct file_operation
     LONG ref;
     struct list sinks;
     DWORD next_cookie;
+    struct list ops;
 };
+
+static void free_file_operation_ops(struct file_operation *operation)
+{
+    struct copy_engine_operation *op, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE(op, next, &operation->ops, struct copy_engine_operation, entry)
+    {
+        if (op->sink)
+            IFileOperationProgressSink_Release(op->sink);
+        ILFree(op->item_pidl);
+        if (op->folder)
+            IShellItem_Release(op->folder);
+        CoTaskMemFree(op->name);
+        list_remove(&op->entry);
+        free(op);
+    }
+}
+
+static HRESULT add_operation(struct file_operation *operation, enum copy_engine_opcode opcode, IShellItem *item,
+        IShellItem *folder, const WCHAR *name, IFileOperationProgressSink *sink)
+{
+    struct copy_engine_operation *op;
+    HRESULT hr;
+
+    if (!name)
+        name = L"";
+
+    if (!(op = calloc(1, sizeof(*op))))
+        return E_OUTOFMEMORY;
+
+    op->opcode = opcode;
+    if (item && FAILED((hr = SHGetIDListFromObject((IUnknown *)item, &op->item_pidl))))
+    {
+        hr = E_INVALIDARG;
+        goto error;
+    }
+
+    if (folder)
+    {
+        IShellItem_AddRef(folder);
+        op->folder = folder;
+    }
+    if (!(op->name = wcsdup(name)))
+    {
+        hr = E_OUTOFMEMORY;
+        goto error;
+    }
+    if (sink)
+    {
+        IFileOperationProgressSink_AddRef(sink);
+        op->sink = sink;
+    }
+    list_add_tail(&operation->ops, &op->entry);
+    return S_OK;
+
+error:
+    ILFree(op->item_pidl);
+    if (op->folder)
+        IShellItem_Release(op->folder);
+    if (op->sink)
+        IFileOperationProgressSink_Release(sink);
+    CoTaskMemFree(op->name);
+    free(op);
+    return hr;
+}
 
 static inline struct file_operation *impl_from_IFileOperation(IFileOperation *iface)
 {
@@ -1866,6 +1947,7 @@ static ULONG WINAPI file_operation_Release(IFileOperation *iface)
             list_remove(&sink->entry);
             free(sink);
         }
+        free_file_operation_ops(operation);
         free(operation);
     }
 
@@ -1977,9 +2059,12 @@ static HRESULT WINAPI file_operation_RenameItems(IFileOperation *iface, IUnknown
 static HRESULT WINAPI file_operation_MoveItem(IFileOperation *iface, IShellItem *item, IShellItem *folder,
         LPCWSTR name, IFileOperationProgressSink *sink)
 {
-    FIXME("(%p, %p, %p, %s, %p): stub.\n", iface, item, folder, debugstr_w(name), sink);
+    TRACE("(%p, %p, %p, %s, %p).\n", iface, item, folder, debugstr_w(name), sink);
 
-    return E_NOTIMPL;
+    if (!folder || !item)
+        return E_INVALIDARG;
+
+    return add_operation(impl_from_IFileOperation(iface), COPY_ENGINE_MOVE, item, folder, name, sink);
 }
 
 static HRESULT WINAPI file_operation_MoveItems(IFileOperation *iface, IUnknown *items, IShellItem *folder)
@@ -2030,8 +2115,14 @@ static HRESULT WINAPI file_operation_NewItem(IFileOperation *iface, IShellItem *
 
 static HRESULT WINAPI file_operation_PerformOperations(IFileOperation *iface)
 {
+    struct file_operation *operation = impl_from_IFileOperation(iface);
+
     FIXME("(%p): stub.\n", iface);
 
+    if (list_empty(&operation->ops))
+        return E_UNEXPECTED;
+
+    free_file_operation_ops(operation);
     return E_NOTIMPL;
 }
 
@@ -2080,6 +2171,7 @@ HRESULT WINAPI IFileOperation_Constructor(IUnknown *outer, REFIID riid, void **o
 
     object->IFileOperation_iface.lpVtbl = &file_operation_vtbl;
     list_init(&object->sinks);
+    list_init(&object->ops);
     object->ref = 1;
 
     hr = IFileOperation_QueryInterface(&object->IFileOperation_iface, riid, out);
