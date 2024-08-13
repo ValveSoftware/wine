@@ -83,7 +83,7 @@ static void align_video_info_planes(MFVideoInfo *video_info, gsize plane_align,
 
     align->padding_right = ((plane_align + 1) - (info->width & plane_align)) & plane_align;
     align->padding_bottom = ((plane_align + 1) - (info->height & plane_align)) & plane_align;
-    if (!is_mf_video_area_empty(aperture))
+    if (!is_mf_video_area_empty(aperture) && !plane_align)
     {
         align->padding_right = max(align->padding_right, video_info->dwWidth - aperture->OffsetX.value - aperture->Area.cx);
         align->padding_bottom = max(align->padding_bottom, video_info->dwHeight - aperture->OffsetY.value - aperture->Area.cy);
