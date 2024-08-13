@@ -183,3 +183,8 @@ coclass KnownFolderManager { interface IKnownFolderManager; }
     threading(apartment),
     uuid(75048700-ef1f-11d0-9888-006097deacf9)
 ] coclass ActiveDesktop { interface IActiveDesktop; }
+
+[
+    threading(apartment),
+    uuid(9ac9fbe1-e0a2-4ad6-b4ee-e212013ea917)
+] coclass ShellItem { interface IShellItem2; }
