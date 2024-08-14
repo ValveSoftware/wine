@@ -825,20 +825,13 @@ HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO 
         }
     }
 
-    if (load_info->Usage != D3DX10_DEFAULT)
-        FIXME("load_info->Usage is ignored.\n");
-    if (load_info->BindFlags != D3DX10_DEFAULT)
-        FIXME("load_info->BindFlags is ignored.\n");
-    if (load_info->CpuAccessFlags != D3DX10_DEFAULT)
-        FIXME("load_info->CpuAccessFlags is ignored.\n");
-    if (load_info->MiscFlags != D3DX10_DEFAULT)
-        FIXME("load_info->MiscFlags is ignored.\n");
     if (load_info->pSrcInfo)
        *load_info->pSrcInfo = img_info;
-    load_info->Usage = D3D10_USAGE_DEFAULT;
-    load_info->BindFlags = D3D10_BIND_SHADER_RESOURCE;
-    load_info->CpuAccessFlags = 0;
-    load_info->MiscFlags = img_info.MiscFlags;
+    load_info->Usage = (load_info->Usage == D3DX10_DEFAULT) ? D3D10_USAGE_DEFAULT : load_info->Usage;
+    load_info->BindFlags = (load_info->BindFlags == D3DX10_DEFAULT) ? D3D10_BIND_SHADER_RESOURCE : load_info->BindFlags;
+    load_info->CpuAccessFlags = (load_info->CpuAccessFlags == D3DX10_DEFAULT) ? 0 : load_info->CpuAccessFlags;
+    load_info->MiscFlags = (load_info->MiscFlags == D3DX10_DEFAULT) ? 0 : load_info->MiscFlags;
+    load_info->MiscFlags |= img_info.MiscFlags;
     *resource_data = sub_rsrcs;
     sub_rsrcs = NULL;
 

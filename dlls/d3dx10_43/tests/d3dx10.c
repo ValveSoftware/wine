@@ -1034,7 +1034,7 @@ test_image_load_info[] =
                        (D3D10_BIND_SHADER_RESOURCE | D3D10_BIND_RENDER_TARGET), 0,
                        (D3D10_RESOURCE_MISC_GENERATE_MIPS | D3D10_RESOURCE_MISC_TEXTURECUBE) } },
         { 4, 4, 1, 6, 3, DDS_RESOURCE_MISC_TEXTURECUBE, DXGI_FORMAT_BC1_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D,
-          D3DX10_IFF_DDS }, .todo_resource_desc = TRUE,
+          D3DX10_IFF_DDS },
     },
     /*
      * Even with the autogen mips misc flag specified, the mip levels argument
@@ -1050,7 +1050,7 @@ test_image_load_info[] =
                        (D3D10_BIND_SHADER_RESOURCE | D3D10_BIND_RENDER_TARGET), 0,
                        (D3D10_RESOURCE_MISC_GENERATE_MIPS | D3D10_RESOURCE_MISC_TEXTURECUBE) } },
         { 4, 4, 1, 6, 3, DDS_RESOURCE_MISC_TEXTURECUBE, DXGI_FORMAT_BC1_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D,
-          D3DX10_IFF_DDS }, .todo_resource_desc = TRUE,
+          D3DX10_IFF_DDS },
     },
 };
 
@@ -1107,13 +1107,13 @@ test_invalid_image_load_info[] =
         test_dds_32bpp, sizeof(test_dds_32bpp),
         { D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3D10_CPU_ACCESS_READ, D3D10_USAGE_DYNAMIC,
           D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT },
-        E_INVALIDARG, S_OK, E_INVALIDARG, .todo_hr = TRUE, .todo_create_device_object_hr = TRUE,
+        E_INVALIDARG, S_OK, E_INVALIDARG,
     },
     {
         test_dds_32bpp, sizeof(test_dds_32bpp),
         { D3DX10_DEFAULT,           D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3D10_USAGE_DEFAULT,
           D3D10_BIND_DEPTH_STENCIL, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT },
-        E_INVALIDARG, S_OK, E_INVALIDARG, .todo_hr = TRUE, .todo_create_device_object_hr = TRUE,
+        E_INVALIDARG, S_OK, E_INVALIDARG,
     },
     /*
      * D3D10_RESOURCE_MISC_GENERATE_MIPS requires binding as a shader resource
@@ -1123,14 +1123,14 @@ test_invalid_image_load_info[] =
         test_dds_32bpp, sizeof(test_dds_32bpp),
         { D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT,    D3DX10_DEFAULT, D3D10_USAGE_DEFAULT,
           D3DX10_DEFAULT, D3DX10_DEFAULT, D3D10_RESOURCE_MISC_GENERATE_MIPS, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT },
-        E_INVALIDARG, S_OK, E_INVALIDARG, .todo_hr = TRUE, .todo_create_device_object_hr = TRUE,
+        E_INVALIDARG, S_OK, E_INVALIDARG,
     },
     /* Can't set the cube texture flag if the image isn't a cube texture. */
     {
         test_dds_32bpp, sizeof(test_dds_32bpp),
         { D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT,    D3DX10_DEFAULT, D3D10_USAGE_DEFAULT,
           D3DX10_DEFAULT, D3DX10_DEFAULT, D3D10_RESOURCE_MISC_TEXTURECUBE,   D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT },
-        E_INVALIDARG, S_OK, E_INVALIDARG, .todo_hr = TRUE, .todo_create_device_object_hr = TRUE,
+        E_INVALIDARG, S_OK, E_INVALIDARG
     },
 };
 
