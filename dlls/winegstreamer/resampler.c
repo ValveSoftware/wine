@@ -398,6 +398,8 @@ static HRESULT WINAPI transform_SetInputType(IMFTransform *iface, DWORD id, IMFM
 
     if (SUCCEEDED(hr = MFCreateWaveFormatExFromMFMediaType(type, &format, &value, 0)))
     {
+        format->nBlockAlign = format->wBitsPerSample * format->nChannels / 8;
+        format->nAvgBytesPerSec = format->nSamplesPerSec * format->nBlockAlign;
         impl->input_info.cbSize = format->nBlockAlign;
         impl->input_format = format;
     }
@@ -432,6 +434,9 @@ static HRESULT WINAPI transform_SetOutputType(IMFTransform *iface, DWORD id, IMF
 
     if (SUCCEEDED(hr = MFCreateWaveFormatExFromMFMediaType(type, &format, &value, 0)))
     {
+        format->nBlockAlign = format->wBitsPerSample * format->nChannels / 8;
+        format->nAvgBytesPerSec = format->nSamplesPerSec * format->nBlockAlign;
+
         if (FAILED(hr = try_create_wg_transform(impl, impl->input_format, format)))
             CoTaskMemFree(format);
         else
