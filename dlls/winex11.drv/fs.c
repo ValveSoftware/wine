@@ -1003,6 +1003,30 @@ void fs_hack_init(void)
     initialized = TRUE;
 }
 
+/* Disable the fullscreen hack after it's been initialized */
+void fs_hack_disable(void)
+{
+    struct fs_monitor *monitor, *next;
+
+    if (!initialized)
+        return;
+
+    real_settings_handler.priority = 600;
+    real_device_handler.priority = 600;
+    X11DRV_Settings_SetHandler( &real_settings_handler );
+    X11DRV_DisplayDevices_SetHandler( &real_device_handler );
+
+    pthread_mutex_lock( &fs_lock );
+    LIST_FOR_EACH_ENTRY_SAFE( monitor, next, &fs_monitors, struct fs_monitor, entry )
+    {
+        list_remove( &monitor->entry );
+        free( monitor );
+    }
+    pthread_mutex_unlock( &fs_lock );
+
+    initialized = FALSE;
+}
+
 const float *fs_hack_get_gamma_ramp( LONG *serial )
 {
     if (gamma_serial == 0) return NULL;

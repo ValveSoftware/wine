@@ -56,6 +56,7 @@ void X11DRV_init_desktop( Window win, unsigned int width, unsigned int height )
     host_primary_rect = get_host_primary_monitor_rect();
     root_window = win;
     managed_mode = FALSE;  /* no managed windows in desktop mode */
+    fs_hack_disable();
 }
 
 /***********************************************************************

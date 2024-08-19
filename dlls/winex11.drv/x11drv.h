@@ -721,6 +721,7 @@ extern double fs_hack_get_user_to_real_scale( HMONITOR );
 extern SIZE fs_hack_get_scaled_screen_size( HMONITOR monitor );
 extern RECT fs_hack_get_real_virtual_screen(void);
 extern void fs_hack_init(void);
+extern void fs_hack_disable(void);
 extern const float *fs_hack_get_gamma_ramp( LONG *serial );
 extern void fs_hack_set_gamma_ramp( const WORD *ramp );
 extern BOOL fs_hack_put_image_scaled( HWND hwnd, Window window, GC gc, XImage *image, unsigned int x_dst, unsigned int y_dst,
