@@ -4699,7 +4699,10 @@ int main( int argc, char *argv[] )
         strarray_add( &target_flags[arch], target );
         arch_dirs[arch] = strmake( "%s-windows/", archs.str[arch] );
         arch_pe_dirs[arch] = arch_dirs[arch];
-        arch_install_dirs[arch] = strmake( "$(libdir)/wine/%s", arch_dirs[arch] );
+        if (!strcmp( archs.str[arch], "arm64ec" ))
+            arch_install_dirs[arch] = "$(libdir)/wine/aarch64-windows/";
+        else
+            arch_install_dirs[arch] = strmake( "$(libdir)/wine/%s", arch_dirs[arch] );
         strip_progs[arch] = get_expanded_arch_var( top_makefile, "STRIP", arch );
         dll_ext[arch] = "";
     }
