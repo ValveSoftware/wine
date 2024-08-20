@@ -1874,6 +1874,7 @@ static void handle_nc_calc_size( HWND hwnd, WPARAM wparam, RECT *win_rect )
         if (!((style & WS_POPUP) && (ex_style & WS_EX_TOOLWINDOW))  /* Bug 20038: game splash screens */
             && !(sgi && !strcmp( sgi, "2563800" ))                  /* Bug 23342: The Last Game */
             && !(sgi && !strcmp( sgi, "1240440" ))                  /* Bug 23802: Halo Infinite */
+            && !(sgi && !strcmp( sgi, "2883280" ))                  /* Bug 24151: Dog Brew */
            )
             return;
     }
