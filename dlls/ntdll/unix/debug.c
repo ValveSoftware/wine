@@ -47,6 +47,7 @@ WINE_DECLARE_DEBUG_CHANNEL(pid);
 WINE_DECLARE_DEBUG_CHANNEL(timestamp);
 WINE_DECLARE_DEBUG_CHANNEL(microsecs);
 WINE_DEFAULT_DEBUG_CHANNEL(ntdll);
+WINE_DECLARE_DEBUG_CHANNEL(ftracelog);
 
 struct debug_info
 {
@@ -276,13 +277,9 @@ NTSTATUS unixcall_wine_dbg_write( void *args )
     return write( 2, params->str, params->len );
 }
 
-unsigned int WINAPI __wine_dbg_ftrace( char *str, unsigned int str_size, unsigned int ctx )
+static void __wine_dbg_ftrace_write( const char *str, unsigned int str_len )
 {
-    static unsigned int curr_ctx;
     static int ftrace_fd = -1;
-    unsigned int str_len;
-    char ctx_str[64];
-    int ctx_len;
 
     if (ftrace_fd == -1)
     {
@@ -295,14 +292,24 @@ unsigned int WINAPI __wine_dbg_ftrace( char *str, unsigned int str_size, unsigne
         {
             MESSAGE( "wine: error opening ftrace file: %s.\n", strerror(errno) );
             ftrace_fd = -2;
-            return 0;
+            return;
         }
         if (!__atomic_compare_exchange_n( &ftrace_fd, &expected, fd, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ))
             close( fd );
         else
             MESSAGE( "wine: ftrace initialized.\n" );
     }
-    if (ftrace_fd == -2) return ~0u;
+
+    if (ftrace_fd == -2) return;
+    write( ftrace_fd, str, str_len );
+}
+
+unsigned int WINAPI __wine_dbg_ftrace( char *str, unsigned int str_size, unsigned int ctx )
+{
+    static unsigned int curr_ctx;
+    unsigned int str_len;
+    char ctx_str[64];
+    int ctx_len;
 
     if (ctx == ~0u) ctx_len = 0;
     else if (ctx) ctx_len = sprintf( ctx_str, " (end_ctx=%u)", ctx );
@@ -320,7 +327,7 @@ unsigned int WINAPI __wine_dbg_ftrace( char *str, unsigned int str_size, unsigne
         memcpy( &str[str_len], ctx_str, ctx_len );
         str_len += ctx_len;
     }
-    write( ftrace_fd, str, str_len );
+    __wine_dbg_ftrace_write( str, str_len );
     return ctx;
 }
 
@@ -353,6 +360,7 @@ int __cdecl __wine_dbg_output( const char *str )
     {
         ret += append_output( info, str, end + 1 - str );
         write( 2, info->output, info->out_pos );
+        if (TRACE_ON(ftracelog)) __wine_dbg_ftrace_write( info->output, info->out_pos );
         info->out_pos = 0;
         str = end + 1;
     }
