@@ -84,10 +84,20 @@ WINE_DEFAULT_DEBUG_CHANNEL(seh);
 static struct _aarch64_ctx *get_extended_sigcontext( const ucontext_t *sigcontext, unsigned int magic )
 {
     struct _aarch64_ctx *ctx = (struct _aarch64_ctx *)sigcontext->uc_mcontext.__reserved;
-    while ((char *)ctx < (char *)(&sigcontext->uc_mcontext + 1) && ctx->magic && ctx->size)
+    BOOL extra = FALSE;
+    while ((extra || (char *)ctx < (char *)(&sigcontext->uc_mcontext + 1)) && ctx->magic && ctx->size)
     {
         if (ctx->magic == magic) return ctx;
-        ctx = (struct _aarch64_ctx *)((char *)ctx + ctx->size);
+
+        if (ctx->magic == EXTRA_MAGIC)
+        {
+            ctx = (struct _aarch64_ctx *)((struct extra_context *)ctx)->datap;
+            extra = TRUE;
+        }
+        else
+        {
+            ctx = (struct _aarch64_ctx *)((char *)ctx + ctx->size);
+        }
     }
     return NULL;
 }
@@ -95,6 +105,11 @@ static struct _aarch64_ctx *get_extended_sigcontext( const ucontext_t *sigcontex
 static struct fpsimd_context *get_fpsimd_context( const ucontext_t *sigcontext )
 {
     return (struct fpsimd_context *)get_extended_sigcontext( sigcontext, FPSIMD_MAGIC );
+}
+
+static struct sve_context *get_sve_context( const ucontext_t *sigcontext )
+{
+    return (struct sve_context *)get_extended_sigcontext( sigcontext, SVE_MAGIC );
 }
 
 static DWORD64 get_fault_esr( ucontext_t *sigcontext )
@@ -1343,11 +1358,20 @@ static void usr2_handler( int signal, siginfo_t *siginfo, void *sigcontext )
 #ifdef linux
     {
         struct fpsimd_context *fp = get_fpsimd_context( sigcontext );
+        struct sve_context *sve = get_sve_context( sigcontext );
         if (fp)
         {
             fp->fpcr = frame->fpcr;
             fp->fpsr = frame->fpsr;
             memcpy( fp->vregs, frame->v, sizeof(fp->vregs) );
+        }
+
+        if (sve)
+        {
+            /* setup FEX SVE state */
+            ULONG64 vq = sve_vq_from_vl(sve->vl);
+            *(UINT16 *)((BYTE *)sve + SVE_SIG_PREG_OFFSET(vq, 2)) = 0x155;
+            *(UINT16 *)((BYTE *)sve + SVE_SIG_PREG_OFFSET(vq, 6)) = 0xffff;
         }
     }
 #elif defined(__APPLE__)
