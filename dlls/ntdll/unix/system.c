@@ -651,6 +651,23 @@ static ULONGLONG get_cpu_features(void)
     return 0;  /* FIXME */
 }
 
+static void init_xstate_features( XSTATE_CONFIGURATION *xstate )
+{
+    xstate->EnabledFeatures = (1 << XSTATE_LEGACY_FLOATING_POINT) | (1 << XSTATE_LEGACY_SSE) | (1 << XSTATE_AVX);
+    xstate->EnabledVolatileFeatures = xstate->EnabledFeatures;
+    xstate->AllFeatureSize = 0x340;
+
+    xstate->OptimizedSave = 0;
+    xstate->CompactionEnabled = 0;
+
+    xstate->Features[0].Size = xstate->AllFeatures[0] = offsetof(XSAVE_FORMAT, XmmRegisters);
+    xstate->Features[1].Size = xstate->AllFeatures[1] = sizeof(M128A) * 16;
+    xstate->Features[1].Offset = xstate->Features[0].Size;
+    xstate->Features[2].Offset = 0x240;
+    xstate->Features[2].Size = 0x100;
+    xstate->Size = 0x340;
+}
+
 void init_shared_data_cpuinfo( KUSER_SHARED_DATA *data )
 {
     BOOLEAN *features = data->ProcessorFeatures;
@@ -734,6 +751,8 @@ void init_shared_data_cpuinfo( KUSER_SHARED_DATA *data )
             break;
         }
     }
+
+    init_xstate_features( &data->XState );
 }
 
 #endif /* End architecture specific feature detection for CPUs */
