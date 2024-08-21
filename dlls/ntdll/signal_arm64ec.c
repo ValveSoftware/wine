@@ -36,6 +36,11 @@
 #include "wine/debug.h"
 #include "ntsyscalls.h"
 
+union ARM64EC_NT_XCONTEXT {
+    ARM64EC_NT_CONTEXT context;
+    BYTE buffer[0x800];
+};
+
 WINE_DEFAULT_DEBUG_CHANNEL(seh);
 WINE_DECLARE_DEBUG_CHANNEL(relay);
 
@@ -1241,7 +1246,11 @@ NTSTATUS call_seh_handlers( EXCEPTION_RECORD *rec, CONTEXT *orig_context )
  */
 void dispatch_emulation( ARM64_NT_CONTEXT *arm_ctx )
 {
-    context_arm_to_x64( get_arm64ec_cpu_area()->ContextAmd64, arm_ctx );
+    ARM64EC_NT_CONTEXT *context = get_arm64ec_cpu_area()->ContextAmd64;
+    CONTEXT_EX *xctx;
+
+    RtlInitializeExtendedContext( context, ctx_flags_arm_to_x64( arm_ctx->ContextFlags), &xctx );
+    context_arm_to_x64( context, arm_ctx );
     get_arm64ec_cpu_area()->InSimulation = 1;
     pBeginSimulation();
 }
@@ -1271,11 +1280,13 @@ static void dispatch_syscall( ARM64_NT_CONTEXT *context )
 }
 
 
-static void * __attribute__((used)) prepare_exception_arm64ec( EXCEPTION_RECORD *rec, ARM64EC_NT_CONTEXT *context, ARM64_NT_CONTEXT *arm_ctx )
+static void * __attribute__((used)) prepare_exception_arm64ec( EXCEPTION_RECORD *rec, union ARM64EC_NT_XCONTEXT *context, ARM64_NT_CONTEXT *arm_ctx )
 {
+    CONTEXT_EX *xctx;
     if (rec->ExceptionCode == STATUS_EMULATION_SYSCALL) dispatch_syscall( arm_ctx );
-    context_arm_to_x64( context, arm_ctx );
-    if (pResetToConsistentState) pResetToConsistentState( rec, &context->AMD64_Context, arm_ctx );
+    RtlInitializeExtendedContext( context, ctx_flags_arm_to_x64( arm_ctx->ContextFlags ), &xctx );
+    context_arm_to_x64( &context->context, arm_ctx );
+    if (pResetToConsistentState) pResetToConsistentState( rec, &context->context.AMD64_Context, arm_ctx );
     /* call x64 dispatcher if the thunk or the function pointer was modified */
     if (pWow64PrepareForException || memcmp( KiUserExceptionDispatcher_thunk, KiUserExceptionDispatcher_orig,
                                              sizeof(KiUserExceptionDispatcher_orig) ))
@@ -1290,12 +1301,13 @@ void __attribute__((naked)) KiUserExceptionDispatcher( EXCEPTION_RECORD *rec, CO
 {
     asm( ".seh_proc \"#KiUserExceptionDispatcher\"\n\t"
          ".seh_context\n\t"
-         "sub sp, sp, #0x4d0\n\t"       /* sizeof(ARM64EC_NT_CONTEXT) */
-         ".seh_stackalloc 0x4d0\n\t"
+         "sub sp, sp, #0xcd0\n\t"       /* sizeof(union ARM64EC_NT_XCONTEXT) */
+         ".seh_stackalloc 0xcd0\n\t"
          ".seh_endprologue\n\t"
-         "add x0, sp, #0x3b0+0x4d0\n\t" /* rec */
+         "add x0, sp, #0xcd0\n\t"
+         "add x0, x0, #0x3b0\n\t"       /* rec */
          "mov x1, sp\n\t"               /* context */
-         "add x2, sp, #0x4d0\n\t"       /* arm_ctx (context + 1) */
+         "add x2, sp, #0xcd0\n\t"       /* arm_ctx (context + 1) */
          "bl \"#prepare_exception_arm64ec\"\n\t"
          "cbz x0, 1f\n\t"
          /* bypass exit thunk to avoid messing up the stack */
@@ -1303,8 +1315,9 @@ void __attribute__((naked)) KiUserExceptionDispatcher( EXCEPTION_RECORD *rec, CO
          "ldr x16, [x16, #:lo12:__os_arm64x_dispatch_call_no_redirect]\n\t"
          "mov x9, x0\n\t"
          "blr x16\n"
-         "1:\tadd x0, sp, #0x3b0+0x4d0\n\t" /* rec */
-         "mov x1, sp\n\t"                   /* context */
+         "1:\tadd x0, sp, #0xcd0\n\t"
+         "add x0, x0, #0x3b0\n\t"       /* rec */
+         "mov x1, sp\n\t"               /* context */
          "bl #dispatch_exception\n\t"
          "brk #1\n\t"
          ".seh_endproc" );
@@ -1318,11 +1331,12 @@ static void __attribute__((used)) dispatch_apc( void (CALLBACK *func)(ULONG_PTR,
                                                 ULONG_PTR arg1, ULONG_PTR arg2, ULONG_PTR arg3,
                                                 BOOLEAN alertable, ARM64_NT_CONTEXT *arm_ctx )
 {
-    ARM64EC_NT_CONTEXT context;
-
-    context_arm_to_x64( &context, arm_ctx );
-    func( arg1, arg2, arg3, &context.AMD64_Context );
-    NtContinue( &context.AMD64_Context, alertable );
+    union ARM64EC_NT_XCONTEXT context;
+    CONTEXT_EX *xctx;
+    RtlInitializeExtendedContext( &context, ctx_flags_arm_to_x64( arm_ctx->ContextFlags), &xctx );
+    context_arm_to_x64( &context.context, arm_ctx );
+    func( arg1, arg2, arg3, &context.context.AMD64_Context );
+    NtContinue( &context.context.AMD64_Context, alertable );
 }
 __ASM_GLOBAL_FUNC( "#KiUserApcDispatcher",
                    ".seh_context\n\t"
@@ -2070,7 +2084,9 @@ void __attribute__((naked)) RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry,
  */
 void WINAPI LdrInitializeThunk( CONTEXT *arm_context, ULONG_PTR unk2, ULONG_PTR unk3, ULONG_PTR unk4 )
 {
-    ARM64EC_NT_CONTEXT context;
+    union ARM64EC_NT_XCONTEXT context;
+    CONTEXT_EX *xctx;
+    RtlInitializeExtendedContext( &context, ctx_flags_arm_to_x64( arm_context->ContextFlags), &xctx );
 
     if (!__os_arm64x_check_call)
     {
@@ -2081,10 +2097,10 @@ void WINAPI LdrInitializeThunk( CONTEXT *arm_context, ULONG_PTR unk2, ULONG_PTR 
         __os_arm64x_set_x64_information = LdrpSetX64Information;
     }
 
-    context_arm_to_x64( &context, (ARM64_NT_CONTEXT *)arm_context );
-    loader_init( &context.AMD64_Context, (void **)&context.X0 );
-    TRACE_(relay)( "\1Starting thread proc %p (arg=%p)\n", (void *)context.X0, (void *)context.X1 );
-    NtContinue( &context.AMD64_Context, TRUE );
+    context_arm_to_x64( &context.context, (ARM64_NT_CONTEXT *)arm_context );
+    loader_init( &context.context.AMD64_Context, (void **)&context.context.X0 );
+    TRACE_(relay)( "\1Starting thread proc %p (arg=%p)\n", (void *)context.context.X0, (void *)context.context.X1 );
+    NtContinue( &context.context.AMD64_Context, TRUE );
 }
 
 
