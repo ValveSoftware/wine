@@ -425,6 +425,67 @@ RECT get_host_primary_monitor_rect(void)
     return rect;
 }
 
+/* Get an array of host monitor rectangles in X11 root coordinates. Free the array when it's done */
+BOOL get_host_monitor_rects( RECT **ret_rects, int *ret_count )
+{
+    int gpu_count, adapter_count, monitor_count, rect_count = 0;
+    int gpu_idx, adapter_idx, monitor_idx, rect_idx;
+    struct gdi_gpu *gpus = NULL;
+    struct gdi_adapter *adapters = NULL;
+    struct gdi_monitor *monitors = NULL;
+    RECT *rects = NULL, *new_rects;
+    POINT left_top = {INT_MAX, INT_MAX};
+
+    if (!host_handler.get_gpus( &gpus, &gpu_count, FALSE )) goto failed;
+
+    for (gpu_idx = 0; gpu_idx < gpu_count; gpu_idx++)
+    {
+        if (!host_handler.get_adapters( gpus[gpu_idx].id, &adapters, &adapter_count )) goto failed;
+
+        for (adapter_idx = 0; adapter_idx < adapter_count; adapter_idx++)
+        {
+            if (!host_handler.get_monitors( adapters[adapter_idx].id, &monitors, &monitor_count )) goto failed;
+
+            new_rects = realloc( rects, (rect_count + monitor_count) * sizeof(*rects) );
+            if (!new_rects) goto failed;
+            rects = new_rects;
+
+            for (monitor_idx = 0; monitor_idx < monitor_count; monitor_idx++)
+            {
+                rects[rect_count++] = monitors[monitor_idx].rc_monitor;
+                left_top.x = min( left_top.x, monitors[monitor_idx].rc_monitor.left );
+                left_top.y = min( left_top.y, monitors[monitor_idx].rc_monitor.top );
+            }
+
+            host_handler.free_monitors( monitors, monitor_count );
+            monitors = NULL;
+        }
+
+        host_handler.free_adapters( adapters );
+        adapters = NULL;
+    }
+
+    host_handler.free_gpus( gpus );
+    gpus = NULL;
+
+    /* Convert from win32 virtual screen coordinates to X11 root coordinates */
+    for (rect_idx = 0; rect_idx < rect_count; rect_idx++)
+        OffsetRect( &rects[rect_idx], -left_top.x, -left_top.y );
+
+    *ret_rects = rects;
+    *ret_count = rect_count;
+    return TRUE;
+
+failed:
+    if (monitors) host_handler.free_monitors( monitors, monitor_count );
+    if (adapters) host_handler.free_adapters( adapters );
+    if (gpus) host_handler.free_gpus( gpus );
+    free( rects );
+    *ret_rects = NULL;
+    *ret_count = 0;
+    return FALSE;
+}
+
 RECT get_work_area(const RECT *monitor_rect)
 {
     Atom type;

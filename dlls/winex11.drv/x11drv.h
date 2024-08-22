@@ -759,6 +759,7 @@ extern void X11DRV_X_to_window_rect( struct x11drv_win_data *data, RECT *rect, i
 extern POINT virtual_screen_to_root( INT x, INT y );
 extern POINT root_to_virtual_screen( INT x, INT y );
 extern RECT get_host_primary_monitor_rect(void);
+extern BOOL get_host_monitor_rects( RECT **ret_rects, int *ret_count );
 extern RECT get_work_area( const RECT *monitor_rect );
 extern BOOL xinerama_get_fullscreen_monitors( const RECT *rect, long *indices );
 extern void xinerama_init( unsigned int width, unsigned int height );
