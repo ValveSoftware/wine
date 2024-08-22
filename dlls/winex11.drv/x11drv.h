@@ -778,6 +778,7 @@ extern int X11DRV_check_error(void);
 extern POINT virtual_screen_to_root( INT x, INT y );
 extern POINT root_to_virtual_screen( INT x, INT y );
 extern RECT get_host_primary_monitor_rect(void);
+extern BOOL get_host_monitor_rects( RECT **ret_rects, int *ret_count );
 extern RECT get_work_area( const RECT *monitor_rect );
 extern BOOL xinerama_get_fullscreen_monitors( const RECT *rect, unsigned int *generation, long *indices );
 extern void xinerama_init( unsigned int width, unsigned int height );
