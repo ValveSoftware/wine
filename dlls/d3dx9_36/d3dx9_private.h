@@ -224,9 +224,6 @@ void convert_argb_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pit
         const struct pixel_format_desc *src_format, BYTE *dst, UINT dst_row_pitch, UINT dst_slice_pitch,
         const struct volume *dst_size, const struct pixel_format_desc *dst_format, D3DCOLOR color_key,
         const PALETTEENTRY *palette, uint32_t filter_flags);
-HRESULT d3dx_pixels_init(const void *data, uint32_t row_pitch, uint32_t slice_pitch,
-        const PALETTEENTRY *palette, enum d3dx_pixel_format_id format, uint32_t left, uint32_t top, uint32_t right,
-        uint32_t bottom, uint32_t front, uint32_t back, struct d3dx_pixels *pixels);
 void get_aligned_rect(uint32_t left, uint32_t top, uint32_t right, uint32_t bottom, uint32_t width, uint32_t height,
         const struct pixel_format_desc *fmt_desc, RECT *aligned_rect);
 

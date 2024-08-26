@@ -6310,12 +6310,6 @@ static void test_D3DX10LoadTextureFromTexture(void)
     uint32_t i;
     HRESULT hr;
 
-    if (!strcmp(winetest_platform, "wine"))
-    {
-        skip("Skipping D3DX10LoadTextureFromTexture() tests.\n");
-        return;
-    }
-
     device = create_device();
     if (!device)
     {

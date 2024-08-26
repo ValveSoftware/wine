@@ -938,3 +938,398 @@ HRESULT WINAPI D3DX10CreateTextureFromMemory(ID3D10Device *device, const void *s
         *hresult = hr;
     return hr;
 }
+
+struct d3d10_texture_resource {
+    D3D10_RESOURCE_DIMENSION texture_dimension;
+    union
+    {
+        ID3D10Resource  *tex_rsrc;
+        ID3D10Texture2D *tex_2d;
+        ID3D10Texture3D *tex_3d;
+    } iface;
+    struct volume size;
+    uint32_t mip_levels;
+    uint32_t layer_count;
+};
+
+struct d3d10_texture {
+    ID3D10Device *device;
+    struct d3d10_texture_resource texture;
+    struct d3d10_texture_resource staging_texture;
+
+    const struct pixel_format_desc *fmt_desc;
+    D3D10_MAP map_flags;
+    D3D10_BOX texture_box;
+
+    uint32_t first_layer;
+    uint32_t first_mip_level;
+};
+
+static void set_d3d10_box(D3D10_BOX *box, uint32_t left, uint32_t top, uint32_t right, uint32_t bottom, uint32_t front,
+        uint32_t back)
+{
+    box->left = left;
+    box->top = top;
+    box->right = right;
+    box->bottom = bottom;
+    box->front = front;
+    box->back = back;
+}
+
+static const char *debug_d3d10_box(const struct D3D10_BOX *box)
+{
+    if (!box)
+        return "(null)";
+    return wine_dbg_sprintf("(%ux%ux%u)-(%ux%ux%u)", box->left, box->top, box->front, box->right, box->bottom, box->back);
+}
+
+static void d3d10_box_get_mip_level(D3D10_BOX *box, uint32_t level)
+{
+    uint32_t i;
+
+    for (i = 0; i < level; ++i)
+    {
+        set_d3d10_box(box, (box->left ? (box->left / 2) : 0), (box->top ? (box->top / 2) : 0),
+                max(box->right / 2, 1), max(box->bottom / 2, 1),
+                (box->front ? (box->front / 2) : 0), max(box->back / 2, 1));
+    }
+}
+
+static HRESULT d3dx_d3d10_texture_init(ID3D10Resource *tex_rsrc, uint32_t first_layer, uint32_t first_mip_level,
+        D3D10_MAP map_flags, D3D10_BOX *tex_box, struct d3d10_texture *texture)
+{
+    struct d3d10_texture_resource *staging_tex_rsrc = &texture->staging_texture;
+    struct d3d10_texture_resource *src_tex_rsrc = &texture->texture;
+    HRESULT hr;
+
+    ID3D10Resource_GetDevice(tex_rsrc, &texture->device);
+    if (!texture->device)
+    {
+        ERR("Failed to get device from texture resource.\n");
+        return E_FAIL;
+    }
+
+    texture->map_flags = map_flags;
+    ID3D10Resource_GetType(tex_rsrc, &src_tex_rsrc->texture_dimension);
+    switch (src_tex_rsrc->texture_dimension)
+    {
+    case D3D10_RESOURCE_DIMENSION_TEXTURE2D:
+    {
+        D3D10_TEXTURE2D_DESC desc;
+
+        hr = ID3D10Resource_QueryInterface(tex_rsrc, &IID_ID3D10Texture2D, (void **)&src_tex_rsrc->iface.tex_2d);
+        if (FAILED(hr))
+            return hr;
+
+        ID3D10Texture2D_GetDesc(src_tex_rsrc->iface.tex_2d, &desc);
+        if (map_flags != D3D10_MAP_READ && (first_mip_level >= desc.MipLevels))
+            return S_FALSE;
+
+        texture->fmt_desc = get_d3dx_pixel_format_info(d3dx_pixel_format_id_from_dxgi_format(desc.Format));
+        if (texture->fmt_desc->format == D3DX_PIXEL_FORMAT_COUNT)
+        {
+            FIXME("Unknown DXGI format supplied, %#x.\n", desc.Format);
+            return E_NOTIMPL;
+        }
+
+        set_volume_struct(&src_tex_rsrc->size, desc.Width, desc.Height, 1);
+        src_tex_rsrc->mip_levels = desc.MipLevels;
+        src_tex_rsrc->layer_count = desc.ArraySize;
+
+        texture->first_mip_level = min((desc.MipLevels - 1), first_mip_level);
+        texture->first_layer = first_layer >= desc.ArraySize ? 0 : first_layer;
+
+        staging_tex_rsrc->texture_dimension = src_tex_rsrc->texture_dimension;
+        staging_tex_rsrc->size = src_tex_rsrc->size;
+        d3dx_get_mip_level_size(&staging_tex_rsrc->size, texture->first_mip_level);
+        staging_tex_rsrc->mip_levels = src_tex_rsrc->mip_levels - texture->first_mip_level;
+        staging_tex_rsrc->layer_count = 1;
+
+        /* Create the staging texture. */
+        desc.Usage = D3D10_USAGE_STAGING;
+        desc.BindFlags = desc.MiscFlags = 0;
+        desc.CPUAccessFlags = D3D10_CPU_ACCESS_READ;
+        if (map_flags != D3D10_MAP_READ)
+            desc.CPUAccessFlags |= D3D10_CPU_ACCESS_WRITE;
+        desc.ArraySize = 1;
+        desc.MipLevels = staging_tex_rsrc->mip_levels;
+        desc.Width = staging_tex_rsrc->size.width;
+        desc.Height = staging_tex_rsrc->size.height;
+
+        hr = ID3D10Device_CreateTexture2D(texture->device, &desc, NULL, &staging_tex_rsrc->iface.tex_2d);
+        if (FAILED(hr))
+            return hr;
+        break;
+    }
+
+    case D3D10_RESOURCE_DIMENSION_TEXTURE3D:
+    {
+        D3D10_TEXTURE3D_DESC desc;
+
+        hr = ID3D10Resource_QueryInterface(tex_rsrc, &IID_ID3D10Texture3D, (void **)&src_tex_rsrc->iface.tex_3d);
+        if (FAILED(hr))
+            return hr;
+
+        ID3D10Texture3D_GetDesc(src_tex_rsrc->iface.tex_3d, &desc);
+        if (map_flags != D3D10_MAP_READ && (first_mip_level >= desc.MipLevels))
+            return S_FALSE;
+
+        texture->fmt_desc = get_d3dx_pixel_format_info(d3dx_pixel_format_id_from_dxgi_format(desc.Format));
+        if (texture->fmt_desc->format == D3DX_PIXEL_FORMAT_COUNT)
+        {
+            FIXME("Unknown DXGI format supplied, %#x.\n", desc.Format);
+            return E_NOTIMPL;
+        }
+
+        set_volume_struct(&src_tex_rsrc->size, desc.Width, desc.Height, desc.Depth);
+        src_tex_rsrc->mip_levels = desc.MipLevels;
+        src_tex_rsrc->layer_count = 1;
+
+        texture->first_mip_level = min((desc.MipLevels - 1), first_mip_level);
+        if (first_layer)
+            WARN("Specified a non zero FirstElement argument on a 3D texture.\n");
+        texture->first_layer = 0;
+
+        staging_tex_rsrc->texture_dimension = src_tex_rsrc->texture_dimension;
+        staging_tex_rsrc->size = src_tex_rsrc->size;
+        d3dx_get_mip_level_size(&staging_tex_rsrc->size, texture->first_mip_level);
+        staging_tex_rsrc->mip_levels = src_tex_rsrc->mip_levels - texture->first_mip_level;
+        staging_tex_rsrc->layer_count = 1;
+
+        /* Create the staging texture. */
+        desc.Usage = D3D10_USAGE_STAGING;
+        desc.BindFlags = desc.MiscFlags = 0;
+        desc.CPUAccessFlags = D3D10_CPU_ACCESS_READ;
+        if (map_flags != D3D10_MAP_READ)
+            desc.CPUAccessFlags |= D3D10_CPU_ACCESS_WRITE;
+        desc.MipLevels = staging_tex_rsrc->mip_levels;
+        desc.Width = staging_tex_rsrc->size.width;
+        desc.Height = staging_tex_rsrc->size.height;
+        desc.Depth = staging_tex_rsrc->size.depth;
+
+        hr = ID3D10Device_CreateTexture3D(texture->device, &desc, NULL, &staging_tex_rsrc->iface.tex_3d);
+        if (FAILED(hr))
+            return hr;
+        break;
+    }
+
+    default:
+        FIXME("Unhandled resource dimension %u.\n", src_tex_rsrc->texture_dimension);
+        return E_NOTIMPL;
+    }
+
+    if (tex_box)
+        texture->texture_box = *tex_box;
+    else
+        set_d3d10_box(&texture->texture_box, 0, 0, staging_tex_rsrc->size.width, staging_tex_rsrc->size.height, 0,
+                staging_tex_rsrc->size.depth);
+
+    return S_OK;
+}
+
+static void d3dx_d3d10_texture_release(struct d3d10_texture *texture)
+{
+    if (texture->device)
+        ID3D10Device_Release(texture->device);
+    if (texture->texture.iface.tex_rsrc)
+        ID3D10Resource_Release(texture->texture.iface.tex_rsrc);
+    if (texture->staging_texture.iface.tex_rsrc)
+        ID3D10Resource_Release(texture->staging_texture.iface.tex_rsrc);
+}
+
+static HRESULT d3dx_d3d10_texture_map(struct d3d10_texture *texture, uint32_t layer, uint32_t mip_level,
+        struct d3dx_pixels *pixels)
+{
+    struct d3d10_texture_resource *staging_tex_rsrc = &texture->staging_texture;
+    struct d3d10_texture_resource *src_tex_rsrc = &texture->texture;
+    uint32_t row_pitch, slice_pitch, sub_rsrc_idx;
+    D3D10_BOX tmp_box = texture->texture_box;
+    const void *data = NULL;
+    HRESULT hr;
+
+    d3d10_box_get_mip_level(&tmp_box, mip_level);
+    sub_rsrc_idx = (src_tex_rsrc->mip_levels * (texture->first_layer + layer)) + (mip_level + texture->first_mip_level);
+    ID3D10Device_CopySubresourceRegion(texture->device, staging_tex_rsrc->iface.tex_rsrc, mip_level, 0, 0, 0,
+             src_tex_rsrc->iface.tex_rsrc, sub_rsrc_idx, NULL);
+    switch (src_tex_rsrc->texture_dimension)
+    {
+    case D3D10_RESOURCE_DIMENSION_TEXTURE2D:
+    {
+        D3D10_MAPPED_TEXTURE2D map = { 0 };
+
+        hr = ID3D10Texture2D_Map(staging_tex_rsrc->iface.tex_2d, mip_level, texture->map_flags, 0, &map);
+        if (FAILED(hr))
+            break;
+        data = map.pData;
+        row_pitch = map.RowPitch;
+        slice_pitch = 0;
+        break;
+    }
+
+    case D3D10_RESOURCE_DIMENSION_TEXTURE3D:
+    {
+        D3D10_MAPPED_TEXTURE3D map = { 0 };
+
+        hr = ID3D10Texture3D_Map(staging_tex_rsrc->iface.tex_3d, mip_level, texture->map_flags, 0, &map);
+        if (FAILED(hr))
+            break;
+        data = map.pData;
+        row_pitch = map.RowPitch;
+        slice_pitch = map.DepthPitch;
+        break;
+    }
+
+    default:
+        break;
+    }
+
+    if (!data)
+        return E_FAIL;
+
+    TRACE("Mapping layer %u, mip level %u, box %s.\n", texture->first_layer + layer, texture->first_mip_level + mip_level,
+            debug_d3d10_box(&tmp_box));
+    return d3dx_pixels_init(data, row_pitch, slice_pitch, NULL, texture->fmt_desc->format, tmp_box.left, tmp_box.top,
+            tmp_box.right, tmp_box.bottom, tmp_box.front, tmp_box.back, pixels);
+}
+
+static void d3dx_d3d10_texture_unmap(struct d3d10_texture *texture, uint32_t layer, uint32_t mip_level)
+{
+    struct d3d10_texture_resource *staging_tex_rsrc = &texture->staging_texture;
+    struct d3d10_texture_resource *src_tex_rsrc = &texture->texture;
+    uint32_t sub_rsrc_idx;
+
+    switch (src_tex_rsrc->texture_dimension)
+    {
+    case D3D10_RESOURCE_DIMENSION_TEXTURE2D:
+    {
+        ID3D10Texture2D_Unmap(staging_tex_rsrc->iface.tex_2d, mip_level);
+        break;
+    }
+
+    case D3D10_RESOURCE_DIMENSION_TEXTURE3D:
+    {
+        ID3D10Texture3D_Unmap(staging_tex_rsrc->iface.tex_3d, mip_level);
+        break;
+    }
+
+    default:
+        break;
+    }
+
+    if (texture->map_flags == D3D10_MAP_READ)
+        return;
+
+    sub_rsrc_idx = (src_tex_rsrc->mip_levels * (texture->first_layer + layer)) + (mip_level + texture->first_mip_level);
+    ID3D10Device_CopySubresourceRegion(texture->device, src_tex_rsrc->iface.tex_rsrc, sub_rsrc_idx, 0, 0, 0,
+            staging_tex_rsrc->iface.tex_rsrc, mip_level, NULL);
+}
+
+static const D3DX10_TEXTURE_LOAD_INFO default_load_info = { NULL, NULL, 0, 0, D3DX10_DEFAULT, 0, 0, D3DX10_DEFAULT,
+                                                            D3DX10_DEFAULT, D3DX10_DEFAULT };
+HRESULT WINAPI D3DX10LoadTextureFromTexture(ID3D10Resource *src_texture, D3DX10_TEXTURE_LOAD_INFO *load_info,
+        ID3D10Resource *dst_texture)
+{
+    D3DX10_TEXTURE_LOAD_INFO info = (load_info) ? *load_info : default_load_info;
+    struct d3d10_texture src_tex = { 0 };
+    struct d3d10_texture dst_tex = { 0 };
+    uint32_t i, j, loaded_mip_levels;
+    HRESULT hr;
+
+    TRACE("src_texture %p, load_info %p, dst_texture %p.\n", src_texture, load_info, dst_texture);
+
+    if (!src_texture || !dst_texture)
+        return E_INVALIDARG;
+
+    if (!info.Filter || FAILED(hr = d3dx_handle_filter(&info.Filter)))
+    {
+        FIXME("Invalid filter argument.\n");
+        return D3DERR_INVALIDCALL;
+    }
+
+    hr = d3dx_d3d10_texture_init(src_texture, info.SrcFirstElement, info.SrcFirstMip, D3D10_MAP_READ, info.pSrcBox, &src_tex);
+    if (FAILED(hr))
+        goto end;
+
+    hr = d3dx_d3d10_texture_init(dst_texture, info.DstFirstElement, info.DstFirstMip, D3D10_MAP_READ_WRITE, info.pDstBox, &dst_tex);
+    if (hr == S_FALSE || FAILED(hr))
+        goto end;
+
+    if ((src_texture == dst_texture) && ((src_tex.first_layer == dst_tex.first_layer) &&
+                (src_tex.first_mip_level == dst_tex.first_mip_level)))
+    {
+        hr = D3DERR_INVALIDCALL;
+        goto end;
+    }
+
+    if (!info.NumMips || info.NumMips == D3DX10_DEFAULT)
+        info.NumMips = dst_tex.staging_texture.mip_levels;
+    info.NumMips = min(info.NumMips, dst_tex.staging_texture.mip_levels);
+    if (!info.NumElements || info.NumElements == D3DX10_DEFAULT)
+        info.NumElements = min(src_tex.texture.layer_count, dst_tex.texture.layer_count);
+    info.NumElements = min(info.NumElements, min(src_tex.texture.layer_count, dst_tex.texture.layer_count));
+    loaded_mip_levels = min(info.NumMips, src_tex.staging_texture.mip_levels);
+    for (i = 0; i < info.NumElements; ++i)
+    {
+        for (j = 0; j < loaded_mip_levels; ++j)
+        {
+            struct d3dx_pixels src_pixels, dst_pixels;
+
+            hr = d3dx_d3d10_texture_map(&src_tex, i, j, &src_pixels);
+            if (FAILED(hr))
+                goto end;
+
+            hr = d3dx_d3d10_texture_map(&dst_tex, i, j, &dst_pixels);
+            if (FAILED(hr))
+            {
+                d3dx_d3d10_texture_unmap(&src_tex, i, j);
+                goto end;
+            }
+
+            hr = d3dx_load_pixels_from_pixels(&dst_pixels, dst_tex.fmt_desc, &src_pixels, src_tex.fmt_desc, info.Filter, 0);
+            d3dx_d3d10_texture_unmap(&src_tex, i, j);
+            d3dx_d3d10_texture_unmap(&dst_tex, i, j);
+            if (FAILED(hr))
+            {
+                WARN("Failed with hr %#lx.\n", hr);
+                goto end;
+            }
+        }
+    }
+
+    if (loaded_mip_levels < info.NumMips)
+    {
+        if (!info.MipFilter || FAILED(hr = d3dx_handle_filter(&info.MipFilter)))
+        {
+            FIXME("Invalid mip filter argument.\n");
+            hr = D3DERR_INVALIDCALL;
+            goto end;
+        }
+
+        for (i = 0; i < info.NumElements; ++i)
+        {
+            for (j = loaded_mip_levels; j < info.NumMips; ++j)
+            {
+                struct d3dx_pixels src_pixels, dst_pixels;
+
+                hr = d3dx_d3d10_texture_map(&dst_tex, i, j - 1, &src_pixels);
+                if (FAILED(hr))
+                    break;
+
+                hr = d3dx_d3d10_texture_map(&dst_tex, i, j, &dst_pixels);
+                if (SUCCEEDED(hr))
+                {
+                    hr = d3dx_load_pixels_from_pixels(&dst_pixels, dst_tex.fmt_desc, &src_pixels, dst_tex.fmt_desc, info.MipFilter, 0);
+                    d3dx_d3d10_texture_unmap(&dst_tex, i, j);
+                }
+                d3dx_d3d10_texture_unmap(&dst_tex, i, j - 1);
+                if (FAILED(hr))
+                    goto end;
+            }
+        }
+    }
+
+end:
+    d3dx_d3d10_texture_release(&src_tex);
+    d3dx_d3d10_texture_release(&dst_tex);
+    return SUCCEEDED(hr) ? S_OK : hr;
+}
