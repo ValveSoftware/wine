@@ -200,6 +200,9 @@ static inline void set_d3dx_pixels(struct d3dx_pixels *pixels, const void *data,
     pixels->unaligned_rect = *unaligned_rect;
 }
 
+HRESULT d3dx_pixels_init(const void *data, uint32_t row_pitch, uint32_t slice_pitch,
+        const PALETTEENTRY *palette, enum d3dx_pixel_format_id format, uint32_t left, uint32_t top, uint32_t right,
+        uint32_t bottom, uint32_t front, uint32_t back, struct d3dx_pixels *pixels);
 HRESULT d3dx_load_pixels_from_pixels(struct d3dx_pixels *dst_pixels,
        const struct pixel_format_desc *dst_desc, struct d3dx_pixels *src_pixels,
        const struct pixel_format_desc *src_desc, uint32_t filter_flags, uint32_t color_key);
