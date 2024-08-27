@@ -35,6 +35,13 @@ static inline void set_volume_struct(struct volume *volume, uint32_t width, uint
     volume->depth = depth;
 }
 
+/* These match existing d3dx9/d3dx10/d3dx11 filter flags. */
+#ifndef D3DX_FILTER_SRGB_IN
+#define D3DX_FILTER_SRGB_IN  0x00200000
+#define D3DX_FILTER_SRGB_OUT 0x00400000
+#define D3DX_FILTER_SRGB     0x00600000
+#endif
+
 /* These are custom Wine only filter flags. */
 #define D3DX_FILTER_PMA_IN  0x00800000
 #define D3DX_FILTER_PMA_OUT 0x01000000
@@ -46,6 +53,7 @@ enum d3dx_pixel_format_id {
     D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM,
     D3DX_PIXEL_FORMAT_B8G8R8X8_UNORM,
     D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM,
+    D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM_SRGB,
     D3DX_PIXEL_FORMAT_R8G8B8X8_UNORM,
     D3DX_PIXEL_FORMAT_B5G6R5_UNORM,
     D3DX_PIXEL_FORMAT_B5G5R5X1_UNORM,
@@ -64,10 +72,13 @@ enum d3dx_pixel_format_id {
     D3DX_PIXEL_FORMAT_R16G16_UNORM,
     D3DX_PIXEL_FORMAT_A8_UNORM,
     D3DX_PIXEL_FORMAT_DXT1_UNORM,
+    D3DX_PIXEL_FORMAT_BC1_UNORM_SRGB,
     D3DX_PIXEL_FORMAT_DXT2_UNORM,
     D3DX_PIXEL_FORMAT_DXT3_UNORM,
+    D3DX_PIXEL_FORMAT_BC2_UNORM_SRGB,
     D3DX_PIXEL_FORMAT_DXT4_UNORM,
     D3DX_PIXEL_FORMAT_DXT5_UNORM,
+    D3DX_PIXEL_FORMAT_BC3_UNORM_SRGB,
     D3DX_PIXEL_FORMAT_BC4_UNORM,
     D3DX_PIXEL_FORMAT_BC4_SNORM,
     D3DX_PIXEL_FORMAT_BC5_UNORM,
@@ -148,10 +159,14 @@ enum format_flag {
     FMT_FLAG_PM_ALPHA = 0x04,
     /* For formats that only have a DXGI_FORMAT mapping, no D3DFORMAT equivalent. */
     FMT_FLAG_DXGI     = 0x08,
+    FMT_FLAG_SRGB     = 0x10
 };
 
 #define FMT_FLAG_PMA_DXT (FMT_FLAG_DXT | FMT_FLAG_PM_ALPHA)
 #define FMT_FLAG_DXGI_DXT (FMT_FLAG_DXGI | FMT_FLAG_DXT)
+/* All SRGB format variants are DXGI-only. */
+#define FMT_FLAG_SRGB_DXGI (FMT_FLAG_DXGI | FMT_FLAG_SRGB)
+#define FMT_FLAG_SRGB_DXT (FMT_FLAG_SRGB_DXGI | FMT_FLAG_DXT)
 
 struct pixel_format_type_desc {
     enum component_type a_type;
