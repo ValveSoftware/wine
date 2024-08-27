@@ -179,6 +179,8 @@ static inline BOOL filter_flags_match(uint32_t filter_flags)
 {
     if (!!(filter_flags & D3DX_FILTER_PMA_IN) != !!((filter_flags & D3DX_FILTER_PMA_OUT)))
         return FALSE;
+    if (!!(filter_flags & D3DX_FILTER_SRGB_IN) != !!((filter_flags & D3DX_FILTER_SRGB_OUT)))
+        return FALSE;
 
     return TRUE;
 }

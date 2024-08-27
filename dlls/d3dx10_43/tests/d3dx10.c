@@ -6124,11 +6124,11 @@ test_texture_format_conversion[] =
     },
     {
         { 4, 4, 1, 1,        DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, { 1, 0 }, D3D10_USAGE_DEFAULT, D3D10_BIND_SHADER_RESOURCE, 0, 0 },
-        rgba_unorm_srgb_4_4, DXGI_FORMAT_R8G8B8A8_UNORM,      rgba_unorm_srgb_to_unorm_non_srgb_4_4, .todo_hr = TRUE
+        rgba_unorm_srgb_4_4, DXGI_FORMAT_R8G8B8A8_UNORM,      rgba_unorm_srgb_to_unorm_non_srgb_4_4, .max_diff = 3
     },
     {
         { 4, 4, 1, 1,            DXGI_FORMAT_R8G8B8A8_UNORM,      { 1, 0 }, D3D10_USAGE_DEFAULT, D3D10_BIND_SHADER_RESOURCE, 0, 0 },
-        rgba_unorm_non_srgb_4_4, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, rgba_unorm_non_srgb_to_unorm_srgb_4_4, .todo_hr = TRUE
+        rgba_unorm_non_srgb_4_4, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, rgba_unorm_non_srgb_to_unorm_srgb_4_4, .max_diff = 2
     },
 };
 
