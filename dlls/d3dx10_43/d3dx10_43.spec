@@ -15,7 +15,7 @@
 @ stdcall D3DX10CreateAsyncResourceLoaderA(long str ptr)
 @ stdcall D3DX10CreateAsyncResourceLoaderW(long wstr ptr)
 @ stub D3DX10CreateAsyncShaderPreprocessProcessor(str ptr ptr ptr ptr ptr)
-@ stub D3DX10CreateAsyncShaderResourceViewProcessor(ptr ptr ptr)
+@ stdcall D3DX10CreateAsyncShaderResourceViewProcessor(ptr ptr ptr)
 @ stdcall D3DX10CreateAsyncTextureInfoProcessor(ptr ptr)
 @ stdcall D3DX10CreateAsyncTextureProcessor(ptr ptr ptr)
 @ stdcall D3DX10CreateDevice(ptr long long long ptr)

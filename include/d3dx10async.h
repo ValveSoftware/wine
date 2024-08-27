@@ -79,5 +79,7 @@ HRESULT WINAPI D3DX10CreateAsyncResourceLoaderW(HMODULE module, const WCHAR *res
 HRESULT WINAPI D3DX10CreateAsyncTextureProcessor(ID3D10Device *device,
         D3DX10_IMAGE_LOAD_INFO *info, ID3DX10DataProcessor **processor);
 HRESULT WINAPI D3DX10CreateAsyncTextureInfoProcessor(D3DX10_IMAGE_INFO *info, ID3DX10DataProcessor **processor);
+HRESULT WINAPI D3DX10CreateAsyncShaderResourceViewProcessor(ID3D10Device *device,
+        D3DX10_IMAGE_LOAD_INFO *info, ID3DX10DataProcessor **processor);
 
 #endif

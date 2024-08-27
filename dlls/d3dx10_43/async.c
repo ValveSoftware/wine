@@ -603,6 +603,14 @@ HRESULT WINAPI D3DX10CreateAsyncTextureProcessor(ID3D10Device *device,
     return S_OK;
 }
 
+HRESULT WINAPI D3DX10CreateAsyncShaderResourceViewProcessor(ID3D10Device *device,
+        D3DX10_IMAGE_LOAD_INFO *load_info, ID3DX10DataProcessor **processor)
+{
+    FIXME("device %p, load_info %p, processor %p stub.\n", device, load_info, processor);
+
+    return E_NOTIMPL;
+}
+
 struct work_item
 {
     struct list entry;
