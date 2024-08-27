@@ -3167,13 +3167,7 @@ static void test_D3DX10CreateAsyncShaderResourceViewProcessor(void)
     ID3DX10DataProcessor *dp;
     ID3D10Device *device;
     HRESULT hr;
-    int i;
-
-    if (!strcmp(winetest_platform, "wine"))
-    {
-        skip("Skipping D3DX10CreateAsyncShaderResourceViewProcessor() tests.\n");
-        return;
-    }
+    uint32_t i;
 
     device = create_device();
     if (!device)
