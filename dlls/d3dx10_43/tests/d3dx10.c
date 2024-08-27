@@ -4053,12 +4053,6 @@ static void test_D3DX10CreateAsyncShaderResourceViewProcessor(void)
     HRESULT hr;
     int i;
 
-    if (!strcmp(winetest_platform, "wine"))
-    {
-        skip("Skipping D3DX10CreateAsyncShaderResourceViewProcessor() tests.\n");
-        return;
-    }
-
     device = create_device();
     if (!device)
     {
