@@ -999,6 +999,52 @@ static void d3d10_box_get_mip_level(D3D10_BOX *box, uint32_t level)
     }
 }
 
+static uint32_t d3d10_get_resource_mip_levels(ID3D10Resource *rsrc)
+{
+    D3D10_RESOURCE_DIMENSION rsrc_dim;
+    uint32_t mip_levels = 0;
+    HRESULT hr;
+
+    ID3D10Resource_GetType(rsrc, &rsrc_dim);
+    switch (rsrc_dim)
+    {
+    case D3D10_RESOURCE_DIMENSION_TEXTURE2D:
+    {
+        D3D10_TEXTURE2D_DESC desc;
+        ID3D10Texture2D *tex_2d;
+
+        hr = ID3D10Resource_QueryInterface(rsrc, &IID_ID3D10Texture2D, (void **)&tex_2d);
+        if (FAILED(hr))
+            break;
+
+        ID3D10Texture2D_GetDesc(tex_2d, &desc);
+        ID3D10Texture2D_Release(tex_2d);
+        mip_levels = desc.MipLevels;
+        break;
+    }
+
+    case D3D10_RESOURCE_DIMENSION_TEXTURE3D:
+    {
+        D3D10_TEXTURE3D_DESC desc;
+        ID3D10Texture3D *tex_3d;
+
+        hr = ID3D10Resource_QueryInterface(rsrc, &IID_ID3D10Texture3D, (void **)&tex_3d);
+        if (FAILED(hr))
+            break;
+
+        ID3D10Texture3D_GetDesc(tex_3d, &desc);
+        ID3D10Texture3D_Release(tex_3d);
+        mip_levels = desc.MipLevels;
+        break;
+    }
+
+    default:
+        break;
+    }
+
+    return mip_levels;
+}
+
 static HRESULT d3dx_d3d10_texture_init(ID3D10Resource *tex_rsrc, uint32_t first_layer, uint32_t first_mip_level,
         D3D10_MAP map_flags, D3D10_BOX *tex_box, struct d3d10_texture *texture)
 {
@@ -1336,4 +1382,16 @@ end:
     d3dx_d3d10_texture_release(&src_tex);
     d3dx_d3d10_texture_release(&dst_tex);
     return SUCCEEDED(hr) ? S_OK : hr;
+}
+
+HRESULT WINAPI D3DX10FilterTexture(ID3D10Resource *texture, UINT src_level, UINT filter)
+{
+    D3DX10_TEXTURE_LOAD_INFO load_info = { NULL, NULL, src_level, src_level + 1, 0, 0, 0, 0, filter, filter };
+
+    TRACE("texture %p, src_level %u, filter %#x.\n", texture, src_level, filter);
+
+    if (d3d10_get_resource_mip_levels(texture) <= src_level)
+        return S_OK;
+
+    return D3DX10LoadTextureFromTexture(texture, &load_info, texture);
 }
