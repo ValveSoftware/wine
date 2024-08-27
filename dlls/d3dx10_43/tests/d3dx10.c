@@ -858,132 +858,164 @@ static const struct test_image
     unsigned int size;
     const BYTE *expected_data;
     D3DX10_IMAGE_INFO expected_info;
+    D3D10_SRV_DIMENSION expected_srv_dimension;
 }
 test_image[] =
 {
     {
         test_bmp_1bpp,       sizeof(test_bmp_1bpp),          test_bmp_1bpp_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_bmp_4bpp,       sizeof(test_bmp_4bpp),          test_bmp_4bpp_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_bmp_8bpp,       sizeof(test_bmp_8bpp),          test_bmp_8bpp_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_bmp_16bpp,      sizeof(test_bmp_16bpp),         test_bmp_16bpp_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_bmp_24bpp,      sizeof(test_bmp_24bpp),         test_bmp_24bpp_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_bmp_32bpp_xrgb, sizeof(test_bmp_32bpp_xrgb),    test_bmp_32bpp_xrgb_data,
-        {2, 2, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP}
+        {2, 2, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_bmp_32bpp_argb, sizeof(test_bmp_32bpp_argb),    test_bmp_32bpp_argb_data,
-        {2, 2, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP}
+        {2, 2, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_BMP},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_png_8bpp_gray,  sizeof(test_png_8bpp_gray),     test_png_8bpp_gray_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_PNG}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_PNG},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_jpg,            sizeof(test_jpg),               test_jpg_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_JPG}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_JPG},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_gif,            sizeof(test_gif),               test_gif_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_GIF}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_GIF},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_tiff,           sizeof(test_tiff),              test_tiff_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_TIFF}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_TIFF},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_alpha,      sizeof(test_dds_alpha),         test_dds_alpha_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_A8_UNORM,           D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_A8_UNORM,           D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_luminance,  sizeof(test_dds_luminance),     test_dds_luminance_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_16bpp,      sizeof(test_dds_16bpp),         test_dds_16bpp_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_24bpp,      sizeof(test_dds_24bpp),         test_dds_24bpp_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_32bpp,      sizeof(test_dds_32bpp),         test_dds_32bpp_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_64bpp,      sizeof(test_dds_64bpp),         test_dds_64bpp_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R16G16B16A16_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R16G16B16A16_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_96bpp,      sizeof(test_dds_96bpp),         test_dds_96bpp_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R32G32B32_FLOAT,    D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R32G32B32_FLOAT,    D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_128bpp,     sizeof(test_dds_128bpp),        test_dds_128bpp_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R32G32B32A32_FLOAT, D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R32G32B32A32_FLOAT, D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_dxt1,       sizeof(test_dds_dxt1),          test_dds_dxt1_data,
-        {4, 4, 1, 1, 1, 0,   DXGI_FORMAT_BC1_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {4, 4, 1, 1, 1, 0,   DXGI_FORMAT_BC1_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_dxt1_4x8,   sizeof(test_dds_dxt1_4x8),      test_dds_dxt1_4x8_data,
-        {4, 8, 1, 1, 4, 0,   DXGI_FORMAT_BC1_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {4, 8, 1, 1, 4, 0,   DXGI_FORMAT_BC1_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_dxt2,       sizeof(test_dds_dxt2),          test_dds_dxt2_data,
-        {4, 4, 1, 1, 3, 0,   DXGI_FORMAT_BC2_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {4, 4, 1, 1, 3, 0,   DXGI_FORMAT_BC2_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_dxt3,       sizeof(test_dds_dxt3),          test_dds_dxt3_data,
-        {1, 3, 1, 1, 2, 0,   DXGI_FORMAT_BC2_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {1, 3, 1, 1, 2, 0,   DXGI_FORMAT_BC2_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_dxt4,       sizeof(test_dds_dxt4),          test_dds_dxt4_data,
-        {4, 4, 1, 1, 3, 0,   DXGI_FORMAT_BC3_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {4, 4, 1, 1, 3, 0,   DXGI_FORMAT_BC3_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_dxt5,       sizeof(test_dds_dxt5),          test_dds_dxt5_data,
-        {4, 2, 1, 1, 1, 0,   DXGI_FORMAT_BC3_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {4, 2, 1, 1, 1, 0,   DXGI_FORMAT_BC3_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_dxt5_8x8,   sizeof(test_dds_dxt5_8x8),      test_dds_dxt5_8x8_data,
-        {8, 8, 1, 1, 4, 0,   DXGI_FORMAT_BC3_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {8, 8, 1, 1, 4, 0,   DXGI_FORMAT_BC3_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_bc4,        sizeof(test_dds_bc4),           test_dds_bc4_data,
-        {4, 4, 1, 1, 3, 0,   DXGI_FORMAT_BC4_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {4, 4, 1, 1, 3, 0,   DXGI_FORMAT_BC4_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_bc5,        sizeof(test_dds_bc5),           test_dds_bc5_data,
-        {6, 3, 1, 1, 3, 0,   DXGI_FORMAT_BC5_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {6, 3, 1, 1, 3, 0,   DXGI_FORMAT_BC5_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
     {
         test_dds_cube,       sizeof(test_dds_cube),          test_dds_cube_data,
-        {4, 4, 1, 6, 3, 0x4, DXGI_FORMAT_BC1_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS}
+        {4, 4, 1, 6, 3, 0x4, DXGI_FORMAT_BC1_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURECUBE
     },
     {
         test_dds_volume,     sizeof(test_dds_volume),        test_dds_volume_data,
-        {4, 4, 2, 1, 3, 0,   DXGI_FORMAT_BC2_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE3D, D3DX10_IFF_DDS}
+        {4, 4, 2, 1, 3, 0,   DXGI_FORMAT_BC2_UNORM,          D3D10_RESOURCE_DIMENSION_TEXTURE3D, D3DX10_IFF_DDS},
+        D3D10_SRV_DIMENSION_TEXTURE3D
     },
     {
         test_wmp,            sizeof(test_wmp),               test_wmp_data,
-        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_WMP}
+        {1, 1, 1, 1, 1, 0,   DXGI_FORMAT_R8G8B8A8_UNORM,     D3D10_RESOURCE_DIMENSION_TEXTURE2D, D3DX10_IFF_WMP},
+        D3D10_SRV_DIMENSION_TEXTURE2D
     },
 };
 
@@ -2035,6 +2067,80 @@ static void check_resource_data(ID3D10Resource *resource, const struct test_imag
     }
 }
 
+static void check_shader_resource_view_info(ID3D10ShaderResourceView *srv, const struct test_image *image, uint32_t line)
+{
+    uint32_t expected_mip_levels, expected_width, expected_height, max_dimension;
+    D3D10_SHADER_RESOURCE_VIEW_DESC srv_desc;
+    ID3D10Resource *resource;
+
+    expected_width = image->expected_info.Width;
+    expected_height = image->expected_info.Height;
+    if (is_block_compressed(image->expected_info.Format))
+    {
+        expected_width = (expected_width + 3) & ~3;
+        expected_height = (expected_height + 3) & ~3;
+    }
+    expected_mip_levels = 0;
+    max_dimension = max(max(expected_width, expected_height), image->expected_info.Depth);
+    while (max_dimension)
+    {
+        ++expected_mip_levels;
+        max_dimension >>= 1;
+    }
+
+    ID3D10ShaderResourceView_GetDesc(srv, &srv_desc);
+    ok_(__FILE__, line)(srv_desc.Format == image->expected_info.Format, "Got unexpected Format %u, expected %u.\n",
+            srv_desc.Format, image->expected_info.Format);
+    ok_(__FILE__, line)(srv_desc.ViewDimension == image->expected_srv_dimension, "Got unexpected ViewDimension %u, expected %u.\n",
+            srv_desc.ViewDimension, image->expected_srv_dimension);
+    if (srv_desc.ViewDimension != image->expected_srv_dimension)
+        return;
+
+    ID3D10ShaderResourceView_GetResource(srv, &resource);
+    check_resource_info(resource, image, line);
+    check_resource_data(resource, image, line);
+    ID3D10Resource_Release(resource);
+
+    switch (srv_desc.ViewDimension)
+    {
+    case D3D10_SRV_DIMENSION_TEXTURE2D:
+        ok_(__FILE__, line)(!srv_desc.Texture2D.MostDetailedMip, "Unexpected MostDetailedMip %u.\n",
+                srv_desc.Texture2D.MostDetailedMip);
+        ok_(__FILE__, line)(srv_desc.Texture2D.MipLevels == expected_mip_levels, "Unexpected MipLevels %u.\n",
+                srv_desc.Texture2D.MipLevels);
+        break;
+
+    case D3D10_SRV_DIMENSION_TEXTURE2DARRAY:
+        ok_(__FILE__, line)(!srv_desc.Texture2DArray.MostDetailedMip, "Unexpected MostDetailedMip %u.\n",
+                srv_desc.Texture2DArray.MostDetailedMip);
+        ok_(__FILE__, line)(srv_desc.Texture2DArray.MipLevels == expected_mip_levels, "Unexpected MipLevels %u.\n",
+                srv_desc.Texture2DArray.MipLevels);
+        ok_(__FILE__, line)(!srv_desc.Texture2DArray.FirstArraySlice, "Unexpected FirstArraySlice %u.\n",
+                srv_desc.Texture2DArray.FirstArraySlice);
+        ok_(__FILE__, line)(srv_desc.Texture2DArray.ArraySize == image->expected_info.ArraySize, "Unexpected ArraySize %u.\n",
+                srv_desc.Texture2DArray.ArraySize);
+        break;
+
+    case D3D10_SRV_DIMENSION_TEXTURECUBE:
+        ok_(__FILE__, line)(!srv_desc.TextureCube.MostDetailedMip, "Unexpected MostDetailedMip %u.\n",
+                srv_desc.TextureCube.MostDetailedMip);
+        ok_(__FILE__, line)(srv_desc.TextureCube.MipLevels == expected_mip_levels, "Unexpected MipLevels %u.\n",
+                srv_desc.TextureCube.MipLevels);
+        break;
+
+    case D3D10_SRV_DIMENSION_TEXTURE3D:
+        ok_(__FILE__, line)(!srv_desc.Texture3D.MostDetailedMip, "Unexpected MostDetailedMip %u.\n",
+                srv_desc.Texture3D.MostDetailedMip);
+        ok_(__FILE__, line)(srv_desc.Texture3D.MipLevels == expected_mip_levels, "Unexpected MipLevels %u.\n",
+                srv_desc.Texture3D.MipLevels);
+        break;
+
+    default:
+        ok_(__FILE__, line)(0, "Unexpected ViewDimension %u.\n", srv_desc.ViewDimension);
+        break;
+    }
+}
+
 /*
  * Taken from the d3d10core tests. If there's a missing resource type or
  * texture format checking function, check to see if it exists there first.
@@ -3042,6 +3148,103 @@ static void test_D3DX10CreateAsyncTextureProcessor(void)
                 ok(hr == test_load_info->expected_create_device_object_hr, "Got unexpected hr %#lx.\n", hr);
             if (SUCCEEDED(hr))
                 ID3D10Resource_Release(resource);
+        }
+
+        hr = ID3DX10DataProcessor_Destroy(dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        winetest_pop_context();
+    }
+
+    CoUninitialize();
+
+    ok(!ID3D10Device_Release(device), "Unexpected refcount.\n");
+}
+
+static void test_D3DX10CreateAsyncShaderResourceViewProcessor(void)
+{
+    ID3D10ShaderResourceView *resource_view;
+    ID3DX10DataProcessor *dp;
+    ID3D10Device *device;
+    HRESULT hr;
+    int i;
+
+    if (!strcmp(winetest_platform, "wine"))
+    {
+        skip("Skipping D3DX10CreateAsyncShaderResourceViewProcessor() tests.\n");
+        return;
+    }
+
+    device = create_device();
+    if (!device)
+    {
+        skip("Failed to create device, skipping tests.\n");
+        return;
+    }
+
+    CoInitialize(NULL);
+
+    hr = D3DX10CreateAsyncShaderResourceViewProcessor(device, NULL, NULL);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#lx.\n", hr);
+
+    hr = D3DX10CreateAsyncShaderResourceViewProcessor(NULL, NULL, &dp);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#lx.\n", hr);
+
+    hr = D3DX10CreateAsyncShaderResourceViewProcessor(device, NULL, &dp);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX10DataProcessor_Process(dp, (void *)test_image[0].data, 0);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX10DataProcessor_Process(dp, NULL, test_image[0].size);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX10DataProcessor_Destroy(dp);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+    for (i = 0; i < ARRAY_SIZE(test_image); ++i)
+    {
+        winetest_push_context("Test %u", i);
+
+        hr = D3DX10CreateAsyncShaderResourceViewProcessor(device, NULL, &dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        hr = ID3DX10DataProcessor_Process(dp, (void *)test_image[i].data, test_image[i].size);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX10_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            hr = ID3DX10DataProcessor_CreateDeviceObject(dp, (void **)&resource_view);
+            ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+            check_shader_resource_view_info(resource_view, test_image + i, __LINE__);
+            ID3D10ShaderResourceView_Release(resource_view);
+        }
+
+        hr = ID3DX10DataProcessor_Destroy(dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        winetest_pop_context();
+    }
+
+    for (i = 0; i < ARRAY_SIZE(test_invalid_image_load_info); ++i)
+    {
+        const struct test_invalid_image_load_info *test_load_info = &test_invalid_image_load_info[i];
+        D3DX10_IMAGE_LOAD_INFO load_info = test_load_info->load_info;
+
+        winetest_push_context("Test %u", i);
+
+        hr = D3DX10CreateAsyncShaderResourceViewProcessor(device, &load_info, &dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        hr = ID3DX10DataProcessor_Process(dp, (void *)test_load_info->data, test_load_info->size);
+        todo_wine_if(test_load_info->todo_process_hr)
+            ok(hr == test_load_info->expected_process_hr, "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            resource_view = NULL;
+            hr = ID3DX10DataProcessor_CreateDeviceObject(dp, (void **)&resource_view);
+            todo_wine_if(test_load_info->todo_create_device_object_hr)
+                ok(hr == test_load_info->expected_create_device_object_hr, "Got unexpected hr %#lx.\n", hr);
+            if (SUCCEEDED(hr))
+                ID3D10ShaderResourceView_Release(resource_view);
         }
 
         hr = ID3DX10DataProcessor_Destroy(dp);
@@ -6803,6 +7006,7 @@ START_TEST(d3dx10)
     test_D3DX10CreateAsyncResourceLoader();
     test_D3DX10CreateAsyncTextureInfoProcessor();
     test_D3DX10CreateAsyncTextureProcessor();
+    test_D3DX10CreateAsyncShaderResourceViewProcessor();
     test_D3DX10CreateThreadPump();
     test_D3DX10LoadTextureFromTexture();
     test_D3DX10FilterTexture();
