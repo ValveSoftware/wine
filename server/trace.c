@@ -24,6 +24,17 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#ifdef HAVE_NETINET_TCP_H
+#include <netinet/tcp.h>
+#endif
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
 
 #ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
@@ -42,6 +53,8 @@
 #include "ddk/ntddser.h"
 #define USE_WS_PREFIX
 #include "winsock2.h"
+#include "ws2tcpip.h"
+#include "tcpmib.h"
 #include "file.h"
 #include "request.h"
 #include "security.h"
@@ -1391,6 +1404,60 @@ static void dump_varargs_handle_infos( const char *prefix, data_size_t size )
                  handle->owner, handle->handle, handle->access, handle->attributes, handle->type );
         size -= sizeof(*handle);
         remove_data( sizeof(*handle) );
+        if (size) fputc( ',', stderr );
+    }
+    fputc( '}', stderr );
+}
+
+static void dump_varargs_tcp_connections( const char *prefix, data_size_t size )
+{
+    static const char * const state_names[] = {
+        NULL,
+        "CLOSED",
+        "LISTEN",
+        "SYN_SENT",
+        "SYN_RCVD",
+        "ESTAB",
+        "FIN_WAIT1",
+        "FIN_WAIT2",
+        "CLOSE_WAIT",
+        "CLOSING",
+        "LAST_ACK",
+        "TIME_WAIT",
+        "DELETE_TCB"
+    };
+    const tcp_connection *conn;
+
+    fprintf( stderr, "%s{", prefix );
+    while (size >= sizeof(*conn))
+    {
+        conn = cur_data;
+
+        if (conn->common.family == WS_AF_INET)
+        {
+            char local_addr_str[INET_ADDRSTRLEN] = { 0 };
+            char remote_addr_str[INET_ADDRSTRLEN] = { 0 };
+            inet_ntop( AF_INET, (struct in_addr *)&conn->ipv4.local_addr, local_addr_str, INET_ADDRSTRLEN );
+            inet_ntop( AF_INET, (struct in_addr *)&conn->ipv4.remote_addr, remote_addr_str, INET_ADDRSTRLEN );
+            fprintf( stderr, "{family=AF_INET,owner=%04x,state=%s,local=%s:%d,remote=%s:%d}",
+                     conn->ipv4.owner, state_names[conn->ipv4.state],
+                     local_addr_str, conn->ipv4.local_port,
+                     remote_addr_str, conn->ipv4.remote_port );
+        }
+        else
+        {
+            char local_addr_str[INET6_ADDRSTRLEN];
+            char remote_addr_str[INET6_ADDRSTRLEN];
+            inet_ntop( AF_INET6, (struct in6_addr *)&conn->ipv6.local_addr, local_addr_str, INET6_ADDRSTRLEN );
+            inet_ntop( AF_INET6, (struct in6_addr *)&conn->ipv6.remote_addr, remote_addr_str, INET6_ADDRSTRLEN );
+            fprintf( stderr, "{family=AF_INET6,owner=%04x,state=%s,local=[%s%%%d]:%d,remote=[%s%%%d]:%d}",
+                     conn->ipv6.owner, state_names[conn->ipv6.state],
+                     local_addr_str, conn->ipv6.local_scope_id, conn->ipv6.local_port,
+                     remote_addr_str, conn->ipv6.remote_scope_id, conn->ipv6.remote_port );
+        }
+
+        size -= sizeof(*conn);
+        remove_data( sizeof(*conn) );
         if (size) fputc( ',', stderr );
     }
     fputc( '}', stderr );
