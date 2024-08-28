@@ -422,7 +422,6 @@ AC_CHECK_HEADERS(\
 	elf.h \
 	float.h \
 	gettext-po.h \
-	libproc.h \
 	link.h \
 	linux/cdrom.h \
 	linux/filter.h \
@@ -2138,7 +2137,6 @@ AC_CHECK_FUNCS(\
 	posix_fallocate \
 	ppoll \
 	prctl \
-	proc_pidinfo \
 	sched_yield \
 	setproctitle \
 	setprogname \
@@ -2188,28 +2186,6 @@ dnl **** Check for types ****
 
 AC_C_INLINE
 AC_CHECK_TYPES([request_sense],,,[#include <linux/cdrom.h>])
-
-AC_CHECK_TYPES([struct xinpgen],,,
-[#include <sys/types.h>
-#include <sys/socket.h>
-#ifdef HAVE_SYS_SOCKETVAR_H
-#include <sys/socketvar.h>
-#endif
-#ifdef HAVE_NET_ROUTE_H
-#include <net/route.h>
-#endif
-#ifdef HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#endif
-#ifdef HAVE_NETINET_IN_SYSTM_H
-#include <netinet/in_systm.h>
-#endif
-#ifdef HAVE_NETINET_IP_H
-#include <netinet/ip.h>
-#endif
-#ifdef HAVE_NETINET_IN_PCB_H
-#include <netinet/in_pcb.h>
-#endif])
 
 AC_CACHE_CHECK([whether we can use re-entrant gethostbyname_r Linux style],
    	wine_cv_linux_gethostbyname_r_6,
