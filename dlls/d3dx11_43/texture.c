@@ -198,7 +198,24 @@ HRESULT WINAPI D3DX11GetImageInfoFromMemory(const void *src_data, SIZE_T src_dat
         return E_FAIL;
 
     if (pump)
-        FIXME("Thread pump is not supported yet.\n");
+    {
+        ID3DX11DataProcessor *processor;
+        ID3DX11DataLoader *loader;
+
+        if (FAILED((hr = D3DX11CreateAsyncMemoryLoader(src_data, src_data_size, &loader))))
+            return hr;
+        if (FAILED((hr = D3DX11CreateAsyncTextureInfoProcessor(img_info, &processor))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            return hr;
+        }
+        if (FAILED((hr = ID3DX11ThreadPump_AddWorkItem(pump, loader, processor, hresult, NULL))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            ID3DX11DataProcessor_Destroy(processor);
+        }
+        return hr;
+    }
 
     hr = get_image_info(src_data, src_data_size, img_info);
     if (hresult)
