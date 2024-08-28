@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Piotr Caban
+ * Copyright 2024 Connor McAdams for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,19 +21,3 @@
 
 extern DXGI_FORMAT dxgi_format_from_dds_d3dx_pixel_format_id(enum d3dx_pixel_format_id format);
 extern DXGI_FORMAT dxgi_format_from_d3dx_pixel_format_id(enum d3dx_pixel_format_id format);
-
-extern HRESULT load_file(const WCHAR *path, void **data, DWORD *size);
-extern HRESULT load_resourceA(HMODULE module, const char *resource,
-        void **data, DWORD *size);
-extern HRESULT load_resourceW(HMODULE module, const WCHAR *resource,
-        void **data, DWORD *size);
-
-extern HRESULT get_image_info(const void *data, SIZE_T size, D3DX10_IMAGE_INFO *img_info);
-
-extern void init_load_info(const D3DX10_IMAGE_LOAD_INFO *load_info,
-        D3DX10_IMAGE_LOAD_INFO *out);
-/* Returns array of D3D10_SUBRESOURCE_DATA structures followed by textures data. */
-extern HRESULT load_texture_data(const void *data, SIZE_T size, D3DX10_IMAGE_LOAD_INFO *load_info,
-        D3D10_SUBRESOURCE_DATA **resource_data);
-extern HRESULT create_d3d_texture(ID3D10Device *device, D3DX10_IMAGE_LOAD_INFO *load_info,
-        D3D10_SUBRESOURCE_DATA *resource_data, ID3D10Resource **texture);
