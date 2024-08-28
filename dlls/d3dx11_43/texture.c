@@ -102,6 +102,77 @@ HRESULT WINAPI D3DX11LoadTextureFromTexture(ID3D11DeviceContext *context, ID3D11
     return E_NOTIMPL;
 }
 
+HRESULT WINAPI D3DX11GetImageInfoFromFileA(const char *src_file, ID3DX11ThreadPump *pump, D3DX11_IMAGE_INFO *info,
+        HRESULT *result)
+{
+    WCHAR *buffer;
+    int str_len;
+    HRESULT hr;
+
+    TRACE("src_file %s, pump %p, info %p, result %p.\n", debugstr_a(src_file), pump, info, result);
+
+    if (!src_file)
+        return E_FAIL;
+
+    str_len = MultiByteToWideChar(CP_ACP, 0, src_file, -1, NULL, 0);
+    if (!str_len)
+        return HRESULT_FROM_WIN32(GetLastError());
+
+    buffer = malloc(str_len * sizeof(*buffer));
+    if (!buffer)
+        return E_OUTOFMEMORY;
+
+    MultiByteToWideChar(CP_ACP, 0, src_file, -1, buffer, str_len);
+    hr = D3DX11GetImageInfoFromFileW(buffer, pump, info, result);
+
+    free(buffer);
+
+    return hr;
+}
+
+HRESULT WINAPI D3DX11GetImageInfoFromFileW(const WCHAR *src_file, ID3DX11ThreadPump *pump, D3DX11_IMAGE_INFO *info,
+        HRESULT *result)
+{
+    void *buffer = NULL;
+    DWORD size = 0;
+    HRESULT hr;
+
+    TRACE("src_file %s, pump %p, info %p, result %p.\n", debugstr_w(src_file), pump, info, result);
+
+    if (!src_file)
+        return E_FAIL;
+
+    if (pump)
+    {
+        ID3DX11DataProcessor *processor;
+        ID3DX11DataLoader *loader;
+
+        if (FAILED((hr = D3DX11CreateAsyncFileLoaderW(src_file, &loader))))
+            return hr;
+        if (FAILED((hr = D3DX11CreateAsyncTextureInfoProcessor(info, &processor))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            return hr;
+        }
+        hr = ID3DX11ThreadPump_AddWorkItem(pump, loader, processor, result, NULL);
+        if (FAILED(hr))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            ID3DX11DataProcessor_Destroy(processor);
+        }
+        return hr;
+    }
+
+    if (SUCCEEDED((hr = load_file(src_file, &buffer, &size))))
+    {
+        hr = get_image_info(buffer, size, info);
+        free(buffer);
+    }
+    if (result)
+        *result = hr;
+    return hr;
+}
+
 static HRESULT d3dx11_image_info_from_d3dx_image(D3DX11_IMAGE_INFO *info, struct d3dx_image *image)
 {
     DXGI_FORMAT format;

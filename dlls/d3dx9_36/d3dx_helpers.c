@@ -2438,3 +2438,34 @@ void get_aligned_rect(uint32_t left, uint32_t top, uint32_t right, uint32_t bott
         aligned_rect->bottom = min((aligned_rect->bottom + fmt_desc->block_height - 1)
                 & ~(fmt_desc->block_height - 1), height);
 }
+
+/* File/resource loading functions shared amongst d3dx10/d3dx11. */
+HRESULT d3dx_load_file(const WCHAR *path, void **data, DWORD *size)
+{
+    DWORD read_len;
+    HANDLE file;
+    BOOL ret;
+
+    file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+            NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (file == INVALID_HANDLE_VALUE)
+        return D3DX_HELPER_ERR_FILE_NOT_FOUND;
+
+    *size = GetFileSize(file, NULL);
+    *data = malloc(*size);
+    if (!*data)
+    {
+        CloseHandle(file);
+        return E_OUTOFMEMORY;
+    }
+
+    ret = ReadFile(file, *data, *size, &read_len, NULL);
+    CloseHandle(file);
+    if (!ret || read_len != *size)
+    {
+        WARN("Failed to read file contents.\n");
+        free(*data);
+        return E_FAIL;
+    }
+    return S_OK;
+}
