@@ -1147,6 +1147,18 @@ void * WINAPI RtlFindExportedRoutineByName( HMODULE module, const char *name )
     return proc;
 }
 
+static int use_lsteamclient(void)
+{
+    WCHAR env[32];
+    static int use = -1;
+
+    if (use != -1) return use;
+
+    use = !get_env( L"PROTON_DISABLE_LSTEAMCLIENT", env, sizeof(env) ) || *env == '0';
+    if (!use)
+        ERR("lsteamclient disabled.\n");
+    return use;
+}
 
 /*************************************************************************
  *		import_dll
@@ -1183,6 +1195,17 @@ static BOOL import_dll( WINE_MODREF *wm, const IMAGE_IMPORT_DESCRIPTOR *descr, L
         WARN( "Skipping unused import %s\n", name );
         *pwm = NULL;
         return TRUE;
+    }
+
+    if (use_lsteamclient())
+    {
+        if ((!strcmp(name, "tier0_s64.dll") || !strcmp(name, "vstdlib_s64.dll")) && wm->ldr.BaseDllName.Buffer
+            && (!wcscmp(wm->ldr.BaseDllName.Buffer, L"steamclient64.dll")
+                || !wcscmp(wm->ldr.BaseDllName.Buffer, L"gameoverlayrenderer64.dll")))
+        {
+            TRACE("%s -> ntdll.\n", name);
+            name = "ntdll.dll";
+        }
     }
 
     status = build_import_name( wm, buffer, name, len );
@@ -2258,19 +2281,6 @@ done:
     return status;
 }
 
-static int use_lsteamclient(void)
-{
-    WCHAR env[32];
-    static int use = -1;
-
-    if (use != -1) return use;
-
-    use = !get_env( L"PROTON_DISABLE_LSTEAMCLIENT", env, sizeof(env) ) || *env == '0';
-    if (!use)
-        ERR("lsteamclient disabled.\n");
-    return use;
-}
-
 /*************************************************************************
  *		build_module
  *
@@ -2355,6 +2365,11 @@ static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name, 
             NtClose( file );
             TRACE( "steamclient ImageBase %#Ix.\n", nt->OptionalHeader.ImageBase );
             NtProtectVirtualMemory( NtCurrentProcess(), &addr, &size, protect_old, &protect_old );
+        }
+        else
+        {
+            fixup_imports( wm, load_path );
+            wm->ldr.Flags |= LDR_DONT_RESOLVE_REFS;
         }
     }
 
