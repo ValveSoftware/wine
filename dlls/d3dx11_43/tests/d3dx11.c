@@ -29,6 +29,140 @@
     ((DWORD)(BYTE)(ch2) << 16) | ((DWORD)(BYTE)(ch3) << 24 ))
 #endif
 
+static uint32_t get_bpp_from_format(DXGI_FORMAT format)
+{
+    switch (format)
+    {
+        case DXGI_FORMAT_R32G32B32A32_TYPELESS:
+        case DXGI_FORMAT_R32G32B32A32_FLOAT:
+        case DXGI_FORMAT_R32G32B32A32_UINT:
+        case DXGI_FORMAT_R32G32B32A32_SINT:
+            return 128;
+        case DXGI_FORMAT_R32G32B32_TYPELESS:
+        case DXGI_FORMAT_R32G32B32_FLOAT:
+        case DXGI_FORMAT_R32G32B32_UINT:
+        case DXGI_FORMAT_R32G32B32_SINT:
+            return 96;
+        case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+        case DXGI_FORMAT_R16G16B16A16_FLOAT:
+        case DXGI_FORMAT_R16G16B16A16_UNORM:
+        case DXGI_FORMAT_R16G16B16A16_UINT:
+        case DXGI_FORMAT_R16G16B16A16_SNORM:
+        case DXGI_FORMAT_R16G16B16A16_SINT:
+        case DXGI_FORMAT_R32G32_TYPELESS:
+        case DXGI_FORMAT_R32G32_FLOAT:
+        case DXGI_FORMAT_R32G32_UINT:
+        case DXGI_FORMAT_R32G32_SINT:
+        case DXGI_FORMAT_R32G8X24_TYPELESS:
+        case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+        case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+        case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
+        case DXGI_FORMAT_Y416:
+        case DXGI_FORMAT_Y210:
+        case DXGI_FORMAT_Y216:
+            return 64;
+        case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+        case DXGI_FORMAT_R10G10B10A2_UNORM:
+        case DXGI_FORMAT_R10G10B10A2_UINT:
+        case DXGI_FORMAT_R11G11B10_FLOAT:
+        case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+        case DXGI_FORMAT_R8G8B8A8_UNORM:
+        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+        case DXGI_FORMAT_R8G8B8A8_UINT:
+        case DXGI_FORMAT_R8G8B8A8_SNORM:
+        case DXGI_FORMAT_R8G8B8A8_SINT:
+        case DXGI_FORMAT_R16G16_TYPELESS:
+        case DXGI_FORMAT_R16G16_FLOAT:
+        case DXGI_FORMAT_R16G16_UNORM:
+        case DXGI_FORMAT_R16G16_UINT:
+        case DXGI_FORMAT_R16G16_SNORM:
+        case DXGI_FORMAT_R16G16_SINT:
+        case DXGI_FORMAT_R32_TYPELESS:
+        case DXGI_FORMAT_D32_FLOAT:
+        case DXGI_FORMAT_R32_FLOAT:
+        case DXGI_FORMAT_R32_UINT:
+        case DXGI_FORMAT_R32_SINT:
+        case DXGI_FORMAT_R24G8_TYPELESS:
+        case DXGI_FORMAT_D24_UNORM_S8_UINT:
+        case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+        case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
+        case DXGI_FORMAT_R9G9B9E5_SHAREDEXP:
+        case DXGI_FORMAT_R8G8_B8G8_UNORM:
+        case DXGI_FORMAT_G8R8_G8B8_UNORM:
+        case DXGI_FORMAT_B8G8R8A8_UNORM:
+        case DXGI_FORMAT_B8G8R8X8_UNORM:
+        case DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM:
+        case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+        case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+        case DXGI_FORMAT_B8G8R8X8_TYPELESS:
+        case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
+        case DXGI_FORMAT_AYUV:
+        case DXGI_FORMAT_Y410:
+        case DXGI_FORMAT_YUY2:
+            return 32;
+        case DXGI_FORMAT_P010:
+        case DXGI_FORMAT_P016:
+            return 24;
+        case DXGI_FORMAT_R8G8_TYPELESS:
+        case DXGI_FORMAT_R8G8_UNORM:
+        case DXGI_FORMAT_R8G8_UINT:
+        case DXGI_FORMAT_R8G8_SNORM:
+        case DXGI_FORMAT_R8G8_SINT:
+        case DXGI_FORMAT_R16_TYPELESS:
+        case DXGI_FORMAT_R16_FLOAT:
+        case DXGI_FORMAT_D16_UNORM:
+        case DXGI_FORMAT_R16_UNORM:
+        case DXGI_FORMAT_R16_UINT:
+        case DXGI_FORMAT_R16_SNORM:
+        case DXGI_FORMAT_R16_SINT:
+        case DXGI_FORMAT_B5G6R5_UNORM:
+        case DXGI_FORMAT_B5G5R5A1_UNORM:
+        case DXGI_FORMAT_A8P8:
+        case DXGI_FORMAT_B4G4R4A4_UNORM:
+            return 16;
+        case DXGI_FORMAT_NV12:
+        case DXGI_FORMAT_420_OPAQUE:
+        case DXGI_FORMAT_NV11:
+            return 12;
+        case DXGI_FORMAT_R8_TYPELESS:
+        case DXGI_FORMAT_R8_UNORM:
+        case DXGI_FORMAT_R8_UINT:
+        case DXGI_FORMAT_R8_SNORM:
+        case DXGI_FORMAT_R8_SINT:
+        case DXGI_FORMAT_A8_UNORM:
+        case DXGI_FORMAT_AI44:
+        case DXGI_FORMAT_IA44:
+        case DXGI_FORMAT_P8:
+        case DXGI_FORMAT_BC2_TYPELESS:
+        case DXGI_FORMAT_BC2_UNORM:
+        case DXGI_FORMAT_BC2_UNORM_SRGB:
+        case DXGI_FORMAT_BC3_TYPELESS:
+        case DXGI_FORMAT_BC3_UNORM:
+        case DXGI_FORMAT_BC3_UNORM_SRGB:
+        case DXGI_FORMAT_BC5_TYPELESS:
+        case DXGI_FORMAT_BC5_UNORM:
+        case DXGI_FORMAT_BC5_SNORM:
+        case DXGI_FORMAT_BC6H_TYPELESS:
+        case DXGI_FORMAT_BC6H_UF16:
+        case DXGI_FORMAT_BC6H_SF16:
+        case DXGI_FORMAT_BC7_TYPELESS:
+        case DXGI_FORMAT_BC7_UNORM:
+        case DXGI_FORMAT_BC7_UNORM_SRGB:
+            return 8;
+        case DXGI_FORMAT_BC1_TYPELESS:
+        case DXGI_FORMAT_BC1_UNORM:
+        case DXGI_FORMAT_BC1_UNORM_SRGB:
+        case DXGI_FORMAT_BC4_TYPELESS:
+        case DXGI_FORMAT_BC4_UNORM:
+        case DXGI_FORMAT_BC4_SNORM:
+            return 4;
+        case DXGI_FORMAT_R1_UNORM:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
 /* 1x1 bmp (1 bpp) */
 static const unsigned char bmp_1bpp[] =
 {
@@ -701,15 +835,31 @@ static void test_D3DX11CompileFromFile(void)
 #define DDS_PIXELFORMAT 0x00001000
 #define DDS_MIPMAPCOUNT 0x00020000
 #define DDS_LINEARSIZE 0x00080000
+#define DDS_DEPTH 0x00800000
 
 /* dds_header.caps */
 #define DDSCAPS_ALPHA    0x00000002
+#define DDS_CAPS_COMPLEX 0x00000008
 #define DDS_CAPS_TEXTURE 0x00001000
+
+/* dds_header.caps2 */
+#define DDS_CAPS2_VOLUME  0x00200000
+#define DDS_CAPS2_CUBEMAP 0x00000200
+#define DDS_CAPS2_CUBEMAP_POSITIVEX 0x00000400
+#define DDS_CAPS2_CUBEMAP_NEGATIVEX 0x00000800
+#define DDS_CAPS2_CUBEMAP_POSITIVEY 0x00001000
+#define DDS_CAPS2_CUBEMAP_NEGATIVEY 0x00002000
+#define DDS_CAPS2_CUBEMAP_POSITIVEZ 0x00004000
+#define DDS_CAPS2_CUBEMAP_NEGATIVEZ 0x00008000
+#define DDS_CAPS2_CUBEMAP_ALL_FACES ( DDS_CAPS2_CUBEMAP_POSITIVEX | DDS_CAPS2_CUBEMAP_NEGATIVEX \
+                                    | DDS_CAPS2_CUBEMAP_POSITIVEY | DDS_CAPS2_CUBEMAP_NEGATIVEY \
+                                    | DDS_CAPS2_CUBEMAP_POSITIVEZ | DDS_CAPS2_CUBEMAP_NEGATIVEZ )
 
 /* dds_pixel_format.flags */
 #define DDS_PF_ALPHA 0x00000001
 #define DDS_PF_ALPHA_ONLY 0x00000002
 #define DDS_PF_FOURCC 0x00000004
+#define DDS_PF_INDEXED 0x00000020
 #define DDS_PF_RGB 0x00000040
 #define DDS_PF_LUMINANCE 0x00020000
 #define DDS_PF_BUMPLUMINANCE 0x00040000
@@ -745,6 +895,16 @@ struct dds_header
     DWORD reserved2;
 };
 
+#define DDS_RESOURCE_MISC_TEXTURECUBE 0x04
+struct dds_header_dxt10
+{
+    DWORD dxgi_format;
+    DWORD resource_dimension;
+    DWORD misc_flag;
+    DWORD array_size;
+    DWORD misc_flags2;
+};
+
 /* fills dds_header with reasonable default values */
 static void fill_dds_header(struct dds_header *header)
 {
@@ -766,6 +926,35 @@ static void fill_dds_header(struct dds_header *header)
     header->caps = DDS_CAPS_TEXTURE;
 }
 
+static void set_dxt10_dds_header(struct dds_header *header, uint32_t append_flags, uint32_t width, uint32_t height,
+        uint32_t depth, uint32_t mip_levels, uint32_t pitch, uint32_t caps, uint32_t caps2)
+{
+    memset(header, 0, sizeof(*header));
+
+    header->size = sizeof(*header);
+    header->flags = DDS_CAPS | DDS_PIXELFORMAT | append_flags;
+    header->height = height;
+    header->width = width;
+    header->depth = depth;
+    header->miplevels = mip_levels;
+    header->pitch_or_linear_size = pitch;
+    header->pixel_format.size = sizeof(header->pixel_format);
+    header->pixel_format.flags = DDS_PF_FOURCC;
+    header->pixel_format.fourcc = MAKEFOURCC('D','X','1','0');
+    header->caps = caps;
+    header->caps2 = caps2;
+}
+
+static void set_dds_header_dxt10(struct dds_header_dxt10 *dxt10, DXGI_FORMAT format, uint32_t resource_dimension,
+        uint32_t misc_flag, uint32_t array_size, uint32_t misc_flags2)
+{
+    dxt10->dxgi_format = format;
+    dxt10->resource_dimension = resource_dimension;
+    dxt10->misc_flag = misc_flag;
+    dxt10->array_size = array_size;
+    dxt10->misc_flags2 = misc_flags2;
+}
+
 #define check_dds_pixel_format(flags, fourcc, bpp, rmask, gmask, bmask, amask, format) \
         check_dds_pixel_format_(__LINE__, flags, fourcc, bpp, rmask, gmask, bmask, amask, format)
 static void check_dds_pixel_format_(unsigned int line, DWORD flags, DWORD fourcc, DWORD bpp,
@@ -777,6 +966,7 @@ static void check_dds_pixel_format_(unsigned int line, DWORD flags, DWORD fourcc
     {
         DWORD magic;
         struct dds_header header;
+        PALETTEENTRY palette[256];
         BYTE data[256];
     } dds;
 
@@ -798,6 +988,308 @@ static void check_dds_pixel_format_(unsigned int line, DWORD flags, DWORD fourcc
         ok_(__FILE__, line)(info.Format == expected_format, "Unexpected format %#x, expected %#x\n",
                 info.Format, expected_format);
     }
+}
+
+#define check_dds_pixel_format_unsupported(flags, fourcc, bpp, rmask, gmask, bmask, amask, expected_hr) \
+        check_dds_pixel_format_unsupported_(__LINE__, flags, fourcc, bpp, rmask, gmask, bmask, amask, expected_hr)
+static void check_dds_pixel_format_unsupported_(unsigned int line, DWORD flags, DWORD fourcc, DWORD bpp,
+        DWORD rmask, DWORD gmask, DWORD bmask, DWORD amask, HRESULT expected_hr)
+{
+    D3DX11_IMAGE_INFO info;
+    HRESULT hr;
+    struct
+    {
+        DWORD magic;
+        struct dds_header header;
+        PALETTEENTRY palette[256];
+        BYTE data[256];
+    } dds;
+
+    dds.magic = MAKEFOURCC('D','D','S',' ');
+    fill_dds_header(&dds.header);
+    dds.header.pixel_format.flags = flags;
+    dds.header.pixel_format.fourcc = fourcc;
+    dds.header.pixel_format.bpp = bpp;
+    dds.header.pixel_format.rmask = rmask;
+    dds.header.pixel_format.gmask = gmask;
+    dds.header.pixel_format.bmask = bmask;
+    dds.header.pixel_format.amask = amask;
+    memset(dds.data, 0, sizeof(dds.data));
+
+    hr = D3DX11GetImageInfoFromMemory(&dds, sizeof(dds), NULL, &info, NULL);
+    ok_(__FILE__, line)(hr == expected_hr, "Got unexpected hr %#lx, expected %#lx.\n", hr, expected_hr);
+}
+
+#define check_dds_dx10_format(format, expected_format, wine_todo) \
+        check_dds_dx10_format_(__LINE__, format, expected_format, wine_todo)
+static void check_dds_dx10_format_(uint32_t line, DXGI_FORMAT format, DXGI_FORMAT expected_format, BOOL wine_todo)
+{
+    const uint32_t stride = (4 * get_bpp_from_format(format) + 7) / 8;
+    D3DX11_IMAGE_INFO info;
+    HRESULT hr;
+    struct
+    {
+        DWORD magic;
+        struct dds_header header;
+        struct dds_header_dxt10 dxt10;
+        BYTE data[256];
+    } dds;
+
+    dds.magic = MAKEFOURCC('D','D','S',' ');
+    set_dxt10_dds_header(&dds.header, 0, 4, 4, 1, 1, stride, 0, 0);
+    set_dds_header_dxt10(&dds.dxt10, format, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0);
+
+    hr = D3DX11GetImageInfoFromMemory(&dds, sizeof(dds), NULL, &info, NULL);
+    ok_(__FILE__, line)(hr == S_OK, "Got unexpected hr %#lx for DXGI format %#x.\n", hr, format);
+    if (SUCCEEDED(hr))
+    {
+        todo_wine_if(wine_todo) ok_(__FILE__, line)(info.Format == expected_format, "Unexpected format %#x, expected %#x.\n",
+                info.Format, expected_format);
+    }
+}
+
+#define check_dds_dx10_format_unsupported(format, expected_hr) \
+        check_dds_dx10_format_unsupported_(__LINE__, format, expected_hr)
+static void check_dds_dx10_format_unsupported_(uint32_t line, DXGI_FORMAT format, HRESULT expected_hr)
+{
+    const uint32_t stride = (4 * get_bpp_from_format(format) + 7) / 8;
+    D3DX11_IMAGE_INFO info;
+    HRESULT hr;
+    struct
+    {
+        DWORD magic;
+        struct dds_header header;
+        struct dds_header_dxt10 dxt10;
+        BYTE data[256];
+    } dds;
+
+    dds.magic = MAKEFOURCC('D','D','S',' ');
+    set_dxt10_dds_header(&dds.header, 0, 4, 4, 1, 1, stride, 0, 0);
+    set_dds_header_dxt10(&dds.dxt10, format, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0);
+
+    hr = D3DX11GetImageInfoFromMemory(&dds, sizeof(dds), NULL, &info, NULL);
+    ok_(__FILE__, line)(hr == expected_hr, "Got unexpected hr %#lx for DXGI format %#x.\n", hr, format);
+}
+
+static void test_dds_header_image_info(void)
+{
+    struct expected
+    {
+        HRESULT hr;
+        uint32_t width;
+        uint32_t height;
+        uint32_t depth;
+        uint32_t array_size;
+        uint32_t mip_levels;
+        uint32_t misc_flags;
+        DXGI_FORMAT format;
+        D3D11_RESOURCE_DIMENSION resource_dimension;
+    };
+    static const struct
+    {
+        uint32_t flags;
+        uint32_t width;
+        uint32_t height;
+        uint32_t depth;
+        uint32_t row_pitch;
+        uint32_t mip_levels;
+        uint32_t caps;
+        uint32_t caps2;
+        struct expected expected;
+        uint32_t pixel_data_size;
+        BOOL todo_hr;
+        BOOL todo_info;
+    } tests[] = {
+        /* File size validation isn't done on d3dx10. */
+        { (DDS_CAPS | DDS_WIDTH | DDS_HEIGHT | DDS_PIXELFORMAT), 4, 4, 1, (4 * 4), 3, 0, 0,
+          { S_OK, 4, 4, 1, 1, 3, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, }, 0, },
+        /* Depth value set to 4, but no caps bits are set. Depth is ignored. */
+        { (DDS_CAPS | DDS_WIDTH | DDS_HEIGHT | DDS_PIXELFORMAT), 4, 4, 4, (4 * 4), 3, 0, 0,
+          { S_OK, 4, 4, 1, 1, 3, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, }, 292 },
+        /* The volume texture caps2 field is ignored. */
+        { (DDS_CAPS | DDS_WIDTH | DDS_HEIGHT | DDS_PIXELFORMAT), 4, 4, 4, (4 * 4), 3,
+          (DDS_CAPS_TEXTURE | DDS_CAPS_COMPLEX), DDS_CAPS2_VOLUME,
+          { S_OK, 4, 4, 1, 1, 3, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, }, 292 },
+        /*
+         * The DDS_DEPTH flag is the only thing checked to determine if a DDS
+         * file represents a 3D texture.
+         */
+        { (DDS_CAPS | DDS_WIDTH | DDS_HEIGHT | DDS_PIXELFORMAT | DDS_DEPTH), 4, 4, 4, (4 * 4), 3,
+          0, 0,
+          { S_OK, 4, 4, 4, 1, 3, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, }, 292 },
+        /* Even if the depth field is set to 0, it's still a 3D texture. */
+        { (DDS_CAPS | DDS_WIDTH | DDS_HEIGHT | DDS_PIXELFORMAT | DDS_DEPTH), 4, 4, 0, (4 * 4), 3,
+          0, 0,
+          { S_OK, 4, 4, 1, 1, 3, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, }, 292 },
+        /* The DDS_DEPTH flag overrides cubemap caps. */
+        { (DDS_CAPS | DDS_WIDTH | DDS_HEIGHT | DDS_PIXELFORMAT | DDS_DEPTH), 4, 4, 4, (4 * 4), 3,
+          (DDS_CAPS_TEXTURE | DDS_CAPS_COMPLEX), (DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES),
+          { S_OK, 4, 4, 4, 1, 3, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, }, 292 },
+        /* Cubemap where width field does not equal height. */
+        { (DDS_CAPS | DDS_WIDTH | DDS_HEIGHT | DDS_PIXELFORMAT), 4, 5, 1, (4 * 4), 1,
+          (DDS_CAPS_TEXTURE | DDS_CAPS_COMPLEX), (DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES),
+          { S_OK, 4, 5, 1, 6, 1, D3D11_RESOURCE_MISC_TEXTURECUBE, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, }, (80 * 6) },
+        /* Partial cubemaps are not supported. */
+        { (DDS_CAPS | DDS_WIDTH | DDS_HEIGHT | DDS_PIXELFORMAT), 4, 4, 1, (4 * 4), 1,
+          (DDS_CAPS_TEXTURE | DDS_CAPS_COMPLEX), (DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_POSITIVEX),
+          { E_FAIL, }, (64 * 6), },
+    };
+    static const struct
+    {
+        uint32_t append_flags;
+        uint32_t width;
+        uint32_t height;
+        uint32_t depth;
+        uint32_t row_pitch;
+        uint32_t mip_levels;
+        uint32_t caps;
+        uint32_t caps2;
+        struct dds_header_dxt10 dxt10;
+        struct expected expected;
+        uint32_t pixel_data_size;
+        BOOL todo_hr;
+        BOOL todo_info;
+    } dxt10_tests[] = {
+        /* File size validation isn't done on d3dx10. */
+        { 0, 4, 4, 0, (4 * 4), 1, 0, 0,
+          { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0, },
+          { S_OK, 4, 4, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, }, 0, },
+        /*
+         * Setting the misc_flags2 field to anything other than 0 results in
+         * E_FAIL.
+         */
+        { 0, 4, 4, 0, (4 * 4), 1, 0, 0,
+          { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 1, },
+          { E_FAIL }, (4 * 4 * 4), },
+        /*
+         * The misc_flags field isn't passed through directly, only the
+         * cube texture flag is (if it's set).
+         */
+        { 0, 4, 4, 0, (4 * 4), 1, 0, 0,
+          { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0xfffffffb, 1, 0, },
+          { S_OK, 4, 4, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, }, (4 * 4 * 4) },
+        /* Resource dimension field of the header isn't validated. */
+        { 0, 4, 4, 0, (4 * 4), 1, 0, 0,
+          { DXGI_FORMAT_R8G8B8A8_UNORM, 500, 0, 1, 0, },
+          { S_OK, 4, 4, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, 500, }, (4 * 4 * 4), .todo_hr = TRUE },
+        /* Depth value of 2, but D3D11_RESOURCE_DIMENSION_TEXTURE2D. */
+        { DDS_DEPTH, 4, 4, 2, (4 * 4), 1, 0, 0,
+          { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0, },
+          { S_OK, 4, 4, 2, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, }, (4 * 4 * 4 * 2) },
+        /* Depth field value is ignored if DDS_DEPTH isn't set. */
+        { 0, 4, 4, 2, (4 * 4), 1, 0, 0,
+          { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0, },
+          { S_OK, 4, 4, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, }, (4 * 4 * 4 * 2), },
+        /*
+         * 3D texture with an array size larger than 1. Technically there's no
+         * such thing as a 3D texture array, but it succeeds.
+         */
+        { DDS_DEPTH, 4, 4, 2, (4 * 4), 1, 0, 0,
+          { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 2, 0, },
+          { S_OK, 4, 4, 2, 2, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, }, (4 * 4 * 4 * 2 * 2) },
+        /* Cubemap caps are ignored for DXT10 files. */
+        { 0, 4, 4, 1, (4 * 4), 1, 0, DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES,
+          { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0, },
+          { S_OK, 4, 4, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D }, (4 * 4 * 4 * 6) },
+        /* Array size value is multiplied by 6 for cubemap files. */
+        { 0, 4, 4, 1, (4 * 4), 1, 0, 0,
+          { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 2, 0, },
+          { S_OK, 4, 4, 1, 12, 1, D3D11_RESOURCE_MISC_TEXTURECUBE, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D }, (4 * 4 * 4 * 12) },
+        /* Resource dimension is validated for cube textures. */
+        { 0, 4, 4, 1, (4 * 4), 1, 0, 0,
+          { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, DDS_RESOURCE_MISC_TEXTURECUBE, 2, 0, },
+          { E_FAIL }, (4 * 4 * 4 * 12), },
+        /* 1D Texture cube, invalid. */
+        { 0, 4, 4, 1, (4 * 4), 1, 0, 0,
+          { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, DDS_RESOURCE_MISC_TEXTURECUBE, 2, 0, },
+          { E_FAIL }, (4 * 4 * 4 * 12), },
+    };
+    D3DX11_IMAGE_INFO info;
+    uint32_t i, file_size;
+    struct
+    {
+        DWORD magic;
+        struct dds_header header;
+        struct dds_header_dxt10 dxt10;
+    } dds;
+    HRESULT hr;
+
+    for (i = 0; i < ARRAY_SIZE(tests); ++i)
+    {
+        winetest_push_context("Test %u", i);
+        file_size = sizeof(dds.magic) + sizeof(dds.header) + tests[i].pixel_data_size;
+
+        dds.magic = MAKEFOURCC('D','D','S',' ');
+        fill_dds_header(&dds.header);
+        dds.header.flags = tests[i].flags;
+        dds.header.width = tests[i].width;
+        dds.header.height = tests[i].height;
+        dds.header.depth = tests[i].depth;
+        dds.header.pitch_or_linear_size = tests[i].row_pitch;
+        dds.header.miplevels = tests[i].mip_levels;
+        dds.header.caps = tests[i].caps;
+        dds.header.caps2 = tests[i].caps2;
+
+        memset(&info, 0, sizeof(info));
+        hr = D3DX11GetImageInfoFromMemory(&dds, file_size, NULL, &info, NULL);
+        todo_wine_if(tests[i].todo_hr) ok(hr == tests[i].expected.hr, "Got unexpected hr %#lx, expected %#lx.\n",
+                hr, tests[i].expected.hr);
+        if (SUCCEEDED(hr) && SUCCEEDED(tests[i].expected.hr))
+            check_image_info_values(&info, tests[i].expected.width, tests[i].expected.height,
+                    tests[i].expected.depth, tests[i].expected.array_size, tests[i].expected.mip_levels,
+                    tests[i].expected.misc_flags, tests[i].expected.format,
+                    tests[i].expected.resource_dimension, D3DX11_IFF_DDS, tests[i].todo_info);
+
+        winetest_pop_context();
+    }
+
+    for (i = 0; i < ARRAY_SIZE(dxt10_tests); ++i)
+    {
+        winetest_push_context("Test %u", i);
+        file_size = sizeof(dds) + dxt10_tests[i].pixel_data_size;
+
+        dds.magic = MAKEFOURCC('D','D','S',' ');
+        set_dxt10_dds_header(&dds.header, dxt10_tests[i].append_flags, dxt10_tests[i].width, dxt10_tests[i].height,
+                dxt10_tests[i].depth, dxt10_tests[i].mip_levels, dxt10_tests[i].row_pitch, dxt10_tests[i].caps, dxt10_tests[i].caps2);
+        dds.dxt10 = dxt10_tests[i].dxt10;
+
+        memset(&info, 0, sizeof(info));
+        hr = D3DX11GetImageInfoFromMemory(&dds, file_size, NULL, &info, NULL);
+        todo_wine_if(dxt10_tests[i].todo_hr) ok(hr == dxt10_tests[i].expected.hr, "Got unexpected hr %#lx, expected %#lx.\n",
+                hr, dxt10_tests[i].expected.hr);
+        if (SUCCEEDED(hr) && SUCCEEDED(dxt10_tests[i].expected.hr))
+            check_image_info_values(&info, dxt10_tests[i].expected.width, dxt10_tests[i].expected.height,
+                    dxt10_tests[i].expected.depth, dxt10_tests[i].expected.array_size, dxt10_tests[i].expected.mip_levels,
+                    dxt10_tests[i].expected.misc_flags, dxt10_tests[i].expected.format,
+                    dxt10_tests[i].expected.resource_dimension, D3DX11_IFF_DDS, dxt10_tests[i].todo_info);
+
+        winetest_pop_context();
+    }
+
+    /*
+     * Image size (e.g, the size of the pixels) isn't validated, but header
+     * size is.
+     */
+    dds.magic = MAKEFOURCC('D','D','S',' ');
+    set_dxt10_dds_header(&dds.header, dxt10_tests[0].append_flags, dxt10_tests[0].width, dxt10_tests[0].height,
+            dxt10_tests[0].depth, dxt10_tests[0].mip_levels, dxt10_tests[0].row_pitch, dxt10_tests[0].caps, dxt10_tests[0].caps2);
+    dds.dxt10 = dxt10_tests[0].dxt10;
+
+    hr = D3DX11GetImageInfoFromMemory(&dds, sizeof(dds) - 1, NULL, &info, NULL);
+    ok(hr == E_FAIL, "Unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11GetImageInfoFromMemory(&dds, sizeof(dds), NULL, &info, NULL);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    /* Non DXT10 header. */
+    dds.magic = MAKEFOURCC('D','D','S',' ');
+    fill_dds_header(&dds.header);
+
+    hr = D3DX11GetImageInfoFromMemory(&dds, sizeof(dds) - sizeof(dds.dxt10) - 1, NULL, &info, NULL);
+    ok(hr == E_FAIL, "Unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11GetImageInfoFromMemory(&dds, sizeof(dds) - sizeof(dds.dxt10), NULL, &info, NULL);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 }
 
 static void test_D3DX11GetImageInfoFromMemory(void)
@@ -974,6 +1466,51 @@ static void test_D3DX11GetImageInfoFromMemory(void)
     check_dds_pixel_format(DDS_PF_LUMINANCE, 0, 16, 0xffff, 0, 0, 0, DXGI_FORMAT_R16G16B16A16_UNORM);
     check_dds_pixel_format(DDS_PF_LUMINANCE | DDS_PF_ALPHA, 0, 16, 0x00ff, 0, 0, 0xff00, DXGI_FORMAT_R8G8B8A8_UNORM);
     check_dds_pixel_format(DDS_PF_LUMINANCE | DDS_PF_ALPHA, 0, 8, 0x0f, 0, 0, 0xf0, DXGI_FORMAT_R8G8B8A8_UNORM);
+    check_dds_pixel_format(DDS_PF_INDEXED, 0, 8, 0, 0, 0, 0, DXGI_FORMAT_R8G8B8A8_UNORM);
+    check_dds_pixel_format(DDS_PF_INDEXED | DDS_PF_ALPHA, 0, 16, 0, 0, 0, 0xff00, DXGI_FORMAT_R8G8B8A8_UNORM);
+    check_dds_pixel_format(DDS_PF_FOURCC, 0x24, 0, 0, 0, 0, 0, DXGI_FORMAT_R16G16B16A16_UNORM); /* D3DFMT_A16B16G16R16 */
+    check_dds_pixel_format(DDS_PF_FOURCC, 0x6e, 0, 0, 0, 0, 0, DXGI_FORMAT_R16G16B16A16_SNORM); /* D3DFMT_Q16W16V16U16 */
+    check_dds_pixel_format(DDS_PF_FOURCC, 0x6f, 0, 0, 0, 0, 0, DXGI_FORMAT_R16_FLOAT); /* D3DFMT_R16F */
+    check_dds_pixel_format(DDS_PF_FOURCC, 0x70, 0, 0, 0, 0, 0, DXGI_FORMAT_R16G16_FLOAT); /* D3DFMT_G16R16F */
+    check_dds_pixel_format(DDS_PF_FOURCC, 0x71, 0, 0, 0, 0, 0, DXGI_FORMAT_R16G16B16A16_FLOAT); /* D3DFMT_A16B16G16R16F */
+    check_dds_pixel_format(DDS_PF_FOURCC, 0x72, 0, 0, 0, 0, 0, DXGI_FORMAT_R32_FLOAT); /* D3DFMT_R32F */
+    check_dds_pixel_format(DDS_PF_FOURCC, 0x73, 0, 0, 0, 0, 0, DXGI_FORMAT_R32G32_FLOAT); /* D3DFMT_G32R32F */
+    check_dds_pixel_format(DDS_PF_FOURCC, 0x74, 0, 0, 0, 0, 0, DXGI_FORMAT_R32G32B32A32_FLOAT); /* D3DFMT_A32B32G32R32F */
+
+    /* Test for DDS pixel formats that are valid on d3dx9, but not d3dx10. */
+    check_dds_pixel_format_unsupported(DDS_PF_FOURCC, MAKEFOURCC('U','Y','V','Y'), 0, 0, 0, 0, 0, E_FAIL);
+    check_dds_pixel_format_unsupported(DDS_PF_FOURCC, MAKEFOURCC('Y','U','Y','2'), 0, 0, 0, 0, 0, E_FAIL);
+    /* Bumpmap formats aren't supported. */
+    check_dds_pixel_format_unsupported(DDS_PF_BUMPDUDV, 0, 16, 0x00ff, 0xff00, 0, 0, E_FAIL);
+    check_dds_pixel_format_unsupported(DDS_PF_BUMPDUDV, 0, 32, 0x0000ffff, 0xffff0000, 0, 0, E_FAIL);
+    check_dds_pixel_format_unsupported(DDS_PF_BUMPDUDV, 0, 32, 0xff, 0xff00, 0x00ff0000, 0xff000000, E_FAIL);
+    check_dds_pixel_format_unsupported(DDS_PF_BUMPLUMINANCE, 0, 32, 0x0000ff, 0x00ff00, 0xff0000, 0, E_FAIL);
+
+    /* Newer fourCC formats. */
+    check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('B','C','4','U'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC4_UNORM);
+    check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('B','C','5','U'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC5_UNORM);
+    check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('B','C','4','S'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC4_SNORM);
+    check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('B','C','5','S'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC5_SNORM);
+
+    check_dds_dx10_format_unsupported(DXGI_FORMAT_B5G6R5_UNORM, E_FAIL);
+    check_dds_dx10_format_unsupported(DXGI_FORMAT_B5G5R5A1_UNORM, E_FAIL);
+    check_dds_dx10_format_unsupported(DXGI_FORMAT_B4G4R4A4_UNORM, E_FAIL);
+
+    /*
+     * These formats should map 1:1 from the DXT10 header, unlike legacy DDS
+     * file equivalents.
+     */
+    check_dds_dx10_format(DXGI_FORMAT_R8_UNORM, DXGI_FORMAT_R8_UNORM, FALSE);
+    check_dds_dx10_format(DXGI_FORMAT_R16_UNORM, DXGI_FORMAT_R16_UNORM, FALSE);
+    check_dds_dx10_format(DXGI_FORMAT_R8G8_UNORM, DXGI_FORMAT_R8G8_UNORM, FALSE);
+    check_dds_dx10_format(DXGI_FORMAT_B8G8R8X8_UNORM, DXGI_FORMAT_B8G8R8X8_UNORM, FALSE);
+    check_dds_dx10_format(DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM, FALSE);
+    /* Formats unsupported on d3dx10, but now supported on d3dx11. */
+    check_dds_dx10_format(DXGI_FORMAT_BC6H_UF16, DXGI_FORMAT_BC6H_UF16, FALSE);
+    check_dds_dx10_format(DXGI_FORMAT_BC6H_SF16, DXGI_FORMAT_BC6H_SF16, FALSE);
+    check_dds_dx10_format(DXGI_FORMAT_BC7_UNORM, DXGI_FORMAT_BC7_UNORM, FALSE);
+
+    test_dds_header_image_info();
 }
 
 START_TEST(d3dx11)
