@@ -90,32 +90,10 @@ static const ID3DX10DataLoaderVtbl memorydataloadervtbl =
 
 HRESULT load_file(const WCHAR *path, void **data, DWORD *size)
 {
-    DWORD read_len;
-    HANDLE file;
-    BOOL ret;
+    HRESULT hr;
 
-    file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-            NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (file == INVALID_HANDLE_VALUE)
-        return D3D10_ERROR_FILE_NOT_FOUND;
-
-    *size = GetFileSize(file, NULL);
-    *data = malloc(*size);
-    if (!*data)
-    {
-        CloseHandle(file);
-        return E_OUTOFMEMORY;
-    }
-
-    ret = ReadFile(file, *data, *size, &read_len, NULL);
-    CloseHandle(file);
-    if (!ret || read_len != *size)
-    {
-        WARN("Failed to read file contents.\n");
-        free(*data);
-        return E_FAIL;
-    }
-    return S_OK;
+    hr = d3dx_load_file(path, data, size);
+    return (hr == D3DX_HELPER_ERR_FILE_NOT_FOUND) ? D3D10_ERROR_FILE_NOT_FOUND : hr;
 }
 
 static HRESULT WINAPI filedataloader_Load(ID3DX10DataLoader *iface)

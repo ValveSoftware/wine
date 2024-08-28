@@ -35,6 +35,12 @@ static inline void set_volume_struct(struct volume *volume, uint32_t width, uint
     volume->depth = depth;
 }
 
+#define FAC_D3DX_HELPER 0x870
+enum D3DX_HELPER_ERR
+{
+    D3DX_HELPER_ERR_FILE_NOT_FOUND = MAKE_HRESULT(1, FAC_D3DX_HELPER, 3000),
+};
+
 /* These match existing d3dx9/d3dx10/d3dx11 filter flags. */
 #ifndef D3DX_FILTER_SRGB_IN
 #define D3DX_FILTER_SRGB_IN  0x00200000
@@ -256,3 +262,5 @@ HRESULT d3dx_image_init(const void *src_data, uint32_t src_data_size, struct d3d
 void d3dx_image_cleanup(struct d3dx_image *image);
 HRESULT d3dx_image_get_pixels(struct d3dx_image *image, uint32_t element, uint32_t mip_level,
         struct d3dx_pixels *pixels);
+
+HRESULT d3dx_load_file(const WCHAR *path, void **data, DWORD *size);

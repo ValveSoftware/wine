@@ -1305,7 +1305,15 @@ static inline void check_image_info_values_(uint32_t line, const D3DX11_IMAGE_IN
 
 static WCHAR temp_dir[MAX_PATH];
 
-static BOOL create_file(const WCHAR *filename, const char *data, unsigned int size, WCHAR *out_path)
+static char *get_str_a(const WCHAR *wstr)
+{
+    static char buffer[MAX_PATH];
+
+    WideCharToMultiByte(CP_ACP, 0, wstr, -1, buffer, sizeof(buffer), NULL, NULL);
+    return buffer;
+}
+
+static BOOL create_file(const WCHAR *filename, const void *data, unsigned int size, WCHAR *out_path)
 {
     WCHAR path[MAX_PATH];
     DWORD written;
@@ -2228,9 +2236,11 @@ static void test_dds_header_image_info(void)
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 }
 
-static void test_D3DX11GetImageInfoFromMemory(void)
+static void test_get_image_info(void)
 {
+    static const WCHAR test_filename[] = L"image.data";
     D3DX11_IMAGE_INFO info;
+    WCHAR path[MAX_PATH];
     HRESULT hr, hr2;
     uint32_t i;
 
@@ -2396,6 +2406,48 @@ static void test_D3DX11GetImageInfoFromMemory(void)
     ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
     check_image_info(&info, test_image, __LINE__);
 
+    hr2 = 0xdeadbeef;
+    hr = D3DX11GetImageInfoFromFileW(NULL, NULL, &info, &hr2);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX11GetImageInfoFromFileW(L"deadbeaf", NULL, &info, &hr2);
+    ok(hr == D3D11_ERROR_FILE_NOT_FOUND, "Got unexpected hr %#lx.\n", hr);
+    ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX11GetImageInfoFromFileA(NULL, NULL, &info, &hr2);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX11GetImageInfoFromFileA("deadbeaf", NULL, &info, &hr2);
+    ok(hr == D3D11_ERROR_FILE_NOT_FOUND, "Got unexpected hr %#lx.\n", hr);
+    ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+
+    for (i = 0; i < ARRAY_SIZE(test_image); ++i)
+    {
+        winetest_push_context("Test %u", i);
+        create_file(test_filename, test_image[i].data, test_image[i].size, path);
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX11GetImageInfoFromFileW(path, NULL, &info, &hr2);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX11_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        if (hr == S_OK)
+            check_image_info(&info, test_image + i, __LINE__);
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX11GetImageInfoFromFileA(get_str_a(path), NULL, &info, &hr2);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX11_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        if (hr == S_OK)
+            check_image_info(&info, test_image + i, __LINE__);
+
+        delete_file(test_filename);
+        winetest_pop_context();
+    }
+
     check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('D','X','T','1'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC1_UNORM);
     check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('D','X','T','2'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC2_UNORM);
     check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('D','X','T','3'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC2_UNORM);
@@ -2478,5 +2530,5 @@ START_TEST(d3dx11)
     test_D3DX11CreateAsyncResourceLoader();
     test_D3DX11CreateAsyncTextureInfoProcessor();
     test_D3DX11CompileFromFile();
-    test_D3DX11GetImageInfoFromMemory();
+    test_get_image_info();
 }
