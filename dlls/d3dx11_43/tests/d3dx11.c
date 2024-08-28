@@ -163,6 +163,95 @@ static uint32_t get_bpp_from_format(DXGI_FORMAT format)
     }
 }
 
+static HRESULT WINAPI D3DX11ThreadPump_QueryInterface(ID3DX11ThreadPump *iface, REFIID riid, void **out)
+{
+    ok(0, "unexpected call\n");
+    return E_NOTIMPL;
+}
+
+static ULONG WINAPI D3DX11ThreadPump_AddRef(ID3DX11ThreadPump *iface)
+{
+    return 2;
+}
+
+static ULONG WINAPI D3DX11ThreadPump_Release(ID3DX11ThreadPump *iface)
+{
+    return 1;
+}
+
+static int add_work_item_count = 1;
+
+static HRESULT WINAPI D3DX11ThreadPump_AddWorkItem(ID3DX11ThreadPump *iface, ID3DX11DataLoader *loader,
+        ID3DX11DataProcessor *processor, HRESULT *result, void **object)
+{
+    SIZE_T size;
+    void *data;
+    HRESULT hr;
+
+    ok(!add_work_item_count++, "unexpected call\n");
+
+    hr = ID3DX11DataLoader_Load(loader);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX11DataLoader_Decompress(loader, &data, &size);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX11DataProcessor_Process(processor, data, size);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX11DataProcessor_CreateDeviceObject(processor, object);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX11DataProcessor_Destroy(processor);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX11DataLoader_Destroy(loader);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+    if (result) *result = S_OK;
+    return S_OK;
+}
+
+static UINT WINAPI D3DX11ThreadPump_GetWorkItemCount(ID3DX11ThreadPump *iface)
+{
+    ok(0, "unexpected call\n");
+    return 0;
+}
+
+static HRESULT WINAPI D3DX11ThreadPump_WaitForAllItems(ID3DX11ThreadPump *iface)
+{
+    ok(0, "unexpected call\n");
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI D3DX11ThreadPump_ProcessDeviceWorkItems(ID3DX11ThreadPump *iface, UINT count)
+{
+    ok(0, "unexpected call\n");
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI D3DX11ThreadPump_PurgeAllItems(ID3DX11ThreadPump *iface)
+{
+    ok(0, "unexpected call\n");
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI D3DX11ThreadPump_GetQueueStatus(ID3DX11ThreadPump *iface, UINT *queue,
+        UINT *processqueue, UINT *devicequeue)
+{
+    ok(0, "unexpected call\n");
+    return E_NOTIMPL;
+}
+
+static ID3DX11ThreadPumpVtbl D3DX11ThreadPumpVtbl =
+{
+    D3DX11ThreadPump_QueryInterface,
+    D3DX11ThreadPump_AddRef,
+    D3DX11ThreadPump_Release,
+    D3DX11ThreadPump_AddWorkItem,
+    D3DX11ThreadPump_GetWorkItemCount,
+    D3DX11ThreadPump_WaitForAllItems,
+    D3DX11ThreadPump_ProcessDeviceWorkItems,
+    D3DX11ThreadPump_PurgeAllItems,
+    D3DX11ThreadPump_GetQueueStatus
+};
+static ID3DX11ThreadPump thread_pump = { &D3DX11ThreadPumpVtbl };
+
 /* 1x1 bmp (1 bpp) */
 static const unsigned char bmp_1bpp[] =
 {
@@ -2142,7 +2231,10 @@ static void test_dds_header_image_info(void)
 static void test_D3DX11GetImageInfoFromMemory(void)
 {
     D3DX11_IMAGE_INFO info;
-    HRESULT hr;
+    HRESULT hr, hr2;
+    uint32_t i;
+
+    CoInitialize(NULL);
 
     hr = D3DX11GetImageInfoFromMemory(bmp_1bpp, sizeof(bmp_1bpp), NULL, &info, NULL);
     ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
@@ -2281,6 +2373,29 @@ static void test_D3DX11GetImageInfoFromMemory(void)
     check_image_info_values(&info, 4, 4, 2, 1, 3, 0, DXGI_FORMAT_BC2_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D,
             D3DX11_IFF_DDS, FALSE);
 
+    for (i = 0; i < ARRAY_SIZE(test_image); ++i)
+    {
+        winetest_push_context("Test %u", i);
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX11GetImageInfoFromMemory(test_image[i].data, test_image[i].size, NULL, &info, &hr2);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX11_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        if (hr == S_OK)
+            check_image_info(&info, test_image + i, __LINE__);
+
+        winetest_pop_context();
+    }
+
+    hr2 = 0xdeadbeef;
+    add_work_item_count = 0;
+    hr = D3DX11GetImageInfoFromMemory(test_image[0].data, test_image[0].size, &thread_pump, &info, &hr2);
+    ok(add_work_item_count == 1, "Got unexpected add_work_item_count %u.\n", add_work_item_count);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+    check_image_info(&info, test_image, __LINE__);
+
     check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('D','X','T','1'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC1_UNORM);
     check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('D','X','T','2'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC2_UNORM);
     check_dds_pixel_format(DDS_PF_FOURCC, MAKEFOURCC('D','X','T','3'), 0, 0, 0, 0, 0, DXGI_FORMAT_BC2_UNORM);
@@ -2352,6 +2467,8 @@ static void test_D3DX11GetImageInfoFromMemory(void)
     todo_wine check_dds_dx10_format(DXGI_FORMAT_BC7_UNORM, DXGI_FORMAT_BC7_UNORM, FALSE);
 
     test_dds_header_image_info();
+
+    CoUninitialize();
 }
 
 START_TEST(d3dx11)
