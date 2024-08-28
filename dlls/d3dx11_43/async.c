@@ -16,8 +16,10 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#define COBJMACROS
 #include "d3dx11.h"
 #include "d3dcompiler.h"
+#include "dxhelpers.h"
 
 #include "wine/debug.h"
 
@@ -214,6 +216,48 @@ static const ID3DX11DataLoaderVtbl resourcedataloadervtbl =
     resourcedataloader_Destroy
 };
 
+struct texture_info_processor
+{
+    ID3DX11DataProcessor ID3DX11DataProcessor_iface;
+    D3DX11_IMAGE_INFO *info;
+};
+
+static inline struct texture_info_processor *impl_from_ID3DX11DataProcessor(ID3DX11DataProcessor *iface)
+{
+    return CONTAINING_RECORD(iface, struct texture_info_processor, ID3DX11DataProcessor_iface);
+}
+
+static HRESULT WINAPI texture_info_processor_Process(ID3DX11DataProcessor *iface, void *data, SIZE_T size)
+{
+    struct texture_info_processor *processor = impl_from_ID3DX11DataProcessor(iface);
+
+    TRACE("iface %p, data %p, size %Iu.\n", iface, data, size);
+    return get_image_info(data, size, processor->info);
+}
+
+static HRESULT WINAPI texture_info_processor_CreateDeviceObject(ID3DX11DataProcessor *iface, void **object)
+{
+    TRACE("iface %p, object %p.\n", iface, object);
+    return S_OK;
+}
+
+static HRESULT WINAPI texture_info_processor_Destroy(ID3DX11DataProcessor *iface)
+{
+    struct texture_info_processor *processor = impl_from_ID3DX11DataProcessor(iface);
+
+    TRACE("iface %p.\n", iface);
+
+    free(processor);
+    return S_OK;
+}
+
+static ID3DX11DataProcessorVtbl texture_info_processor_vtbl =
+{
+    texture_info_processor_Process,
+    texture_info_processor_CreateDeviceObject,
+    texture_info_processor_Destroy
+};
+
 HRESULT WINAPI D3DX11CompileFromMemory(const char *data, SIZE_T data_size, const char *filename,
         const D3D10_SHADER_MACRO *defines, ID3D10Include *include, const char *entry_point,
         const char *target, UINT sflags, UINT eflags, ID3DX11ThreadPump *pump, ID3D10Blob **shader,
@@ -407,5 +451,25 @@ HRESULT WINAPI D3DX11CreateAsyncResourceLoaderW(HMODULE module, const WCHAR *res
 
     *loader = &object->ID3DX11DataLoader_iface;
 
+    return S_OK;
+}
+
+HRESULT WINAPI D3DX11CreateAsyncTextureInfoProcessor(D3DX11_IMAGE_INFO *info, ID3DX11DataProcessor **processor)
+{
+    struct texture_info_processor *object;
+
+    TRACE("info %p, processor %p.\n", info, processor);
+
+    if (!processor)
+        return E_INVALIDARG;
+
+    object = malloc(sizeof(*object));
+    if (!object)
+        return E_OUTOFMEMORY;
+
+    object->ID3DX11DataProcessor_iface.lpVtbl = &texture_info_processor_vtbl;
+    object->info = info;
+
+    *processor = &object->ID3DX11DataProcessor_iface;
     return S_OK;
 }
