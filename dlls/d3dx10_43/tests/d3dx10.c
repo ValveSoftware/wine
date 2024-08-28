@@ -1026,6 +1026,7 @@ static const struct test_image_load_info
     D3DX10_IMAGE_LOAD_INFO load_info;
     HRESULT expected_hr;
 
+    D3D10_SRV_DIMENSION expected_srv_dimension;
     D3D10_RESOURCE_DIMENSION expected_type;
     union
     {
@@ -1047,7 +1048,7 @@ test_image_load_info[] =
         dds_volume_24bit_4_4_4, sizeof(dds_volume_24bit_4_4_4),
         { D3DX10_FROM_FILE, D3DX10_DEFAULT, 0,              1,              D3DX10_DEFAULT, (D3D10_USAGE)D3DX10_DEFAULT,
           D3DX10_DEFAULT,   D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT },
-        S_OK, D3D10_RESOURCE_DIMENSION_TEXTURE3D,
+        S_OK, D3D10_SRV_DIMENSION_TEXTURE3D, D3D10_RESOURCE_DIMENSION_TEXTURE3D,
         { .desc_3d = { 4, 4, 4, 3, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_USAGE_DEFAULT, D3D10_BIND_SHADER_RESOURCE, 0, 0 } },
         { 4, 4, 4, 1, 3, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE3D, D3DX10_IFF_DDS },
     },
@@ -1061,7 +1062,7 @@ test_image_load_info[] =
         { D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, (D3D10_USAGE)D3DX10_DEFAULT,
           (D3D10_BIND_SHADER_RESOURCE | D3D10_BIND_RENDER_TARGET),        D3DX10_DEFAULT, D3D10_RESOURCE_MISC_GENERATE_MIPS,
           DXGI_FORMAT_R8G8B8A8_UNORM, D3DX10_DEFAULT, D3DX10_DEFAULT },
-        S_OK, D3D10_RESOURCE_DIMENSION_TEXTURE2D,
+        S_OK, D3D10_SRV_DIMENSION_TEXTURECUBE, D3D10_RESOURCE_DIMENSION_TEXTURE2D,
         { .desc_2d = { 4, 4, 3, 6, DXGI_FORMAT_R8G8B8A8_UNORM, { 1, 0 }, D3D10_USAGE_DEFAULT,
                        (D3D10_BIND_SHADER_RESOURCE | D3D10_BIND_RENDER_TARGET), 0,
                        (D3D10_RESOURCE_MISC_GENERATE_MIPS | D3D10_RESOURCE_MISC_TEXTURECUBE) } },
@@ -1077,7 +1078,7 @@ test_image_load_info[] =
         { D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, 2,              (D3D10_USAGE)D3DX10_DEFAULT,
           (D3D10_BIND_SHADER_RESOURCE | D3D10_BIND_RENDER_TARGET),        D3DX10_DEFAULT, D3D10_RESOURCE_MISC_GENERATE_MIPS,
           DXGI_FORMAT_R8G8B8A8_UNORM, D3DX10_DEFAULT, D3DX10_DEFAULT },
-        S_OK, D3D10_RESOURCE_DIMENSION_TEXTURE2D,
+        S_OK, D3D10_SRV_DIMENSION_TEXTURECUBE, D3D10_RESOURCE_DIMENSION_TEXTURE2D,
         { .desc_2d = { 4, 4, 2, 6, DXGI_FORMAT_R8G8B8A8_UNORM, { 1, 0 }, D3D10_USAGE_DEFAULT,
                        (D3D10_BIND_SHADER_RESOURCE | D3D10_BIND_RENDER_TARGET), 0,
                        (D3D10_RESOURCE_MISC_GENERATE_MIPS | D3D10_RESOURCE_MISC_TEXTURECUBE) } },
@@ -1826,6 +1827,71 @@ static void check_test_image_load_info_resource_(uint32_t line, ID3D10Resource *
     }
 
     default:
+        break;
+    }
+}
+
+#define check_test_image_load_info_srv(srv, image_load_info) \
+    check_test_image_load_info_srv_(__LINE__, srv, image_load_info)
+static void check_test_image_load_info_srv_(uint32_t line, ID3D10ShaderResourceView *srv,
+        const struct test_image_load_info *image_load_info)
+{
+    D3D10_SHADER_RESOURCE_VIEW_DESC srv_desc;
+    ID3D10Resource *resource;
+
+    ID3D10ShaderResourceView_GetDesc(srv, &srv_desc);
+    ok_(__FILE__, line)(srv_desc.ViewDimension == image_load_info->expected_srv_dimension, "Got unexpected ViewDimension %u, expected %u.\n",
+            srv_desc.ViewDimension, image_load_info->expected_srv_dimension);
+    if (srv_desc.ViewDimension != image_load_info->expected_srv_dimension)
+        return;
+
+    ID3D10ShaderResourceView_GetResource(srv, &resource);
+    check_test_image_load_info_resource_(line, resource, image_load_info);
+    ID3D10Resource_Release(resource);
+    switch (srv_desc.ViewDimension)
+    {
+    case D3D10_SRV_DIMENSION_TEXTURE2D:
+        ok_(__FILE__, line)(srv_desc.Format == image_load_info->expected_resource_desc.desc_2d.Format,
+                "Got unexpected Format %u, expected %u.\n", srv_desc.Format, image_load_info->expected_resource_desc.desc_2d.Format);
+        ok_(__FILE__, line)(!srv_desc.Texture2D.MostDetailedMip, "Unexpected MostDetailedMip %u.\n",
+                srv_desc.Texture2D.MostDetailedMip);
+        ok_(__FILE__, line)(srv_desc.Texture2D.MipLevels == image_load_info->expected_resource_desc.desc_2d.MipLevels,
+                "Unexpected MipLevels %u.\n", srv_desc.Texture2D.MipLevels);
+        break;
+
+    case D3D10_SRV_DIMENSION_TEXTURE2DARRAY:
+        ok_(__FILE__, line)(srv_desc.Format == image_load_info->expected_resource_desc.desc_2d.Format,
+                "Got unexpected Format %u, expected %u.\n", srv_desc.Format, image_load_info->expected_resource_desc.desc_2d.Format);
+        ok_(__FILE__, line)(!srv_desc.Texture2DArray.MostDetailedMip, "Unexpected MostDetailedMip %u.\n",
+                srv_desc.Texture2DArray.MostDetailedMip);
+        ok_(__FILE__, line)(srv_desc.Texture2DArray.MipLevels == image_load_info->expected_resource_desc.desc_2d.MipLevels,
+                "Unexpected MipLevels %u.\n", srv_desc.Texture2DArray.MipLevels);
+        ok_(__FILE__, line)(!srv_desc.Texture2DArray.FirstArraySlice, "Unexpected FirstArraySlice %u.\n",
+                srv_desc.Texture2DArray.FirstArraySlice);
+        ok_(__FILE__, line)(srv_desc.Texture2DArray.ArraySize == image_load_info->expected_resource_desc.desc_2d.ArraySize,
+                "Unexpected ArraySize %u.\n", srv_desc.Texture2DArray.ArraySize);
+        break;
+
+    case D3D10_SRV_DIMENSION_TEXTURECUBE:
+        ok_(__FILE__, line)(srv_desc.Format == image_load_info->expected_resource_desc.desc_2d.Format,
+                "Got unexpected Format %u, expected %u.\n", srv_desc.Format, image_load_info->expected_resource_desc.desc_2d.Format);
+        ok_(__FILE__, line)(!srv_desc.TextureCube.MostDetailedMip, "Unexpected MostDetailedMip %u.\n",
+                srv_desc.TextureCube.MostDetailedMip);
+        ok_(__FILE__, line)(srv_desc.TextureCube.MipLevels == image_load_info->expected_resource_desc.desc_2d.MipLevels,
+                "Unexpected MipLevels %u.\n", srv_desc.TextureCube.MipLevels);
+        break;
+
+    case D3D10_SRV_DIMENSION_TEXTURE3D:
+        ok_(__FILE__, line)(srv_desc.Format == image_load_info->expected_resource_desc.desc_3d.Format,
+                "Got unexpected Format %u, expected %u.\n", srv_desc.Format, image_load_info->expected_resource_desc.desc_3d.Format);
+        ok_(__FILE__, line)(!srv_desc.Texture3D.MostDetailedMip, "Unexpected MostDetailedMip %u.\n",
+                srv_desc.Texture3D.MostDetailedMip);
+        ok_(__FILE__, line)(srv_desc.Texture3D.MipLevels == image_load_info->expected_resource_desc.desc_3d.MipLevels,
+                "Unexpected MipLevels %u.\n", srv_desc.Texture3D.MipLevels);
+        break;
+
+    default:
+        ok_(__FILE__, line)(0, "Unexpected ViewDimension %u.\n", srv_desc.ViewDimension);
         break;
     }
 }
@@ -4571,6 +4637,386 @@ static void test_create_texture(void)
     ok(!ID3D10Device_Release(device), "Unexpected refcount.\n");
 }
 
+static void test_create_shader_resource_view(void)
+{
+    static const uint32_t dds_24bit_8_8_mip_level_expected[] = { 0xff0000ff, 0xff00ff00, 0xffff0000, 0xff000000 };
+    static const WCHAR test_resource_name[] = L"resource.data";
+    static const WCHAR test_filename[] = L"image.data";
+    D3D10_SHADER_RESOURCE_VIEW_DESC srv_desc;
+    D3D10_TEXTURE2D_DESC tex_2d_desc;
+    D3DX10_IMAGE_LOAD_INFO load_info;
+    ID3D10ShaderResourceView *srv;
+    D3DX10_IMAGE_INFO img_info;
+    ID3D10Resource *resource;
+    ID3D10Texture2D *tex_2d;
+    HMODULE resource_module;
+    ID3D10Device *device;
+    WCHAR path[MAX_PATH];
+    uint32_t i, mip_level;
+    HRESULT hr, hr2;
+
+    device = create_device();
+    if (!device)
+    {
+        skip("Failed to create device, skipping tests.\n");
+        return;
+    }
+
+    CoInitialize(NULL);
+
+    /* D3DX10CreateShaderResourceViewFromMemory tests. */
+    srv = (ID3D10ShaderResourceView *)0xdeadbeef;
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromMemory(NULL, test_bmp_1bpp, sizeof(test_bmp_1bpp), NULL, NULL, &srv, &hr2);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    ok(srv == (ID3D10ShaderResourceView *)0xdeadbeef, "Got unexpected srv %p.\n", srv);
+
+    srv = (ID3D10ShaderResourceView *)0xdeadbeef;
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromMemory(device, NULL, 0, NULL, NULL, &srv, &hr2);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    ok(srv == (ID3D10ShaderResourceView *)0xdeadbeef, "Got unexpected srv %p.\n", srv);
+
+    srv = (ID3D10ShaderResourceView *)0xdeadbeef;
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromMemory(device, NULL, sizeof(test_bmp_1bpp), NULL, NULL, &srv, &hr2);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    ok(srv == (ID3D10ShaderResourceView *)0xdeadbeef, "Got unexpected srv %p.\n", srv);
+
+    srv = (ID3D10ShaderResourceView *)0xdeadbeef;
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromMemory(device, test_bmp_1bpp, 0, NULL, NULL, &srv, &hr2);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+    ok(srv == (ID3D10ShaderResourceView *)0xdeadbeef, "Got unexpected srv %p.\n", srv);
+
+    srv = (ID3D10ShaderResourceView *)0xdeadbeef;
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromMemory(device, test_bmp_1bpp, sizeof(test_bmp_1bpp) - 1, NULL, NULL, &srv, &hr2);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+    ok(srv == (ID3D10ShaderResourceView *)0xdeadbeef, "Got unexpected srv %p.\n", srv);
+
+    for (i = 0; i < ARRAY_SIZE(test_image); ++i)
+    {
+        winetest_push_context("Test %u", i);
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX10CreateShaderResourceViewFromMemory(device, test_image[i].data, test_image[i].size, NULL, NULL, &srv, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX10_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            check_shader_resource_view_info(srv, test_image + i, __LINE__);
+            ID3D10ShaderResourceView_Release(srv);
+        }
+
+        winetest_pop_context();
+    }
+
+    for (i = 0; i < ARRAY_SIZE(test_invalid_image_load_info); ++i)
+    {
+        const struct test_invalid_image_load_info *test_load_info = &test_invalid_image_load_info[i];
+
+        winetest_push_context("Test %u", i);
+
+        hr2 = 0xdeadbeef;
+        load_info = test_load_info->load_info;
+        hr = D3DX10CreateShaderResourceViewFromMemory(device, test_load_info->data, test_load_info->size, &load_info, NULL, &srv, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        todo_wine_if(test_load_info->todo_hr) ok(hr == test_load_info->expected_hr, "Got unexpected hr %#lx.\n", hr);
+        if (SUCCEEDED(hr))
+            ID3D10ShaderResourceView_Release(srv);
+
+        winetest_pop_context();
+    }
+
+    for (i = 0; i < ARRAY_SIZE(test_image_load_info); ++i)
+    {
+        const struct test_image_load_info *test_load_info = &test_image_load_info[i];
+
+        winetest_push_context("Test %u", i);
+
+        load_info = test_load_info->load_info;
+        load_info.pSrcInfo = &img_info;
+
+        srv = NULL;
+        hr2 = 0xdeadbeef;
+        hr = D3DX10CreateShaderResourceViewFromMemory(device, test_load_info->data, test_load_info->size, &load_info, NULL, &srv, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        ok(hr == test_load_info->expected_hr, "Got unexpected hr %#lx.\n", hr);
+        if (SUCCEEDED(hr))
+        {
+            check_test_image_load_info_srv(srv, test_load_info);
+            ID3D10ShaderResourceView_Release(srv);
+        }
+
+        winetest_pop_context();
+    }
+
+    /* Check behavior of the FirstMipLevel argument. */
+    for (i = 0; i < 2; ++i)
+    {
+        winetest_push_context("FirstMipLevel %u", i);
+        memset(&img_info, 0, sizeof(img_info));
+        set_d3dx10_image_load_info(&load_info, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, i, D3DX10_FROM_FILE,
+                D3D10_USAGE_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT,
+                D3DX10_DEFAULT, &img_info);
+
+        srv = NULL;
+        hr2 = 0xdeadbeef;
+        hr = D3DX10CreateShaderResourceViewFromMemory(device, dds_24bit_8_8, sizeof(dds_24bit_8_8), &load_info, NULL, &srv, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+        check_image_info_values(&img_info, 8, 8, 1, 1, 4, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D,
+                D3DX10_IFF_DDS, FALSE);
+
+        ID3D10ShaderResourceView_GetDesc(srv, &srv_desc);
+        ok(srv_desc.ViewDimension == D3D10_SRV_DIMENSION_TEXTURE2D, "Got unexpected ViewDimension %u.\n", srv_desc.ViewDimension);
+        ok(srv_desc.Format == img_info.Format, "Got unexpected Format %#x.\n", srv_desc.Format);
+        ok(!srv_desc.Texture2D.MostDetailedMip, "Unexpected MostDetailedMip %u.\n", srv_desc.Texture2D.MostDetailedMip);
+        ok(srv_desc.Texture2D.MipLevels == img_info.MipLevels, "Unexpected MipLevels %u.\n", srv_desc.Texture2D.MipLevels);
+
+        ID3D10ShaderResourceView_GetResource(srv, &resource);
+        hr = ID3D10Resource_QueryInterface(resource, &IID_ID3D10Texture2D, (void **)&tex_2d);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        ID3D10Texture2D_GetDesc(tex_2d, &tex_2d_desc);
+        check_texture2d_desc_values(&tex_2d_desc, 8, 8, 4, 1, DXGI_FORMAT_R8G8B8A8_UNORM, 1, 0, D3D10_USAGE_DEFAULT,
+                D3D10_BIND_SHADER_RESOURCE, 0, 0, FALSE);
+        for (mip_level = 0; mip_level < 4; ++mip_level)
+        {
+            winetest_push_context("MipLevel %u", mip_level);
+            check_texture_sub_resource_color(tex_2d, mip_level, NULL,
+                    dds_24bit_8_8_mip_level_expected[min(3, mip_level + i)], 0);
+            winetest_pop_context();
+        }
+
+        ID3D10Texture2D_Release(tex_2d);
+        ID3D10Resource_Release(resource);
+        ID3D10ShaderResourceView_Release(srv);
+        winetest_pop_context();
+    }
+
+    /*
+     * If FirstMipLevel is set to a value that is larger than the total number
+     * of mip levels in the image, it falls back to 0.
+     */
+    memset(&img_info, 0, sizeof(img_info));
+    set_d3dx10_image_load_info(&load_info, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, 5, D3DX10_FROM_FILE,
+            D3D10_USAGE_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT, D3DX10_DEFAULT,
+            D3DX10_DEFAULT, &img_info);
+
+    resource = NULL;
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromMemory(device, dds_24bit_8_8, sizeof(dds_24bit_8_8), &load_info, NULL, &srv, &hr2);
+    ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    check_image_info_values(&img_info, 8, 8, 1, 1, 4, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D,
+            D3DX10_IFF_DDS, FALSE);
+
+    ID3D10ShaderResourceView_GetDesc(srv, &srv_desc);
+    ok(srv_desc.ViewDimension == D3D10_SRV_DIMENSION_TEXTURE2D, "Got unexpected ViewDimension %u.\n", srv_desc.ViewDimension);
+    ok(srv_desc.Format == img_info.Format, "Got unexpected Format %#x.\n", srv_desc.Format);
+    ok(!srv_desc.Texture2D.MostDetailedMip, "Unexpected MostDetailedMip %u.\n", srv_desc.Texture2D.MostDetailedMip);
+    ok(srv_desc.Texture2D.MipLevels == img_info.MipLevels, "Unexpected MipLevels %u.\n", srv_desc.Texture2D.MipLevels);
+
+    ID3D10ShaderResourceView_GetResource(srv, &resource);
+    hr = ID3D10Resource_QueryInterface(resource, &IID_ID3D10Texture2D, (void **)&tex_2d);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    ID3D10Texture2D_GetDesc(tex_2d, &tex_2d_desc);
+    check_texture2d_desc_values(&tex_2d_desc, 8, 8, 4, 1, DXGI_FORMAT_R8G8B8A8_UNORM, 1, 0, D3D10_USAGE_DEFAULT,
+            D3D10_BIND_SHADER_RESOURCE, 0, 0, FALSE);
+    for (mip_level = 0; mip_level < 4; ++mip_level)
+    {
+        winetest_push_context("MipLevel %u", mip_level);
+        check_texture_sub_resource_color(tex_2d, mip_level, NULL, dds_24bit_8_8_mip_level_expected[mip_level], 0);
+        winetest_pop_context();
+    }
+
+    ID3D10Texture2D_Release(tex_2d);
+    ID3D10Resource_Release(resource);
+    ID3D10ShaderResourceView_Release(srv);
+
+    hr2 = 0xdeadbeef;
+    add_work_item_count = 0;
+    hr = D3DX10CreateShaderResourceViewFromMemory(device, test_image[0].data, test_image[0].size,
+            NULL, &thread_pump, &srv, &hr2);
+    ok(add_work_item_count == 1, "Got unexpected add_work_item_count %u.\n", add_work_item_count);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+    check_shader_resource_view_info(srv, test_image, __LINE__);
+    ID3D10ShaderResourceView_Release(srv);
+
+    /* D3DX10CreateShaderResourceViewFromFile tests */
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromFileW(device, NULL, NULL, NULL, &srv, &hr2);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromFileW(device, L"deadbeef", NULL, NULL, &srv, &hr2);
+    ok(hr == D3D10_ERROR_FILE_NOT_FOUND, "Got unexpected hr %#lx.\n", hr);
+    ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromFileA(device, NULL, NULL, NULL, &srv, &hr2);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromFileA(device, "deadbeef", NULL, NULL, &srv, &hr2);
+    ok(hr == D3D10_ERROR_FILE_NOT_FOUND, "Got unexpected hr %#lx.\n", hr);
+    ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+
+    for (i = 0; i < ARRAY_SIZE(test_image); ++i)
+    {
+        winetest_push_context("Test %u", i);
+        create_file(test_filename, test_image[i].data, test_image[i].size, path);
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX10CreateShaderResourceViewFromFileW(device, path, NULL, NULL, &srv, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX10_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            check_shader_resource_view_info(srv, test_image + i, __LINE__);
+            ID3D10ShaderResourceView_Release(srv);
+        }
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX10CreateShaderResourceViewFromFileA(device, get_str_a(path), NULL, NULL, &srv, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX10_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            check_shader_resource_view_info(srv, test_image + i, __LINE__);
+            ID3D10ShaderResourceView_Release(srv);
+        }
+
+        delete_file(test_filename);
+        winetest_pop_context();
+    }
+
+    for (i = 0; i < ARRAY_SIZE(test_invalid_image_load_info); ++i)
+    {
+        const struct test_invalid_image_load_info *test_load_info = &test_invalid_image_load_info[i];
+
+        winetest_push_context("Test %u", i);
+        create_file(test_filename, test_image[i].data, test_image[i].size, path);
+        load_info = test_load_info->load_info;
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX10CreateShaderResourceViewFromFileW(device, path, &load_info, NULL, &srv, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        todo_wine_if(test_load_info->todo_hr) ok(hr == test_load_info->expected_hr, "Got unexpected hr %#lx.\n", hr);
+        if (SUCCEEDED(hr))
+            ID3D10ShaderResourceView_Release(srv);
+
+        hr = D3DX10CreateShaderResourceViewFromFileA(device, get_str_a(path), &load_info, NULL, &srv, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        todo_wine_if(test_load_info->todo_hr) ok(hr == test_load_info->expected_hr, "Got unexpected hr %#lx.\n", hr);
+        if (SUCCEEDED(hr))
+            ID3D10ShaderResourceView_Release(srv);
+
+        delete_file(test_filename);
+        winetest_pop_context();
+    }
+
+    /* D3DX10CreateShaderResourceViewFromResource tests */
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromResourceW(device, NULL, NULL, NULL, NULL, &srv, &hr2);
+    ok(hr == D3DX10_ERR_INVALID_DATA, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromResourceW(device, NULL, L"deadbeef", NULL, NULL, &srv, &hr2);
+    ok(hr == D3DX10_ERR_INVALID_DATA, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromResourceA(device, NULL, NULL, NULL, NULL, &srv, &hr2);
+    ok(hr == D3DX10_ERR_INVALID_DATA, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX10CreateShaderResourceViewFromResourceA(device, NULL, "deadbeef", NULL, NULL, &srv, &hr2);
+    ok(hr == D3DX10_ERR_INVALID_DATA, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+
+    for (i = 0; i < ARRAY_SIZE(test_image); ++i)
+    {
+        winetest_push_context("Test %u", i);
+        resource_module = create_resource_module(test_resource_name, test_image[i].data, test_image[i].size);
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX10CreateShaderResourceViewFromResourceW(device, resource_module, L"deadbeef", NULL, NULL, &srv, &hr2);
+        ok(hr == D3DX10_ERR_INVALID_DATA, "Got unexpected hr %#lx.\n", hr);
+        ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX10CreateShaderResourceViewFromResourceW(device, resource_module,
+                test_resource_name, NULL, NULL, &srv, &hr2);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX10_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        if (hr == S_OK)
+        {
+            check_shader_resource_view_info(srv, test_image + i, __LINE__);
+            ID3D10ShaderResourceView_Release(srv);
+        }
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX10CreateShaderResourceViewFromResourceA(device, resource_module,
+                get_str_a(test_resource_name), NULL, NULL, &srv, &hr2);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX10_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        if (hr == S_OK)
+        {
+            check_shader_resource_view_info(srv, test_image + i, __LINE__);
+            ID3D10ShaderResourceView_Release(srv);
+        }
+
+        delete_resource_module(test_resource_name, resource_module);
+        winetest_pop_context();
+    }
+
+    for (i = 0; i < ARRAY_SIZE(test_invalid_image_load_info); ++i)
+    {
+        const struct test_invalid_image_load_info *test_load_info = &test_invalid_image_load_info[i];
+
+        winetest_push_context("Test %u", i);
+        resource_module = create_resource_module(test_resource_name, test_load_info->data, test_load_info->size);
+        load_info = test_load_info->load_info;
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX10CreateShaderResourceViewFromResourceW(device, resource_module,
+                test_resource_name, &load_info, NULL, &srv, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        todo_wine_if(test_load_info->todo_hr) ok(hr == test_load_info->expected_hr, "Got unexpected hr %#lx.\n", hr);
+        if (SUCCEEDED(hr))
+            ID3D10ShaderResourceView_Release(srv);
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX10CreateShaderResourceViewFromResourceA(device, resource_module,
+                get_str_a(test_resource_name), &load_info, NULL, &srv, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        todo_wine_if(test_load_info->todo_hr) ok(hr == test_load_info->expected_hr, "Got unexpected hr %#lx.\n", hr);
+        if (SUCCEEDED(hr))
+            ID3D10ShaderResourceView_Release(srv);
+
+        delete_resource_module(test_resource_name, resource_module);
+        winetest_pop_context();
+    }
+
+    CoUninitialize();
+
+    ok(!ID3D10Device_Release(device), "Unexpected refcount.\n");
+}
+
+
+
 #define check_rect(rect, left, top, right, bottom) _check_rect(__LINE__, rect, left, top, right, bottom)
 static inline void _check_rect(unsigned int line, const RECT *rect, int left, int top, int right, int bottom)
 {
@@ -7006,6 +7452,7 @@ START_TEST(d3dx10)
     test_D3DX10FilterTexture();
     test_get_image_info();
     test_create_texture();
+    test_create_shader_resource_view();
     test_font();
     test_sprite();
     test_create_effect_from_memory();
