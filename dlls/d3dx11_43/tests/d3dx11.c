@@ -3540,6 +3540,7 @@ static void test_get_image_info(void)
 static void test_create_texture(void)
 {
     static const uint32_t dds_24bit_8_8_mip_level_expected[] = { 0xff0000ff, 0xff00ff00, 0xffff0000, 0xff000000 };
+    static const WCHAR test_filename[] = L"image.data";
     D3D11_TEXTURE2D_DESC tex_2d_desc;
     D3DX11_IMAGE_LOAD_INFO load_info;
     D3DX11_IMAGE_INFO img_info;
@@ -3547,6 +3548,7 @@ static void test_create_texture(void)
     ID3D11Texture2D *tex_2d;
     ID3D11Device *device;
     uint32_t i, mip_level;
+    WCHAR path[MAX_PATH];
     HRESULT hr, hr2;
 
     device = create_device();
@@ -3731,6 +3733,82 @@ static void test_create_texture(void)
     check_resource_info(resource, test_image, __LINE__);
     check_resource_data(resource, test_image, __LINE__);
     ID3D11Resource_Release(resource);
+
+    /* D3DX11CreateTextureFromFile tests */
+    hr2 = 0xdeadbeef;
+    hr = D3DX11CreateTextureFromFileW(device, NULL, NULL, NULL, &resource, &hr2);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX11CreateTextureFromFileW(device, L"deadbeef", NULL, NULL, &resource, &hr2);
+    ok(hr == D3D11_ERROR_FILE_NOT_FOUND, "Got unexpected hr %#lx.\n", hr);
+    ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX11CreateTextureFromFileA(device, NULL, NULL, NULL, &resource, &hr2);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX11CreateTextureFromFileA(device, "deadbeef", NULL, NULL, &resource, &hr2);
+    ok(hr == D3D11_ERROR_FILE_NOT_FOUND, "Got unexpected hr %#lx.\n", hr);
+    ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+
+    for (i = 0; i < ARRAY_SIZE(test_image); ++i)
+    {
+        winetest_push_context("Test %u", i);
+        create_file(test_filename, test_image[i].data, test_image[i].size, path);
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX11CreateTextureFromFileW(device, path, NULL, NULL, &resource, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX11_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            check_resource_info(resource, test_image + i, __LINE__);
+            check_resource_data(resource, test_image + i, __LINE__);
+            ID3D11Resource_Release(resource);
+        }
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX11CreateTextureFromFileA(device, get_str_a(path), NULL, NULL, &resource, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX11_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            check_resource_info(resource, test_image + i, __LINE__);
+            check_resource_data(resource, test_image + i, __LINE__);
+            ID3D11Resource_Release(resource);
+        }
+
+        delete_file(test_filename);
+        winetest_pop_context();
+    }
+
+    for (i = 0; i < ARRAY_SIZE(test_invalid_image_load_info); ++i)
+    {
+        const struct test_invalid_image_load_info *test_load_info = &test_invalid_image_load_info[i];
+
+        winetest_push_context("Test %u", i);
+        create_file(test_filename, test_image[i].data, test_image[i].size, path);
+        load_info = test_load_info->load_info;
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX11CreateTextureFromFileW(device, path, &load_info, NULL, &resource, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        todo_wine_if(test_load_info->todo_hr) ok(hr == test_load_info->expected_hr, "Got unexpected hr %#lx.\n", hr);
+        if (SUCCEEDED(hr))
+            ID3D11Resource_Release(resource);
+
+        hr = D3DX11CreateTextureFromFileA(device, get_str_a(path), &load_info, NULL, &resource, &hr2);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        todo_wine_if(test_load_info->todo_hr) ok(hr == test_load_info->expected_hr, "Got unexpected hr %#lx.\n", hr);
+        if (SUCCEEDED(hr))
+            ID3D11Resource_Release(resource);
+
+        delete_file(test_filename);
+        winetest_pop_context();
+    }
 
     CoUninitialize();
 
