@@ -2110,6 +2110,80 @@ static void check_resource_data(ID3D11Resource *resource, const struct test_imag
     }
 }
 
+static void check_shader_resource_view_info(ID3D11ShaderResourceView *srv, const struct test_image *image, uint32_t line)
+{
+    uint32_t expected_mip_levels, expected_width, expected_height, max_dimension;
+    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
+    ID3D11Resource *resource;
+
+    expected_width = image->expected_info.Width;
+    expected_height = image->expected_info.Height;
+    if (is_block_compressed(image->expected_info.Format))
+    {
+        expected_width = (expected_width + 3) & ~3;
+        expected_height = (expected_height + 3) & ~3;
+    }
+    expected_mip_levels = 0;
+    max_dimension = max(max(expected_width, expected_height), image->expected_info.Depth);
+    while (max_dimension)
+    {
+        ++expected_mip_levels;
+        max_dimension >>= 1;
+    }
+
+    ID3D11ShaderResourceView_GetDesc(srv, &srv_desc);
+    ok_(__FILE__, line)(srv_desc.Format == image->expected_info.Format, "Got unexpected Format %u, expected %u.\n",
+            srv_desc.Format, image->expected_info.Format);
+    ok_(__FILE__, line)(srv_desc.ViewDimension == image->expected_srv_dimension, "Got unexpected ViewDimension %u, expected %u.\n",
+            srv_desc.ViewDimension, image->expected_srv_dimension);
+    if (srv_desc.ViewDimension != image->expected_srv_dimension)
+        return;
+
+    ID3D11ShaderResourceView_GetResource(srv, &resource);
+    check_resource_info(resource, image, line);
+    check_resource_data(resource, image, line);
+    ID3D11Resource_Release(resource);
+
+    switch (srv_desc.ViewDimension)
+    {
+    case D3D11_SRV_DIMENSION_TEXTURE2D:
+        ok_(__FILE__, line)(!srv_desc.Texture2D.MostDetailedMip, "Unexpected MostDetailedMip %u.\n",
+                srv_desc.Texture2D.MostDetailedMip);
+        ok_(__FILE__, line)(srv_desc.Texture2D.MipLevels == expected_mip_levels, "Unexpected MipLevels %u.\n",
+                srv_desc.Texture2D.MipLevels);
+        break;
+
+    case D3D11_SRV_DIMENSION_TEXTURE2DARRAY:
+        ok_(__FILE__, line)(!srv_desc.Texture2DArray.MostDetailedMip, "Unexpected MostDetailedMip %u.\n",
+                srv_desc.Texture2DArray.MostDetailedMip);
+        ok_(__FILE__, line)(srv_desc.Texture2DArray.MipLevels == expected_mip_levels, "Unexpected MipLevels %u.\n",
+                srv_desc.Texture2DArray.MipLevels);
+        ok_(__FILE__, line)(!srv_desc.Texture2DArray.FirstArraySlice, "Unexpected FirstArraySlice %u.\n",
+                srv_desc.Texture2DArray.FirstArraySlice);
+        ok_(__FILE__, line)(srv_desc.Texture2DArray.ArraySize == image->expected_info.ArraySize, "Unexpected ArraySize %u.\n",
+                srv_desc.Texture2DArray.ArraySize);
+        break;
+
+    case D3D11_SRV_DIMENSION_TEXTURECUBE:
+        ok_(__FILE__, line)(!srv_desc.TextureCube.MostDetailedMip, "Unexpected MostDetailedMip %u.\n",
+                srv_desc.TextureCube.MostDetailedMip);
+        ok_(__FILE__, line)(srv_desc.TextureCube.MipLevels == expected_mip_levels, "Unexpected MipLevels %u.\n",
+                srv_desc.TextureCube.MipLevels);
+        break;
+
+    case D3D11_SRV_DIMENSION_TEXTURE3D:
+        ok_(__FILE__, line)(!srv_desc.Texture3D.MostDetailedMip, "Unexpected MostDetailedMip %u.\n",
+                srv_desc.Texture3D.MostDetailedMip);
+        ok_(__FILE__, line)(srv_desc.Texture3D.MipLevels == expected_mip_levels, "Unexpected MipLevels %u.\n",
+                srv_desc.Texture3D.MipLevels);
+        break;
+
+    default:
+        ok_(__FILE__, line)(0, "Unexpected ViewDimension %u.\n", srv_desc.ViewDimension);
+        break;
+    }
+}
+
 static WCHAR temp_dir[MAX_PATH];
 
 static char *get_str_a(const WCHAR *wstr)
@@ -2557,6 +2631,97 @@ static void test_D3DX11CreateAsyncTextureProcessor(void)
                 ok(hr == test_load_info->expected_create_device_object_hr, "Got unexpected hr %#lx.\n", hr);
             if (SUCCEEDED(hr))
                 ID3D11Resource_Release(resource);
+        }
+
+        hr = ID3DX11DataProcessor_Destroy(dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        winetest_pop_context();
+    }
+
+    CoUninitialize();
+
+    ok(!ID3D11Device_Release(device), "Unexpected refcount.\n");
+}
+
+static void test_D3DX11CreateAsyncShaderResourceViewProcessor(void)
+{
+    ID3D11ShaderResourceView *resource_view;
+    ID3DX11DataProcessor *dp;
+    ID3D11Device *device;
+    HRESULT hr;
+    uint32_t i;
+
+    device = create_device();
+    if (!device)
+    {
+        skip("Failed to create device, skipping tests.\n");
+        return;
+    }
+
+    CoInitialize(NULL);
+
+    hr = D3DX11CreateAsyncShaderResourceViewProcessor(device, NULL, NULL);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11CreateAsyncShaderResourceViewProcessor(NULL, NULL, &dp);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11CreateAsyncShaderResourceViewProcessor(device, NULL, &dp);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX11DataProcessor_Process(dp, (void *)test_image[0].data, 0);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX11DataProcessor_Process(dp, NULL, test_image[0].size);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX11DataProcessor_Destroy(dp);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+    for (i = 0; i < ARRAY_SIZE(test_image); ++i)
+    {
+        winetest_push_context("Test %u", i);
+
+        hr = D3DX11CreateAsyncShaderResourceViewProcessor(device, NULL, &dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        hr = ID3DX11DataProcessor_Process(dp, (void *)test_image[i].data, test_image[i].size);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX11_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            hr = ID3DX11DataProcessor_CreateDeviceObject(dp, (void **)&resource_view);
+            ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+            check_shader_resource_view_info(resource_view, test_image + i, __LINE__);
+            ID3D11ShaderResourceView_Release(resource_view);
+        }
+
+        hr = ID3DX11DataProcessor_Destroy(dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        winetest_pop_context();
+    }
+
+    for (i = 0; i < ARRAY_SIZE(test_invalid_image_load_info); ++i)
+    {
+        const struct test_invalid_image_load_info *test_load_info = &test_invalid_image_load_info[i];
+        D3DX11_IMAGE_LOAD_INFO load_info = test_load_info->load_info;
+
+        winetest_push_context("Test %u", i);
+
+        hr = D3DX11CreateAsyncShaderResourceViewProcessor(device, &load_info, &dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        hr = ID3DX11DataProcessor_Process(dp, (void *)test_load_info->data, test_load_info->size);
+        todo_wine_if(test_load_info->todo_process_hr)
+            ok(hr == test_load_info->expected_process_hr, "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            resource_view = NULL;
+            hr = ID3DX11DataProcessor_CreateDeviceObject(dp, (void **)&resource_view);
+            todo_wine_if(test_load_info->todo_create_device_object_hr)
+                ok(hr == test_load_info->expected_create_device_object_hr, "Got unexpected hr %#lx.\n", hr);
+            if (SUCCEEDED(hr))
+                ID3D11ShaderResourceView_Release(resource_view);
         }
 
         hr = ID3DX11DataProcessor_Destroy(dp);
@@ -3921,6 +4086,7 @@ START_TEST(d3dx11)
     test_D3DX11CreateAsyncResourceLoader();
     test_D3DX11CreateAsyncTextureInfoProcessor();
     test_D3DX11CreateAsyncTextureProcessor();
+    test_D3DX11CreateAsyncShaderResourceViewProcessor();
     test_D3DX11CompileFromFile();
     test_get_image_info();
     test_create_texture();
