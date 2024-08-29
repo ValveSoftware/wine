@@ -173,6 +173,82 @@ HRESULT WINAPI D3DX11GetImageInfoFromFileW(const WCHAR *src_file, ID3DX11ThreadP
     return hr;
 }
 
+HRESULT WINAPI D3DX11GetImageInfoFromResourceA(HMODULE module, const char *resource, ID3DX11ThreadPump *pump,
+        D3DX11_IMAGE_INFO *info, HRESULT *result)
+{
+    void *buffer;
+    HRESULT hr;
+    DWORD size;
+
+    TRACE("module %p, resource %s, pump %p, info %p, result %p.\n",
+            module, debugstr_a(resource), pump, info, result);
+
+    if (pump)
+    {
+        ID3DX11DataProcessor *processor;
+        ID3DX11DataLoader *loader;
+
+        if (FAILED((hr = D3DX11CreateAsyncResourceLoaderA(module, resource, &loader))))
+            return hr;
+        if (FAILED((hr = D3DX11CreateAsyncTextureInfoProcessor(info, &processor))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            return hr;
+        }
+        if (FAILED((hr = ID3DX11ThreadPump_AddWorkItem(pump, loader, processor, result, NULL))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            ID3DX11DataProcessor_Destroy(processor);
+        }
+        return hr;
+    }
+
+    if (FAILED((hr = load_resourceA(module, resource, &buffer, &size))))
+        return hr;
+    hr = get_image_info(buffer, size, info);
+    if (result)
+        *result = hr;
+    return hr;
+}
+
+HRESULT WINAPI D3DX11GetImageInfoFromResourceW(HMODULE module, const WCHAR *resource, ID3DX11ThreadPump *pump,
+        D3DX11_IMAGE_INFO *info, HRESULT *result)
+{
+    void *buffer;
+    HRESULT hr;
+    DWORD size;
+
+    TRACE("module %p, resource %s, pump %p, info %p, result %p.\n",
+            module, debugstr_w(resource), pump, info, result);
+
+    if (pump)
+    {
+        ID3DX11DataProcessor *processor;
+        ID3DX11DataLoader *loader;
+
+        if (FAILED((hr = D3DX11CreateAsyncResourceLoaderW(module, resource, &loader))))
+            return hr;
+        if (FAILED((hr = D3DX11CreateAsyncTextureInfoProcessor(info, &processor))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            return hr;
+        }
+        if (FAILED((hr = ID3DX11ThreadPump_AddWorkItem(pump, loader, processor, result, NULL))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            ID3DX11DataProcessor_Destroy(processor);
+        }
+        return hr;
+    }
+
+    if (FAILED((hr = load_resourceW(module, resource, &buffer, &size))))
+        return hr;
+    hr = get_image_info(buffer, size, info);
+    if (result)
+        *result = hr;
+    return hr;
+}
+
 static HRESULT d3dx11_image_info_from_d3dx_image(D3DX11_IMAGE_INFO *info, struct d3dx_image *image)
 {
     DXGI_FORMAT format;

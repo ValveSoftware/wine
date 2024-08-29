@@ -39,6 +39,7 @@ static inline void set_volume_struct(struct volume *volume, uint32_t width, uint
 enum D3DX_HELPER_ERR
 {
     D3DX_HELPER_ERR_FILE_NOT_FOUND = MAKE_HRESULT(1, FAC_D3DX_HELPER, 3000),
+    D3DX_HELPER_ERR_INVALID_DATA   = MAKE_HRESULT(1, FAC_D3DX_HELPER, 3001),
 };
 
 /* These match existing d3dx9/d3dx10/d3dx11 filter flags. */
@@ -264,3 +265,8 @@ HRESULT d3dx_image_get_pixels(struct d3dx_image *image, uint32_t element, uint32
         struct d3dx_pixels *pixels);
 
 HRESULT d3dx_load_file(const WCHAR *path, void **data, DWORD *size);
+HRESULT d3dx_load_resource(HMODULE module, HRSRC rsrc, void **data, DWORD *size);
+HRESULT d3dx_load_resourceW(HMODULE module, const WCHAR *resource, void **data, DWORD *size);
+HRESULT d3dx_load_resourceA(HMODULE module, const char *resource, void **data, DWORD *size);
+HRESULT d3dx_load_resource_initA(HMODULE module, const char *resource, HRSRC *rsrc);
+HRESULT d3dx_load_resource_initW(HMODULE module, const WCHAR *resource, HRSRC *rsrc);

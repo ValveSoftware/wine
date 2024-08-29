@@ -2469,3 +2469,60 @@ HRESULT d3dx_load_file(const WCHAR *path, void **data, DWORD *size)
     }
     return S_OK;
 }
+
+HRESULT d3dx_load_resource_initA(HMODULE module, const char *resource, HRSRC *rsrc)
+{
+    if (!(*rsrc = FindResourceA(module, resource, (const char *)RT_RCDATA)))
+        *rsrc = FindResourceA(module, resource, (const char *)RT_BITMAP);
+    if (!*rsrc)
+    {
+        WARN("Failed to find resource.\n");
+        return D3DX_HELPER_ERR_INVALID_DATA;
+    }
+    return S_OK;
+}
+
+HRESULT d3dx_load_resource_initW(HMODULE module, const WCHAR *resource, HRSRC *rsrc)
+{
+    if (!(*rsrc = FindResourceW(module, resource, (const WCHAR *)RT_RCDATA)))
+        *rsrc = FindResourceW(module, resource, (const WCHAR *)RT_BITMAP);
+    if (!*rsrc)
+    {
+        WARN("Failed to find resource.\n");
+        return D3DX_HELPER_ERR_INVALID_DATA;
+    }
+    return S_OK;
+}
+
+HRESULT d3dx_load_resource(HMODULE module, HRSRC rsrc, void **data, DWORD *size)
+{
+    HGLOBAL hglobal;
+
+    if (!(*size = SizeofResource(module, rsrc)))
+        return D3DX_HELPER_ERR_INVALID_DATA;
+    if (!(hglobal = LoadResource(module, rsrc)))
+        return D3DX_HELPER_ERR_INVALID_DATA;
+    if (!(*data = LockResource(hglobal)))
+        return D3DX_HELPER_ERR_INVALID_DATA;
+    return S_OK;
+}
+
+HRESULT d3dx_load_resourceA(HMODULE module, const char *resource, void **data, DWORD *size)
+{
+    HRESULT hr;
+    HRSRC rsrc;
+
+    if (FAILED((hr = d3dx_load_resource_initA(module, resource, &rsrc))))
+        return hr;
+    return d3dx_load_resource(module, rsrc, data, size);
+}
+
+HRESULT d3dx_load_resourceW(HMODULE module, const WCHAR *resource, void **data, DWORD *size)
+{
+    HRESULT hr;
+    HRSRC rsrc;
+
+    if ((FAILED(hr = d3dx_load_resource_initW(module, resource, &rsrc))))
+        return hr;
+    return d3dx_load_resource(module, rsrc, data, size);
+}

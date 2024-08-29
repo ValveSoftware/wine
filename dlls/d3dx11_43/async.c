@@ -148,27 +148,55 @@ static const ID3DX11DataLoaderVtbl filedataloadervtbl =
     filedataloader_Destroy
 };
 
+static HRESULT load_resource_initA(HMODULE module, const char *resource, HRSRC *rsrc)
+{
+    HRESULT hr = d3dx_load_resource_initA(module, resource, rsrc);
+    return (hr == D3DX_HELPER_ERR_INVALID_DATA) ? D3DX11_ERR_INVALID_DATA : hr;
+}
+
+static HRESULT load_resource_initW(HMODULE module, const WCHAR *resource, HRSRC *rsrc)
+{
+    HRESULT hr = d3dx_load_resource_initW(module, resource, rsrc);
+    return (hr == D3DX_HELPER_ERR_INVALID_DATA) ? D3DX11_ERR_INVALID_DATA : hr;
+}
+
+static HRESULT load_resource(HMODULE module, HRSRC rsrc, void **data, DWORD *size)
+{
+    HRESULT hr = d3dx_load_resource(module, rsrc, data, size);
+    return (hr == D3DX_HELPER_ERR_INVALID_DATA) ? D3DX11_ERR_INVALID_DATA : hr;
+}
+
+HRESULT load_resourceA(HMODULE module, const char *resource, void **data, DWORD *size)
+{
+    HRESULT hr;
+    HRSRC rsrc;
+
+    if (FAILED((hr = load_resource_initA(module, resource, &rsrc))))
+        return hr;
+    return load_resource(module, rsrc, data, size);
+}
+
+HRESULT load_resourceW(HMODULE module, const WCHAR *resource, void **data, DWORD *size)
+{
+    HRESULT hr;
+    HRSRC rsrc;
+
+    if ((FAILED(hr = load_resource_initW(module, resource, &rsrc))))
+        return hr;
+    return load_resource(module, rsrc, data, size);
+}
+
 static HRESULT WINAPI resourcedataloader_Load(ID3DX11DataLoader *iface)
 {
     struct asyncdataloader *loader = impl_from_ID3DX11DataLoader(iface);
-    HGLOBAL hglobal;
 
     TRACE("iface %p.\n", iface);
 
     if (loader->data)
         return S_OK;
 
-    hglobal = LoadResource(loader->u.resource.module, loader->u.resource.rsrc);
-    if (!hglobal)
-    {
-        ERR("Failed to load resource.\n");
-        return E_FAIL;
-    }
-
-    loader->data = LockResource(hglobal);
-    loader->size = SizeofResource(loader->u.resource.module, loader->u.resource.rsrc);
-
-    return S_OK;
+    return load_resource(loader->u.resource.module, loader->u.resource.rsrc,
+            &loader->data, &loader->size);
 }
 
 static HRESULT WINAPI resourcedataloader_Decompress(ID3DX11DataLoader *iface, void **data, SIZE_T *size)
@@ -382,6 +410,7 @@ HRESULT WINAPI D3DX11CreateAsyncResourceLoaderA(HMODULE module, const char *reso
 {
     struct asyncdataloader *object;
     HRSRC rsrc;
+    HRESULT hr;
 
     TRACE("module %p, resource %s, loader %p.\n", module, debugstr_a(resource), loader);
 
@@ -392,11 +421,10 @@ HRESULT WINAPI D3DX11CreateAsyncResourceLoaderA(HMODULE module, const char *reso
     if (!object)
         return E_OUTOFMEMORY;
 
-    if (!(rsrc = FindResourceA(module, resource, (const char *)RT_RCDATA)))
+    if (FAILED((hr = load_resource_initA(module, resource, &rsrc))))
     {
-        WARN("Failed to find resource.\n");
         free(object);
-        return D3DX11_ERR_INVALID_DATA;
+        return hr;
     }
 
     object->ID3DX11DataLoader_iface.lpVtbl = &resourcedataloadervtbl;
@@ -414,6 +442,7 @@ HRESULT WINAPI D3DX11CreateAsyncResourceLoaderW(HMODULE module, const WCHAR *res
 {
     struct asyncdataloader *object;
     HRSRC rsrc;
+    HRESULT hr;
 
     TRACE("module %p, resource %s, loader %p.\n", module, debugstr_w(resource), loader);
 
@@ -424,11 +453,10 @@ HRESULT WINAPI D3DX11CreateAsyncResourceLoaderW(HMODULE module, const WCHAR *res
     if (!object)
         return E_OUTOFMEMORY;
 
-    if (!(rsrc = FindResourceW(module, resource, (const WCHAR *)RT_RCDATA)))
+    if (FAILED((hr = load_resource_initW(module, resource, &rsrc))))
     {
-        WARN("Failed to find resource.\n");
         free(object);
-        return D3DX11_ERR_INVALID_DATA;
+        return hr;
     }
 
     object->ID3DX11DataLoader_iface.lpVtbl = &resourcedataloadervtbl;
