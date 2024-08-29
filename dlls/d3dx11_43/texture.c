@@ -1428,3 +1428,64 @@ end:
     d3dx_d3d11_texture_release(&dst_tex);
     return SUCCEEDED(hr) ? S_OK : hr;
 }
+
+static uint32_t d3d11_get_resource_mip_levels(ID3D11Resource *rsrc)
+{
+    D3D11_RESOURCE_DIMENSION rsrc_dim;
+    uint32_t mip_levels = 0;
+    HRESULT hr;
+
+    ID3D11Resource_GetType(rsrc, &rsrc_dim);
+    switch (rsrc_dim)
+    {
+    case D3D11_RESOURCE_DIMENSION_TEXTURE2D:
+    {
+        D3D11_TEXTURE2D_DESC desc;
+        ID3D11Texture2D *tex_2d;
+
+        hr = ID3D11Resource_QueryInterface(rsrc, &IID_ID3D11Texture2D, (void **)&tex_2d);
+        if (FAILED(hr))
+            break;
+
+        ID3D11Texture2D_GetDesc(tex_2d, &desc);
+        ID3D11Texture2D_Release(tex_2d);
+        mip_levels = desc.MipLevels;
+        break;
+    }
+
+    case D3D11_RESOURCE_DIMENSION_TEXTURE3D:
+    {
+        D3D11_TEXTURE3D_DESC desc;
+        ID3D11Texture3D *tex_3d;
+
+        hr = ID3D11Resource_QueryInterface(rsrc, &IID_ID3D11Texture3D, (void **)&tex_3d);
+        if (FAILED(hr))
+            break;
+
+        ID3D11Texture3D_GetDesc(tex_3d, &desc);
+        ID3D11Texture3D_Release(tex_3d);
+        mip_levels = desc.MipLevels;
+        break;
+    }
+
+    default:
+        break;
+    }
+
+    return mip_levels;
+}
+
+HRESULT WINAPI D3DX11FilterTexture(ID3D11DeviceContext *context, ID3D11Resource *texture, UINT src_level, UINT filter)
+{
+    D3DX11_TEXTURE_LOAD_INFO load_info = { NULL, NULL, src_level, src_level + 1, 0, 0, 0, 0, filter, filter };
+
+    TRACE("context %p, texture %p, src_level %u, filter %#x.\n", context, texture, src_level, filter);
+
+    if (!context)
+        return D3DERR_INVALIDCALL;
+
+    if (d3d11_get_resource_mip_levels(texture) <= src_level)
+        return S_OK;
+
+    return D3DX11LoadTextureFromTexture(context, texture, &load_info, texture);
+}

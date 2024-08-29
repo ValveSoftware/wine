@@ -29,18 +29,7 @@
 #include "d3dx11core.h"
 #include "d3dx11tex.h"
 
-#include "wine/debug.h"
-
-WINE_DEFAULT_DEBUG_CHANNEL(d3dx);
-
 BOOL WINAPI D3DX11CheckVersion(UINT d3d_sdk_ver, UINT d3dx_sdk_ver)
 {
     return d3d_sdk_ver == D3D11_SDK_VERSION && d3dx_sdk_ver == D3DX11_SDK_VERSION;
-}
-
-HRESULT WINAPI D3DX11FilterTexture(ID3D11DeviceContext *context, ID3D11Resource *texture, UINT src_level, UINT filter)
-{
-    FIXME("context %p, texture %p, src_level %u, filter %#x stub!\n", context, texture, src_level, filter);
-
-    return E_NOTIMPL;
 }

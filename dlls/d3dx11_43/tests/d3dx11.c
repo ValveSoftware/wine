@@ -5422,6 +5422,89 @@ cleanup_next_compressed_texture:
     ok(!ID3D11Device_Release(device), "Unexpected refcount.\n");
 }
 
+static void test_D3DX11FilterTexture(void)
+{
+    D3D11_SUBRESOURCE_DATA sub_resource_data[4] = { 0 };
+    D3D11_TEXTURE2D_DESC tex_2d_desc;
+    ID3D11DeviceContext *context;
+    ID3D11Texture2D *tex_2d;
+    uint8_t tmp_buf[1024];
+    ID3D11Device *device;
+    RECT tmp_rect;
+    HRESULT hr;
+
+    device = create_device();
+    if (!device)
+    {
+        skip("Failed to create device, skipping tests.\n");
+        return;
+    }
+
+    CoInitialize(NULL);
+
+    ID3D11Device_GetImmediateContext(device, &context);
+    set_d3d11_2d_texture_desc(&tex_2d_desc, 8, 8, 4, 1, DXGI_FORMAT_R8G8B8A8_UNORM, 1, 0, D3D11_USAGE_DEFAULT,
+            D3D11_BIND_SHADER_RESOURCE, 0, 0);
+    memset(tmp_buf, 0, sizeof(tmp_buf));
+    memcpy(tmp_buf, bc1_to_bc3_8_8_decompressed, sizeof(bc1_to_bc3_8_8_decompressed));
+    init_subresource_data(sub_resource_data, (const void *)tmp_buf, tex_2d_desc.Width, tex_2d_desc.Height, 1,
+            tex_2d_desc.MipLevels, tex_2d_desc.ArraySize, tex_2d_desc.Format);
+
+    hr = ID3D11Device_CreateTexture2D(device, &tex_2d_desc, sub_resource_data, &tex_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    check_texture_sub_resource_color(tex_2d, 1, NULL, 0x00000000, 0);
+    check_texture_sub_resource_color(tex_2d, 2, NULL, 0x00000000, 0);
+    check_texture_sub_resource_color(tex_2d, 3, NULL, 0x00000000, 0);
+
+    /* Invalid filter arguments. */
+    hr = D3DX11FilterTexture(context, (ID3D11Resource *)tex_2d, 0, 0);
+    ok(hr == D3DERR_INVALIDCALL, "Unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11FilterTexture(context, (ID3D11Resource *)tex_2d, 0, 9);
+    ok(hr == D3DERR_INVALIDCALL, "Unexpected hr %#lx.\n", hr);
+
+    /*
+     * Filter argument isn't validated if src_level argument is greater than
+     * total mip levels.
+     */
+    hr = D3DX11FilterTexture(context, (ID3D11Resource *)tex_2d, 5, 9);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    /* NULL device context. */
+    hr = D3DX11FilterTexture(NULL, (ID3D11Resource *)tex_2d, 5, 9);
+    ok(hr == D3DERR_INVALIDCALL, "Unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11FilterTexture(context, (ID3D11Resource *)tex_2d, 0, D3DX11_FILTER_POINT);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    SetRect(&tmp_rect, 0, 0, 2, 2);
+    check_texture_sub_resource_color(tex_2d, 1, &tmp_rect, 0xffff0000, 0);
+    SetRect(&tmp_rect, 2, 0, 4, 2);
+    check_texture_sub_resource_color(tex_2d, 1, &tmp_rect, 0xff00ff00, 0);
+    SetRect(&tmp_rect, 0, 2, 2, 4);
+    check_texture_sub_resource_color(tex_2d, 1, &tmp_rect, 0xff0000ff, 0);
+    SetRect(&tmp_rect, 2, 2, 4, 4);
+    check_texture_sub_resource_color(tex_2d, 1, &tmp_rect, 0xff000000, 0);
+
+    SetRect(&tmp_rect, 0, 0, 1, 1);
+    check_texture_sub_resource_color(tex_2d, 2, &tmp_rect, 0xffff0000, 0);
+    SetRect(&tmp_rect, 1, 0, 2, 1);
+    check_texture_sub_resource_color(tex_2d, 2, &tmp_rect, 0xff00ff00, 0);
+    SetRect(&tmp_rect, 0, 1, 1, 2);
+    check_texture_sub_resource_color(tex_2d, 2, &tmp_rect, 0xff0000ff, 0);
+    SetRect(&tmp_rect, 1, 1, 2, 2);
+    check_texture_sub_resource_color(tex_2d, 2, &tmp_rect, 0xff000000, 0);
+
+    check_texture_sub_resource_color(tex_2d, 3, NULL, 0xffff0000, 0);
+
+    ID3D11Texture2D_Release(tex_2d);
+
+    CoUninitialize();
+
+    ID3D11DeviceContext_Release(context);
+    ok(!ID3D11Device_Release(device), "Unexpected refcount.\n");
+}
+
 START_TEST(d3dx11)
 {
     HMODULE wined3d;
@@ -5443,6 +5526,7 @@ START_TEST(d3dx11)
     test_D3DX11CreateAsyncShaderResourceViewProcessor();
     test_D3DX11CompileFromFile();
     test_D3DX11LoadTextureFromTexture();
+    test_D3DX11FilterTexture();
     test_get_image_info();
     test_create_texture();
     test_create_shader_resource_view();
