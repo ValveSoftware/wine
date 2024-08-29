@@ -23,5 +23,9 @@ extern DXGI_FORMAT dxgi_format_from_dds_d3dx_pixel_format_id(enum d3dx_pixel_for
 extern DXGI_FORMAT dxgi_format_from_d3dx_pixel_format_id(enum d3dx_pixel_format_id format);
 
 HRESULT load_file(const WCHAR *path, void **data, DWORD *size);
+HRESULT load_resourceA(HMODULE module, const char *resource,
+        void **data, DWORD *size);
+HRESULT load_resourceW(HMODULE module, const WCHAR *resource,
+        void **data, DWORD *size);
 
 HRESULT get_image_info(const void *data, SIZE_T size, D3DX11_IMAGE_INFO *img_info);

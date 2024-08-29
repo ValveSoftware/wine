@@ -1350,6 +1350,43 @@ static void delete_file(const WCHAR *filename)
     DeleteFileW(path);
 }
 
+static HMODULE create_resource_module(const WCHAR *filename, const void *data, unsigned int size)
+{
+    WCHAR resource_module_path[MAX_PATH], current_module_path[MAX_PATH];
+    HANDLE resource;
+    HMODULE module;
+    BOOL ret;
+
+    if (!temp_dir[0])
+        GetTempPathW(ARRAY_SIZE(temp_dir), temp_dir);
+    lstrcpyW(resource_module_path, temp_dir);
+    lstrcatW(resource_module_path, filename);
+
+    GetModuleFileNameW(NULL, current_module_path, ARRAY_SIZE(current_module_path));
+    ret = CopyFileW(current_module_path, resource_module_path, FALSE);
+    ok(ret, "CopyFileW failed, error %lu.\n", GetLastError());
+    SetFileAttributesW(resource_module_path, FILE_ATTRIBUTE_NORMAL);
+
+    resource = BeginUpdateResourceW(resource_module_path, TRUE);
+    UpdateResourceW(resource, (LPCWSTR)RT_RCDATA, filename, MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL), (void *)data, size);
+    EndUpdateResourceW(resource, FALSE);
+
+    module = LoadLibraryExW(resource_module_path, NULL, LOAD_LIBRARY_AS_DATAFILE);
+
+    return module;
+}
+
+static void delete_resource_module(const WCHAR *filename, HMODULE module)
+{
+    WCHAR path[MAX_PATH];
+
+    FreeLibrary(module);
+
+    lstrcpyW(path, temp_dir);
+    lstrcatW(path, filename);
+    DeleteFileW(path);
+}
+
 static BOOL create_directory(const WCHAR *dir)
 {
     WCHAR path[MAX_PATH];
@@ -2238,7 +2275,9 @@ static void test_dds_header_image_info(void)
 
 static void test_get_image_info(void)
 {
+    static const WCHAR test_resource_name[] = L"resource.data";
     static const WCHAR test_filename[] = L"image.data";
+    HMODULE resource_module;
     D3DX11_IMAGE_INFO info;
     WCHAR path[MAX_PATH];
     HRESULT hr, hr2;
@@ -2445,6 +2484,56 @@ static void test_get_image_info(void)
             check_image_info(&info, test_image + i, __LINE__);
 
         delete_file(test_filename);
+        winetest_pop_context();
+    }
+
+    /* D3DX11GetImageInfoFromResource tests */
+    hr2 = 0xdeadbeef;
+    hr = D3DX11GetImageInfoFromResourceW(NULL, NULL, NULL, &info, &hr2);
+    ok(hr == D3DX11_ERR_INVALID_DATA, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX11GetImageInfoFromResourceW(NULL, L"deadbeaf", NULL, &info, &hr2);
+    ok(hr == D3DX11_ERR_INVALID_DATA, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX11GetImageInfoFromResourceA(NULL, NULL, NULL, &info, &hr2);
+    ok(hr == D3DX11_ERR_INVALID_DATA, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+    hr2 = 0xdeadbeef;
+    hr = D3DX11GetImageInfoFromResourceA(NULL, "deadbeaf", NULL, &info, &hr2);
+    ok(hr == D3DX11_ERR_INVALID_DATA, "Got unexpected hr %#lx.\n", hr);
+    ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+
+    for (i = 0; i < ARRAY_SIZE(test_image); ++i)
+    {
+        winetest_push_context("Test %u", i);
+        resource_module = create_resource_module(test_resource_name, test_image[i].data, test_image[i].size);
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX11GetImageInfoFromResourceW(resource_module, L"deadbeef", NULL, &info, &hr2);
+        ok(hr == D3DX11_ERR_INVALID_DATA, "Got unexpected hr %#lx.\n", hr);
+        ok(hr2 == 0xdeadbeef, "Got unexpected hr2 %#lx.\n", hr2);
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX11GetImageInfoFromResourceW(resource_module, test_resource_name, NULL, &info, &hr2);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX11_IFF_WMP)
+                || broken(hr == D3DX11_ERR_INVALID_DATA) /* Vista */,
+                "Got unexpected hr %#lx.\n", hr);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        if (hr == S_OK)
+            check_image_info(&info, test_image + i, __LINE__);
+
+        hr2 = 0xdeadbeef;
+        hr = D3DX11GetImageInfoFromResourceA(resource_module, get_str_a(test_resource_name), NULL, &info, &hr2);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX11_IFF_WMP)
+                || broken(hr == D3DX11_ERR_INVALID_DATA) /* Vista */,
+                "Got unexpected hr %#lx.\n", hr);
+        ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
+        if (hr == S_OK)
+            check_image_info(&info, test_image + i, __LINE__);
+
+        delete_resource_module(test_resource_name, resource_module);
         winetest_pop_context();
     }
 

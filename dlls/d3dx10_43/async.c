@@ -153,39 +153,20 @@ static const ID3DX10DataLoaderVtbl filedataloadervtbl =
 
 static HRESULT load_resource_initA(HMODULE module, const char *resource, HRSRC *rsrc)
 {
-    if (!(*rsrc = FindResourceA(module, resource, (const char *)RT_RCDATA)))
-        *rsrc = FindResourceA(module, resource, (const char *)RT_BITMAP);
-    if (!*rsrc)
-    {
-        WARN("Failed to find resource.\n");
-        return D3DX10_ERR_INVALID_DATA;
-    }
-    return S_OK;
+    HRESULT hr = d3dx_load_resource_initA(module, resource, rsrc);
+    return (hr == D3DX_HELPER_ERR_INVALID_DATA) ? D3DX10_ERR_INVALID_DATA : hr;
 }
 
 static HRESULT load_resource_initW(HMODULE module, const WCHAR *resource, HRSRC *rsrc)
 {
-    if (!(*rsrc = FindResourceW(module, resource, (const WCHAR *)RT_RCDATA)))
-        *rsrc = FindResourceW(module, resource, (const WCHAR *)RT_BITMAP);
-    if (!*rsrc)
-    {
-        WARN("Failed to find resource.\n");
-        return D3DX10_ERR_INVALID_DATA;
-    }
-    return S_OK;
+    HRESULT hr = d3dx_load_resource_initW(module, resource, rsrc);
+    return (hr == D3DX_HELPER_ERR_INVALID_DATA) ? D3DX10_ERR_INVALID_DATA : hr;
 }
 
 static HRESULT load_resource(HMODULE module, HRSRC rsrc, void **data, DWORD *size)
 {
-    HGLOBAL hglobal;
-
-    if (!(*size = SizeofResource(module, rsrc)))
-        return D3DX10_ERR_INVALID_DATA;
-    if (!(hglobal = LoadResource(module, rsrc)))
-        return D3DX10_ERR_INVALID_DATA;
-    if (!(*data = LockResource(hglobal)))
-        return D3DX10_ERR_INVALID_DATA;
-    return S_OK;
+    HRESULT hr = d3dx_load_resource(module, rsrc, data, size);
+    return (hr == D3DX_HELPER_ERR_INVALID_DATA) ? D3DX10_ERR_INVALID_DATA : hr;
 }
 
 HRESULT load_resourceA(HMODULE module, const char *resource, void **data, DWORD *size)
