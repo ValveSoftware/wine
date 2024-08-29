@@ -20,6 +20,8 @@
 
 #define COBJMACROS
 
+#include "initguid.h"
+#include "d3d11.h"
 #include "d3dx11.h"
 #include "d3dcompiler.h"
 #include "dxhelpers.h"
@@ -49,15 +51,6 @@ HRESULT WINAPI D3DX11SaveTextureToMemory(ID3D11DeviceContext *context, ID3D11Res
 {
     FIXME("context %p, texture %p, format %u, buffer %p, flags %#x stub!\n",
             context, texture, format, buffer, flags);
-
-    return E_NOTIMPL;
-}
-
-HRESULT WINAPI D3DX11LoadTextureFromTexture(ID3D11DeviceContext *context, ID3D11Resource *src_texture,
-        D3DX11_TEXTURE_LOAD_INFO *info, ID3D11Resource *dst_texture)
-{
-    FIXME("context %p, src_texture %p, info %p, dst_texture %p stub!\n",
-            context, src_texture, info, dst_texture);
 
     return E_NOTIMPL;
 }
@@ -1075,4 +1068,363 @@ HRESULT WINAPI D3DX11CreateShaderResourceViewFromMemory(ID3D11Device *device, co
     if (hresult)
         *hresult = hr;
     return hr;
+}
+
+/*
+ * D3DX11LoadTextureFromTexture implementation.
+ */
+struct d3d11_texture_resource {
+    D3D11_RESOURCE_DIMENSION texture_dimension;
+    union
+    {
+        ID3D11Resource  *tex_rsrc;
+        ID3D11Texture2D *tex_2d;
+        ID3D11Texture3D *tex_3d;
+    } iface;
+    struct volume size;
+    uint32_t mip_levels;
+    uint32_t layer_count;
+};
+
+struct d3d11_texture {
+    ID3D11Device *device;
+    ID3D11DeviceContext *device_context;
+    struct d3d11_texture_resource texture;
+    struct d3d11_texture_resource staging_texture;
+
+    const struct pixel_format_desc *fmt_desc;
+    D3D11_MAP map_flags;
+    D3D11_BOX texture_box;
+
+    uint32_t first_layer;
+    uint32_t first_mip_level;
+};
+
+static void set_d3d11_box(D3D11_BOX *box, uint32_t left, uint32_t top, uint32_t right, uint32_t bottom, uint32_t front,
+        uint32_t back)
+{
+    box->left = left;
+    box->top = top;
+    box->right = right;
+    box->bottom = bottom;
+    box->front = front;
+    box->back = back;
+}
+
+static const char *debug_d3d11_box(const struct D3D11_BOX *box)
+{
+    if (!box)
+        return "(null)";
+    return wine_dbg_sprintf("(%ux%ux%u)-(%ux%ux%u)", box->left, box->top, box->front, box->right, box->bottom, box->back);
+}
+
+static void d3d11_box_get_mip_level(D3D11_BOX *box, uint32_t level)
+{
+    uint32_t i;
+
+    for (i = 0; i < level; ++i)
+    {
+        set_d3d11_box(box, (box->left ? (box->left / 2) : 0), (box->top ? (box->top / 2) : 0),
+                max(box->right / 2, 1), max(box->bottom / 2, 1),
+                (box->front ? (box->front / 2) : 0), max(box->back / 2, 1));
+    }
+}
+
+static HRESULT d3dx_d3d11_texture_init(ID3D11DeviceContext *context, ID3D11Resource *tex_rsrc, uint32_t first_layer,
+        uint32_t first_mip_level, D3D11_MAP map_flags, D3D11_BOX *tex_box, struct d3d11_texture *texture)
+{
+    struct d3d11_texture_resource *staging_tex_rsrc = &texture->staging_texture;
+    struct d3d11_texture_resource *src_tex_rsrc = &texture->texture;
+    HRESULT hr;
+
+    ID3D11Resource_GetDevice(tex_rsrc, &texture->device);
+    if (!texture->device)
+    {
+        ERR("Failed to get device from texture resource.\n");
+        return E_FAIL;
+    }
+
+    texture->map_flags = map_flags;
+    ID3D11Resource_GetType(tex_rsrc, &src_tex_rsrc->texture_dimension);
+    switch (src_tex_rsrc->texture_dimension)
+    {
+    case D3D11_RESOURCE_DIMENSION_TEXTURE2D:
+    {
+        D3D11_TEXTURE2D_DESC desc;
+
+        hr = ID3D11Resource_QueryInterface(tex_rsrc, &IID_ID3D11Texture2D, (void **)&src_tex_rsrc->iface.tex_2d);
+        if (FAILED(hr))
+            return hr;
+
+        ID3D11Texture2D_GetDesc(src_tex_rsrc->iface.tex_2d, &desc);
+        if (map_flags != D3D11_MAP_READ && (first_mip_level >= desc.MipLevels))
+            return S_FALSE;
+
+        texture->fmt_desc = get_d3dx_pixel_format_info(d3dx_pixel_format_id_from_dxgi_format(desc.Format));
+        if (texture->fmt_desc->format == D3DX_PIXEL_FORMAT_COUNT)
+        {
+            FIXME("Unknown DXGI format supplied, %#x.\n", desc.Format);
+            return E_NOTIMPL;
+        }
+
+        set_volume_struct(&src_tex_rsrc->size, desc.Width, desc.Height, 1);
+        src_tex_rsrc->mip_levels = desc.MipLevels;
+        src_tex_rsrc->layer_count = desc.ArraySize;
+
+        texture->first_mip_level = min((desc.MipLevels - 1), first_mip_level);
+        texture->first_layer = first_layer >= desc.ArraySize ? 0 : first_layer;
+
+        staging_tex_rsrc->texture_dimension = src_tex_rsrc->texture_dimension;
+        staging_tex_rsrc->size = src_tex_rsrc->size;
+        d3dx_get_mip_level_size(&staging_tex_rsrc->size, texture->first_mip_level);
+        staging_tex_rsrc->mip_levels = src_tex_rsrc->mip_levels - texture->first_mip_level;
+        staging_tex_rsrc->layer_count = 1;
+
+        /* Create the staging texture. */
+        desc.Usage = D3D11_USAGE_STAGING;
+        desc.BindFlags = desc.MiscFlags = 0;
+        desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        if (map_flags != D3D11_MAP_READ)
+            desc.CPUAccessFlags |= D3D11_CPU_ACCESS_WRITE;
+        desc.ArraySize = 1;
+        desc.MipLevels = staging_tex_rsrc->mip_levels;
+        desc.Width = staging_tex_rsrc->size.width;
+        desc.Height = staging_tex_rsrc->size.height;
+
+        hr = ID3D11Device_CreateTexture2D(texture->device, &desc, NULL, &staging_tex_rsrc->iface.tex_2d);
+        if (FAILED(hr))
+            return hr;
+        break;
+    }
+
+    case D3D11_RESOURCE_DIMENSION_TEXTURE3D:
+    {
+        D3D11_TEXTURE3D_DESC desc;
+
+        hr = ID3D11Resource_QueryInterface(tex_rsrc, &IID_ID3D11Texture3D, (void **)&src_tex_rsrc->iface.tex_3d);
+        if (FAILED(hr))
+            return hr;
+
+        ID3D11Texture3D_GetDesc(src_tex_rsrc->iface.tex_3d, &desc);
+        if (map_flags != D3D11_MAP_READ && (first_mip_level >= desc.MipLevels))
+            return S_FALSE;
+
+        texture->fmt_desc = get_d3dx_pixel_format_info(d3dx_pixel_format_id_from_dxgi_format(desc.Format));
+        if (texture->fmt_desc->format == D3DX_PIXEL_FORMAT_COUNT)
+        {
+            FIXME("Unknown DXGI format supplied, %#x.\n", desc.Format);
+            return E_NOTIMPL;
+        }
+
+        set_volume_struct(&src_tex_rsrc->size, desc.Width, desc.Height, desc.Depth);
+        src_tex_rsrc->mip_levels = desc.MipLevels;
+        src_tex_rsrc->layer_count = 1;
+
+        texture->first_mip_level = min((desc.MipLevels - 1), first_mip_level);
+        if (first_layer)
+            WARN("Specified a non zero FirstElement argument on a 3D texture.\n");
+        texture->first_layer = 0;
+
+        staging_tex_rsrc->texture_dimension = src_tex_rsrc->texture_dimension;
+        staging_tex_rsrc->size = src_tex_rsrc->size;
+        d3dx_get_mip_level_size(&staging_tex_rsrc->size, texture->first_mip_level);
+        staging_tex_rsrc->mip_levels = src_tex_rsrc->mip_levels - texture->first_mip_level;
+        staging_tex_rsrc->layer_count = 1;
+
+        /* Create the staging texture. */
+        desc.Usage = D3D11_USAGE_STAGING;
+        desc.BindFlags = desc.MiscFlags = 0;
+        desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        if (map_flags != D3D11_MAP_READ)
+            desc.CPUAccessFlags |= D3D11_CPU_ACCESS_WRITE;
+        desc.MipLevels = staging_tex_rsrc->mip_levels;
+        desc.Width = staging_tex_rsrc->size.width;
+        desc.Height = staging_tex_rsrc->size.height;
+        desc.Depth = staging_tex_rsrc->size.depth;
+
+        hr = ID3D11Device_CreateTexture3D(texture->device, &desc, NULL, &staging_tex_rsrc->iface.tex_3d);
+        if (FAILED(hr))
+            return hr;
+        break;
+    }
+
+    default:
+        FIXME("Unhandled resource dimension %u.\n", src_tex_rsrc->texture_dimension);
+        return E_NOTIMPL;
+    }
+
+    if (tex_box)
+        texture->texture_box = *tex_box;
+    else
+        set_d3d11_box(&texture->texture_box, 0, 0, staging_tex_rsrc->size.width, staging_tex_rsrc->size.height, 0,
+                staging_tex_rsrc->size.depth);
+    texture->device_context = context;
+    ID3D11DeviceContext_AddRef(context);
+
+    return S_OK;
+}
+
+static void d3dx_d3d11_texture_release(struct d3d11_texture *texture)
+{
+    if (texture->device)
+        ID3D11Device_Release(texture->device);
+    if (texture->device_context)
+        ID3D11DeviceContext_Release(texture->device_context);
+    if (texture->texture.iface.tex_rsrc)
+        ID3D11Resource_Release(texture->texture.iface.tex_rsrc);
+    if (texture->staging_texture.iface.tex_rsrc)
+        ID3D11Resource_Release(texture->staging_texture.iface.tex_rsrc);
+}
+
+static HRESULT d3dx_d3d11_texture_map(struct d3d11_texture *texture, uint32_t layer, uint32_t mip_level,
+        struct d3dx_pixels *pixels)
+{
+    struct d3d11_texture_resource *staging_tex_rsrc = &texture->staging_texture;
+    struct d3d11_texture_resource *src_tex_rsrc = &texture->texture;
+    D3D11_BOX tmp_box = texture->texture_box;
+    D3D11_MAPPED_SUBRESOURCE map = { 0 };
+    uint32_t sub_rsrc_idx;
+    HRESULT hr;
+
+    d3d11_box_get_mip_level(&tmp_box, mip_level);
+    sub_rsrc_idx = (src_tex_rsrc->mip_levels * (texture->first_layer + layer)) + (mip_level + texture->first_mip_level);
+    ID3D11DeviceContext_CopySubresourceRegion(texture->device_context, staging_tex_rsrc->iface.tex_rsrc, mip_level, 0, 0, 0,
+             src_tex_rsrc->iface.tex_rsrc, sub_rsrc_idx, NULL);
+    hr = ID3D11DeviceContext_Map(texture->device_context, staging_tex_rsrc->iface.tex_rsrc, mip_level,
+            texture->map_flags, 0, &map);
+    if (FAILED(hr))
+        return hr;
+
+    TRACE("Mapping layer %u, mip level %u, box %s.\n", texture->first_layer + layer, texture->first_mip_level + mip_level,
+            debug_d3d11_box(&tmp_box));
+    return d3dx_pixels_init(map.pData, map.RowPitch, map.DepthPitch, NULL, texture->fmt_desc->format, tmp_box.left, tmp_box.top,
+            tmp_box.right, tmp_box.bottom, tmp_box.front, tmp_box.back, pixels);
+}
+
+static void d3dx_d3d11_texture_unmap(struct d3d11_texture *texture, uint32_t layer, uint32_t mip_level)
+{
+    struct d3d11_texture_resource *staging_tex_rsrc = &texture->staging_texture;
+    struct d3d11_texture_resource *src_tex_rsrc = &texture->texture;
+    uint32_t sub_rsrc_idx;
+
+    ID3D11DeviceContext_Unmap(texture->device_context, staging_tex_rsrc->iface.tex_rsrc, mip_level);
+    if (texture->map_flags == D3D11_MAP_READ)
+        return;
+
+    sub_rsrc_idx = (src_tex_rsrc->mip_levels * (texture->first_layer + layer)) + (mip_level + texture->first_mip_level);
+    ID3D11DeviceContext_CopySubresourceRegion(texture->device_context, src_tex_rsrc->iface.tex_rsrc, sub_rsrc_idx, 0, 0, 0,
+            staging_tex_rsrc->iface.tex_rsrc, mip_level, NULL);
+}
+
+static const D3DX11_TEXTURE_LOAD_INFO default_load_info = { NULL, NULL, 0, 0, D3DX11_DEFAULT, 0, 0, D3DX11_DEFAULT,
+                                                            D3DX11_DEFAULT, D3DX11_DEFAULT };
+HRESULT WINAPI D3DX11LoadTextureFromTexture(ID3D11DeviceContext *context, ID3D11Resource *src_texture,
+        D3DX11_TEXTURE_LOAD_INFO *load_info, ID3D11Resource *dst_texture)
+{
+    D3DX11_TEXTURE_LOAD_INFO info = (load_info) ? *load_info : default_load_info;
+    struct d3d11_texture src_tex = { 0 };
+    struct d3d11_texture dst_tex = { 0 };
+    uint32_t i, j, loaded_mip_levels;
+    HRESULT hr;
+
+    TRACE("context %p, src_texture %p, load_info %p, dst_texture %p.\n", context, src_texture, load_info, dst_texture);
+
+    if (!src_texture || !dst_texture)
+        return E_INVALIDARG;
+
+    if (!context)
+        return D3DERR_INVALIDCALL;
+
+    if (!info.Filter || FAILED(hr = d3dx_handle_filter(&info.Filter)))
+    {
+        FIXME("Invalid filter argument.\n");
+        return D3DERR_INVALIDCALL;
+    }
+
+    hr = d3dx_d3d11_texture_init(context, src_texture, info.SrcFirstElement, info.SrcFirstMip, D3D11_MAP_READ, info.pSrcBox, &src_tex);
+    if (FAILED(hr))
+        goto end;
+
+    hr = d3dx_d3d11_texture_init(context, dst_texture, info.DstFirstElement, info.DstFirstMip, D3D11_MAP_READ_WRITE, info.pDstBox, &dst_tex);
+    if (hr == S_FALSE || FAILED(hr))
+        goto end;
+
+    if ((src_texture == dst_texture) && ((src_tex.first_layer == dst_tex.first_layer) &&
+                (src_tex.first_mip_level == dst_tex.first_mip_level)))
+    {
+        hr = D3DERR_INVALIDCALL;
+        goto end;
+    }
+
+    if (!info.NumMips || info.NumMips == D3DX11_DEFAULT)
+        info.NumMips = dst_tex.staging_texture.mip_levels;
+    info.NumMips = min(info.NumMips, dst_tex.staging_texture.mip_levels);
+    if (!info.NumElements || info.NumElements == D3DX11_DEFAULT)
+        info.NumElements = min(src_tex.texture.layer_count, dst_tex.texture.layer_count);
+    info.NumElements = min(info.NumElements, min(src_tex.texture.layer_count, dst_tex.texture.layer_count));
+    loaded_mip_levels = min(info.NumMips, src_tex.staging_texture.mip_levels);
+    for (i = 0; i < info.NumElements; ++i)
+    {
+        for (j = 0; j < loaded_mip_levels; ++j)
+        {
+            struct d3dx_pixels src_pixels, dst_pixels;
+
+            hr = d3dx_d3d11_texture_map(&src_tex, i, j, &src_pixels);
+            if (FAILED(hr))
+                goto end;
+
+            hr = d3dx_d3d11_texture_map(&dst_tex, i, j, &dst_pixels);
+            if (FAILED(hr))
+            {
+                d3dx_d3d11_texture_unmap(&src_tex, i, j);
+                goto end;
+            }
+
+            hr = d3dx_load_pixels_from_pixels(&dst_pixels, dst_tex.fmt_desc, &src_pixels, src_tex.fmt_desc, info.Filter, 0);
+            d3dx_d3d11_texture_unmap(&src_tex, i, j);
+            d3dx_d3d11_texture_unmap(&dst_tex, i, j);
+            if (FAILED(hr))
+            {
+                WARN("Failed with hr %#lx.\n", hr);
+                goto end;
+            }
+        }
+    }
+
+    if (loaded_mip_levels < info.NumMips)
+    {
+        if (!info.MipFilter || FAILED(hr = d3dx_handle_filter(&info.MipFilter)))
+        {
+            FIXME("Invalid mip filter argument.\n");
+            hr = D3DERR_INVALIDCALL;
+            goto end;
+        }
+
+        for (i = 0; i < info.NumElements; ++i)
+        {
+            for (j = loaded_mip_levels; j < info.NumMips; ++j)
+            {
+                struct d3dx_pixels src_pixels, dst_pixels;
+
+                hr = d3dx_d3d11_texture_map(&dst_tex, i, j - 1, &src_pixels);
+                if (FAILED(hr))
+                    break;
+
+                hr = d3dx_d3d11_texture_map(&dst_tex, i, j, &dst_pixels);
+                if (SUCCEEDED(hr))
+                {
+                    hr = d3dx_load_pixels_from_pixels(&dst_pixels, dst_tex.fmt_desc, &src_pixels, dst_tex.fmt_desc, info.MipFilter, 0);
+                    d3dx_d3d11_texture_unmap(&dst_tex, i, j);
+                }
+                d3dx_d3d11_texture_unmap(&dst_tex, i, j - 1);
+                if (FAILED(hr))
+                    goto end;
+            }
+        }
+    }
+
+end:
+    d3dx_d3d11_texture_release(&src_tex);
+    d3dx_d3d11_texture_release(&dst_tex);
+    return SUCCEEDED(hr) ? S_OK : hr;
 }
