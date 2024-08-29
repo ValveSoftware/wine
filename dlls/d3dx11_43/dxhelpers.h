@@ -29,3 +29,11 @@ HRESULT load_resourceW(HMODULE module, const WCHAR *resource,
         void **data, DWORD *size);
 
 HRESULT get_image_info(const void *data, SIZE_T size, D3DX11_IMAGE_INFO *img_info);
+
+void init_load_info(const D3DX11_IMAGE_LOAD_INFO *load_info,
+        D3DX11_IMAGE_LOAD_INFO *out);
+/* Returns array of D3D11_SUBRESOURCE_DATA structures followed by textures data. */
+HRESULT load_texture_data(const void *data, SIZE_T size, D3DX11_IMAGE_LOAD_INFO *load_info,
+        D3D11_SUBRESOURCE_DATA **resource_data);
+HRESULT create_d3d_texture(ID3D11Device *device, D3DX11_IMAGE_LOAD_INFO *load_info,
+        D3D11_SUBRESOURCE_DATA *resource_data, ID3D11Resource **texture);

@@ -360,7 +360,7 @@ HRESULT WINAPI D3DX11GetImageInfoFromMemory(const void *src_data, SIZE_T src_dat
     return hr;
 }
 
-static void init_load_info(const D3DX11_IMAGE_LOAD_INFO *load_info, D3DX11_IMAGE_LOAD_INFO *out)
+void init_load_info(const D3DX11_IMAGE_LOAD_INFO *load_info, D3DX11_IMAGE_LOAD_INFO *out)
 {
     if (load_info)
     {
@@ -451,7 +451,7 @@ static HRESULT d3dx_create_subresource_data_for_texture(uint32_t width, uint32_t
     return hr;
 }
 
-static HRESULT load_texture_data(const void *data, SIZE_T size, D3DX11_IMAGE_LOAD_INFO *load_info,
+HRESULT load_texture_data(const void *data, SIZE_T size, D3DX11_IMAGE_LOAD_INFO *load_info,
         D3D11_SUBRESOURCE_DATA **resource_data)
 {
     const struct pixel_format_desc *fmt_desc, *src_desc;
@@ -610,7 +610,7 @@ end:
     return hr;
 }
 
-static HRESULT create_d3d_texture(ID3D11Device *device, D3DX11_IMAGE_LOAD_INFO *load_info,
+HRESULT create_d3d_texture(ID3D11Device *device, D3DX11_IMAGE_LOAD_INFO *load_info,
         D3D11_SUBRESOURCE_DATA *resource_data, ID3D11Resource **texture)
 {
     HRESULT hr;
