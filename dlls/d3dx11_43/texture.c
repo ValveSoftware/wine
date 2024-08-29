@@ -26,16 +26,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(d3dx);
 
-HRESULT WINAPI D3DX11CreateShaderResourceViewFromMemory(ID3D11Device *device, const void *data,
-        SIZE_T data_size, D3DX11_IMAGE_LOAD_INFO *load_info, ID3DX11ThreadPump *pump,
-        ID3D11ShaderResourceView **view, HRESULT *hresult)
-{
-    FIXME("device %p, data %p, data_size %Iu, load_info %p, pump %p, view %p, hresult %p stub!\n",
-            device, data, data_size, load_info, pump, view, hresult);
-
-    return E_NOTIMPL;
-}
-
 HRESULT WINAPI D3DX11SaveTextureToFileW(ID3D11DeviceContext *context, ID3D11Resource *texture,
         D3DX11_IMAGE_FILE_FORMAT format, const WCHAR *filename)
 {
@@ -860,6 +850,228 @@ HRESULT WINAPI D3DX11CreateTextureFromResourceW(ID3D11Device *device, HMODULE mo
     if (FAILED((hr = load_resourceW(module, resource, &buffer, &size))))
         return hr;
     hr = create_texture(device, buffer, size, load_info, texture);
+    if (hresult)
+        *hresult = hr;
+    return hr;
+}
+
+/*
+ * D3DX11CreateShaderResourceView variants.
+ */
+HRESULT WINAPI D3DX11CreateShaderResourceViewFromFileA(ID3D11Device *device, const char *src_file,
+        D3DX11_IMAGE_LOAD_INFO *load_info, ID3DX11ThreadPump *pump, ID3D11ShaderResourceView **srv, HRESULT *hresult)
+{
+    WCHAR *buffer;
+    int str_len;
+    HRESULT hr;
+
+    TRACE("device %p, src_file %s, load_info %p, pump %p, srv %p, hresult %p.\n",
+            device, debugstr_a(src_file), load_info, pump, srv, hresult);
+
+    if (!device)
+        return E_INVALIDARG;
+    if (!src_file)
+        return E_FAIL;
+
+    if (!(str_len = MultiByteToWideChar(CP_ACP, 0, src_file, -1, NULL, 0)))
+        return HRESULT_FROM_WIN32(GetLastError());
+
+    if (!(buffer = malloc(str_len * sizeof(*buffer))))
+        return E_OUTOFMEMORY;
+
+    MultiByteToWideChar(CP_ACP, 0, src_file, -1, buffer, str_len);
+    hr = D3DX11CreateShaderResourceViewFromFileW(device, buffer, load_info, pump, srv, hresult);
+
+    free(buffer);
+
+    return hr;
+}
+
+HRESULT WINAPI D3DX11CreateShaderResourceViewFromFileW(ID3D11Device *device, const WCHAR *src_file,
+        D3DX11_IMAGE_LOAD_INFO *load_info, ID3DX11ThreadPump *pump, ID3D11ShaderResourceView **srv, HRESULT *hresult)
+{
+    ID3D11Resource *texture;
+    void *buffer = NULL;
+    DWORD size = 0;
+    HRESULT hr;
+
+    TRACE("device %p, src_file %s, load_info %p, pump %p, srv %p, hresult %p.\n",
+            device, debugstr_w(src_file), load_info, pump, srv, hresult);
+
+    if (!device)
+        return E_INVALIDARG;
+    if (!src_file)
+        return E_FAIL;
+
+    if (pump)
+    {
+        ID3DX11DataProcessor *processor;
+        ID3DX11DataLoader *loader;
+
+        if (FAILED((hr = D3DX11CreateAsyncFileLoaderW(src_file, &loader))))
+            return hr;
+        if (FAILED((hr = D3DX11CreateAsyncShaderResourceViewProcessor(device, load_info, &processor))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            return hr;
+        }
+        if (FAILED((hr = ID3DX11ThreadPump_AddWorkItem(pump, loader, processor, hresult, (void **)srv))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            ID3DX11DataProcessor_Destroy(processor);
+        }
+        return hr;
+    }
+
+    if (SUCCEEDED((hr = load_file(src_file, &buffer, &size))))
+    {
+        hr = create_texture(device, buffer, size, load_info, &texture);
+        if (SUCCEEDED(hr))
+        {
+            hr = ID3D11Device_CreateShaderResourceView(device, texture, NULL, srv);
+            ID3D11Resource_Release(texture);
+        }
+        free(buffer);
+    }
+    if (hresult)
+        *hresult = hr;
+    return hr;
+}
+
+HRESULT WINAPI D3DX11CreateShaderResourceViewFromResourceA(ID3D11Device *device, HMODULE module, const char *resource,
+        D3DX11_IMAGE_LOAD_INFO *load_info, ID3DX11ThreadPump *pump, ID3D11ShaderResourceView **srv, HRESULT *hresult)
+{
+    ID3D11Resource *texture;
+    void *buffer;
+    DWORD size;
+    HRESULT hr;
+
+    TRACE("device %p, module %p, resource %s, load_info %p, pump %p, srv %p, hresult %p.\n",
+            device, module, debugstr_a(resource), load_info, pump, srv, hresult);
+
+    if (!device)
+        return E_INVALIDARG;
+
+    if (pump)
+    {
+        ID3DX11DataProcessor *processor;
+        ID3DX11DataLoader *loader;
+
+        if (FAILED((hr = D3DX11CreateAsyncResourceLoaderA(module, resource, &loader))))
+            return hr;
+        if (FAILED((hr = D3DX11CreateAsyncShaderResourceViewProcessor(device, load_info, &processor))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            return hr;
+        }
+        if (FAILED((hr = ID3DX11ThreadPump_AddWorkItem(pump, loader, processor, hresult, (void **)srv))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            ID3DX11DataProcessor_Destroy(processor);
+        }
+        return hr;
+    }
+
+    if (FAILED((hr = load_resourceA(module, resource, &buffer, &size))))
+        return hr;
+    hr = create_texture(device, buffer, size, load_info, &texture);
+    if (SUCCEEDED(hr))
+    {
+        hr = ID3D11Device_CreateShaderResourceView(device, texture, NULL, srv);
+        ID3D11Resource_Release(texture);
+    }
+    if (hresult)
+        *hresult = hr;
+    return hr;
+}
+
+HRESULT WINAPI D3DX11CreateShaderResourceViewFromResourceW(ID3D11Device *device, HMODULE module, const WCHAR *resource,
+        D3DX11_IMAGE_LOAD_INFO *load_info, ID3DX11ThreadPump *pump, ID3D11ShaderResourceView **srv, HRESULT *hresult)
+{
+    ID3D11Resource *texture;
+    void *buffer;
+    DWORD size;
+    HRESULT hr;
+
+    TRACE("device %p, module %p, resource %s, load_info %p, pump %p, srv %p, hresult %p.\n",
+            device, module, debugstr_w(resource), load_info, pump, srv, hresult);
+
+    if (!device)
+        return E_INVALIDARG;
+
+    if (pump)
+    {
+        ID3DX11DataProcessor *processor;
+        ID3DX11DataLoader *loader;
+
+        if (FAILED((hr = D3DX11CreateAsyncResourceLoaderW(module, resource, &loader))))
+            return hr;
+        if (FAILED((hr = D3DX11CreateAsyncShaderResourceViewProcessor(device, load_info, &processor))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            return hr;
+        }
+        if (FAILED((hr = ID3DX11ThreadPump_AddWorkItem(pump, loader, processor, hresult, (void **)srv))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            ID3DX11DataProcessor_Destroy(processor);
+        }
+        return hr;
+    }
+
+    if (FAILED((hr = load_resourceW(module, resource, &buffer, &size))))
+        return hr;
+    hr = create_texture(device, buffer, size, load_info, &texture);
+    if (SUCCEEDED(hr))
+    {
+        hr = ID3D11Device_CreateShaderResourceView(device, texture, NULL, srv);
+        ID3D11Resource_Release(texture);
+    }
+    if (hresult)
+        *hresult = hr;
+    return hr;
+}
+
+HRESULT WINAPI D3DX11CreateShaderResourceViewFromMemory(ID3D11Device *device, const void *src_data, SIZE_T src_data_size,
+        D3DX11_IMAGE_LOAD_INFO *load_info, ID3DX11ThreadPump *pump, ID3D11ShaderResourceView **srv, HRESULT *hresult)
+{
+    ID3D11Resource *texture;
+    HRESULT hr;
+
+    TRACE("device %p, src_data %p, src_data_size %Iu, load_info %p, pump %p, srv %p, hresult %p.\n",
+            device, src_data, src_data_size, load_info, pump, srv, hresult);
+
+    if (!device)
+        return E_INVALIDARG;
+    if (!src_data)
+        return E_FAIL;
+
+    if (pump)
+    {
+        ID3DX11DataProcessor *processor;
+        ID3DX11DataLoader *loader;
+
+        if (FAILED((hr = D3DX11CreateAsyncMemoryLoader(src_data, src_data_size, &loader))))
+            return hr;
+        if (FAILED((hr = D3DX11CreateAsyncShaderResourceViewProcessor(device, load_info, &processor))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            return hr;
+        }
+        if (FAILED((hr = ID3DX11ThreadPump_AddWorkItem(pump, loader, processor, hresult, (void **)srv))))
+        {
+            ID3DX11DataLoader_Destroy(loader);
+            ID3DX11DataProcessor_Destroy(processor);
+        }
+        return hr;
+    }
+
+    hr = create_texture(device, src_data, src_data_size, load_info, &texture);
+    if (SUCCEEDED(hr))
+    {
+        hr = ID3D11Device_CreateShaderResourceView(device, texture, NULL, srv);
+        ID3D11Resource_Release(texture);
+    }
     if (hresult)
         *hresult = hr;
     return hr;
