@@ -274,6 +274,67 @@ static ID3DX11DataProcessorVtbl texture_info_processor_vtbl =
     texture_info_processor_Destroy
 };
 
+struct texture_processor
+{
+    ID3DX11DataProcessor ID3DX11DataProcessor_iface;
+    ID3D11Device *device;
+    D3DX11_IMAGE_INFO img_info;
+    D3DX11_IMAGE_LOAD_INFO load_info;
+    D3D11_SUBRESOURCE_DATA *resource_data;
+};
+
+static inline struct texture_processor *texture_processor_from_ID3DX11DataProcessor(ID3DX11DataProcessor *iface)
+{
+    return CONTAINING_RECORD(iface, struct texture_processor, ID3DX11DataProcessor_iface);
+}
+
+static HRESULT WINAPI texture_processor_Process(ID3DX11DataProcessor *iface, void *data, SIZE_T size)
+{
+    struct texture_processor *processor = texture_processor_from_ID3DX11DataProcessor(iface);
+
+    TRACE("iface %p, data %p, size %Iu.\n", iface, data, size);
+
+    if (processor->resource_data)
+    {
+        WARN("Called multiple times.\n");
+        free(processor->resource_data);
+        processor->resource_data = NULL;
+    }
+    return load_texture_data(data, size, &processor->load_info, &processor->resource_data);
+}
+
+static HRESULT WINAPI texture_processor_CreateDeviceObject(ID3DX11DataProcessor *iface, void **object)
+{
+    struct texture_processor *processor = texture_processor_from_ID3DX11DataProcessor(iface);
+
+    TRACE("iface %p, object %p.\n", iface, object);
+
+    if (!processor->resource_data)
+        return E_FAIL;
+
+    return create_d3d_texture(processor->device, &processor->load_info,
+            processor->resource_data, (ID3D11Resource **)object);
+}
+
+static HRESULT WINAPI texture_processor_Destroy(ID3DX11DataProcessor *iface)
+{
+    struct texture_processor *processor = texture_processor_from_ID3DX11DataProcessor(iface);
+
+    TRACE("iface %p.\n", iface);
+
+    ID3D11Device_Release(processor->device);
+    free(processor->resource_data);
+    free(processor);
+    return S_OK;
+}
+
+static ID3DX11DataProcessorVtbl texture_processor_vtbl =
+{
+    texture_processor_Process,
+    texture_processor_CreateDeviceObject,
+    texture_processor_Destroy
+};
+
 HRESULT WINAPI D3DX11CompileFromMemory(const char *data, SIZE_T data_size, const char *filename,
         const D3D10_SHADER_MACRO *defines, ID3D10Include *include, const char *entry_point,
         const char *target, UINT sflags, UINT eflags, ID3DX11ThreadPump *pump, ID3D10Blob **shader,
@@ -485,6 +546,31 @@ HRESULT WINAPI D3DX11CreateAsyncTextureInfoProcessor(D3DX11_IMAGE_INFO *info, ID
 
     object->ID3DX11DataProcessor_iface.lpVtbl = &texture_info_processor_vtbl;
     object->info = info;
+
+    *processor = &object->ID3DX11DataProcessor_iface;
+    return S_OK;
+}
+
+HRESULT WINAPI D3DX11CreateAsyncTextureProcessor(ID3D11Device *device,
+        D3DX11_IMAGE_LOAD_INFO *load_info, ID3DX11DataProcessor **processor)
+{
+    struct texture_processor *object;
+
+    TRACE("device %p, load_info %p, processor %p.\n", device, load_info, processor);
+
+    if (!device || !processor)
+        return E_INVALIDARG;
+
+    object = calloc(1, sizeof(*object));
+    if (!object)
+        return E_OUTOFMEMORY;
+
+    object->ID3DX11DataProcessor_iface.lpVtbl = &texture_processor_vtbl;
+    object->device = device;
+    ID3D11Device_AddRef(device);
+    init_load_info(load_info, &object->load_info);
+    if (!object->load_info.pSrcInfo)
+        object->load_info.pSrcInfo = &object->img_info;
 
     *processor = &object->ID3DX11DataProcessor_iface;
     return S_OK;
