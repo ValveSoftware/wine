@@ -57,6 +57,22 @@ static BOOL is_block_compressed(DXGI_FORMAT format)
     return FALSE;
 }
 
+static BOOL dxgi_format_is_8bpp_rgba(DXGI_FORMAT format)
+{
+    switch (format)
+    {
+    case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+    case DXGI_FORMAT_R8G8B8A8_UNORM:
+    case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+    case DXGI_FORMAT_R8G8B8A8_UINT:
+    case DXGI_FORMAT_R8G8B8A8_SNORM:
+    case DXGI_FORMAT_R8G8B8A8_SINT:
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
 static uint32_t get_bpp_from_format(DXGI_FORMAT format)
 {
     switch (format)
@@ -4511,6 +4527,901 @@ static void test_create_shader_resource_view(void)
     ok(!ID3D11Device_Release(device), "Unexpected refcount.\n");
 }
 
+/*
+ * 4x4 RGBA cubemap with faces in the following order: blue, green, red,
+ * green/blue, red/blue, red/green.
+ */
+static const uint8_t rgba_4_4_cubemap[] =
+{
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,
+    0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,
+    0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,
+    0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,
+    0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,
+    0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,
+    0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,
+    0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,
+    0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,
+    0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,
+    0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,
+    0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,
+    0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,
+    0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,
+    0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,
+    0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,
+    0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,
+};
+
+/*
+ * 8x8 (BC1-BC3) image data, four 4x4 blocks:
+ * +-----+-----+
+ * |Blue |Green|
+ * |     |     |
+ * +-----+-----+
+ * |Red  |Black|
+ * |     |     |
+ * +-----+-----+
+ */
+static const uint8_t bc1_8_8[] =
+{
+    0x1f,0x00,0x1f,0x00,0xaa,0xaa,0xaa,0xaa,0xe0,0x07,0xe0,0x07,0xaa,0xaa,0xaa,0xaa,
+    0x00,0xf8,0x00,0xf8,0xaa,0xaa,0xaa,0xaa,0x00,0x00,0x00,0x00,0xaa,0xaa,0xaa,0xaa,
+};
+
+static const uint8_t bc2_8_8[] =
+{
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x1f,0x00,0x1f,0x00,0xaa,0xaa,0xaa,0xaa,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xe0,0x07,0xe0,0x07,0xaa,0xaa,0xaa,0xaa,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x00,0xf8,0x00,0xf8,0xaa,0xaa,0xaa,0xaa,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,0xaa,0xaa,0xaa,0xaa,
+};
+
+static const uint8_t bc3_8_8[] =
+{
+    0xff,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x1f,0x00,0x1f,0x00,0x00,0x00,0x00,0x00,
+    0xff,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xe0,0x07,0xe0,0x07,0x00,0x00,0x00,0x00,
+    0xff,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf8,0x00,0xf8,0x00,0x00,0x00,0x00,
+    0xff,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+};
+
+static const uint8_t bc1_to_bc3_8_8_decompressed[] =
+{
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,
+    0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,
+    0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,
+    0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,
+    0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,
+    0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,
+    0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,
+    0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,
+    0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,
+    0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,
+    0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,
+    0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,
+};
+
+static const uint8_t bc4_unorm_8_8[] =
+{
+    0xff,0xff,0x49,0x92,0x24,0x49,0x92,0x24,0x80,0x80,0x49,0x92,0x24,0x49,0x92,0x24,
+    0x00,0x00,0x49,0x92,0x24,0x49,0x92,0x24,0x40,0x40,0x49,0x92,0x24,0x49,0x92,0x24,
+};
+
+static const uint8_t r8_unorm_8_8_decompressed[] =
+{
+    0xff,0xff,0xff,0xff,0x80,0x80,0x80,0x80,0xff,0xff,0xff,0xff,0x80,0x80,0x80,0x80,
+    0xff,0xff,0xff,0xff,0x80,0x80,0x80,0x80,0xff,0xff,0xff,0xff,0x80,0x80,0x80,0x80,
+    0x00,0x00,0x00,0x00,0x40,0x40,0x40,0x40,0x00,0x00,0x00,0x00,0x40,0x40,0x40,0x40,
+    0x00,0x00,0x00,0x00,0x40,0x40,0x40,0x40,0x00,0x00,0x00,0x00,0x40,0x40,0x40,0x40,
+};
+
+static const uint8_t bc5_unorm_8_8[] =
+{
+    0xff,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xdf,0xdf,0x00,0x00,0x00,0x00,0x00,0x00,
+    0xbf,0xbf,0x00,0x00,0x00,0x00,0x00,0x00,0x9f,0x9f,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x7f,0x7f,0x00,0x00,0x00,0x00,0x00,0x00,0x5f,0x5f,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x3f,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x1f,0x1f,0x00,0x00,0x00,0x00,0x00,0x00,
+};
+
+static const uint8_t r8g8_unorm_8_8_decompressed[] =
+{
+    0xff,0xdf,0xff,0xdf,0xff,0xdf,0xff,0xdf,0xbf,0x9f,0xbf,0x9f,0xbf,0x9f,0xbf,0x9f,
+    0xff,0xdf,0xff,0xdf,0xff,0xdf,0xff,0xdf,0xbf,0x9f,0xbf,0x9f,0xbf,0x9f,0xbf,0x9f,
+    0xff,0xdf,0xff,0xdf,0xff,0xdf,0xff,0xdf,0xbf,0x9f,0xbf,0x9f,0xbf,0x9f,0xbf,0x9f,
+    0xff,0xdf,0xff,0xdf,0xff,0xdf,0xff,0xdf,0xbf,0x9f,0xbf,0x9f,0xbf,0x9f,0xbf,0x9f,
+    0x7f,0x5f,0x7f,0x5f,0x7f,0x5f,0x7f,0x5f,0x3f,0x1f,0x3f,0x1f,0x3f,0x1f,0x3f,0x1f,
+    0x7f,0x5f,0x7f,0x5f,0x7f,0x5f,0x7f,0x5f,0x3f,0x1f,0x3f,0x1f,0x3f,0x1f,0x3f,0x1f,
+    0x7f,0x5f,0x7f,0x5f,0x7f,0x5f,0x7f,0x5f,0x3f,0x1f,0x3f,0x1f,0x3f,0x1f,0x3f,0x1f,
+    0x7f,0x5f,0x7f,0x5f,0x7f,0x5f,0x7f,0x5f,0x3f,0x1f,0x3f,0x1f,0x3f,0x1f,0x3f,0x1f,
+};
+
+/*
+ * DXGI_FORMAT_BC{4,5}_SNORM compression/decompression is bugged in
+ * native D3DX10/D3DX11. When decompressing, it seems to read the decompressed
+ * 8-bit channel values as signed normalized integers, but then clamps them to the
+ * unsigned normalized integer range. That means 0x00-0x7f present unique values,
+ * but anything from 0x80-0xff just gives the equivalent of 0x00. When this gets
+ * converted to an SNORM format such as DXGI_FORMAT_R8_SNORM, it gets mapped
+ * to the SNORM range, where 0x00 is -1.0f, and 0x7f is 1.0f. So effectively,
+ * it ends up with half of the range.
+ */
+static const uint8_t bc4_snorm_8_8[] =
+{
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x20,0x20,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x7f,0x7f,0x00,0x00,0x00,0x00,0x00,0x00,0x5f,0x5f,0x00,0x00,0x00,0x00,0x00,0x00,
+};
+
+static const uint8_t r8_snorm_8_8_decompressed[] =
+{
+    0x81,0x81,0x81,0x81,0xc1,0xc1,0xc1,0xc1,0x81,0x81,0x81,0x81,0xc1,0xc1,0xc1,0xc1,
+    0x81,0x81,0x81,0x81,0xc1,0xc1,0xc1,0xc1,0x81,0x81,0x81,0x81,0xc1,0xc1,0xc1,0xc1,
+    0x7F,0x7F,0x7F,0x7F,0x3F,0x3F,0x3F,0x3F,0x7F,0x7F,0x7F,0x7F,0x3F,0x3F,0x3F,0x3F,
+    0x7F,0x7F,0x7F,0x7F,0x3F,0x3F,0x3F,0x3F,0x7F,0x7F,0x7F,0x7F,0x3F,0x3F,0x3F,0x3F,
+};
+
+static const uint8_t bc5_snorm_8_8[] =
+{
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x10,0x10,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x1f,0x1f,0x00,0x00,0x00,0x00,0x00,0x00,0x2f,0x2f,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x3e,0x3e,0x00,0x00,0x00,0x00,0x00,0x00,0x4e,0x4e,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x5d,0x5d,0x00,0x00,0x00,0x00,0x00,0x00,0x6d,0x6d,0x00,0x00,0x00,0x00,0x00,0x00,
+};
+
+static const uint8_t r8g8_snorm_8_8_decompressed[] =
+{
+    0x81,0xa1,0x81,0xa1,0x81,0xa1,0x81,0xa1,0xbf,0xdf,0xbf,0xdf,0xbf,0xdf,0xbf,0xdf,
+    0x81,0xa1,0x81,0xa1,0x81,0xa1,0x81,0xa1,0xbf,0xdf,0xbf,0xdf,0xbf,0xdf,0xbf,0xdf,
+    0x81,0xa1,0x81,0xa1,0x81,0xa1,0x81,0xa1,0xbf,0xdf,0xbf,0xdf,0xbf,0xdf,0xbf,0xdf,
+    0x81,0xa1,0x81,0xa1,0x81,0xa1,0x81,0xa1,0xbf,0xdf,0xbf,0xdf,0xbf,0xdf,0xbf,0xdf,
+    0xfd,0x1d,0xfd,0x1d,0xfd,0x1d,0xfd,0x1d,0x3b,0x5b,0x3b,0x5b,0x3b,0x5b,0x3b,0x5b,
+    0xfd,0x1d,0xfd,0x1d,0xfd,0x1d,0xfd,0x1d,0x3b,0x5b,0x3b,0x5b,0x3b,0x5b,0x3b,0x5b,
+    0xfd,0x1d,0xfd,0x1d,0xfd,0x1d,0xfd,0x1d,0x3b,0x5b,0x3b,0x5b,0x3b,0x5b,0x3b,0x5b,
+    0xfd,0x1d,0xfd,0x1d,0xfd,0x1d,0xfd,0x1d,0x3b,0x5b,0x3b,0x5b,0x3b,0x5b,0x3b,0x5b,
+};
+
+static const uint8_t rgba_unorm_4_4[] =
+{
+    0x10,0x20,0x30,0x40,0x50,0x60,0x70,0x80,0x90,0xa0,0xb0,0xc0,0xd0,0xe0,0xf0,0xff,
+    0x14,0x24,0x34,0x44,0x54,0x64,0x74,0x84,0x94,0xa4,0xb4,0xc4,0xd4,0xe4,0xf4,0xff,
+    0x18,0x28,0x38,0x48,0x58,0x68,0x78,0x88,0x98,0xa8,0xb8,0xc8,0xd8,0xe8,0xf8,0xff,
+    0x1c,0x2c,0x3c,0x4c,0x5c,0x6c,0x7c,0x8c,0x9c,0xac,0xbc,0xcc,0xdc,0xec,0xfc,0xff,
+};
+
+static const uint8_t rgba_snorm_4_4[] =
+{
+    0x91,0xa1,0xb1,0xc1,0xd1,0xe1,0xf1,0x00,0x10,0x20,0x30,0x40,0x50,0x60,0x70,0x7f,
+    0x95,0xa5,0xb5,0xc5,0xd5,0xe5,0xf5,0x04,0x14,0x24,0x34,0x44,0x54,0x64,0x74,0x7f,
+    0x99,0xa9,0xb9,0xc9,0xd9,0xe9,0xf9,0x08,0x18,0x28,0x38,0x48,0x58,0x68,0x78,0x7f,
+    0x9d,0xad,0xbd,0xcd,0xdd,0xed,0xfd,0x0c,0x1c,0x2c,0x3c,0x4c,0x5c,0x6c,0x7c,0x7f,
+};
+
+/* Conversion to/from uint/sint. */
+static const uint8_t rgba_uint_4_4[] =
+{
+    0x00,0x04,0x08,0x0c,0x10,0x14,0x18,0x1c,0x20,0x24,0x28,0x2c,0x30,0x34,0x38,0x3c,
+    0x40,0x44,0x48,0x4c,0x50,0x54,0x58,0x5c,0x60,0x64,0x68,0x6c,0x70,0x74,0x78,0x7c,
+    0x80,0x84,0x88,0x8c,0x90,0x94,0x98,0x9c,0xa0,0xa4,0xa8,0xac,0xb0,0xb4,0xb8,0xbc,
+    0xc0,0xc4,0xc8,0xcc,0xd0,0xd4,0xd8,0xdc,0xe0,0xe4,0xe8,0xec,0xf0,0xf4,0xf8,0xfc,
+};
+
+static const uint8_t rgba_uint_to_sint_4_4[] =
+{
+    0x00,0x04,0x08,0x0c,0x10,0x14,0x18,0x1c,0x20,0x24,0x28,0x2c,0x30,0x34,0x38,0x3c,
+    0x40,0x44,0x48,0x4c,0x50,0x54,0x58,0x5c,0x60,0x64,0x68,0x6c,0x70,0x74,0x78,0x7c,
+    0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,
+    0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,0x7f,
+};
+
+static const uint8_t rgba_sint_4_4[] =
+{
+    0x80,0x84,0x88,0x8c,0x90,0x94,0x98,0x9c,0xa0,0xa4,0xa8,0xac,0xb0,0xb4,0xb8,0xbc,
+    0xc0,0xc4,0xc8,0xcc,0xd0,0xd4,0xd8,0xdc,0xe0,0xe4,0xe8,0xec,0xf0,0xf4,0xf8,0xfc,
+    0x00,0x04,0x08,0x0c,0x10,0x14,0x18,0x1c,0x20,0x24,0x28,0x2c,0x30,0x34,0x38,0x3c,
+    0x40,0x44,0x48,0x4c,0x50,0x54,0x58,0x5c,0x60,0x64,0x68,0x6c,0x70,0x74,0x78,0x7c,
+};
+
+static const uint8_t rgba_sint_to_uint_4_4[] =
+{
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x04,0x08,0x0c,0x10,0x14,0x18,0x1c,0x20,0x24,0x28,0x2c,0x30,0x34,0x38,0x3c,
+    0x40,0x44,0x48,0x4c,0x50,0x54,0x58,0x5c,0x60,0x64,0x68,0x6c,0x70,0x74,0x78,0x7c,
+};
+
+/* Conversion to/from SRGB. */
+static const uint8_t rgba_unorm_srgb_4_4[] =
+{
+    0x10,0x20,0x30,0x40,0x50,0x60,0x70,0x80,0x90,0xa0,0xb0,0xc0,0xd0,0xe0,0xf0,0xff,
+    0x14,0x24,0x34,0x44,0x54,0x64,0x74,0x84,0x94,0xa4,0xb4,0xc4,0xd4,0xe4,0xf4,0xff,
+    0x18,0x28,0x38,0x48,0x58,0x68,0x78,0x88,0x98,0xa8,0xb8,0xc8,0xd8,0xe8,0xf8,0xff,
+    0x1c,0x2c,0x3c,0x4c,0x5c,0x6c,0x7c,0x8c,0x9c,0xac,0xbc,0xcc,0xdc,0xec,0xfc,0xff,
+};
+
+static const uint8_t rgba_unorm_srgb_to_unorm_non_srgb_4_4[] =
+{
+    0x01,0x03,0x06,0x40,0x14,0x1e,0x2a,0x80,0x49,0x5b,0x71,0xc0,0xa3,0xc0,0xdf,0xff,
+    0x01,0x03,0x08,0x44,0x16,0x21,0x2d,0x84,0x4d,0x61,0x77,0xc4,0xaa,0xc7,0xe7,0xff,
+    0x01,0x04,0x09,0x48,0x19,0x23,0x31,0x88,0x52,0x66,0x7c,0xc8,0xb1,0xcf,0xf0,0xff,
+    0x02,0x05,0x0b,0x4c,0x1b,0x27,0x34,0x8c,0x57,0x6b,0x82,0xcc,0xb8,0xd7,0xf8,0xff,
+};
+
+static const uint8_t rgba_unorm_non_srgb_4_4[] =
+{
+    0x00,0x20,0x50,0x40,0x50,0x60,0x70,0x80,0x90,0xa0,0xb0,0xc0,0xd0,0xe0,0xf0,0xff,
+    0x00,0x24,0x54,0x44,0x54,0x64,0x74,0x84,0x94,0xa4,0xb4,0xc4,0xd4,0xe4,0xf4,0xff,
+    0x00,0x28,0x58,0x48,0x58,0x68,0x78,0x88,0x98,0xa8,0xb8,0xc8,0xd8,0xe8,0xf8,0xff,
+    0x00,0x2c,0x5c,0x4c,0x5c,0x6c,0x7c,0x8c,0x9c,0xac,0xbc,0xcc,0xdc,0xec,0xfc,0xff,
+};
+
+static const uint8_t rgba_unorm_non_srgb_to_unorm_srgb_4_4[] =
+{
+    0x00,0x63,0x97,0x40,0x97,0xa4,0xaf,0x80,0xc5,0xce,0xd7,0xc0,0xe8,0xf0,0xf8,0xff,
+    0x00,0x69,0x9a,0x44,0x9a,0xa7,0xb2,0x84,0xc7,0xd1,0xda,0xc4,0xea,0xf2,0xfa,0xff,
+    0x00,0x6e,0x9d,0x48,0x9d,0xaa,0xb5,0x88,0xca,0xd3,0xdc,0xc8,0xec,0xf4,0xfc,0xff,
+    0x00,0x73,0xa0,0x4c,0xa0,0xad,0xb8,0x8c,0xcc,0xd5,0xde,0xcc,0xee,0xf6,0xfe,0xff,
+};
+
+static const struct test_texture_format_conversion
+{
+    D3D11_TEXTURE2D_DESC src_desc;
+    const uint8_t *src_data;
+
+    DXGI_FORMAT dst_format;
+    const uint8_t *expected_dst_data;
+
+    uint8_t max_diff;
+    BOOL todo_hr;
+    BOOL todo_data;
+}
+test_texture_format_conversion[] =
+{
+    {
+        { 8, 8, 1, 1, DXGI_FORMAT_BC1_UNORM,      { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        bc1_8_8,      DXGI_FORMAT_R8G8B8A8_UNORM, bc1_to_bc3_8_8_decompressed
+    },
+    {
+        { 8, 8, 1, 1, DXGI_FORMAT_BC2_UNORM,      { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        bc2_8_8,      DXGI_FORMAT_R8G8B8A8_UNORM, bc1_to_bc3_8_8_decompressed
+    },
+    {
+        { 8, 8, 1, 1, DXGI_FORMAT_BC3_UNORM,      { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        bc3_8_8,      DXGI_FORMAT_R8G8B8A8_UNORM, bc1_to_bc3_8_8_decompressed
+    },
+    {
+        { 8, 8, 1, 1,  DXGI_FORMAT_BC4_UNORM, { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        bc4_unorm_8_8, DXGI_FORMAT_R8_UNORM,  r8_unorm_8_8_decompressed
+    },
+    {
+        { 8, 8, 1, 1,  DXGI_FORMAT_BC4_SNORM, { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        bc4_snorm_8_8, DXGI_FORMAT_R8_SNORM,  r8_snorm_8_8_decompressed, .todo_data = TRUE
+    },
+    {
+        { 8, 8, 1, 1,  DXGI_FORMAT_BC5_UNORM,  { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        bc5_unorm_8_8, DXGI_FORMAT_R8G8_UNORM, r8g8_unorm_8_8_decompressed
+    },
+    {
+        { 8, 8, 1, 1,  DXGI_FORMAT_BC5_SNORM,      { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        bc5_snorm_8_8, DXGI_FORMAT_R8G8_SNORM,  r8g8_snorm_8_8_decompressed, .todo_data = TRUE
+    },
+    {
+        { 4, 4, 1, 1,   DXGI_FORMAT_R8G8B8A8_UNORM, { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        /*
+         * Wine's UNORM->SNORM conversion doesn't always match Window's,
+         * worst case is a difference of +/- 1.
+         */
+        rgba_unorm_4_4, DXGI_FORMAT_R8G8B8A8_SNORM, rgba_snorm_4_4, .max_diff = 1
+    },
+    {
+        { 4, 4, 1, 1,  DXGI_FORMAT_R8G8B8A8_UINT, { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        rgba_uint_4_4, DXGI_FORMAT_R8G8B8A8_SINT, rgba_uint_to_sint_4_4, .todo_hr = TRUE
+    },
+    {
+        { 4, 4, 1, 1,  DXGI_FORMAT_R8G8B8A8_SINT, { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        rgba_sint_4_4, DXGI_FORMAT_R8G8B8A8_UINT, rgba_sint_to_uint_4_4, .todo_hr = TRUE
+    },
+    {
+        { 4, 4, 1, 1,        DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        rgba_unorm_srgb_4_4, DXGI_FORMAT_R8G8B8A8_UNORM,      rgba_unorm_srgb_to_unorm_non_srgb_4_4, .max_diff = 3
+    },
+    {
+        { 4, 4, 1, 1,            DXGI_FORMAT_R8G8B8A8_UNORM,      { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        rgba_unorm_non_srgb_4_4, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, rgba_unorm_non_srgb_to_unorm_srgb_4_4, .max_diff = 2
+    },
+};
+
+static const struct test_texture_compression
+{
+    D3D11_TEXTURE2D_DESC src_desc;
+    DXGI_FORMAT compressed_format;
+    const BYTE *src_data;
+}
+test_texture_compression[] =
+{
+    {
+        { 8, 8, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        DXGI_FORMAT_BC1_UNORM, bc1_to_bc3_8_8_decompressed
+    },
+    {
+        { 8, 8, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        DXGI_FORMAT_BC2_UNORM, bc1_to_bc3_8_8_decompressed
+    },
+    {
+        { 8, 8, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        DXGI_FORMAT_BC3_UNORM, bc1_to_bc3_8_8_decompressed
+    },
+    {
+        { 8, 8, 1, 1, DXGI_FORMAT_R8_UNORM, { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        DXGI_FORMAT_BC4_UNORM, r8_unorm_8_8_decompressed
+    },
+    {
+        { 8, 8, 1, 1, DXGI_FORMAT_R8G8_UNORM, { 1, 0 }, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0 },
+        DXGI_FORMAT_BC5_UNORM, r8g8_unorm_8_8_decompressed
+    },
+};
+
+#define check_texture_data_level(tex_pixels, tex_row_pitch, tex_slice_pitch, width, height, depth, format, exp_pixels, max_diff, wine_todo) \
+        check_texture_data_level_(tex_pixels, tex_row_pitch, tex_slice_pitch, width, height, depth, format, exp_pixels, max_diff, wine_todo, __LINE__)
+static void check_texture_data_level_(const uint8_t *tex_pixels, uint32_t tex_row_pitch, uint32_t tex_slice_pitch, uint32_t width,
+        uint32_t height, uint32_t depth, DXGI_FORMAT format, const uint8_t *exp_pixels, uint8_t max_diff, BOOL wine_todo, uint32_t line)
+{
+    uint32_t line_height, exp_row_pitch, exp_slice_pitch, i, j, k;
+    BOOL line_match = FALSE;
+
+    line_height = 1;
+    exp_row_pitch = (width * get_bpp_from_format(format) + 7) / 8;
+    exp_slice_pitch = exp_row_pitch * height;
+    if (is_block_compressed(format))
+    {
+        exp_row_pitch *= 4;
+        line_height = 4;
+    }
+
+    for (i = 0; i < depth; ++i)
+    {
+        const uint8_t *exp_slice = exp_pixels + (i * (exp_slice_pitch));
+        const uint8_t *pixel_slice = tex_pixels + (i * tex_slice_pitch);
+
+        for (j = 0; j < height; j += line_height)
+        {
+            if (dxgi_format_is_8bpp_rgba(format))
+            {
+                for (k = 0; k < width; ++k)
+                {
+                    const uint32_t exp_pixel = ((const uint32_t *)(exp_slice + j * exp_row_pitch))[k];
+                    const uint32_t tex_pixel = ((const uint32_t *)(pixel_slice + j * tex_row_pitch))[k];
+                    const BOOL pixel_match = compare_color(tex_pixel, exp_pixel, max_diff);
+
+                    todo_wine_if(wine_todo) ok_(__FILE__, line)(pixel_match, "Data mismatch for pixel (%ux%ux%u).\n", k, j, i);
+                    line_match = pixel_match;
+                    if (!pixel_match)
+                        break;
+                }
+            }
+            else
+            {
+                line_match = !memcmp(exp_slice + exp_row_pitch * (j / line_height),
+                        pixel_slice + tex_row_pitch * (j / line_height), exp_row_pitch);
+                todo_wine_if(wine_todo) ok_(__FILE__, line)(line_match, "Data mismatch for line %u, slice %u.\n", j, i);
+            }
+            if (!line_match)
+                break;
+        }
+    }
+}
+
+static void set_d3dx11_texture_load_info(D3DX11_TEXTURE_LOAD_INFO *load_info, D3D11_BOX *src_box, D3D11_BOX *dst_box,
+        uint32_t src_first_mip, uint32_t dst_first_mip, uint32_t num_mips, uint32_t src_first_element,
+        uint32_t dst_first_element, uint32_t num_elems, uint32_t filter, uint32_t mip_filter)
+{
+    load_info->pSrcBox = src_box;
+    load_info->pDstBox = dst_box;
+    load_info->SrcFirstMip = src_first_mip;
+    load_info->DstFirstMip = dst_first_mip;
+    load_info->NumMips = num_mips;
+    load_info->SrcFirstElement = src_first_element;
+    load_info->DstFirstElement = dst_first_element;
+    load_info->NumElements = num_elems;
+    load_info->Filter = filter;
+    load_info->MipFilter = mip_filter;
+}
+
+static void set_d3d11_2d_texture_desc(D3D11_TEXTURE2D_DESC *desc, uint32_t width, uint32_t height, uint32_t mip_levels,
+        uint32_t array_size, DXGI_FORMAT format, uint32_t sample_count, uint32_t sample_quality, uint32_t usage,
+        uint32_t bind_flags, uint32_t cpu_access_flags, uint32_t misc_flags)
+{
+    desc->Width = width;
+    desc->Height = height;
+    desc->MipLevels = mip_levels;
+    desc->ArraySize = array_size;
+    desc->Format = format;
+    desc->SampleDesc.Count = sample_count;
+    desc->SampleDesc.Quality = sample_quality;
+    desc->Usage = usage;
+    desc->BindFlags = bind_flags;
+    desc->CPUAccessFlags = cpu_access_flags;
+    desc->MiscFlags = misc_flags;
+}
+
+static void init_subresource_data(D3D11_SUBRESOURCE_DATA *subresources, const void *data, uint32_t width, uint32_t height,
+        uint32_t depth, uint32_t mip_levels, uint32_t array_size, DXGI_FORMAT format)
+{
+    const uint8_t *pixel_ptr = data;
+    uint32_t i, j;
+
+    for (i = 0; i < array_size; ++i)
+    {
+        uint32_t tmp_width, tmp_height, tmp_depth;
+
+        tmp_width = width;
+        tmp_height = height;
+        tmp_depth = depth;
+        for (j = 0; j < mip_levels; ++j)
+        {
+            D3D11_SUBRESOURCE_DATA *subresource = &subresources[(i * mip_levels) + j];
+
+            subresource->pSysMem = pixel_ptr;
+            subresource->SysMemPitch = (tmp_width * get_bpp_from_format(format) + 7) / 8;
+            subresource->SysMemSlicePitch = subresource->SysMemPitch * tmp_height;
+            if (is_block_compressed(format))
+                subresource->SysMemPitch *= 4;
+            pixel_ptr += (subresource->SysMemSlicePitch * tmp_depth);
+
+            tmp_width  = max(tmp_width  / 2, 1);
+            tmp_height = max(tmp_height / 2, 1);
+            tmp_depth  = max(tmp_depth  / 2, 1);
+        }
+    }
+}
+
+static uint8_t *init_buffer_color(uint8_t *buf, uint32_t color, uint32_t width, uint32_t height, uint32_t depth)
+{
+    uint32_t i, total_pixels = width * height * depth;
+    uint32_t *color_buf = (uint32_t *)buf;
+
+    for (i = 0; i < total_pixels; ++i)
+        color_buf[i] = color;
+    return buf + (total_pixels * 4);
+}
+
+static void set_texture_sub_resource_color(ID3D11DeviceContext *context, ID3D11Resource *rsrc, uint32_t idx, uint32_t color,
+        uint32_t width, uint32_t height, uint32_t depth)
+{
+    uint8_t tmp_buf[1024];
+
+    init_buffer_color(tmp_buf, color, width, height, depth);
+    ID3D11DeviceContext_UpdateSubresource(context, rsrc, idx, NULL, (const void *)tmp_buf, width * sizeof(color),
+            width * height * sizeof(color));
+}
+
+static void test_D3DX11LoadTextureFromTexture(void)
+{
+    static const uint32_t test_cubemap_face_colors[] = { 0xffff0000, 0xff00ff00, 0xff0000ff, 0xffffff00, 0xffff00ff, 0xff00ffff };
+    static const uint32_t test_tex_2d_array_colors[] = { 0xff0000ff, 0xff00ff00, 0xffff0000, 0xff000000 };
+    D3D11_SUBRESOURCE_DATA sub_resource_data[6] = { 0 };
+    D3DX11_TEXTURE_LOAD_INFO load_info;
+    ID3D11Texture2D *tex_2d, *tex2_2d;
+    D3D11_TEXTURE2D_DESC tex_2d_desc;
+    uint8_t tmp_buf[1024], *tmp_ptr;
+    ID3D11DeviceContext *context;
+    ID3D11Device *device;
+    RECT tmp_rect;
+    uint32_t i;
+    HRESULT hr;
+
+    device = create_device();
+    if (!device)
+    {
+        skip("Failed to create device, skipping tests.\n");
+        return;
+    }
+
+    CoInitialize(NULL);
+    ID3D11Device_GetImmediateContext(device, &context);
+
+    /*
+     * Tests that still need to be written:
+     * -pSrcBox/pDstBox, how they behave WRT mip levels, too large, too small.
+     * -3D texture test.
+     */
+
+    /* 8x8 2D texture array with 2 elements and 2 mip levels. */
+    tmp_ptr = tmp_buf;
+    for (i = 0; i < ARRAY_SIZE(test_tex_2d_array_colors); ++i)
+        tmp_ptr = init_buffer_color(tmp_ptr, test_tex_2d_array_colors[i], !(i & 0x1) ? 8 : 4, !(i & 0x1) ? 8 : 4, 1);
+
+    set_d3d11_2d_texture_desc(&tex_2d_desc, 8, 8, 2, 2, DXGI_FORMAT_R8G8B8A8_UNORM, 1, 0, D3D11_USAGE_DEFAULT,
+            D3D11_BIND_SHADER_RESOURCE, 0, 0);
+    init_subresource_data(sub_resource_data, (const void *)tmp_buf, tex_2d_desc.Width, tex_2d_desc.Height, 1,
+            tex_2d_desc.MipLevels, tex_2d_desc.ArraySize, tex_2d_desc.Format);
+    hr = ID3D11Device_CreateTexture2D(device, &tex_2d_desc, sub_resource_data, &tex_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    for (i = 0; i < ARRAY_SIZE(test_tex_2d_array_colors); ++i)
+        check_texture_sub_resource_color(tex_2d, i, NULL, test_tex_2d_array_colors[i], 0);
+
+    /* 8x8 2D texture with 4 mip levels. */
+    memset(tmp_buf, 0xff, sizeof(tmp_buf));
+    set_d3d11_2d_texture_desc(&tex_2d_desc, 8, 8, 4, 1, DXGI_FORMAT_R8G8B8A8_UNORM, 1, 0, D3D11_USAGE_DEFAULT,
+            D3D11_BIND_SHADER_RESOURCE, 0, 0);
+    init_subresource_data(sub_resource_data, (const void *)tmp_buf, tex_2d_desc.Width, tex_2d_desc.Height, 1,
+            tex_2d_desc.MipLevels, tex_2d_desc.ArraySize, tex_2d_desc.Format);
+    hr = ID3D11Device_CreateTexture2D(device, &tex_2d_desc, sub_resource_data, &tex2_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    for (i = 0; i < 4; ++i)
+        check_texture_sub_resource_color(tex2_2d, i, NULL, 0xffffffff, 0);
+
+    /*
+     * If a NULL load info argument is supplied, the default D3DX11_TEXTURE_LOAD_INFO
+     * values are used. The first 2 mip levels from tex_2d are loaded, and
+     * the last 2 mip levels of tex2_2d are generated from mip level 1.
+     */
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, NULL, (ID3D11Resource *)tex2_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    for (i = 0; i < 4; ++i)
+        check_texture_sub_resource_color(tex2_2d, i, NULL, test_tex_2d_array_colors[min(i, 1)], 0);
+
+    /* NULL device context. */
+    hr = D3DX11LoadTextureFromTexture(NULL, (ID3D11Resource *)tex_2d, NULL, (ID3D11Resource *)tex2_2d);
+    ok(hr == D3DERR_INVALIDCALL, "Unexpected hr %#lx.\n", hr);
+
+    /* Invalid Filter argument. */
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 0, 0, 0, 0, 0, 9, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex2_2d);
+    ok(hr == D3DERR_INVALIDCALL, "Unexpected hr %#lx.\n", hr);
+
+    /* Filter argument of 0 is invalid. */
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 0, 0, 0, 0, 0, 0, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex2_2d);
+    ok(hr == D3DERR_INVALIDCALL, "Unexpected hr %#lx.\n", hr);
+
+    /* Invalid MipFilter argument. */
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 0, 0, 0, 0, 0, D3DX11_DEFAULT, 9);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex2_2d);
+    ok(hr == D3DERR_INVALIDCALL, "Unexpected hr %#lx.\n", hr);
+
+    /* MipFilter argument is only validated if mip levels are generated. */
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 0, 2, 0, 0, 0, D3DX11_DEFAULT, 9);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex2_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    /*
+     * Cannot use the same source/destination texture with matching first mip
+     * level and array element.
+     */
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 0, 0, 0, 0, 0, D3DX11_DEFAULT, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex_2d);
+    ok(hr == D3DERR_INVALIDCALL, "Unexpected hr %#lx.\n", hr);
+
+    /* Same first mip level, different first element. */
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 0, 0, 0, 1, 0, D3DX11_DEFAULT, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    for (i = 0; i < 2; ++i)
+        check_texture_sub_resource_color(tex_2d, 2 + i, NULL, test_tex_2d_array_colors[i], 0);
+
+    /* Restore values. */
+    for (i = 0; i < ARRAY_SIZE(test_tex_2d_array_colors); ++i)
+    {
+        set_texture_sub_resource_color(context, (ID3D11Resource *)tex_2d, i, test_tex_2d_array_colors[i], !(i & 0x1) ? 8 : 4,
+                !(i & 0x1) ? 8 : 4, 1);
+        check_texture_sub_resource_color(tex_2d, i, NULL, test_tex_2d_array_colors[i], 0);
+    }
+
+    /* Same first array element, but different FirstMips. */
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 1, 0, 0, 0, 0, D3DX11_DEFAULT, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    for (i = 0; i < 4; ++i)
+        check_texture_sub_resource_color(tex_2d, i, NULL, test_tex_2d_array_colors[(i < 2) ? 0 : 2], 0);
+
+    for (i = 0; i < ARRAY_SIZE(test_tex_2d_array_colors); ++i)
+    {
+        set_texture_sub_resource_color(context, (ID3D11Resource *)tex_2d, i, test_tex_2d_array_colors[i], !(i & 0x1) ? 8 : 4,
+                !(i & 0x1) ? 8 : 4, 1);
+        check_texture_sub_resource_color(tex_2d, i, NULL, test_tex_2d_array_colors[i], 0);
+    }
+
+    /*
+     * If SrcFirstElement/DstFirstElement are greater than the total number of
+     * elements, element 0 is used.
+     */
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 0, 2, 2, 0, 0, D3DX11_DEFAULT, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex2_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    for (i = 0; i < 2; ++i)
+        check_texture_sub_resource_color(tex2_2d, i, NULL, test_tex_2d_array_colors[i], 0);
+
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 0, 2, 1, 0, 0, D3DX11_DEFAULT, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex2_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    for (i = 0; i < 2; ++i)
+        check_texture_sub_resource_color(tex2_2d, i, NULL, test_tex_2d_array_colors[2 + i], 0);
+
+    for (i = 0; i < 4; ++i)
+    {
+        set_texture_sub_resource_color(context, (ID3D11Resource *)tex2_2d, i, 0xff000000 | (0xff << (8 * i)), 8 >> i, 8 >> i, 1);
+        check_texture_sub_resource_color(tex2_2d, i, NULL, 0xff000000 | (0xff << (8 * i)), 0);
+    }
+
+    /* DstFirstElement value tests. */
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 0, 2, 0, 2, 0, D3DX11_DEFAULT, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex2_2d, &load_info, (ID3D11Resource *)tex_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    for (i = 0; i < 2; ++i)
+        check_texture_sub_resource_color(tex_2d, i, NULL, 0xff000000 | (0xff << (8 * i)), 0);
+    for (i = 0; i < 2; ++i)
+        check_texture_sub_resource_color(tex_2d, 2 + i, NULL, test_tex_2d_array_colors[2 + i], 0);
+
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 0, 2, 0, 1, 0, D3DX11_DEFAULT, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex2_2d, &load_info, (ID3D11Resource *)tex_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    for (i = 0; i < 4; ++i)
+        check_texture_sub_resource_color(tex_2d, i, NULL, !(i & 0x01) ? 0xff0000ff : 0xff00ff00, 0);
+
+    for (i = 0; i < 4; ++i)
+    {
+        set_texture_sub_resource_color(context, (ID3D11Resource *)tex_2d, i, test_tex_2d_array_colors[i], !(i & 0x1) ? 8 : 4,
+                !(i & 0x1) ? 8 : 4, 1);
+        check_texture_sub_resource_color(tex_2d, i, NULL, test_tex_2d_array_colors[i], 0);
+
+        set_texture_sub_resource_color(context, (ID3D11Resource *)tex2_2d, i, 0xff000000 | (0xff << (8 * i)), 8 >> i, 8 >> i, 1);
+        check_texture_sub_resource_color(tex2_2d, i, NULL, 0xff000000 | (0xff << (8 * i)), 0);
+    }
+
+    /*
+     * If SrcFirstMip is greater than the total number of mip levels, the
+     * final mip level is used, E.g, if SrcFirstMip is set to 3, but the
+     * texture only has 2 mip levels, mip level 2 is used.
+     */
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 2, 0, 1, 0, 0, 0, D3DX11_DEFAULT, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex2_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    check_texture_sub_resource_color(tex2_2d, 0, NULL, test_tex_2d_array_colors[1], 0);
+
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 0, 1, 0, 0, 0, D3DX11_DEFAULT, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex2_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    check_texture_sub_resource_color(tex2_2d, 0, NULL, test_tex_2d_array_colors[0], 0);
+
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 1, 0, 1, 0, 0, 0, D3DX11_DEFAULT, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex2_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    check_texture_sub_resource_color(tex2_2d, 0, NULL, test_tex_2d_array_colors[1], 0);
+
+    /*
+     * If DstFirstMip is greater than the total number of mips, nothing is
+     * loaded.
+     */
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 5, 1, 0, 0, 0, D3DX11_DEFAULT, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex2_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    check_texture_sub_resource_color(tex2_2d, 0, NULL, test_tex_2d_array_colors[1], 0);
+    check_texture_sub_resource_color(tex2_2d, 3, NULL, 0xff000000, 0);
+
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 3, 1, 0, 0, 0, D3DX11_DEFAULT, D3DX11_DEFAULT);
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex2_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    check_texture_sub_resource_color(tex2_2d, 3, NULL, test_tex_2d_array_colors[0], 0);
+
+    ID3D11Texture2D_Release(tex2_2d);
+    ID3D11Texture2D_Release(tex_2d);
+
+    for (i = 0; i < ARRAY_SIZE(test_texture_format_conversion); ++i)
+    {
+        const struct test_texture_format_conversion *test = &test_texture_format_conversion[i];
+        const D3D11_TEXTURE2D_DESC *src_desc = &test->src_desc;
+        D3D11_TEXTURE2D_DESC tmp_desc = test->src_desc;
+        ID3D11Texture2D *src_texture, *dst_texture;
+        D3D11_MAPPED_SUBRESOURCE map = { 0 };
+
+        winetest_push_context("Texture format conversion test %u", i);
+        src_texture = dst_texture = NULL;
+
+        init_subresource_data(sub_resource_data, test->src_data, src_desc->Width, src_desc->Height, 1,
+                src_desc->MipLevels, src_desc->ArraySize, src_desc->Format);
+        hr = ID3D11Device_CreateTexture2D(device, src_desc, sub_resource_data, &src_texture);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        if (FAILED(hr))
+            goto cleanup_next_texture;
+
+        tmp_desc.Format = test->dst_format;
+        tmp_desc.Usage = D3D11_USAGE_STAGING;
+        tmp_desc.BindFlags = 0;
+        tmp_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        hr = ID3D11Device_CreateTexture2D(device, &tmp_desc, NULL, &dst_texture);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        if (FAILED(hr))
+            goto cleanup_next_texture;
+
+        hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)src_texture, NULL, (ID3D11Resource *)dst_texture);
+        todo_wine_if(test->todo_hr) ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        if (FAILED(hr))
+            goto cleanup_next_texture;
+
+        hr = ID3D11DeviceContext_Map(context, (ID3D11Resource *)dst_texture, 0, D3D11_MAP_READ, 0, &map);
+        ok(hr == S_OK, "Failed to map destination texture, hr %#lx.\n", hr);
+        if (FAILED(hr))
+            goto cleanup_next_texture;
+
+        check_texture_data_level(map.pData, map.RowPitch, 0, tmp_desc.Width, tmp_desc.Height, 1, test->dst_format,
+                test->expected_dst_data, test->max_diff, test->todo_data);
+cleanup_next_texture:
+        if (src_texture)
+            ID3D11Texture2D_Release(src_texture);
+        if (map.pData)
+            ID3D11DeviceContext_Unmap(context, (ID3D11Resource *)dst_texture, 0);
+        if (dst_texture)
+            ID3D11Texture2D_Release(dst_texture);
+        winetest_pop_context();
+    }
+
+    /*
+     * Texture compression tests. Rather than checking against compressed values
+     * (which we're unlikely to match due to differences in compression
+     * algorithms), we'll:
+     * Load our uncompressed source texture into a compressed destination texture.
+     * Load our compressed destination texture into a new decompressed destination texture.
+     * Check that the data in the new decompressed texture matches the
+     * original data.
+     */
+    for (i = 0; i < ARRAY_SIZE(test_texture_compression); ++i)
+    {
+        const struct test_texture_compression *test = &test_texture_compression[i];
+        const D3D11_TEXTURE2D_DESC *src_desc = &test->src_desc;
+        ID3D11Texture2D *src_texture, *dst_texture;
+        D3D11_TEXTURE2D_DESC tmp_desc = *src_desc;
+        D3D11_MAPPED_SUBRESOURCE map = { 0 };
+
+        winetest_push_context("Texture compression test %u", i);
+        src_texture = dst_texture = NULL;
+
+        /* Create the uncompressed source texture. */
+        init_subresource_data(sub_resource_data, (const void *)test->src_data, src_desc->Width, src_desc->Height, 1,
+                src_desc->MipLevels, src_desc->ArraySize, src_desc->Format);
+        hr = ID3D11Device_CreateTexture2D(device, src_desc, sub_resource_data, &src_texture);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        if (FAILED(hr))
+            goto cleanup_next_compressed_texture;
+
+        /* Create the compressed destination texture. */
+        tmp_desc.Format = test->compressed_format;
+        hr = ID3D11Device_CreateTexture2D(device, &tmp_desc, NULL, &dst_texture);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        if (FAILED(hr))
+            goto cleanup_next_compressed_texture;
+
+        /* Load the uncompressed source into the compressed destination. */
+        hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)src_texture, NULL, (ID3D11Resource *)dst_texture);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        if (FAILED(hr))
+            goto cleanup_next_compressed_texture;
+
+        ID3D11Texture2D_Release(src_texture);
+        src_texture = dst_texture;
+
+        /* Now create the uncompressed destination texture to decompress into. */
+        tmp_desc = *src_desc;
+        tmp_desc.Usage = D3D11_USAGE_STAGING;
+        tmp_desc.BindFlags = 0;
+        tmp_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        memset(tmp_buf, 0, sizeof(tmp_buf));
+        init_subresource_data(sub_resource_data, (const void *)tmp_buf, src_desc->Width, src_desc->Height, 1,
+                src_desc->MipLevels, src_desc->ArraySize, src_desc->Format);
+        hr = ID3D11Device_CreateTexture2D(device, &tmp_desc, sub_resource_data, &dst_texture);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        if (FAILED(hr))
+            goto cleanup_next_compressed_texture;
+
+        hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)src_texture, NULL, (ID3D11Resource *)dst_texture);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        if (FAILED(hr))
+            goto cleanup_next_compressed_texture;
+
+        hr = ID3D11DeviceContext_Map(context, (ID3D11Resource *)dst_texture, 0, D3D11_MAP_READ, 0, &map);
+        ok(hr == S_OK, "Failed to map destination texture, hr %#lx.\n", hr);
+        if (FAILED(hr))
+            goto cleanup_next_compressed_texture;
+
+        check_texture_data_level(map.pData, map.RowPitch, 0, tmp_desc.Width, tmp_desc.Height, 1, tmp_desc.Format,
+                test->src_data, 0, FALSE);
+cleanup_next_compressed_texture:
+        if (src_texture)
+            ID3D11Texture2D_Release(src_texture);
+        if (map.pData)
+            ID3D11DeviceContext_Unmap(context, (ID3D11Resource *)dst_texture, 0);
+        if (dst_texture)
+            ID3D11Texture2D_Release(dst_texture);
+        winetest_pop_context();
+    }
+
+    /*
+     * Use D3DX11LoadTextureFromTexture to generate mip levels. Some games
+     * (Total War: Shogun 2) do this instead of using D3DX11FilterTexture.
+     */
+    set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 1, 2, 0, 0, 1, D3DX11_FILTER_POINT, D3DX11_FILTER_NONE);
+    set_d3d11_2d_texture_desc(&tex_2d_desc, 8, 8, 3, 1, DXGI_FORMAT_R8G8B8A8_UNORM, 1, 0, D3D11_USAGE_DEFAULT,
+            D3D11_BIND_SHADER_RESOURCE, 0, 0);
+
+    memset(tmp_buf, 0, sizeof(tmp_buf));
+    memcpy(tmp_buf, bc1_to_bc3_8_8_decompressed, sizeof(bc1_to_bc3_8_8_decompressed));
+    init_subresource_data(sub_resource_data, (const void *)tmp_buf, tex_2d_desc.Width, tex_2d_desc.Height, 1,
+            tex_2d_desc.MipLevels, tex_2d_desc.ArraySize, tex_2d_desc.Format);
+
+    hr = ID3D11Device_CreateTexture2D(device, &tex_2d_desc, sub_resource_data, &tex_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    check_texture_sub_resource_color(tex_2d, 1, NULL, 0x00000000, 0);
+    check_texture_sub_resource_color(tex_2d, 2, NULL, 0x00000000, 0);
+
+    hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    SetRect(&tmp_rect, 0, 0, 2, 2);
+    check_texture_sub_resource_color(tex_2d, 1, &tmp_rect, 0xffff0000, 0);
+    SetRect(&tmp_rect, 2, 0, 4, 2);
+    check_texture_sub_resource_color(tex_2d, 1, &tmp_rect, 0xff00ff00, 0);
+    SetRect(&tmp_rect, 0, 2, 2, 4);
+    check_texture_sub_resource_color(tex_2d, 1, &tmp_rect, 0xff0000ff, 0);
+    SetRect(&tmp_rect, 2, 2, 4, 4);
+    check_texture_sub_resource_color(tex_2d, 1, &tmp_rect, 0xff000000, 0);
+
+    SetRect(&tmp_rect, 0, 0, 1, 1);
+    check_texture_sub_resource_color(tex_2d, 2, &tmp_rect, 0xffff0000, 0);
+    SetRect(&tmp_rect, 1, 0, 2, 1);
+    check_texture_sub_resource_color(tex_2d, 2, &tmp_rect, 0xff00ff00, 0);
+    SetRect(&tmp_rect, 0, 1, 1, 2);
+    check_texture_sub_resource_color(tex_2d, 2, &tmp_rect, 0xff0000ff, 0);
+    SetRect(&tmp_rect, 1, 1, 2, 2);
+    check_texture_sub_resource_color(tex_2d, 2, &tmp_rect, 0xff000000, 0);
+
+    ID3D11Texture2D_Release(tex_2d);
+
+    /* Cubemap. */
+    set_d3d11_2d_texture_desc(&tex_2d_desc, 4, 4, 1, 6, DXGI_FORMAT_R8G8B8A8_UNORM, 1, 0, D3D11_USAGE_DEFAULT,
+            D3D11_BIND_SHADER_RESOURCE, 0, D3D11_RESOURCE_MISC_TEXTURECUBE);
+    init_subresource_data(sub_resource_data, (const void *)rgba_4_4_cubemap, tex_2d_desc.Width, tex_2d_desc.Height, 1,
+            tex_2d_desc.MipLevels, tex_2d_desc.ArraySize, tex_2d_desc.Format);
+
+    hr = ID3D11Device_CreateTexture2D(device, &tex_2d_desc, sub_resource_data, &tex_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    for (i = 0; i < 6; ++i)
+        check_texture_sub_resource_color(tex_2d, i, NULL, test_cubemap_face_colors[i], 0);
+
+    /* Load individual faces of a cubemap texture into a non-cubemap texture. */
+    set_d3d11_2d_texture_desc(&tex_2d_desc, 4, 4, 3, 1, DXGI_FORMAT_R8G8B8A8_UNORM, 1, 0, D3D11_USAGE_DEFAULT,
+            D3D11_BIND_SHADER_RESOURCE, 0, 0);
+    hr = ID3D11Device_CreateTexture2D(device, &tex_2d_desc, NULL, &tex2_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    for (i = 0; i < 6; ++i)
+    {
+        /* On top of loading individual faces, we'll also generate mips. */
+        set_d3dx11_texture_load_info(&load_info, NULL, NULL, 0, 0, 0, i, 0, 1, D3DX11_FILTER_POINT, D3DX11_FILTER_POINT);
+        hr = D3DX11LoadTextureFromTexture(context, (ID3D11Resource *)tex_2d, &load_info, (ID3D11Resource *)tex2_2d);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+        check_texture_sub_resource_color(tex2_2d, 0, NULL, test_cubemap_face_colors[i], 0);
+        check_texture_sub_resource_color(tex2_2d, 1, NULL, test_cubemap_face_colors[i], 0);
+        check_texture_sub_resource_color(tex2_2d, 2, NULL, test_cubemap_face_colors[i], 0);
+    }
+
+    ID3D11Texture2D_Release(tex2_2d);
+    ID3D11Texture2D_Release(tex_2d);
+
+    CoUninitialize();
+
+    ID3D11DeviceContext_Release(context);
+    ok(!ID3D11Device_Release(device), "Unexpected refcount.\n");
+}
+
 START_TEST(d3dx11)
 {
     HMODULE wined3d;
@@ -4531,6 +5442,7 @@ START_TEST(d3dx11)
     test_D3DX11CreateAsyncTextureProcessor();
     test_D3DX11CreateAsyncShaderResourceViewProcessor();
     test_D3DX11CompileFromFile();
+    test_D3DX11LoadTextureFromTexture();
     test_get_image_info();
     test_create_texture();
     test_create_shader_resource_view();
