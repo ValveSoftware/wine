@@ -756,19 +756,11 @@ static HRESULT WINAPI PPB_Load(IPersistPropertyBag *iface, IPropertyBag *bag, IE
     VARIANT var;
     HRESULT hr;
 
-    char sgi[64];
-
     TRACE("filter %p, bag %p, error_log %p.\n", filter, bag, error_log);
 
     V_VT(&var) = VT_I4;
     if (FAILED(hr = IPropertyBag_Read(bag, L"WaveInID", &var, error_log)))
         return hr;
-
-    if (GetEnvironmentVariableA("SteamGameId", sgi, sizeof(sgi)) && !strcmp(sgi, "470220"))
-    {
-        FIXME("HACK: returning error.\n");
-        return E_FAIL;
-    }
 
     EnterCriticalSection(&filter->filter.filter_cs);
     filter->id = V_I4(&var);
