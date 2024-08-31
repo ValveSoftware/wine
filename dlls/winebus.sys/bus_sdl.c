@@ -260,6 +260,14 @@ static const USAGE_AND_PAGE g920_absolute_usages[] =
     {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_Z},  /* brake */
     {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_RZ}, /* clutch */
 };
+static const USAGE_AND_PAGE hotas_x_absolute_usages[] =
+{
+    {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_X},
+    {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_Y},
+    {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_Z}, /* throttle */
+    {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_RZ}, /* yaw */
+    {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_SLIDER}, /* throttle rocker */
+};
 static const USAGE_AND_PAGE absolute_axis_usages[] =
 {
     {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_X},
@@ -290,6 +298,11 @@ static int get_absolute_usages(const struct device_desc *desc, const USAGE_AND_P
     {
         *absolute_usages = g920_absolute_usages;
         return ARRAY_SIZE(g920_absolute_usages);
+    }
+    if (desc->vid == 0x044F && desc->pid == 0xB108)
+    {
+        *absolute_usages = hotas_x_absolute_usages;
+        return ARRAY_SIZE(hotas_x_absolute_usages);
     }
 
     *absolute_usages = absolute_axis_usages;
