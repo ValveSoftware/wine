@@ -166,7 +166,10 @@ AddReg=\
     VCRuntime.ntamd64,\
     VCRuntime.ntarm64,\
     VersionInfo,\
-    LicenseInformation
+    LicenseInformation,\
+    NVIDIANGX, \
+    TTS, \
+    ProtonOverrides
 
 [Wow64Install.ntx86]
 RegisterDlls=RegisterDllsSection
