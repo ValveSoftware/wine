@@ -3279,7 +3279,7 @@ class VkGenerator(object):
         f.write("typedef struct VkCreateInfoWineDeviceCallback {\n");
         f.write("    VkStructureType             sType;\n");
         f.write("    const void*                 pNext;\n");
-        f.write("    PFN_native_vkCreateDevice   native_create_callback;\n");
+        f.write("    UINT64                      native_create_callback;\n");
         f.write("    void*                       context;\n");
         f.write("} VkCreateInfoWineDeviceCallback;\n");
 
@@ -3288,7 +3288,7 @@ class VkGenerator(object):
         f.write("typedef struct VkCreateInfoWineInstanceCallback {\n");
         f.write("    VkStructureType             sType;\n");
         f.write("    const void*                 pNext;\n");
-        f.write("    PFN_native_vkCreateInstance native_create_callback;\n");
+        f.write("    UINT64                      native_create_callback;\n");
         f.write("    void*                       context;\n");
         f.write("} VkCreateInfoWineInstanceCallback;\n");
 
