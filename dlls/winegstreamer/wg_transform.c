@@ -61,6 +61,8 @@ struct wg_transform
     GstSample *output_sample;
     bool output_caps_changed;
     GstCaps *output_caps;
+
+    bool draining;
 };
 
 static struct wg_transform *get_transform(wg_transform_t trans)
@@ -657,6 +659,13 @@ NTSTATUS wg_transform_push_data(void *args)
     GstBuffer *buffer;
     guint length;
 
+    if (transform->draining)
+    {
+        GST_INFO("Refusing %u bytes, transform is draining", sample->size);
+        params->result = MF_E_NOTACCEPTING;
+        return STATUS_SUCCESS;
+    }
+
     length = gst_atomic_queue_length(transform->input_queue);
     if (length >= transform->attrs.input_queue_length + 1)
     {
@@ -840,6 +849,33 @@ static NTSTATUS read_transform_output_data(GstBuffer *buffer, GstCaps *caps, gsi
     return STATUS_SUCCESS;
 }
 
+static NTSTATUS complete_drain(struct wg_transform *transform)
+{
+    if (transform->draining && gst_atomic_queue_length(transform->input_queue) == 0)
+    {
+        GstEvent *event;
+        transform->draining = false;
+        if (!(event = gst_event_new_segment_done(GST_FORMAT_TIME, -1))
+                || !push_event(transform->my_src, event))
+            goto error;
+        if (!(event = gst_event_new_eos())
+                || !push_event(transform->my_src, event))
+            goto error;
+        if (!(event = gst_event_new_stream_start("stream"))
+                || !push_event(transform->my_src, event))
+            goto error;
+        if (!(event = gst_event_new_segment(&transform->segment))
+                || !push_event(transform->my_src, event))
+            goto error;
+    }
+
+    return STATUS_SUCCESS;
+
+error:
+    GST_ERROR("Failed to drain transform %p.", transform);
+    return STATUS_UNSUCCESSFUL;
+}
+
 static bool get_transform_output(struct wg_transform *transform, struct wg_sample *sample)
 {
     GstBuffer *input_buffer;
@@ -852,6 +888,8 @@ static bool get_transform_output(struct wg_transform *transform, struct wg_sampl
     {
         if ((ret = gst_pad_push(transform->my_src, input_buffer)))
             GST_WARNING("Failed to push transform input, error %d", ret);
+
+        complete_drain(transform);
     }
 
     /* Remove the sample so the allocator cannot use it */
@@ -969,36 +1007,12 @@ NTSTATUS wg_transform_get_status(void *args)
 NTSTATUS wg_transform_drain(void *args)
 {
     struct wg_transform *transform = get_transform(*(wg_transform_t *)args);
-    GstBuffer *input_buffer;
-    GstFlowReturn ret;
-    GstEvent *event;
 
-    GST_LOG("transform %p", transform);
+    GST_LOG("transform %p, draining %d buffers", transform, gst_atomic_queue_length(transform->input_queue));
 
-    while ((input_buffer = gst_atomic_queue_pop(transform->input_queue)))
-    {
-        if ((ret = gst_pad_push(transform->my_src, input_buffer)))
-            GST_WARNING("Failed to push transform input, error %d", ret);
-    }
+    transform->draining = true;
 
-    if (!(event = gst_event_new_segment_done(GST_FORMAT_TIME, -1))
-            || !push_event(transform->my_src, event))
-        goto error;
-    if (!(event = gst_event_new_eos())
-            || !push_event(transform->my_src, event))
-        goto error;
-    if (!(event = gst_event_new_stream_start("stream"))
-            || !push_event(transform->my_src, event))
-        goto error;
-    if (!(event = gst_event_new_segment(&transform->segment))
-            || !push_event(transform->my_src, event))
-        goto error;
-
-    return STATUS_SUCCESS;
-
-error:
-    GST_ERROR("Failed to drain transform %p.", transform);
-    return STATUS_UNSUCCESSFUL;
+    return complete_drain(transform);
 }
 
 NTSTATUS wg_transform_flush(void *args)
