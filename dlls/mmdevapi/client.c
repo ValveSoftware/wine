@@ -904,9 +904,6 @@ static HRESULT WINAPI client_GetService(IAudioClient3 *iface, REFIID riid, void 
 
         if (!new_session)
             IUnknown_AddRef((IUnknown *)*ppv);
-    } else if (IsEqualIID(riid, &IID_IAudioClockAdjustment)) {
-        IAudioClockAdjustment_AddRef(&This->IAudioClockAdjustment_iface);
-        *ppv = &This->IAudioClockAdjustment_iface;
     } else {
             FIXME("stub %s\n", debugstr_guid(riid));
             hr = E_NOINTERFACE;
