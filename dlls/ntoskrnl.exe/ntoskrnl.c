@@ -1803,7 +1803,7 @@ NTSTATUS WINAPI IoDeleteSymbolicLink( UNICODE_STRING *name )
     attr.SecurityDescriptor       = NULL;
     attr.SecurityQualityOfService = NULL;
 
-    if (!(status = NtOpenSymbolicLinkObject( &handle, 0, &attr )))
+    if (!(status = NtOpenSymbolicLinkObject( &handle, SYMBOLIC_LINK_ALL_ACCESS, &attr )))
     {
         NtMakeTemporaryObject( handle );
         NtClose( handle );
