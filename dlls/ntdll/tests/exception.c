@@ -5826,11 +5826,11 @@ static void test_instrumentation_callback(void)
     status = NtQueryInformationProcess( GetCurrentProcess(), ProcessInstrumentationCallback, &info, sizeof(info), NULL );
     data = curr_data;
     ok( status == STATUS_INVALID_INFO_CLASS, "got %#lx.\n", status );
-    todo_wine ok( data.call_count == 1, "got %u.\n", data.call_count );
-    todo_wine ok( data.call_data[0].r10 >= (char *)NtQueryInformationProcess
+    ok( data.call_count == 1, "got %u.\n", data.call_count );
+    ok( data.call_data[0].r10 >= (char *)NtQueryInformationProcess
         && data.call_data[0].r10 < (char *)NtQueryInformationProcess + 0x20,
         "got %p, NtQueryInformationProcess %p.\n", data.call_data[0].r10, NtQueryInformationProcess );
-    todo_wine ok( data.call_data[0].rcx != data.call_data[0].r10, "got %p.\n", data.call_data[0].rcx );
+    ok( data.call_data[0].rcx != data.call_data[0].r10, "got %p.\n", data.call_data[0].rcx );
 
     memset(&info, 0, sizeof(info));
     info.Callback = code_mem;
@@ -5838,7 +5838,7 @@ static void test_instrumentation_callback(void)
     status = NtSetInformationProcess( GetCurrentProcess(), ProcessInstrumentationCallback, &info, sizeof(info) );
     data = curr_data;
     ok( status == STATUS_SUCCESS, "got %#lx.\n", status );
-    todo_wine ok( data.call_count == 1, "got %u.\n", data.call_count );
+    ok( data.call_count == 1, "got %u.\n", data.call_count );
 
     vectored_handler = AddVectoredExceptionHandler( TRUE, test_instrumentation_callback_handler );
     ok( !!vectored_handler, "failed.\n" );
@@ -5863,8 +5863,8 @@ static void test_instrumentation_callback(void)
     else if (pass == 3)
     {
         data = curr_data;
-        todo_wine ok( data.call_count == 1 || broken( data.call_count == 2 ) /* before Win10 1809 */, "got %u.\n", data.call_count );
-        todo_wine ok( data.call_data[0].r10 == pKiUserExceptionDispatcher, "got %p, expected %p.\n", data.call_data[0].r10,
+        ok( data.call_count == 1 || broken( data.call_count == 2 ) /* before Win10 1809 */, "got %u.\n", data.call_count );
+        ok( data.call_data[0].r10 == pKiUserExceptionDispatcher, "got %p, expected %p.\n", data.call_data[0].r10,
             pKiUserExceptionDispatcher );
         init_instrumentation_data( &curr_data );
         NtContinue( &ctx, FALSE );
@@ -5882,8 +5882,8 @@ static void test_instrumentation_callback(void)
     else if (pass == 5)
     {
         data = curr_data;
-        todo_wine ok( data.call_count == 1, "got %u.\n", data.call_count );
-        todo_wine ok( data.call_data[0].r10 == (void *)ctx.Rip, "got %p, expected %p.\n", data.call_data[0].r10, (void *)ctx.Rip );
+        ok( data.call_count == 1, "got %u.\n", data.call_count );
+        ok( data.call_data[0].r10 == (void *)ctx.Rip, "got %p, expected %p.\n", data.call_data[0].r10, (void *)ctx.Rip );
         init_instrumentation_data( &curr_data );
     }
     ok( pass == 5, "got %ld.\n", pass );
@@ -5896,8 +5896,8 @@ static void test_instrumentation_callback(void)
     SleepEx( 0, TRUE );
     data = curr_data;
     ok( apc_called, "APC was not called.\n" );
-    todo_wine ok( data.call_count == 1, "got %u.\n", data.call_count );
-    todo_wine ok( data.call_data[0].r10 == pKiUserApcDispatcher, "got %p, expected %p.\n", data.call_data[0].r10, pKiUserApcDispatcher );
+    ok( data.call_count == 1, "got %u.\n", data.call_count );
+    ok( data.call_data[0].r10 == pKiUserApcDispatcher, "got %p, expected %p.\n", data.call_data[0].r10, pKiUserApcDispatcher );
 
     instrumentation_callback_thread_ready = CreateEventW( NULL, FALSE, FALSE, NULL );
     instrumentation_callback_thread_wait = CreateEventW( NULL, FALSE, FALSE, NULL );
@@ -5905,7 +5905,7 @@ static void test_instrumentation_callback(void)
     thread = CreateThread( NULL, 0, test_instrumentation_callback_thread, 0, 0, NULL );
     NtWaitForSingleObject( instrumentation_callback_thread_ready, FALSE, NULL );
     data = curr_data;
-    todo_wine ok( data.call_count && data.call_count <= 256, "got %u.\n", data.call_count );
+    ok( data.call_count && data.call_count <= 256, "got %u.\n", data.call_count );
     pLdrInitializeThunk = GetProcAddress( ntdll, "LdrInitializeThunk" );
     for (i = 0; i < data.call_count; ++i)
     {
@@ -5917,14 +5917,14 @@ static void test_instrumentation_callback(void)
     SetEvent( instrumentation_callback_thread_wait );
     NtWaitForSingleObject( instrumentation_callback_thread_ready, FALSE, NULL );
     data = curr_data;
-    todo_wine ok( data.call_count && data.call_count <= 256, "got %u.\n", data.call_count );
+    ok( data.call_count && data.call_count <= 256, "got %u.\n", data.call_count );
     count = 0;
     for (i = 0; i < data.call_count; ++i)
     {
         if (data.call_data[i].r10 >= (char *)NtWaitForSingleObject && data.call_data[i].r10 < (char *)NtWaitForSingleObject + 0x20)
             ++count;
     }
-    todo_wine ok( count == 2, "got %u.\n", count );
+    ok( count == 2, "got %u.\n", count );
 
     SetEvent( instrumentation_callback_thread_wait );
     WaitForSingleObject( thread, INFINITE );
@@ -5936,7 +5936,7 @@ static void test_instrumentation_callback(void)
     init_instrumentation_data( &curr_data );
     DestroyWindow( hwnd );
     data = curr_data;
-    todo_wine ok( data.call_count && data.call_count <= 256, "got %u.\n", data.call_count );
+    ok( data.call_count && data.call_count <= 256, "got %u.\n", data.call_count );
     for (i = 0; i < data.call_count; ++i)
     {
         if (data.call_data[i].r10 == pKiUserCallbackDispatcher)
