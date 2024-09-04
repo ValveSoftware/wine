@@ -760,6 +760,12 @@ static NTSTATUS libunwind_virtual_unwind( DWORD ip, DWORD *frame, CONTEXT *conte
 }
 #endif
 
+void set_process_instrumentation_callback( void *callback )
+{
+    if (callback) FIXME( "Not supported.\n" );
+}
+
+
 /***********************************************************************
  *           unwind_builtin_dll
  */

@@ -206,6 +206,12 @@ static BOOL is_inside_syscall( ucontext_t *sigcontext )
             (char *)SP_sig(sigcontext) <= (char *)arm64_thread_data()->syscall_frame);
 }
 
+void set_process_instrumentation_callback( void *callback )
+{
+    if (callback) FIXME( "Not supported.\n" );
+}
+
+
 /***********************************************************************
  *           dwarf_virtual_unwind
  *
