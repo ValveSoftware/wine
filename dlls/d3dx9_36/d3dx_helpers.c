@@ -86,6 +86,7 @@ static const struct pixel_format_desc formats[] =
     {D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT,       {16, 16, 16, 16}, {48,  0, 16, 32},  8, 1, 1,  8, { CTYPE_FLOAT, CTYPE_FLOAT, FMT_FLAG_NONE    }},
     {D3DX_PIXEL_FORMAT_R32_FLOAT,                { 0, 32,  0,  0}, { 0,  0,  0,  0},  4, 1, 1,  4, { CTYPE_EMPTY, CTYPE_FLOAT, FMT_FLAG_NONE    }},
     {D3DX_PIXEL_FORMAT_R32G32_FLOAT,             { 0, 32, 32,  0}, { 0,  0, 32,  0},  8, 1, 1,  8, { CTYPE_EMPTY, CTYPE_FLOAT, FMT_FLAG_NONE    }},
+    {D3DX_PIXEL_FORMAT_R11G11B10_FLOAT,          { 0, 11, 11, 10}, { 0,  0, 11, 22},  4, 1, 1,  4, { CTYPE_EMPTY, CTYPE_FLOAT, FMT_FLAG_DXGI    }},
     {D3DX_PIXEL_FORMAT_R32G32B32_FLOAT,          { 0, 32, 32, 32}, { 0,  0, 32, 64}, 12, 1, 1, 12, { CTYPE_EMPTY, CTYPE_FLOAT, FMT_FLAG_DXGI    }},
     {D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT,       {32, 32, 32, 32}, {96,  0, 32, 64}, 16, 1, 1, 16, { CTYPE_FLOAT, CTYPE_FLOAT, FMT_FLAG_NONE    }},
     {D3DX_PIXEL_FORMAT_L8A8_UNORM,               { 8,  8,  0,  0}, { 8,  0,  0,  0},  2, 1, 1,  2, { CTYPE_UNORM, CTYPE_LUMA,  FMT_FLAG_NONE    }},
@@ -408,6 +409,7 @@ enum d3dx_pixel_format_id d3dx_pixel_format_id_from_dxgi_format(uint32_t format)
     case DXGI_FORMAT_R16G16B16A16_FLOAT:       return D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT;
     case DXGI_FORMAT_R32_FLOAT:                return D3DX_PIXEL_FORMAT_R32_FLOAT;
     case DXGI_FORMAT_R32G32_FLOAT:             return D3DX_PIXEL_FORMAT_R32G32_FLOAT;
+    case DXGI_FORMAT_R11G11B10_FLOAT:          return D3DX_PIXEL_FORMAT_R11G11B10_FLOAT;
     case DXGI_FORMAT_R32G32B32_FLOAT:          return D3DX_PIXEL_FORMAT_R32G32B32_FLOAT;
     case DXGI_FORMAT_R32G32B32A32_FLOAT:       return D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT;
     case DXGI_FORMAT_G8R8_G8B8_UNORM:          return D3DX_PIXEL_FORMAT_G8R8_G8B8_UNORM;
@@ -525,6 +527,7 @@ DXGI_FORMAT dxgi_format_from_d3dx_pixel_format_id(enum d3dx_pixel_format_id form
     case D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT:      return DXGI_FORMAT_R16G16B16A16_FLOAT;
     case D3DX_PIXEL_FORMAT_R32_FLOAT:               return DXGI_FORMAT_R32_FLOAT;
     case D3DX_PIXEL_FORMAT_R32G32_FLOAT:            return DXGI_FORMAT_R32G32_FLOAT;
+    case D3DX_PIXEL_FORMAT_R11G11B10_FLOAT:         return DXGI_FORMAT_R11G11B10_FLOAT;
     case D3DX_PIXEL_FORMAT_R32G32B32_FLOAT:         return DXGI_FORMAT_R32G32B32_FLOAT;
     case D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT:      return DXGI_FORMAT_R32G32B32A32_FLOAT;
     case D3DX_PIXEL_FORMAT_G8R8_G8B8_UNORM:         return DXGI_FORMAT_G8R8_G8B8_UNORM;
@@ -1319,6 +1322,93 @@ float float_16_to_32(const unsigned short in)
     }
 }
 
+static float partial_float_to_32(const uint16_t in, const uint8_t bits)
+{
+    static const uint16_t exponent_mask[2] = { 0x03e0, 0x07c0 };
+    static const uint16_t mantissa_mask[2] = { 0x1f, 0x3f };
+    static const uint8_t exponent_shift[2] = { 5, 6 };
+    const uint8_t const_idx = (bits == 10) ? 0 : 1;
+    const uint16_t e = (in & exponent_mask[const_idx]) >> exponent_shift[const_idx];
+    const uint16_t m = in & mantissa_mask[const_idx];
+    uint32_t exponent, mantissa;
+    uint32_t float_bits = 0;
+
+    if (!e && !m)
+        return 0.0f;
+
+    if (e == 0x1f)
+        return m ? NAN : INFINITY;
+
+    mantissa = m;
+    exponent = e;
+
+    /* The value is denormalized. */
+    if (!exponent)
+    {
+        /* Normalize the value in the resulting float. */
+        exponent = 1;
+        while (!(mantissa & exponent_mask[const_idx]))
+        {
+            exponent--;
+            mantissa <<= 1;
+        }
+
+        mantissa &= mantissa_mask[const_idx];
+    }
+
+    float_bits = ((exponent + 112) << 23) | (mantissa << (23 - exponent_shift[const_idx]));
+    return *((float *)&float_bits);
+}
+
+static uint16_t float_32_to_partial_float(const float in, const uint8_t bits)
+{
+    const uint32_t in_exponent = ((*((const uint32_t *)&in)) & 0x7f800000) >> 23;
+    const uint32_t in_mantissa = ((*((const uint32_t *)&in)) & 0x007fffff);
+    static const float largest_float[2] = { 64512.0f, 65024.0f };
+    static const uint16_t partial_max_val[2] = { 0x3df, 0x7bf };
+    static const uint16_t partial_inf[2] = { 0x3e0, 0x7c0 };
+    static const uint16_t partial_nan[2] = { 0x3ff, 0x7ff };
+    static const uint8_t mantissa_shift[2] = { 18, 17 };
+    static const uint8_t exp_shift[2] = { 5, 6 };
+    const uint8_t const_idx = (bits == 11);
+    const BOOL sign = signbit(in);
+    uint8_t out_exponent = 0;
+    uint8_t out_mantissa = 0;
+    uint16_t res = 0;
+
+    if (isnan(in))
+        return partial_nan[const_idx];
+    else if (!sign && isinf(in))
+        return partial_inf[const_idx];
+    else if (sign)
+        return 0x000;
+    else if (in >= largest_float[const_idx])
+        return partial_max_val[const_idx];
+
+    /*
+     * Exponent of 0x71 is 2^-14, which is the smallest exponent for float10/11.
+     * If the exponent of our float is smaller than this, we need to
+     * denormalize the float.
+     */
+    if (in_exponent < 0x71)
+    {
+        /* The number is too small to represent, just return 0. */
+        if (((0x71 - in_exponent) + mantissa_shift[const_idx]) >= 24)
+            return 0x000;
+
+        out_mantissa = (((0x800000 | in_mantissa) >> (0x71 - in_exponent)) >> mantissa_shift[const_idx]);
+        out_exponent = 0x00;
+    }
+    else
+    {
+        out_exponent = in_exponent - 0x70;
+        out_mantissa = in_mantissa >> mantissa_shift[const_idx];
+    }
+
+    res = (out_exponent << exp_shift[const_idx]) | out_mantissa;
+    return res;
+}
+
 struct argb_conversion_info
 {
     const struct pixel_format_desc *srcformat;
@@ -1484,7 +1574,9 @@ void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, con
             switch (dst_ctype)
             {
             case CTYPE_FLOAT:
-                if (format->bits[c] == 16)
+                if (format->bits[c] == 10 || format->bits[c] == 11)
+                    *dst_component = partial_float_to_32(((tmp >> format->shift[c] % 8) & mask), format->bits[c]);
+                else if (format->bits[c] == 16)
                     *dst_component = float_16_to_32(tmp);
                 else
                     *dst_component = *(float *)&tmp;
@@ -1562,7 +1654,9 @@ void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 
         switch (dst_ctype)
         {
         case CTYPE_FLOAT:
-            if (format->bits[c] == 16)
+            if (format->bits[c] == 10 || format->bits[c] == 11)
+                v = float_32_to_partial_float(src_component, format->bits[c]);
+            else if (format->bits[c] == 16)
                 v = float_32_to_16(src_component);
             else
                 v = *(DWORD *)&src_component;
