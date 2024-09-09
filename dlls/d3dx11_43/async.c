@@ -20,8 +20,10 @@
 #include "d3dx11.h"
 #include "d3dcompiler.h"
 #include "dxhelpers.h"
+#include "winternl.h"
 
 #include "wine/debug.h"
+#include "wine/list.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(d3dx);
 
@@ -656,5 +658,485 @@ HRESULT WINAPI D3DX11CreateAsyncShaderResourceViewProcessor(ID3D11Device *device
     }
     object->ID3DX11DataProcessor_iface.lpVtbl = &srv_processor_vtbl;
     *processor = &object->ID3DX11DataProcessor_iface;
+    return S_OK;
+}
+
+struct work_item
+{
+    struct list entry;
+
+    ID3DX11DataLoader *loader;
+    ID3DX11DataProcessor *processor;
+    HRESULT *result;
+    void **object;
+};
+
+static inline void work_item_free(struct work_item *work_item, BOOL cancel)
+{
+    ID3DX11DataLoader_Destroy(work_item->loader);
+    ID3DX11DataProcessor_Destroy(work_item->processor);
+    if (cancel && work_item->result)
+        *work_item->result = S_FALSE;
+    free(work_item);
+}
+
+#define THREAD_PUMP_EXITING UINT_MAX
+struct thread_pump
+{
+    ID3DX11ThreadPump ID3DX11ThreadPump_iface;
+    LONG refcount;
+
+    LONG processing_count;
+
+    SRWLOCK io_lock;
+    CONDITION_VARIABLE io_cv;
+    unsigned int io_count;
+    struct list io_queue;
+
+    SRWLOCK proc_lock;
+    CONDITION_VARIABLE proc_cv;
+    unsigned int proc_count;
+    struct list proc_queue;
+
+    SRWLOCK device_lock;
+    unsigned int device_count;
+    struct list device_queue;
+
+    unsigned int thread_count;
+    HANDLE threads[1];
+};
+
+static inline struct thread_pump *impl_from_ID3DX11ThreadPump(ID3DX11ThreadPump *iface)
+{
+    return CONTAINING_RECORD(iface, struct thread_pump, ID3DX11ThreadPump_iface);
+}
+
+static HRESULT WINAPI thread_pump_QueryInterface(ID3DX11ThreadPump *iface, REFIID riid, void **out)
+{
+    TRACE("iface %p, riid %s, out %p.\n", iface, debugstr_guid(riid), out);
+
+    if (IsEqualGUID(riid, &IID_ID3DX11ThreadPump)
+            || IsEqualGUID(riid, &IID_IUnknown))
+    {
+        ID3DX11ThreadPump_AddRef(iface);
+        *out = iface;
+        return S_OK;
+    }
+
+    WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(riid));
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI thread_pump_AddRef(ID3DX11ThreadPump *iface)
+{
+    struct thread_pump *thread_pump = impl_from_ID3DX11ThreadPump(iface);
+    ULONG refcount = InterlockedIncrement(&thread_pump->refcount);
+
+    TRACE("%p increasing refcount to %lu.\n", iface, refcount);
+
+    return refcount;
+}
+
+static ULONG WINAPI thread_pump_Release(ID3DX11ThreadPump *iface)
+{
+    struct thread_pump *thread_pump = impl_from_ID3DX11ThreadPump(iface);
+    ULONG refcount = InterlockedDecrement(&thread_pump->refcount);
+    struct work_item *item, *next;
+    struct list list;
+    unsigned int i;
+
+    TRACE("%p decreasing refcount to %lu.\n", iface, refcount);
+
+    if (!refcount)
+    {
+        AcquireSRWLockExclusive(&thread_pump->io_lock);
+        thread_pump->io_count = THREAD_PUMP_EXITING;
+        ReleaseSRWLockExclusive(&thread_pump->io_lock);
+        WakeAllConditionVariable(&thread_pump->io_cv);
+
+        AcquireSRWLockExclusive(&thread_pump->proc_lock);
+        thread_pump->proc_count = THREAD_PUMP_EXITING;
+        ReleaseSRWLockExclusive(&thread_pump->proc_lock);
+        WakeAllConditionVariable(&thread_pump->proc_cv);
+
+        AcquireSRWLockExclusive(&thread_pump->device_lock);
+        thread_pump->device_count = THREAD_PUMP_EXITING;
+        ReleaseSRWLockExclusive(&thread_pump->device_lock);
+
+        for (i = 0; i < thread_pump->thread_count; ++i)
+        {
+            if (!thread_pump->threads[i])
+                continue;
+
+            WaitForSingleObject(thread_pump->threads[i], INFINITE);
+            CloseHandle(thread_pump->threads[i]);
+        }
+
+        list_init(&list);
+        list_move_tail(&list, &thread_pump->io_queue);
+        list_move_tail(&list, &thread_pump->proc_queue);
+        list_move_tail(&list, &thread_pump->device_queue);
+        LIST_FOR_EACH_ENTRY_SAFE(item, next, &list, struct work_item, entry)
+        {
+            list_remove(&item->entry);
+            work_item_free(item, TRUE);
+        }
+
+        free(thread_pump);
+    }
+
+    return refcount;
+}
+
+static HRESULT WINAPI thread_pump_AddWorkItem(ID3DX11ThreadPump *iface, ID3DX11DataLoader *loader,
+        ID3DX11DataProcessor *processor, HRESULT *result, void **object)
+{
+    struct thread_pump *thread_pump = impl_from_ID3DX11ThreadPump(iface);
+    struct work_item *work_item;
+
+    TRACE("iface %p, loader %p, processor %p, result %p, object %p.\n",
+            iface, loader, processor, result, object);
+
+    work_item = malloc(sizeof(*work_item));
+    if (!work_item)
+        return E_OUTOFMEMORY;
+
+    work_item->loader = loader;
+    work_item->processor = processor;
+    work_item->result = result;
+    work_item->object = object;
+
+    if (object)
+        *object = NULL;
+
+    InterlockedIncrement(&thread_pump->processing_count);
+    AcquireSRWLockExclusive(&thread_pump->io_lock);
+    ++thread_pump->io_count;
+    list_add_tail(&thread_pump->io_queue, &work_item->entry);
+    ReleaseSRWLockExclusive(&thread_pump->io_lock);
+    WakeConditionVariable(&thread_pump->io_cv);
+    return S_OK;
+}
+
+static UINT WINAPI thread_pump_GetWorkItemCount(ID3DX11ThreadPump *iface)
+{
+    struct thread_pump *thread_pump = impl_from_ID3DX11ThreadPump(iface);
+    UINT ret;
+
+    TRACE("iface %p.\n", iface);
+
+    AcquireSRWLockExclusive(&thread_pump->device_lock);
+    ret = thread_pump->processing_count + thread_pump->device_count;
+    ReleaseSRWLockExclusive(&thread_pump->device_lock);
+    return ret;
+}
+
+static HRESULT WINAPI thread_pump_WaitForAllItems(ID3DX11ThreadPump *iface)
+{
+    struct thread_pump *thread_pump = impl_from_ID3DX11ThreadPump(iface);
+    HRESULT hr;
+    LONG v;
+
+    TRACE("iface %p.\n", iface);
+
+    for (;;)
+    {
+        if (FAILED((hr = ID3DX11ThreadPump_ProcessDeviceWorkItems(iface, UINT_MAX))))
+            return hr;
+
+        AcquireSRWLockExclusive(&thread_pump->device_lock);
+        if (thread_pump->device_count)
+        {
+            ReleaseSRWLockExclusive(&thread_pump->device_lock);
+            continue;
+        }
+        v = thread_pump->processing_count;
+        ReleaseSRWLockExclusive(&thread_pump->device_lock);
+        if (!v)
+            break;
+
+        RtlWaitOnAddress(&thread_pump->processing_count, &v, sizeof(v), NULL);
+    }
+
+    return S_OK;
+}
+
+static HRESULT WINAPI thread_pump_ProcessDeviceWorkItems(ID3DX11ThreadPump *iface, UINT count)
+{
+    struct thread_pump *thread_pump = impl_from_ID3DX11ThreadPump(iface);
+    struct work_item *work_item;
+    HRESULT hr;
+    UINT i;
+
+    TRACE("iface %p, count %u.\n", iface, count);
+
+    for (i = 0; i < count; ++i)
+    {
+        AcquireSRWLockExclusive(&thread_pump->device_lock);
+        if (!thread_pump->device_count)
+        {
+            ReleaseSRWLockExclusive(&thread_pump->device_lock);
+            break;
+        }
+
+        --thread_pump->device_count;
+        work_item = LIST_ENTRY(list_head(&thread_pump->device_queue), struct work_item, entry);
+        list_remove(&work_item->entry);
+        ReleaseSRWLockExclusive(&thread_pump->device_lock);
+
+        hr = ID3DX11DataProcessor_CreateDeviceObject(work_item->processor, work_item->object);
+        if (work_item->result)
+            *work_item->result = hr;
+        work_item_free(work_item, FALSE);
+    }
+
+    return S_OK;
+}
+
+static void purge_list(struct list *list, LONG *count)
+{
+    struct work_item *work_item;
+
+    while (!list_empty(list))
+    {
+        work_item = LIST_ENTRY(list_head(list), struct work_item, entry);
+        list_remove(&work_item->entry);
+        work_item_free(work_item, TRUE);
+
+        if (count && !InterlockedDecrement(count))
+            RtlWakeAddressAll(count);
+    }
+}
+
+static HRESULT WINAPI thread_pump_PurgeAllItems(ID3DX11ThreadPump *iface)
+{
+    struct thread_pump *thread_pump = impl_from_ID3DX11ThreadPump(iface);
+    LONG v;
+
+    TRACE("iface %p.\n", iface);
+
+    for (;;)
+    {
+        AcquireSRWLockExclusive(&thread_pump->io_lock);
+        purge_list(&thread_pump->io_queue, &thread_pump->processing_count);
+        thread_pump->io_count = 0;
+        ReleaseSRWLockExclusive(&thread_pump->io_lock);
+
+        AcquireSRWLockExclusive(&thread_pump->proc_lock);
+        purge_list(&thread_pump->proc_queue, &thread_pump->processing_count);
+        thread_pump->proc_count = 0;
+        ReleaseSRWLockExclusive(&thread_pump->proc_lock);
+
+        AcquireSRWLockExclusive(&thread_pump->device_lock);
+        purge_list(&thread_pump->device_queue, NULL);
+        thread_pump->device_count = 0;
+        v = thread_pump->processing_count;
+        ReleaseSRWLockExclusive(&thread_pump->device_lock);
+        if (!v)
+            break;
+
+        RtlWaitOnAddress(&thread_pump->processing_count, &v, sizeof(v), NULL);
+    }
+
+    return S_OK;
+}
+
+static HRESULT WINAPI thread_pump_GetQueueStatus(ID3DX11ThreadPump *iface,
+        UINT *io_queue, UINT *process_queue, UINT *device_queue)
+{
+    struct thread_pump *thread_pump = impl_from_ID3DX11ThreadPump(iface);
+
+    TRACE("iface %p, io_queue %p, process_queue %p, device_queue %p.\n",
+            iface, io_queue, process_queue, device_queue);
+
+    *io_queue = thread_pump->io_count;
+    *process_queue = thread_pump->proc_count;
+    *device_queue = thread_pump->device_count;
+    return S_OK;
+}
+
+static const ID3DX11ThreadPumpVtbl thread_pump_vtbl =
+{
+    thread_pump_QueryInterface,
+    thread_pump_AddRef,
+    thread_pump_Release,
+    thread_pump_AddWorkItem,
+    thread_pump_GetWorkItemCount,
+    thread_pump_WaitForAllItems,
+    thread_pump_ProcessDeviceWorkItems,
+    thread_pump_PurgeAllItems,
+    thread_pump_GetQueueStatus
+};
+
+static DWORD WINAPI io_thread(void *arg)
+{
+    struct thread_pump *thread_pump = arg;
+    struct work_item *work_item;
+    HRESULT hr;
+
+    TRACE("%p thread started.\n", thread_pump);
+
+    for (;;)
+    {
+        AcquireSRWLockExclusive(&thread_pump->io_lock);
+
+        while (!thread_pump->io_count)
+            SleepConditionVariableSRW(&thread_pump->io_cv, &thread_pump->io_lock, INFINITE, 0);
+
+        if (thread_pump->io_count == THREAD_PUMP_EXITING)
+        {
+            ReleaseSRWLockExclusive(&thread_pump->io_lock);
+            return 0;
+        }
+
+        --thread_pump->io_count;
+        work_item = LIST_ENTRY(list_head(&thread_pump->io_queue), struct work_item, entry);
+        list_remove(&work_item->entry);
+        ReleaseSRWLockExclusive(&thread_pump->io_lock);
+
+        if (FAILED(hr = ID3DX11DataLoader_Load(work_item->loader)))
+        {
+            if (work_item->result)
+                *work_item->result = hr;
+            work_item_free(work_item, FALSE);
+            if (!InterlockedDecrement(&thread_pump->processing_count))
+                RtlWakeAddressAll(&thread_pump->processing_count);
+            continue;
+        }
+
+        AcquireSRWLockExclusive(&thread_pump->proc_lock);
+        if (thread_pump->proc_count == THREAD_PUMP_EXITING)
+        {
+            ReleaseSRWLockExclusive(&thread_pump->proc_lock);
+            work_item_free(work_item, TRUE);
+            return 0;
+        }
+
+        list_add_tail(&thread_pump->proc_queue, &work_item->entry);
+        ++thread_pump->proc_count;
+        ReleaseSRWLockExclusive(&thread_pump->proc_lock);
+        WakeConditionVariable(&thread_pump->proc_cv);
+    }
+    return 0;
+}
+
+static DWORD WINAPI proc_thread(void *arg)
+{
+    struct thread_pump *thread_pump = arg;
+    struct work_item *work_item;
+    SIZE_T size;
+    void *data;
+    HRESULT hr;
+
+    TRACE("%p thread started.\n", thread_pump);
+
+    for (;;)
+    {
+        AcquireSRWLockExclusive(&thread_pump->proc_lock);
+
+        while (!thread_pump->proc_count)
+            SleepConditionVariableSRW(&thread_pump->proc_cv, &thread_pump->proc_lock, INFINITE, 0);
+
+        if (thread_pump->proc_count == THREAD_PUMP_EXITING)
+        {
+            ReleaseSRWLockExclusive(&thread_pump->proc_lock);
+            return 0;
+        }
+
+        --thread_pump->proc_count;
+        work_item = LIST_ENTRY(list_head(&thread_pump->proc_queue), struct work_item, entry);
+        list_remove(&work_item->entry);
+        ReleaseSRWLockExclusive(&thread_pump->proc_lock);
+
+        if (FAILED(hr = ID3DX11DataLoader_Decompress(work_item->loader, &data, &size)))
+        {
+            if (work_item->result)
+                *work_item->result = hr;
+            work_item_free(work_item, FALSE);
+            if (!InterlockedDecrement(&thread_pump->processing_count))
+                RtlWakeAddressAll(&thread_pump->processing_count);
+            continue;
+        }
+
+        if (thread_pump->device_count == THREAD_PUMP_EXITING)
+        {
+            work_item_free(work_item, TRUE);
+            return 0;
+        }
+
+        if (FAILED(hr = ID3DX11DataProcessor_Process(work_item->processor, data, size)))
+        {
+            if (work_item->result)
+                *work_item->result = hr;
+            work_item_free(work_item, FALSE);
+            if (!InterlockedDecrement(&thread_pump->processing_count))
+                RtlWakeAddressAll(&thread_pump->processing_count);
+            continue;
+        }
+
+        AcquireSRWLockExclusive(&thread_pump->device_lock);
+        if (thread_pump->device_count == THREAD_PUMP_EXITING)
+        {
+            ReleaseSRWLockExclusive(&thread_pump->device_lock);
+            work_item_free(work_item, TRUE);
+            return 0;
+        }
+
+        list_add_tail(&thread_pump->device_queue, &work_item->entry);
+        ++thread_pump->device_count;
+        InterlockedDecrement(&thread_pump->processing_count);
+        RtlWakeAddressAll(&thread_pump->processing_count);
+        ReleaseSRWLockExclusive(&thread_pump->device_lock);
+    }
+    return 0;
+}
+
+HRESULT WINAPI D3DX11CreateThreadPump(UINT io_threads, UINT proc_threads, ID3DX11ThreadPump **pump)
+{
+    struct thread_pump *object;
+    unsigned int i;
+
+    TRACE("io_threads %u, proc_threads %u, pump %p.\n", io_threads, proc_threads, pump);
+
+    if (io_threads >= 1024 || proc_threads >= 1024)
+        return E_FAIL;
+
+    if (!io_threads)
+        io_threads = 1;
+    if (!proc_threads)
+    {
+        SYSTEM_INFO info;
+
+        GetSystemInfo(&info);
+        proc_threads = info.dwNumberOfProcessors;
+    }
+
+    if (!(object = calloc(1, FIELD_OFFSET(struct thread_pump, threads[io_threads + proc_threads]))))
+        return E_OUTOFMEMORY;
+
+    object->ID3DX11ThreadPump_iface.lpVtbl = &thread_pump_vtbl;
+    object->refcount = 1;
+    InitializeSRWLock(&object->io_lock);
+    InitializeConditionVariable(&object->io_cv);
+    list_init(&object->io_queue);
+    InitializeSRWLock(&object->proc_lock);
+    InitializeConditionVariable(&object->proc_cv);
+    list_init(&object->proc_queue);
+    InitializeSRWLock(&object->device_lock);
+    list_init(&object->device_queue);
+    object->thread_count = io_threads + proc_threads;
+
+    for (i = 0; i < object->thread_count; ++i)
+    {
+        object->threads[i] = CreateThread(NULL, 0, i < io_threads ? io_thread : proc_thread, object, 0, NULL);
+        if (!object->threads[i])
+        {
+            ID3DX11ThreadPump_Release(&object->ID3DX11ThreadPump_iface);
+            return E_FAIL;
+        }
+    }
+
+    *pump = &object->ID3DX11ThreadPump_iface;
     return S_OK;
 }
