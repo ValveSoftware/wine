@@ -2085,6 +2085,7 @@ static void hacks_init(void)
     case 50130: /* Mafia II */
     case 202990: /* CoD Black Ops II Multiplayer */
     case 212910: /* CoD Black Ops II Zombies */
+    case 247910: /* Sniper Elite: Nazi Zombie Army 2 */
         setenv( "WINESTEAMNOEXEC", "1", 0 );
         break;
     }
