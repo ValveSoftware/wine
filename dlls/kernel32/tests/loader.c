@@ -88,6 +88,7 @@ static BOOL (WINAPI *pIsWow64Process)(HANDLE,PBOOL);
 static BOOL (WINAPI *pWow64DisableWow64FsRedirection)(void **);
 static BOOL (WINAPI *pWow64RevertWow64FsRedirection)(void *);
 static HMODULE (WINAPI *pLoadPackagedLibrary)(LPCWSTR lpwLibFileName, DWORD Reserved);
+static NTSTATUS  (WINAPI *pLdrRegisterDllNotification)(ULONG, PLDR_DLL_NOTIFICATION_FUNCTION, void *, void **);
 
 static PVOID RVAToAddr(DWORD_PTR rva, HMODULE module)
 {
@@ -2879,6 +2880,13 @@ static BOOL WINAPI dll_entry_point(HINSTANCE hinst, DWORD reason, LPVOID param)
     return TRUE;
 }
 
+static void CALLBACK ldr_notify_callback(ULONG reason, LDR_DLL_NOTIFICATION_DATA *data, void *context)
+{
+    /* If some DLL happens to be loaded during process shutdown load notification is called but never unload
+     * notification. */
+    ok(reason == LDR_DLL_NOTIFICATION_REASON_LOADED, "got reason %lu.\n", reason);
+}
+
 static void child_process(const char *dll_name, DWORD target_offset)
 {
     void *target;
@@ -2887,6 +2895,7 @@ static void child_process(const char *dll_name, DWORD target_offset)
     HMODULE hmod;
     struct PROCESS_BASIC_INFORMATION_PRIVATE pbi;
     DWORD_PTR affinity;
+    void *cookie;
 
     trace("phase %d: writing %p at %#lx\n", test_dll_phase, dll_entry_point, target_offset);
 
@@ -3037,6 +3046,7 @@ static void child_process(const char *dll_name, DWORD target_offset)
         ok(GetLastError() == ERROR_ACCESS_DENIED, "expected ERROR_ACCESS_DENIED, got %ld\n", GetLastError());
 
         trace("call LdrShutdownProcess()\n");
+        pLdrRegisterDllNotification(0, ldr_notify_callback, NULL, &cookie);
         pLdrShutdownProcess();
 
         ret = pRtlDllShutdownInProgress();
@@ -4309,6 +4319,7 @@ START_TEST(loader)
     pRtlReleasePebLock = (void *)GetProcAddress(ntdll, "RtlReleasePebLock");
     pRtlImageDirectoryEntryToData = (void *)GetProcAddress(ntdll, "RtlImageDirectoryEntryToData");
     pRtlImageNtHeader = (void *)GetProcAddress(ntdll, "RtlImageNtHeader");
+    pLdrRegisterDllNotification = (void *)GetProcAddress(ntdll, "LdrRegisterDllNotification");
     pFlsAlloc = (void *)GetProcAddress(kernel32, "FlsAlloc");
     pFlsSetValue = (void *)GetProcAddress(kernel32, "FlsSetValue");
     pFlsGetValue = (void *)GetProcAddress(kernel32, "FlsGetValue");
