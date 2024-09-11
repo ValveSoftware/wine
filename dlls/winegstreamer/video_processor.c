@@ -339,6 +339,7 @@ failed:
 static HRESULT video_processor_process_output_d3d11(struct video_processor *processor,
         IMFSample *input_sample, IMFSample *output_sample)
 {
+    D3D11_VIDEO_PROCESSOR_COLOR_SPACE color_space;
     D3D11_VIDEO_PROCESSOR_STREAM streams = {0};
     struct resource_desc input_desc, output_desc;
     ID3D11VideoProcessorOutputView *output_view;
@@ -349,6 +350,7 @@ static HRESULT video_processor_process_output_d3d11(struct video_processor *proc
     MFVideoArea aperture;
     RECT rect = {0};
     LONGLONG time;
+    UINT32 value;
     DWORD flags;
     HRESULT hr;
 
@@ -395,6 +397,18 @@ static HRESULT video_processor_process_output_d3d11(struct video_processor *proc
     else
         SetRect(&rect, 0, 0, output_desc.frame_size >> 32, (UINT32)output_desc.frame_size);
     ID3D11VideoContext_VideoProcessorSetStreamDestRect(video_context, video_processor, 0, TRUE, &rect);
+
+    memset(&color_space, 0, sizeof(color_space));
+    if (SUCCEEDED(IMFMediaType_GetUINT32(processor->input_type, &MF_MT_VIDEO_NOMINAL_RANGE, &value)))
+        color_space.Nominal_Range = value == MFNominalRange_Wide ? D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235
+                                                                 : D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255;
+    ID3D11VideoContext_VideoProcessorSetStreamColorSpace(video_context, video_processor, 0, &color_space);
+
+    memset(&color_space, 0, sizeof(color_space));
+    if (SUCCEEDED(IMFMediaType_GetUINT32(processor->output_type, &MF_MT_VIDEO_NOMINAL_RANGE, &value)))
+        color_space.Nominal_Range = value == MFNominalRange_Wide ? D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235
+                                                                 : D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255;
+    ID3D11VideoContext_VideoProcessorSetOutputColorSpace(video_context, video_processor, &color_space);
 
     ID3D11VideoContext_VideoProcessorBlt(video_context, video_processor, output_view, 0, 1, &streams);
 
