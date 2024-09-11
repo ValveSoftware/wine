@@ -66,16 +66,21 @@ DEFINE_MEDIATYPE_GUID(MFVideoFormat_IV50,MAKEFOURCC('I','V','5','0'));
 DEFINE_MEDIATYPE_GUID(MFVideoFormat_VC1S,MAKEFOURCC('V','C','1','S'));
 DEFINE_MEDIATYPE_GUID(MFVideoFormat_ABGR32,D3DFMT_A8B8G8R8);
 
-static void init_caps_codec_data(GstCaps *caps, const void *codec_data, int codec_data_size)
+static void init_caps_codec_data_name(GstCaps *caps, const void *codec_data, int codec_data_size, const char *name)
 {
     GstBuffer *buffer;
 
     if (codec_data_size > 0 && (buffer = gst_buffer_new_and_alloc(codec_data_size)))
     {
         gst_buffer_fill(buffer, 0, codec_data, codec_data_size);
-        gst_caps_set_simple(caps, "codec_data", GST_TYPE_BUFFER, buffer, NULL);
+        gst_caps_set_simple(caps, name, GST_TYPE_BUFFER, buffer, NULL);
         gst_buffer_unref(buffer);
     }
+}
+
+static void init_caps_codec_data(GstCaps *caps, const void *codec_data, int codec_data_size)
+{
+    init_caps_codec_data_name(caps, codec_data, codec_data_size, "codec_data");
 }
 
 static void init_caps_from_wave_format_mpeg1(GstCaps *caps, const MPEG1WAVEFORMAT *format, UINT32 format_size)
@@ -298,11 +303,18 @@ static void init_caps_from_video_cinepak(GstCaps *caps, const MFVIDEOFORMAT *for
 
 static void init_caps_from_video_h264(GstCaps *caps, const MFVIDEOFORMAT *format, UINT format_size)
 {
-    init_caps_codec_data(caps, format + 1, format_size - sizeof(*format));
-
     gst_structure_remove_field(gst_caps_get_structure(caps, 0), "format");
     gst_structure_set_name(gst_caps_get_structure(caps, 0), "video/x-h264");
-    gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, format_size - sizeof(*format) ? "avc" : "byte-stream", NULL);
+    if (format_size - sizeof(*format) >= sizeof(UINT32) && *(UINT32 *)(format + 1) == 0x01000000)
+    {
+        init_caps_codec_data_name(caps, format + 1, format_size - sizeof(*format), "streamheader");
+        gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, "byte-stream", NULL);
+    }
+    else
+    {
+        init_caps_codec_data_name(caps, format + 1, format_size - sizeof(*format), "codec_data");
+        gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, format_size - sizeof(*format) ? "avc" : "byte-stream", NULL);
+    }
 }
 
 static void init_caps_from_video_wmv(GstCaps *caps, const MFVIDEOFORMAT *format, UINT format_size,
