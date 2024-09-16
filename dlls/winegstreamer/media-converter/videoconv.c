@@ -552,9 +552,9 @@ int video_conv_state_fill_buffer(struct video_conv_state *state, uint64_t offset
 static struct video_conv_state *video_conv_lock_state(VideoConv *conv)
 {
     pthread_mutex_lock(&conv->state_mutex);
-    if (!conv->state)
-        pthread_mutex_unlock(&conv->state_mutex);
-    return conv->state;
+    if (conv->state) return conv->state;
+    pthread_mutex_unlock(&conv->state_mutex);
+    return NULL;
 }
 
 static GstStateChangeReturn video_conv_change_state(GstElement *element, GstStateChange transition)
