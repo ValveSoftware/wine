@@ -1276,79 +1276,60 @@ static void video_conv_init(VideoConv *conv)
     conv->active_mode = GST_PAD_MODE_NONE;
 }
 
-static bool codec_info_to_wg_format(char *codec_info, struct wg_format *codec_format)
+static bool codec_stamp_to_wg_format(unsigned int stamp, struct wg_format *codec_format)
 {
-    char *codec_name = codec_info;
-
-    /* Get codec name. */
-    while (*codec_info && *codec_info != ' ')
-        ++codec_info;
-    *(codec_info++) = 0;
-
-    /* FIXME: Get width, height, fps etc. from codec info string. */
-    if (strcmp(codec_name, "cinepak") == 0)
+    switch (stamp)
     {
+    case 0x7d:
         codec_format->major_type = WG_MAJOR_TYPE_VIDEO_CINEPAK;
-    }
-    else if (strcmp(codec_name, "h264") == 0)
-    {
+        break;
+    case 0xc7:
         codec_format->major_type = WG_MAJOR_TYPE_VIDEO_H264;
-    }
-    else if (strcmp(codec_name, "wmv1") == 0)
-    {
+        break;
+    case 0x1ec:
         codec_format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
         codec_format->u.video.format = WG_VIDEO_FORMAT_WMV1;
-    }
-    else if (strcmp(codec_name, "wmv2") == 0)
-    {
+        break;
+    case 0x1ed:
         codec_format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
         codec_format->u.video.format = WG_VIDEO_FORMAT_WMV2;
-    }
-    else if (strcmp(codec_name, "wmv3") == 0)
-    {
+        break;
+    case 0x1ee:
         codec_format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
         codec_format->u.video.format = WG_VIDEO_FORMAT_WMV3;
-    }
-    else if  (strcmp(codec_name, "vc1") == 0)
-    {
+        break;
+    case 0x1c8:
         codec_format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
         codec_format->u.video.format = WG_VIDEO_FORMAT_WVC1;
-    }
-    else if  (strcmp(codec_name, "wmav1") == 0)
-    {
+        break;
+    case 0x1e9:
         codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
         codec_format->u.audio.version = 1;
-    }
-    else if  (strcmp(codec_name, "wmav2") == 0)
-    {
+        break;
+    case 0x1ea:
         codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
         codec_format->u.audio.version = 2;
-    }
-    else if  (strcmp(codec_name, "wmapro") == 0)
-    {
+        break;
+    case 0x1e8:
         codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
         codec_format->u.audio.version = 3;
-    }
-    else if  (strcmp(codec_name, "wmalossless") == 0)
-    {
+        break;
+    case 0x1e7:
         codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
         codec_format->u.audio.version = 4;
-    }
-    else if  (strcmp(codec_name, "xma1") == 0)
-    {
+        break;
+    case 0x1f9:
         codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
         codec_format->u.audio.version = 1;
         codec_format->u.audio.is_xma = true;
-    }
-    else if  (strcmp(codec_name, "xma2") == 0)
-    {
+        break;
+    case 0x1fa:
         codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
         codec_format->u.audio.version = 2;
         codec_format->u.audio.is_xma = true;
-    }
-    else
-    {
-        GST_FIXME("Unsupported codec name: %s.\n", codec_name);
+        break;
+    default:
+        GST_FIXME("Unsupported codec stamp: %u.\n", stamp);
         return false;
     }
 
@@ -1388,7 +1369,7 @@ bool get_untranscoded_stream_format(GstElement *container, uint32_t stream_index
 {
     struct video_conv_state *state;
     uint8_t *buffer = NULL;
-    uint32_t entry_size, i;
+    uint32_t entry_size;
     char *codec_info;
     size_t read_size;
     bool ret = false;
@@ -1412,26 +1393,36 @@ bool get_untranscoded_stream_format(GstElement *container, uint32_t stream_index
         goto done;
     }
 
-    buffer = calloc(1, entry_size + 1);
+    if (!(buffer = calloc(1, entry_size + 1)))
+    {
+        GST_ERROR("Failed to allocate memory.");
+        goto done;
+    }
     if ((conv_ret = fozdb_read_entry_data(state->read_fozdb, VIDEO_CONV_FOZ_TAG_CODEC, &state->transcode_hash, 0,
             buffer, entry_size, &read_size, false)) < 0)
     {
-        GST_ERROR("Failed to read codec info, ret %d.", ret);
+        GST_ERROR("Failed to read codec info, ret %d.", conv_ret);
         goto done;
     }
 
     /* Get stream codec info line by line. */
-    codec_info = strtok((char *)buffer, "\n");
-    for (i = 0; codec_info && i < stream_index; ++i)
-        codec_info = strtok(NULL, "\n");
+    for (codec_info = (char *)buffer; codec_info < (char *)buffer + entry_size && !ret; )
+    {
+        unsigned int idx, from, stamp;
+        char *end = strchr(codec_info, '\n');
 
-    GST_INFO("Got codec info \"%s\" for stream %d.\n", codec_info, stream_index);
-
-   ret = codec_info_to_wg_format(codec_info, codec_format);
+        if (sscanf(codec_info, "Stream %u: from=%u stamp=%x", &idx, &from, &stamp) == 3 && idx == stream_index)
+        {
+            GST_INFO("Got codec info \"%.*s\" for stream %u => from=%u stamp=%x.\n",
+                     (unsigned)(end ? (end - codec_info) : strlen(codec_info)), codec_info, stream_index, from, stamp);
+            ret = codec_stamp_to_wg_format(stamp, codec_format);
+        }
+        codec_info = end ? end + 1 : codec_info + strlen(codec_info);
+    }
 
 done:
-    if (buffer)
-        free(buffer);
+    free(buffer);
     pthread_mutex_unlock(&conv->state_mutex);
+
     return ret;
 }
