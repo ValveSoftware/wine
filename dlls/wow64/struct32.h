@@ -328,6 +328,30 @@ typedef struct
 
 typedef struct
 {
+    ULONG Flags;
+    union
+    {
+        ULONG TlsVector;
+        ULONG TlsModulePointer;
+    };
+    ULONG ThreadId;
+} THREAD_TLS_INFORMATION32;
+
+typedef struct
+{
+    ULONG Flags;
+    ULONG OperationType;
+    ULONG ThreadDataCount;
+    union
+    {
+        ULONG TlsIndex;
+        ULONG TlsVectorLength;
+    };
+    THREAD_TLS_INFORMATION32 ThreadData[1];
+} PROCESS_TLS_INFORMATION32;
+
+typedef struct
+{
     ULONG         BaseAddress;
     ULONG         Attributes;
     LARGE_INTEGER Size;

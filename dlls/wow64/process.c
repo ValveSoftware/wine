@@ -843,6 +843,39 @@ NTSTATUS WINAPI wow64_NtSetInformationProcess( UINT *args )
         }
         else return STATUS_INVALID_PARAMETER;
 
+    case ProcessTlsInformation:
+    {
+        PROCESS_TLS_INFORMATION32 *t32 = ptr;
+        PROCESS_TLS_INFORMATION *t;
+        ULONG i;
+
+        if (len >= sizeof(*t32) && len >= offsetof(PROCESS_TLS_INFORMATION32, ThreadData[t32->ThreadDataCount]))
+        {
+            t = Wow64AllocateTemp( offsetof(PROCESS_TLS_INFORMATION, ThreadData[t32->ThreadDataCount]) );
+            t->Flags = t32->Flags ? t32->Flags : PROCESS_TLS_INFORMATION_WOW64;
+            t->OperationType = t32->OperationType;
+            t->ThreadDataCount = t32->ThreadDataCount;
+            t->TlsIndex = t32->TlsIndex;
+            for (i = 0; i < t->ThreadDataCount; ++i)
+            {
+                t->ThreadData[i].Flags = t32->ThreadData[i].Flags;
+                t->ThreadData[i].ThreadId = t32->ThreadData[i].ThreadId;
+                t->ThreadData[i].TlsVector = ULongToPtr( t32->ThreadData[i].TlsVector );
+            }
+            if (!(status = NtSetInformationProcess( handle, class, t, offsetof(PROCESS_TLS_INFORMATION, ThreadData[t->ThreadDataCount]) )))
+            {
+                for (i = 0; i < t->ThreadDataCount; ++i)
+                {
+                    t32->ThreadData[i].Flags = t->ThreadData[i].Flags;
+                    t32->ThreadData[i].ThreadId = t->ThreadData[i].ThreadId;
+                    t32->ThreadData[i].TlsVector = PtrToUlong( t->ThreadData[i].TlsVector );
+                }
+            }
+            return status;
+        }
+        else return STATUS_INFO_LENGTH_MISMATCH;
+    }
+
     case ProcessInstrumentationCallback:   /* PROCESS_INSTRUMENTATION_CALLBACK_INFORMATION */
         if (len >= sizeof(void *))
         {
