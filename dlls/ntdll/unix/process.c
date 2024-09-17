@@ -1612,6 +1612,33 @@ NTSTATUS WINAPI NtSetInformationProcess( HANDLE handle, PROCESSINFOCLASS class, 
         process_error_mode = *(UINT *)info;
         break;
 
+    case ProcessTlsInformation:
+    {
+        PROCESS_TLS_INFORMATION *t = info;
+        unsigned int i;
+
+        if (handle != NtCurrentProcess())
+        {
+            FIXME( "ProcessTlsInformation is not supported for the other process yet, handle %p.\n", handle );
+            return STATUS_INVALID_HANDLE;
+        }
+
+        if (size < sizeof(*t) || size != offsetof(PROCESS_TLS_INFORMATION, ThreadData[t->ThreadDataCount]))
+            return STATUS_INFO_LENGTH_MISMATCH;
+        if (t->Flags & ~PROCESS_TLS_INFORMATION_WOW64)
+        {
+            WARN( "ProcessTlsInformation: unknown flags %#x.\n", (int)t->Flags );
+            return STATUS_INFO_LENGTH_MISMATCH;
+        }
+        if (t->Flags & PROCESS_TLS_INFORMATION_WOW64 && !(is_win64 && is_wow64()))
+            return STATUS_INVALID_PARAMETER;
+        if (t->OperationType >= MaxProcessTlsOperation) return STATUS_INFO_LENGTH_MISMATCH;
+        for (i = 0; i < t->ThreadDataCount; ++i)
+            if (t->ThreadData[i].Flags) return STATUS_INVALID_PARAMETER;
+        ret = virtual_set_tls_information( t );
+        break;
+    }
+
     case ProcessAffinityMask:
     {
         const ULONG_PTR system_mask = get_system_affinity_mask();

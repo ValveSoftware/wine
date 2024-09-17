@@ -2561,6 +2561,41 @@ typedef struct _PROCESS_CYCLE_TIME_INFORMATION {
     ULONGLONG   CurrentCycleCount;
 } PROCESS_CYCLE_TIME_INFORMATION, *PPROCESS_CYCLE_TIME_INFORMATION;
 
+typedef struct _THREAD_TLS_INFORMATION
+{
+    ULONG Flags;
+    union
+    {
+        void *TlsVector;
+        void *TlsModulePointer;
+    };
+    ULONG_PTR ThreadId;
+} THREAD_TLS_INFORMATION, * PTHREAD_TLS_INFORMATION;
+
+#define THREAD_TLS_INFORMATION_ASSIGNED 0x2
+
+typedef enum _PROCESS_TLS_INFORMATION_TYPE
+{
+    ProcessTlsReplaceIndex,
+    ProcessTlsReplaceVector,
+    MaxProcessTlsOperation
+} PROCESS_TLS_INFORMATION_TYPE, *PPROCESS_TLS_INFORMATION_TYPE;
+
+typedef struct _PROCESS_TLS_INFORMATION
+{
+    ULONG Flags;
+    ULONG OperationType;
+    ULONG ThreadDataCount;
+    union
+    {
+        ULONG TlsIndex;
+        ULONG TlsVectorLength;
+    };
+    THREAD_TLS_INFORMATION ThreadData[1];
+} PROCESS_TLS_INFORMATION, *PPROCESS_TLS_INFORMATION;
+
+#define PROCESS_TLS_INFORMATION_WOW64 1
+
 typedef struct _PROCESS_STACK_ALLOCATION_INFORMATION
 {
     SIZE_T ReserveSize;
