@@ -1927,12 +1927,16 @@ Window get_dummy_parent(void)
  */
 void detach_client_window( struct x11drv_win_data *data, Window client_window, BOOL reparent )
 {
+    unsigned int allow_flip = 0;
+
     if (data->client_window != client_window || !client_window) return;
     data->client_window = 0;
 
     if (!data->whole_window) return;
 
     XSelectInput( data->display, client_window, 0 );
+    XChangeProperty( data->display, client_window, x11drv_atom(_WINE_ALLOW_FLIP), XA_CARDINAL, 32,
+                     PropModeReplace, (unsigned char *)&allow_flip, sizeof(allow_flip) / 4 );
     XFlush( data->display ); /* make sure XSelectInput is disabled for client_window after this point */
     XDeleteContext( data->display, client_window, winContext );
 
@@ -1946,6 +1950,8 @@ void detach_client_window( struct x11drv_win_data *data, Window client_window, B
  */
 void attach_client_window( struct x11drv_win_data *data, Window client_window )
 {
+    unsigned int allow_flip = 1;
+
     if (data->client_window == client_window || !client_window) return;
     detach_client_window( data, data->client_window, TRUE );
     data->client_window = client_window;
@@ -1954,10 +1960,13 @@ void attach_client_window( struct x11drv_win_data *data, Window client_window )
 
     XSaveContext( data->display, client_window, winContext, (char *)data->hwnd );
     XSelectInput( data->display, client_window, ExposureMask );
+    XChangeProperty( data->display, client_window, x11drv_atom(_WINE_ALLOW_FLIP), XA_CARDINAL, 32,
+                     PropModeReplace, (unsigned char *)&allow_flip, sizeof(allow_flip) / 4 );
     XFlush( data->display ); /* make sure XSelectInput is enabled for client_window after this point */
 
     XReparentWindow( gdi_display, client_window, data->whole_window, data->client_rect.left - data->whole_rect.left,
                      data->client_rect.top - data->whole_rect.top );
+
     TRACE( "%p/%lx attached client window %lx\n", data->hwnd, data->whole_window, client_window );
 }
 
@@ -2108,6 +2117,7 @@ void set_gamescope_overlay_prop( Display *display, Window window, HWND hwnd )
  */
 static void create_whole_window( struct x11drv_win_data *data )
 {
+    unsigned int allow_flip = 0;
     int cx, cy, mask;
     XSetWindowAttributes attr;
     WCHAR text[1024];
@@ -2161,6 +2171,9 @@ static void create_whole_window( struct x11drv_win_data *data )
                                         cx, cy, 0, data->vis.depth, InputOutput,
                                         data->vis.visual, mask, &attr );
     if (!data->whole_window) goto done;
+
+    XChangeProperty( data->display, data->whole_window, x11drv_atom(_WINE_ALLOW_FLIP), XA_CARDINAL, 32,
+                     PropModeReplace, (unsigned char *)&allow_flip, sizeof(allow_flip) / 4 );
 
     X11DRV_XInput2_Enable( data->display, data->whole_window, attr.event_mask );
     set_initial_wm_hints( data->display, data->whole_window );

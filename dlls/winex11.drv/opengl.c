@@ -1546,6 +1546,8 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
     else if(usexcomposite)
     {
         struct x11drv_win_data *data;
+        unsigned int allow_flip = 0;
+
         gl->type = DC_GL_CHILD_WIN;
         gl->colormap = XCreateColormap( gdi_display, get_dummy_parent(), visual->visual,
                                         (visual->class == PseudoColor || visual->class == GrayScale ||
@@ -1556,6 +1558,8 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
         {
             gl->drawable = pglXCreateWindow( gdi_display, gl->format->fbconfig, gl->window, NULL );
             pXCompositeRedirectWindow( gdi_display, gl->window, CompositeRedirectManual );
+            XChangeProperty( gdi_display, gl->window, x11drv_atom(_WINE_ALLOW_FLIP), XA_CARDINAL, 32,
+                             PropModeReplace, (unsigned char *)&allow_flip, sizeof(allow_flip) / 4 );
         }
         if ((data = get_win_data( hwnd )))
         {
