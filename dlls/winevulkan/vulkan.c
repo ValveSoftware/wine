@@ -2972,12 +2972,13 @@ static void import_keyed_mutex(struct wine_device *device, struct wine_device_me
     }
 
     vr = device->funcs.p_vkImportSemaphoreFdKHR(device->host_device, &fd_info);
-    close(fd_info.fd);
     if (vr != VK_SUCCESS)
     {
         ERR("vkImportSemaphoreFdKHR failed, vr %d.\n", vr);
+        close(fd_info.fd);
         goto error;
     }
+    /* Not closing fd on successful import, the driver now owns it. */
 
     memory->keyed_mutex_instance_id = InterlockedIncrement64((LONGLONG *)&memory->keyed_mutex_shm->instance_id_counter);
     TRACE("memory %p, imported keyed mutex.\n", memory);
