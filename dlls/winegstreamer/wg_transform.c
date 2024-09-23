@@ -1019,12 +1019,38 @@ static bool sample_needs_buffer_copy(struct wg_sample *sample, GstBuffer *buffer
     return needs_copy;
 }
 
+static void fill_frame_padded_bits(GstBuffer *buffer, const GstVideoAlignment *align, const GstVideoInfo *info)
+{
+    guint i, plane, padded_height, height, stride, padding = align->padding_bottom;
+    GstVideoFrame frame;
+
+    if (!padding || !gst_video_frame_map(&frame, info, buffer, GST_MAP_WRITE)) return;
+
+    /* Windows uses the data in the last scanline for its bottom padding */
+    for (plane = 0; plane < GST_VIDEO_FRAME_N_PLANES(&frame); plane++)
+    {
+        guint8 *data = GST_VIDEO_FRAME_PLANE_DATA(&frame, plane);
+        gint comp[GST_VIDEO_MAX_COMPONENTS];
+
+        gst_video_format_info_component(frame.info.finfo, plane, comp);
+        padded_height = GST_VIDEO_FORMAT_INFO_SCALE_HEIGHT(frame.info.finfo, comp[0], info->height + padding);
+        height = GST_VIDEO_FRAME_COMP_HEIGHT(&frame, comp[0]);
+        stride = GST_VIDEO_FRAME_PLANE_STRIDE(&frame, plane);
+        data += height * stride;
+
+        for (i = 0; i < padded_height - height; i++) memcpy(data + i * stride, data - stride, stride);
+    }
+
+    gst_video_frame_unmap(&frame);
+}
+
 static NTSTATUS read_transform_output_video(struct wg_sample *sample, GstBuffer *buffer,
-        const GstVideoInfo *src_video_info, const GstVideoInfo *dst_video_info)
+        const GstVideoInfo *src_video_info, const GstVideoInfo *dst_video_info, const GstVideoAlignment *align)
 {
     gsize total_size;
     NTSTATUS status;
     bool needs_copy;
+    const char *sgi;
 
     if (!(needs_copy = sample_needs_buffer_copy(sample, buffer, &total_size)))
         status = STATUS_SUCCESS;
@@ -1037,6 +1063,9 @@ static NTSTATUS read_transform_output_video(struct wg_sample *sample, GstBuffer 
         sample->size = 0;
         return status;
     }
+
+    if ((sgi = getenv("SteamGameId")) && !strcmp(sgi, "1449280"))
+        fill_frame_padded_bits(buffer, align, dst_video_info);
 
     set_sample_flags_from_buffer(sample, buffer, total_size);
 
@@ -1186,7 +1215,7 @@ NTSTATUS wg_transform_read_data(void *args)
 
     if (!strcmp(output_mime, "video/x-raw"))
         status = read_transform_output_video(sample, output_buffer,
-                &src_video_info, &dst_video_info);
+                &src_video_info, &dst_video_info, &align);
     else
         status = read_transform_output(sample, output_buffer);
 
