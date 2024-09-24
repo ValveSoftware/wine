@@ -1870,6 +1870,7 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     frame->rcx = ctx->uc_mcontext.gregs[REG_RIP];
     frame->eflags = ctx->uc_mcontext.gregs[REG_EFL];
     frame->restore_flags = 0;
+    if (instrumentation_callback) frame->restore_flags |= RESTORE_FLAGS_INSTRUMENTATION;
     ctx->uc_mcontext.gregs[REG_RCX] = (ULONG_PTR)frame;
     ctx->uc_mcontext.gregs[REG_R11] = frame->eflags;
     ctx->uc_mcontext.gregs[REG_EFL] &= ~0x100;  /* clear single-step flag */
