@@ -197,6 +197,16 @@ extern "C" {
 # define __has_attribute(x) 0
 #endif
 
+#ifndef DECLSPEC_ALLOCATE
+# if __has_attribute(allocate) && !defined(MIDL_PASS)
+#  define DECLSPEC_ALLOCATE(x) __declspec(allocate(x))
+# elif defined(__GNUC__)
+#  define DECLSPEC_ALLOCATE(x) __attribute__((section(x)))
+# else
+#  define DECLSPEC_ALLOCATE(x)
+# endif
+#endif
+
 #if ((defined(__GNUC__) && ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 6)))) || __has_attribute(ms_hook_prologue)) && (defined(__i386__) || defined(__x86_64__))
 #define DECLSPEC_HOTPATCH __attribute__((__ms_hook_prologue__))
 #else

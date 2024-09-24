@@ -54,6 +54,8 @@ extern BOOL heap_zero_hack;
 extern LONG call_vectored_handlers( EXCEPTION_RECORD *rec, CONTEXT *context );
 extern void DECLSPEC_NORETURN raise_status( NTSTATUS status, EXCEPTION_RECORD *rec );
 extern LONG WINAPI call_unhandled_exception_filter( PEXCEPTION_POINTERS eptr );
+extern void register_module_exception_directory( void *module );
+extern void unregister_module_exception_directory( void *module );
 
 extern void WINAPI LdrInitializeThunk(CONTEXT*,ULONG_PTR,ULONG_PTR,ULONG_PTR);
 extern NTSTATUS WINAPI KiUserExceptionDispatcher(EXCEPTION_RECORD*,CONTEXT*);
