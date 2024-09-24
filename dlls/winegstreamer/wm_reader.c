@@ -551,7 +551,9 @@ static HRESULT WINAPI stream_props_GetMediaType(IWMMediaProps *iface, WM_MEDIA_T
     TRACE("iface %p, mt %p, size %p.\n", iface, mt, size);
 
     wg_parser_stream_get_codec_format(config->stream->wg_stream, &codec_format);
-    format = (codec_format.major_type != WG_MAJOR_TYPE_UNKNOWN) ? &codec_format : &config->stream->format;
+    format = (codec_format.major_type != WG_MAJOR_TYPE_UNKNOWN
+            && codec_format.major_type != WG_MAJOR_TYPE_VIDEO
+            && codec_format.major_type != WG_MAJOR_TYPE_AUDIO) ? &codec_format : &config->stream->format;
     if (!amt_from_wg_format(&stream_mt, format, true))
         return E_OUTOFMEMORY;
 
