@@ -1708,7 +1708,10 @@ static void test_tls_links(void)
     TEB *teb = NtCurrentTeb(), *thread_teb;
     THREAD_BASIC_INFORMATION tbi;
     NTSTATUS status;
+    ULONG i, count;
     HANDLE thread;
+    SIZE_T size;
+    void **ptr;
 
     ok(!!teb->ThreadLocalStoragePointer, "got NULL.\n");
 
@@ -1727,6 +1730,26 @@ static void test_tls_links(void)
     ok(!thread_teb->ThreadLocalStoragePointer, "got %p.\n", thread_teb->ThreadLocalStoragePointer);
     ResumeThread(thread);
     WaitForSingleObject(test_tls_links_started, INFINITE);
+
+    if (!is_old_loader_struct())
+    {
+        ptr = teb->ThreadLocalStoragePointer;
+        count = (ULONG_PTR)ptr[-2];
+        size = HeapSize(GetProcessHeap(), 0, ptr - 2);
+        ok(size == (count + 2) * sizeof(void *), "got count %lu, size %Iu.\n", count, size);
+
+        for (i = 0; i < count; ++i)
+        {
+            if (!ptr[i]) continue;
+            size = HeapSize(GetProcessHeap(), 0, (void **)ptr[i] - 2);
+            ok(size && size < 100000, "got %Iu.\n", size);
+        }
+
+        ptr = thread_teb->ThreadLocalStoragePointer;
+        count = (ULONG_PTR)ptr[-2];
+        size = HeapSize(GetProcessHeap(), 0, ptr - 2);
+        ok(size == (count + 2) * sizeof(void *), "got count %lu, size %Iu.\n", count, size);
+    }
 
     ok(!!thread_teb->ThreadLocalStoragePointer, "got NULL.\n");
     ok(!teb->TlsLinks.Flink, "got %p.\n", teb->TlsLinks.Flink);
