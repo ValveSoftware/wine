@@ -1367,6 +1367,36 @@ static BOOL is_dll_native_subsystem( LDR_DATA_TABLE_ENTRY *mod, const IMAGE_NT_H
     return TRUE;
 }
 
+
+/*************************************************************************
+ *		alloc_tls_memory
+ *
+ * Allocate memory for TLS vector or index with an extra data.
+ */
+static void *alloc_tls_memory( BOOL vector, ULONG_PTR size )
+{
+    ULONG_PTR *ptr;
+
+    if (!(ptr = RtlAllocateHeap( GetProcessHeap(), vector ? HEAP_ZERO_MEMORY : 0, size + sizeof(void *) * 2 ))) return NULL;
+    ptr += 2;
+    if (vector) ptr[-2] = size / sizeof(void *);
+    else        ptr[-2] = ptr[-1] = 0;
+    return ptr;
+}
+
+
+/*************************************************************************
+ *		free_tls_memory
+ *
+ * Free TLS vector or index memory.
+ */
+static void free_tls_memory( void *ptr )
+{
+    if (!ptr) return;
+    RtlFreeHeap( GetProcessHeap(), 0, (void **)ptr - 2 );
+}
+
+
 /*************************************************************************
  *		alloc_tls_slot
  *
@@ -1433,13 +1463,13 @@ static BOOL alloc_tls_slot( LDR_DATA_TABLE_ENTRY *mod )
 
         t->ThreadData[j].Flags = 0;
 
-        if (!(new_ptr = RtlAllocateHeap( GetProcessHeap(), 0, size + dir->SizeOfZeroFill ))) return FALSE;
+        if (!(new_ptr = alloc_tls_memory( FALSE, size + dir->SizeOfZeroFill ))) return FALSE;
         memcpy( new_ptr, (void *)dir->StartAddressOfRawData, size );
         memset( (char *)new_ptr + size, 0, dir->SizeOfZeroFill );
 
         if (t->OperationType == ProcessTlsReplaceVector)
         {
-            vector = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY, tls_module_count * sizeof(*vector) );
+            vector = alloc_tls_memory( TRUE, tls_module_count * sizeof(*vector) );
             if (!vector) return FALSE;
             t->ThreadData[j].TlsVector = vector;
             vector[i] = new_ptr;
@@ -1459,12 +1489,12 @@ static BOOL alloc_tls_slot( LDR_DATA_TABLE_ENTRY *mod )
         {
             /* There could be fewer active threads than we counted here due to force terminated threads, first
              * free extra TLS directory data set in the new TLS vector. */
-            RtlFreeHeap( GetProcessHeap(), 0, ((void **)t->ThreadData[j].TlsVector)[i] );
+            free_tls_memory( ((void **)t->ThreadData[j].TlsVector)[i] );
         }
         if (!(t->ThreadData[j].Flags & THREAD_TLS_INFORMATION_ASSIGNED) || t->OperationType == ProcessTlsReplaceIndex)
         {
             /* FIXME: can't free old Tls vector here, should be freed at thread exit. */
-            RtlFreeHeap( GetProcessHeap(), 0, t->ThreadData[j].TlsVector );
+            free_tls_memory( t->ThreadData[j].TlsVector );
         }
     }
     RtlFreeHeap( GetProcessHeap(), 0, t );
@@ -1672,8 +1702,7 @@ static NTSTATUS alloc_thread_tls(void)
     void **pointers;
     UINT i, size;
 
-    if (!(pointers = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
-                                      tls_module_count * sizeof(*pointers) )))
+    if (!(pointers = alloc_tls_memory( TRUE, tls_module_count * sizeof(*pointers) )))
         return STATUS_NO_MEMORY;
 
     for (i = 0; i < tls_module_count; i++)
@@ -1684,10 +1713,10 @@ static NTSTATUS alloc_thread_tls(void)
         size = dir->EndAddressOfRawData - dir->StartAddressOfRawData;
         if (!size && !dir->SizeOfZeroFill) continue;
 
-        if (!(pointers[i] = RtlAllocateHeap( GetProcessHeap(), 0, size + dir->SizeOfZeroFill )))
+        if (!(pointers[i] = alloc_tls_memory( FALSE, size + dir->SizeOfZeroFill )))
         {
-            while (i) RtlFreeHeap( GetProcessHeap(), 0, pointers[--i] );
-            RtlFreeHeap( GetProcessHeap(), 0, pointers );
+            while (i) free_tls_memory( pointers[--i] );
+            free_tls_memory( pointers );
             return STATUS_NO_MEMORY;
         }
         memcpy( pointers[i], (void *)dir->StartAddressOfRawData, size );
@@ -4150,8 +4179,8 @@ void WINAPI LdrShutdownThread(void)
         if (NtCurrentTeb()->Instrumentation[0])
             ((TEB *)NtCurrentTeb()->Instrumentation[0])->ThreadLocalStoragePointer = NULL;
 #endif
-        for (i = 0; i < tls_module_count; i++) RtlFreeHeap( GetProcessHeap(), 0, pointers[i] );
-        RtlFreeHeap( GetProcessHeap(), 0, pointers );
+        for (i = 0; i < tls_module_count; i++) free_tls_memory( pointers[i] );
+        free_tls_memory( pointers );
     }
     RtlProcessFlsData( NtCurrentTeb()->FlsSlots, 2 );
     NtCurrentTeb()->FlsSlots = NULL;

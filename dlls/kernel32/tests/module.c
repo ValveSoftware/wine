@@ -141,6 +141,34 @@ static void create_test_dll( const char *name )
     CloseHandle( handle );
 }
 
+static BOOL is_old_loader_struct(void)
+{
+    LDR_DATA_TABLE_ENTRY *mod, *mod2;
+    LDR_DDAG_NODE *ddag_node;
+    NTSTATUS status;
+    HMODULE hexe;
+
+    /* Check for old LDR data strcuture. */
+    hexe = GetModuleHandleW( NULL );
+    ok( !!hexe, "Got NULL exe handle.\n" );
+    status = LdrFindEntryForAddress( hexe, &mod );
+    ok( !status, "got %#lx.\n", status );
+    if (!(ddag_node = mod->DdagNode))
+    {
+        win_skip( "DdagNode is NULL, skipping tests.\n" );
+        return TRUE;
+    }
+    ok( !!ddag_node->Modules.Flink, "Got NULL module link.\n" );
+    mod2 = CONTAINING_RECORD(ddag_node->Modules.Flink, LDR_DATA_TABLE_ENTRY, NodeModuleLink);
+    ok( mod2 == mod || broken( (void **)mod2 == (void **)mod - 1 ), "got %p, expected %p.\n", mod2, mod );
+    if (mod2 != mod)
+    {
+        win_skip( "Old LDR_DATA_TABLE_ENTRY structure, skipping tests.\n" );
+        return TRUE;
+    }
+    return FALSE;
+}
+
 static void testGetModuleFileName(const char* name)
 {
     HMODULE     hMod;
@@ -1766,6 +1794,76 @@ static void test_known_dlls_load(void)
     DeleteFileA( dll );
 }
 
+static HANDLE test_tls_links_started, test_tls_links_done;
+
+static DWORD WINAPI test_tls_links_thread(void* tlsidx_v)
+{
+    SetEvent(test_tls_links_started);
+    WaitForSingleObject(test_tls_links_done, INFINITE);
+    return 0;
+}
+
+static void test_tls_links(void)
+{
+    TEB *teb = NtCurrentTeb(), *thread_teb;
+    THREAD_BASIC_INFORMATION tbi;
+    NTSTATUS status;
+    ULONG i, count;
+    HANDLE thread;
+    SIZE_T size;
+    void **ptr;
+
+    ok(!!teb->ThreadLocalStoragePointer, "got NULL.\n");
+
+    test_tls_links_started = CreateEventW(NULL, FALSE, FALSE, NULL);
+    test_tls_links_done = CreateEventW(NULL, FALSE, FALSE, NULL);
+
+    thread = CreateThread(NULL, 0, test_tls_links_thread, NULL, CREATE_SUSPENDED, NULL);
+    do
+    {
+        /* workaround currently present Wine bug when thread teb may be not available immediately
+         * after creating a thread before it is initialized on the Unix side. */
+        Sleep(1);
+        status = NtQueryInformationThread(thread, ThreadBasicInformation, &tbi, sizeof(tbi), NULL);
+        ok(!status, "got %#lx.\n", status );
+    } while (!(thread_teb = tbi.TebBaseAddress));
+    ok(!thread_teb->ThreadLocalStoragePointer, "got %p.\n", thread_teb->ThreadLocalStoragePointer);
+    ResumeThread(thread);
+    WaitForSingleObject(test_tls_links_started, INFINITE);
+
+    if (!is_old_loader_struct())
+    {
+        ptr = teb->ThreadLocalStoragePointer;
+        count = (ULONG_PTR)ptr[-2];
+        size = HeapSize(GetProcessHeap(), 0, ptr - 2);
+        ok(size == (count + 2) * sizeof(void *), "got count %lu, size %Iu.\n", count, size);
+
+        for (i = 0; i < count; ++i)
+        {
+            if (!ptr[i]) continue;
+            size = HeapSize(GetProcessHeap(), 0, (void **)ptr[i] - 2);
+            ok(size && size < 100000, "got %Iu.\n", size);
+        }
+
+        ptr = thread_teb->ThreadLocalStoragePointer;
+        count = (ULONG_PTR)ptr[-2];
+        size = HeapSize(GetProcessHeap(), 0, ptr - 2);
+        ok(size == (count + 2) * sizeof(void *), "got count %lu, size %Iu.\n", count, size);
+    }
+
+    ok(!!thread_teb->ThreadLocalStoragePointer, "got NULL.\n");
+    ok(!teb->TlsLinks.Flink, "got %p.\n", teb->TlsLinks.Flink);
+    ok(!teb->TlsLinks.Blink, "got %p.\n", teb->TlsLinks.Blink);
+    ok(!thread_teb->TlsLinks.Flink, "got %p.\n", thread_teb->TlsLinks.Flink);
+    ok(!thread_teb->TlsLinks.Blink, "got %p.\n", thread_teb->TlsLinks.Blink);
+    SetEvent(test_tls_links_done);
+    WaitForSingleObject(thread, INFINITE);
+
+    CloseHandle(thread);
+    CloseHandle(test_tls_links_started);
+    CloseHandle(test_tls_links_done);
+}
+
 
 static RTL_BALANCED_NODE *rtl_node_parent( RTL_BALANCED_NODE *node )
 {
@@ -1806,29 +1904,9 @@ static void test_base_address_index_tree(void)
     unsigned int tree_count, list_count = 0;
     LDR_DATA_TABLE_ENTRY *mod, *mod2;
     RTL_BALANCED_NODE *root, *node;
-    LDR_DDAG_NODE *ddag_node;
-    NTSTATUS status;
-    HMODULE hexe;
     char *base;
 
-    /* Check for old LDR data strcuture. */
-    hexe = GetModuleHandleW( NULL );
-    ok( !!hexe, "Got NULL exe handle.\n" );
-    status = LdrFindEntryForAddress( hexe, &mod );
-    ok( !status, "got %#lx.\n", status );
-    if (!(ddag_node = mod->DdagNode))
-    {
-        win_skip( "DdagNode is NULL, skipping tests.\n" );
-        return;
-    }
-    ok( !!ddag_node->Modules.Flink, "Got NULL module link.\n" );
-    mod2 = CONTAINING_RECORD(ddag_node->Modules.Flink, LDR_DATA_TABLE_ENTRY, NodeModuleLink);
-    ok( mod2 == mod || broken( (void **)mod2 == (void **)mod - 1 ), "got %p, expected %p.\n", mod2, mod );
-    if (mod2 != mod)
-    {
-        win_skip( "Old LDR_DATA_TABLE_ENTRY structure, skipping tests.\n" );
-        return;
-    }
+    if (is_old_loader_struct()) return;
 
     mod = CONTAINING_RECORD(first->Flink, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
     ok( mod->BaseAddressIndexNode.ParentValue || mod->BaseAddressIndexNode.Left || mod->BaseAddressIndexNode.Right,
