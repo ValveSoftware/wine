@@ -147,6 +147,7 @@ typedef struct _wine_modref
 
 static UINT tls_module_count = 32;     /* number of modules with TLS directory */
 static IMAGE_TLS_DIRECTORY *tls_dirs;  /* array of TLS directories */
+static ULONG tls_thread_count;         /* number of threads for which ThreadLocalStoragePointer is allocated in TEB. */
 
 static RTL_CRITICAL_SECTION loader_section;
 static RTL_CRITICAL_SECTION_DEBUG critsect_debug =
@@ -1375,10 +1376,10 @@ static BOOL is_dll_native_subsystem( LDR_DATA_TABLE_ENTRY *mod, const IMAGE_NT_H
 static BOOL alloc_tls_slot( LDR_DATA_TABLE_ENTRY *mod )
 {
     const IMAGE_TLS_DIRECTORY *dir;
-    ULONG i, size;
+    ULONG i, j, size;
     void *new_ptr;
     UINT old_module_count = tls_module_count;
-    HANDLE thread = NULL, next;
+    PROCESS_TLS_INFORMATION *t;
 
     if (!(dir = RtlImageDirectoryEntryToData( mod->DllBase, TRUE, IMAGE_DIRECTORY_ENTRY_TLS, &size )))
         return FALSE;
@@ -1407,57 +1408,66 @@ static BOOL alloc_tls_slot( LDR_DATA_TABLE_ENTRY *mod )
         tls_dirs = new_ptr;
         tls_module_count = new_count;
     }
+    *(DWORD *)dir->AddressOfIndex = i;
+    tls_dirs[i] = *dir;
 
-    /* allocate the data block in all running threads */
-    while (!NtGetNextThread( GetCurrentProcess(), thread, THREAD_QUERY_LIMITED_INFORMATION, 0, 0, &next ))
+    if (!tls_thread_count) return TRUE;
+    t = RtlAllocateHeap( GetProcessHeap(), 0, offsetof( PROCESS_TLS_INFORMATION, ThreadData[tls_thread_count] ));
+    if (!t) return FALSE;
+
+    t->Flags = 0;
+    t->ThreadDataCount = tls_thread_count;
+    if (old_module_count < tls_module_count)
     {
-        THREAD_BASIC_INFORMATION tbi;
-        TEB *teb;
+        t->OperationType = ProcessTlsReplaceVector;
+        t->TlsVectorLength = old_module_count;
+    }
+    else
+    {
+        t->OperationType = ProcessTlsReplaceIndex;
+        t->TlsIndex = i;
+    }
+    for (j = 0; j < tls_thread_count; ++j)
+    {
+        void **vector;
 
-        if (thread) NtClose( thread );
-        thread = next;
-        if (NtQueryInformationThread( thread, ThreadBasicInformation, &tbi, sizeof(tbi), NULL ) || !tbi.TebBaseAddress)
-        {
-            ERR( "NtQueryInformationThread failed.\n" );
-            continue;
-        }
-        teb = tbi.TebBaseAddress;
-        if (!teb->ThreadLocalStoragePointer)
-        {
-            /* Thread is not initialized by loader yet or already teared down. */
-            TRACE( "thread %04lx NULL tls block.\n", HandleToULong(tbi.ClientId.UniqueThread) );
-            continue;
-        }
+        t->ThreadData[j].Flags = 0;
 
-        if (old_module_count < tls_module_count)
-        {
-            void **old = teb->ThreadLocalStoragePointer;
-            void **new = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY, tls_module_count * sizeof(*new));
-
-            if (!new) return FALSE;
-            if (old) memcpy( new, old, old_module_count * sizeof(*new) );
-            teb->ThreadLocalStoragePointer = new;
-#ifdef __x86_64__  /* macOS-specific hack */
-            if (teb->Instrumentation[0]) ((TEB *)teb->Instrumentation[0])->ThreadLocalStoragePointer = new;
-#endif
-            TRACE( "thread %04lx tls block %p -> %p\n", HandleToULong(teb->ClientId.UniqueThread), old, new );
-            /* FIXME: can't free old block here, should be freed at thread exit */
-        }
-
-        if (!(new_ptr = RtlAllocateHeap( GetProcessHeap(), 0, size + dir->SizeOfZeroFill ))) return -1;
+        if (!(new_ptr = RtlAllocateHeap( GetProcessHeap(), 0, size + dir->SizeOfZeroFill ))) return FALSE;
         memcpy( new_ptr, (void *)dir->StartAddressOfRawData, size );
         memset( (char *)new_ptr + size, 0, dir->SizeOfZeroFill );
 
-        TRACE( "thread %04lx slot %lu: %lu/%lu bytes at %p\n",
-               HandleToULong(teb->ClientId.UniqueThread), i, size, dir->SizeOfZeroFill, new_ptr );
-
-        RtlFreeHeap( GetProcessHeap(), 0,
-                     InterlockedExchangePointer( (void **)teb->ThreadLocalStoragePointer + i, new_ptr ));
+        if (t->OperationType == ProcessTlsReplaceVector)
+        {
+            vector = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY, tls_module_count * sizeof(*vector) );
+            if (!vector) return FALSE;
+            t->ThreadData[j].TlsVector = vector;
+            vector[i] = new_ptr;
+        }
+        else t->ThreadData[j].TlsModulePointer = new_ptr;
     }
-    if (thread) NtClose( thread );
+    if (NtSetInformationProcess( GetCurrentProcess(), ProcessTlsInformation, t,
+                                 offsetof(PROCESS_TLS_INFORMATION, ThreadData[t->ThreadDataCount])))
+    {
+        ERR( "ProcessTlsInformation failed.\n" );
+        return FALSE;
+    }
 
-    *(DWORD *)dir->AddressOfIndex = i;
-    tls_dirs[i] = *dir;
+    for (j = 0; j < tls_thread_count; ++j)
+    {
+        if (!(t->ThreadData[j].Flags & THREAD_TLS_INFORMATION_ASSIGNED) && t->OperationType == ProcessTlsReplaceVector)
+        {
+            /* There could be fewer active threads than we counted here due to force terminated threads, first
+             * free extra TLS directory data set in the new TLS vector. */
+            RtlFreeHeap( GetProcessHeap(), 0, ((void **)t->ThreadData[j].TlsVector)[i] );
+        }
+        if (!(t->ThreadData[j].Flags & THREAD_TLS_INFORMATION_ASSIGNED) || t->OperationType == ProcessTlsReplaceIndex)
+        {
+            /* FIXME: can't free old Tls vector here, should be freed at thread exit. */
+            RtlFreeHeap( GetProcessHeap(), 0, t->ThreadData[j].TlsVector );
+        }
+    }
+    RtlFreeHeap( GetProcessHeap(), 0, t );
     return TRUE;
 }
 
@@ -1685,6 +1695,7 @@ static NTSTATUS alloc_thread_tls(void)
 
         TRACE( "slot %u: %u/%lu bytes at %p\n", i, size, dir->SizeOfZeroFill, pointers[i] );
     }
+    ++tls_thread_count;
     NtCurrentTeb()->ThreadLocalStoragePointer = pointers;
 #ifdef __x86_64__  /* macOS-specific hack */
     if (NtCurrentTeb()->Instrumentation[0])
@@ -4134,6 +4145,7 @@ void WINAPI LdrShutdownThread(void)
     if ((pointers = NtCurrentTeb()->ThreadLocalStoragePointer))
     {
         NtCurrentTeb()->ThreadLocalStoragePointer = NULL;
+        --tls_thread_count;
 #ifdef __x86_64__  /* macOS-specific hack */
         if (NtCurrentTeb()->Instrumentation[0])
             ((TEB *)NtCurrentTeb()->Instrumentation[0])->ThreadLocalStoragePointer = NULL;
