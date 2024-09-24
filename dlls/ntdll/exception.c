@@ -326,6 +326,94 @@ static RTL_CRITICAL_SECTION_DEBUG dynamic_unwind_debug =
 };
 static RTL_CRITICAL_SECTION dynamic_unwind_section = { &dynamic_unwind_debug, -1, 0, 0, 0, 0 };
 
+struct module_exception_dir_entry
+{
+    void *exception_dir;
+    void *dllbase;
+    DWORD size_of_image;
+    DWORD exception_dir_size;
+};
+
+#define MAX_MODULE_EXCEPTION_DIR_ENTRIES 512
+
+struct module_exception_dir_table
+{
+    DWORD count;
+    DWORD max_count;
+    DWORD unk;
+    DWORD unk2;
+    struct module_exception_dir_entry entries[MAX_MODULE_EXCEPTION_DIR_ENTRIES];
+};
+struct module_exception_dir_table DECLSPEC_ALLOCATE(".mrdata") exception_dir_table = { 1, MAX_MODULE_EXCEPTION_DIR_ENTRIES };
+
+C_ASSERT( sizeof(struct module_exception_dir_entry) == 0x18 );
+C_ASSERT( offsetof(struct module_exception_dir_table, entries) == 0x10 );
+
+void register_module_exception_directory( void *module )
+{
+    SIZE_T size = sizeof(exception_dir_table);
+    struct module_exception_dir_entry e;
+    void *addr = &exception_dir_table;
+    IMAGE_NT_HEADERS *nt;
+    ULONG old_prot;
+    unsigned int i;
+
+    if (!(nt = RtlImageNtHeader( module ))) return;
+    e.exception_dir = RtlImageDirectoryEntryToData( module, TRUE, IMAGE_DIRECTORY_ENTRY_EXCEPTION, &e.exception_dir_size );
+    if (!e.exception_dir) return;
+    e.size_of_image = nt->OptionalHeader.SizeOfImage;
+    e.dllbase = module;
+
+    RtlEnterCriticalSection( &dynamic_unwind_section );
+
+    TRACE("count %ld, max_count %ld.\n", exception_dir_table.count, exception_dir_table.max_count);
+    if (exception_dir_table.count == MAX_MODULE_EXCEPTION_DIR_ENTRIES) goto done;
+
+    NtProtectVirtualMemory( NtCurrentProcess(), &addr, &size, PAGE_READWRITE, &old_prot );
+    /* First entry is reserved for ntdll regardless of base address order. */
+    if (exception_dir_table.count <= 2)
+    {
+        MEMORY_BASIC_INFORMATION mbi;
+
+        NtQueryVirtualMemory( GetCurrentProcess(), LdrInitializeThunk, MemoryBasicInformation, &mbi, sizeof(mbi), NULL );
+        if (module == mbi.AllocationBase)
+        {
+            exception_dir_table.entries[0] = e;
+            goto done;
+        }
+    }
+    for (i = 1; i < exception_dir_table.count; ++i)
+        if ((ULONG_PTR)module < (ULONG_PTR)exception_dir_table.entries[i].dllbase) break;
+    memmove( &exception_dir_table.entries[i + 1], &exception_dir_table.entries[i],
+             sizeof(*exception_dir_table.entries) * (exception_dir_table.count - i) );
+    exception_dir_table.entries[i] = e;
+    ++exception_dir_table.count;
+done:
+    RtlLeaveCriticalSection( &dynamic_unwind_section );
+}
+
+void unregister_module_exception_directory( void *module )
+{
+    SIZE_T size = sizeof(exception_dir_table);
+    void *addr = &exception_dir_table;
+    ULONG old_prot;
+    unsigned int i;
+
+    RtlEnterCriticalSection( &dynamic_unwind_section );
+    for (i = 1; i < exception_dir_table.count; ++i)
+    {
+        if (module == exception_dir_table.entries[i].dllbase)
+        {
+            NtProtectVirtualMemory( NtCurrentProcess(), &addr, &size, PAGE_READWRITE, &old_prot );
+            memmove( &exception_dir_table.entries[i], &exception_dir_table.entries[i + 1],
+                     sizeof(*exception_dir_table.entries) * (exception_dir_table.count - i - 1) );
+            --exception_dir_table.count;
+            break;
+        }
+    }
+    RtlLeaveCriticalSection( &dynamic_unwind_section );
+}
+
 static ULONG_PTR get_runtime_function_end( RUNTIME_FUNCTION *func, ULONG_PTR addr )
 {
 #ifdef __x86_64__
@@ -635,6 +723,16 @@ PRUNTIME_FUNCTION WINAPI RtlLookupFunctionEntry( ULONG_PTR pc, ULONG_PTR *base,
         WARN( "no exception table found for %Ix\n", pc );
     }
     return func;
+}
+
+#else
+
+void register_module_exception_directory( void *module )
+{
+}
+
+void unregister_module_exception_directory( void *module )
+{
 }
 
 #endif  /* __x86_64__ || __arm__ || __aarch64__ */
