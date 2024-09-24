@@ -3181,6 +3181,53 @@ static void test_dynamic_unwind(void)
     }
 }
 
+static void test_exception_directory(void)
+{
+    ULONG len, exc_dir_size, old, saved_size, saved_address;
+    HMODULE mod = GetModuleHandleW( NULL );
+    PRUNTIME_FUNCTION func;
+    IMAGE_NT_HEADERS *nt;
+    ULONG_PTR base;
+    void *exc_dir;
+    BOOL ret;
+
+    func = pRtlLookupFunctionTable( (ULONG_PTR)test_exception_directory, &base, &len );
+    ok( !!func, "got NULL.\n" );
+
+    exc_dir = RtlImageDirectoryEntryToData( mod, TRUE, IMAGE_DIRECTORY_ENTRY_EXCEPTION, &exc_dir_size );
+    ok( func == exc_dir, "got %p, expected %p.\n", func, exc_dir );
+    ok( len == exc_dir_size, "got %lu, expected %lu.\n", len, exc_dir_size );
+    ok( base == (ULONG_PTR)mod, "got %#Ix, expected %p.\n", base, mod );
+
+    nt = RtlImageNtHeader( mod );
+    ok( !!nt, "got NULL.\n" );
+    ret = VirtualProtect( &nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress,
+                          sizeof(DWORD) * 2, PAGE_READWRITE, &old);
+    ok( ret, "got error %lu.\n", GetLastError() );
+    saved_size = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].Size;
+    saved_address = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress;
+    nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].Size = 0;
+    nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress = 0;
+    ret = VirtualProtect( &nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress,
+                          sizeof(DWORD) * 2, old, &old);
+    ok( ret, "got error %lu.\n", GetLastError() );
+
+    base = 0xdeadbeef;
+    len = 0xdeadbeef;
+    func = pRtlLookupFunctionTable( (ULONG_PTR)test_exception_directory, &base, &len );
+    todo_wine ok( func == exc_dir, "got %p, expected %p.\n", func, exc_dir );
+    todo_wine ok( len == exc_dir_size, "got %lu, expected %lu.\n", len, exc_dir_size );
+    ok( base == (ULONG_PTR)mod, "got %#Ix, expected %p.\n", base, mod );
+    ret = VirtualProtect( &nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress,
+                          sizeof(DWORD) * 2, PAGE_READWRITE, &old);
+    ok( ret, "got error %lu.\n", GetLastError() );
+    nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].Size = saved_size;
+    nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress = saved_address;
+    ret = VirtualProtect( &nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress,
+                          sizeof(DWORD) * 2, old, &old);
+    ok( ret, "got error %lu.\n", GetLastError() );
+}
+
 #endif
 
 START_TEST(unwind)
@@ -3209,6 +3256,7 @@ START_TEST(unwind)
     test_virtual_unwind();
     test_dynamic_unwind();
 #endif
+    test_exception_directory();
 }
 
 #else  /* !__i386__ */
