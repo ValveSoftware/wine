@@ -83,6 +83,16 @@ extern "C" {
 # endif
 #endif
 
+#ifndef DECLSPEC_ALLOCATE
+# if __has_declspec_attribute(allocate) && !defined(MIDL_PASS)
+#  define DECLSPEC_ALLOCATE(x) __declspec(allocate(x))
+# elif defined(__GNUC__)
+#  define DECLSPEC_ALLOCATE(x) __attribute__((section(x)))
+# else
+#  define DECLSPEC_ALLOCATE(x)
+# endif
+#endif
+
 #ifndef DECLSPEC_NOTHROW
 # ifdef __GNUC__
 #  define DECLSPEC_NOTHROW __attribute__((nothrow))
