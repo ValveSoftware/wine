@@ -4574,6 +4574,9 @@ static NTSTATUS virtual_set_tls_information_teb( PROCESS_TLS_INFORMATION *t, uns
                 memcpy( ptr, teb->ThreadLocalStoragePointer, sizeof(*ptr) * t->TlsVectorLength );
                 t->ThreadData[*idx].TlsVector = InterlockedExchangePointer( &teb->ThreadLocalStoragePointer, ptr );
                 t->ThreadData[*idx].ThreadId = HandleToULong( teb->ClientId.UniqueThread );
+#ifdef __x86_64__  /* macOS-specific hack */
+                if (teb->Instrumentation[0]) ((TEB *)teb->Instrumentation[0])->ThreadLocalStoragePointer = ptr;
+#endif
             }
             else
             {
