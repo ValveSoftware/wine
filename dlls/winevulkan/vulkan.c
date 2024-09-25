@@ -667,7 +667,7 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
  */
 static void wine_vk_device_free(struct wine_device *device)
 {
-    struct pending_d3d12_fence_op *op;
+    struct pending_d3d12_fence_op *op, *op_cursor;
     struct wine_queue *queue;
 
     if (!device)
@@ -687,7 +687,7 @@ static void wine_vk_device_free(struct wine_device *device)
     }
     pthread_mutex_destroy(&device->signaller_mutex);
 
-    LIST_FOR_EACH_ENTRY(op, &device->free_fence_ops_list, struct pending_d3d12_fence_op, entry)
+    LIST_FOR_EACH_ENTRY_SAFE(op, op_cursor, &device->free_fence_ops_list, struct pending_d3d12_fence_op, entry)
     {
         device->funcs.p_vkDestroySemaphore(device->host_device, op->local_sem.sem, NULL);
         free(op);
