@@ -1935,11 +1935,11 @@ void detach_client_window( struct x11drv_win_data *data, Window client_window, B
     if (!data->whole_window) return;
 
     XSelectInput( data->display, client_window, 0 );
-    XChangeProperty( data->display, client_window, x11drv_atom(_WINE_ALLOW_FLIP), XA_CARDINAL, 32,
-                     PropModeReplace, (unsigned char *)&allow_flip, sizeof(allow_flip) / 4 );
     XFlush( data->display ); /* make sure XSelectInput is disabled for client_window after this point */
     XDeleteContext( data->display, client_window, winContext );
 
+    XChangeProperty( gdi_display, client_window, x11drv_atom(_WINE_ALLOW_FLIP), XA_CARDINAL, 32,
+                     PropModeReplace, (unsigned char *)&allow_flip, sizeof(allow_flip) / 4 );
     if (reparent) XReparentWindow( gdi_display, client_window, get_dummy_parent(), 0, 0 );
     TRACE( "%p/%lx detached client window %lx\n", data->hwnd, data->whole_window, client_window );
 }
@@ -1960,10 +1960,10 @@ void attach_client_window( struct x11drv_win_data *data, Window client_window )
 
     XSaveContext( data->display, client_window, winContext, (char *)data->hwnd );
     XSelectInput( data->display, client_window, ExposureMask );
-    XChangeProperty( data->display, client_window, x11drv_atom(_WINE_ALLOW_FLIP), XA_CARDINAL, 32,
-                     PropModeReplace, (unsigned char *)&allow_flip, sizeof(allow_flip) / 4 );
     XFlush( data->display ); /* make sure XSelectInput is enabled for client_window after this point */
 
+    XChangeProperty( gdi_display, client_window, x11drv_atom(_WINE_ALLOW_FLIP), XA_CARDINAL, 32,
+                     PropModeReplace, (unsigned char *)&allow_flip, sizeof(allow_flip) / 4 );
     XReparentWindow( gdi_display, client_window, data->whole_window, data->client_rect.left - data->whole_rect.left,
                      data->client_rect.top - data->whole_rect.top );
 
