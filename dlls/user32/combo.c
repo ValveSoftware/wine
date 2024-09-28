@@ -1897,6 +1897,11 @@ LRESULT ComboWndProc_common( HWND hwnd, UINT message, WPARAM wParam, LPARAM lPar
                 return SendMessageW(lphc->owner, message, wParam, lParam);
             break;
 
+        case WM_GETOBJECT:
+            if ((LONG)lParam == OBJID_QUERYCLASSNAMEIDX)
+                return 0x10005;
+            break;
+
 	/* Combo messages */
 
 	case CB_ADDSTRING:
