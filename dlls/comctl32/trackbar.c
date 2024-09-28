@@ -2012,6 +2012,11 @@ TRACKBAR_WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_GETDLGCODE:
         return DLGC_WANTARROWS;
 
+    case WM_GETOBJECT:
+        if ((LONG)lParam == OBJID_QUERYCLASSNAMEIDX)
+            return 0x10012;
+        return 0;
+
     case WM_KEYDOWN:
         return TRACKBAR_KeyDown (infoPtr, (INT)wParam);
 
