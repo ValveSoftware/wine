@@ -1876,7 +1876,7 @@ static BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus )
 {
     HWND previous = get_active_window();
     BOOL ret = FALSE;
-    DWORD old_thread, new_thread;
+    DWORD old_thread, new_thread, foreground_tid;
     CBTACTIVATESTRUCT cbt;
 
     if (previous == hwnd)
@@ -1905,7 +1905,10 @@ static BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus )
         req->handle = wine_server_user_handle( hwnd );
         req->internal_msg = WM_WINE_SETACTIVEWINDOW;
         if ((ret = !wine_server_call_err( req )))
+        {
             previous = wine_server_ptr_handle( reply->previous );
+            foreground_tid = reply->foreground_tid;
+        }
     }
     SERVER_END_REQ;
     if (!ret) goto done;
@@ -1937,7 +1940,7 @@ static BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus )
                 for (phwnd = list; *phwnd; phwnd++)
                 {
                     if (get_window_thread( *phwnd, NULL ) == old_thread)
-                        send_message( *phwnd, WM_ACTIVATEAPP, 0, new_thread );
+                        send_message( *phwnd, WM_ACTIVATEAPP, 0, foreground_tid );
                 }
             }
             if (new_thread)
