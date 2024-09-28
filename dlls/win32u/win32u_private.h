@@ -103,7 +103,7 @@ extern BOOL set_capture_window( HWND hwnd, UINT gui_flags, HWND *prev_ret );
 extern BOOL set_caret_blink_time( unsigned int time );
 extern BOOL set_caret_pos( int x, int y );
 extern BOOL set_foreground_window( HWND hwnd, BOOL mouse );
-extern BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus );
+extern BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus, DWORD new_active_thread_id );
 extern void toggle_caret( HWND hwnd );
 extern void update_mouse_tracking_info( HWND hwnd );
 extern BOOL get_clip_cursor( RECT *rect );
