@@ -66,7 +66,6 @@ struct desktop
     timeout_t            close_timeout_val;/* timeout duration before closing desktop */
     struct list          touches;          /* list of active touches */
     struct thread_input *foreground_input; /* thread input of foreground thread */
-    thread_id_t          foreground_tid;   /* thread id of the foreground window */
     unsigned int         users;            /* processes and threads using this desktop */
     user_handle_t        cursor_win;       /* window that contains the cursor */
     unsigned int         cursor_clip_flags;/* last cursor clip flags */

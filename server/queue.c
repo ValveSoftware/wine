@@ -1429,11 +1429,7 @@ static void thread_input_destroy( struct object *obj )
     empty_msg_list( &input->msg_list );
     if ((desktop = input->desktop))
     {
-        if (desktop->foreground_input == input)
-        {
-            desktop->foreground_input = NULL;
-            desktop->foreground_tid = 0;
-        }
+        if (desktop->foreground_input == input) desktop->foreground_input = NULL;
         release_object( desktop );
     }
     release_object( input->shared_mapping );
@@ -3698,7 +3694,6 @@ DECL_HANDLER(set_foreground_window)
         thread->queue->input->desktop == desktop)
     {
         set_foreground_input( desktop, thread->queue->input );
-        desktop->foreground_tid = thread->id;
         reply->send_msg_new = (desktop->foreground_input != queue->input);
     }
     else set_win32_error( ERROR_INVALID_WINDOW_HANDLE );
@@ -3754,7 +3749,6 @@ DECL_HANDLER(set_active_window)
                 LIST_FOR_EACH_ENTRY_SAFE( msg, next, &queue->msg_list[POST_MESSAGE], struct message, entry )
                     if (msg->msg == req->internal_msg) remove_queue_message( queue, msg, POST_MESSAGE );
             }
-            reply->foreground_tid = desktop->foreground_tid;
         }
         else set_error( STATUS_INVALID_HANDLE );
     }
