@@ -2068,6 +2068,7 @@ static void hacks_init(void)
     else if (main_argc > 1)
     {
         alert_simulate_sched_quantum = !!strstr(main_argv[1], "GTA5.exe");
+        alert_simulate_sched_quantum = alert_simulate_sched_quantum || !!strstr(main_argv[1], "MarySkelter2.exe");
     }
     if (alert_simulate_sched_quantum)
         ERR("HACK: Simulating sched quantum in NtWaitForAlertByThreadId.\n");
