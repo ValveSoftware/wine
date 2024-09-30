@@ -1872,7 +1872,7 @@ static HWND set_focus_window( HWND hwnd, BOOL from_active, BOOL force )
 /*******************************************************************
  *		set_active_window
  */
-static BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus )
+BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus )
 {
     HWND previous = get_active_window();
     BOOL ret = FALSE;
