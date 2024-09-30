@@ -3022,7 +3022,6 @@ enum coords_relative
     unsigned int   internal_msg;  /* set active window internal message */
 @REPLY
     user_handle_t  previous;      /* handle to the previous active window */
-    thread_id_t    foreground_tid;  /* thread id of the new active window */
 @END
 
 /* Set the current thread capture window */

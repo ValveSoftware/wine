@@ -69,7 +69,6 @@ static HWND hwndMessage;
 static HWND hwndMain, hwndMain2;
 static HHOOK hhook;
 static BOOL app_activated, app_deactivated;
-static LPARAM activate_app_lparam;
 
 static const char* szAWRClass = "Winsize";
 static HMENU hmenu;
@@ -1077,7 +1076,6 @@ static LRESULT WINAPI main_window_procA(HWND hwnd, UINT msg, WPARAM wparam, LPAR
         case WM_ACTIVATEAPP:
             if (wparam) app_activated = TRUE;
             else app_deactivated = TRUE;
-            activate_app_lparam = lparam;
             break;
         case WM_MOUSEACTIVATE:
             return MA_ACTIVATE;
@@ -10895,7 +10893,6 @@ static void test_GetMessagePos(void)
 #define SET_FOREGROUND_STEAL_2          0x04
 #define SET_FOREGROUND_SET_2            0x08
 #define SET_FOREGROUND_INJECT           0x10
-#define SET_FOREGROUND_DESKTOP          0x20
 
 struct set_foreground_thread_params
 {
@@ -10944,8 +10941,6 @@ static DWORD WINAPI set_foreground_thread(void *params)
                 SetForegroundWindow(p->window2);
                 check_wnd_state(0, p->window2, 0, 0);
             }
-            if (msg.wParam & SET_FOREGROUND_DESKTOP)
-                SetForegroundWindow(GetDesktopWindow());
 
             SetEvent(p->command_executed);
             continue;
@@ -10993,7 +10988,6 @@ static void test_activateapp(HWND window1)
      * check_wnd_state(window1, thread_params.thread_window, window1, 0); */
     ok(!app_activated, "Received WM_ACTIVATEAPP(1), did not expect it.\n");
     ok(!app_deactivated, "Received WM_ACTIVATEAPP(0), did not expect it.\n");
-    activate_app_lparam = 0;
     while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
     check_wnd_state(0, thread_params.thread_window, 0, 0);
     test_window = GetForegroundWindow();
@@ -11003,8 +10997,6 @@ static void test_activateapp(HWND window1)
     /* This message is reliable on Windows and inside a virtual desktop.
      * It is unreliable on KDE (50/50) and never arrives on FVWM.
      * ok(app_deactivated, "Expected WM_ACTIVATEAPP(0), did not receive it.\n"); */
-    if (app_deactivated)
-        ok(activate_app_lparam == tid, "got thread id %Iu, expected %lu.\n", activate_app_lparam, tid);
 
     /* Set foreground: WM_ACTIVATEAPP (1) is delivered. */
     app_activated = app_deactivated = FALSE;
@@ -11107,88 +11099,11 @@ static void test_activateapp(HWND window1)
     ok(!app_activated, "Received WM_ACTIVATEAPP(1), did not expect it.\n");
     ok(!app_deactivated, "Received WM_ACTIVATEAPP(0), did not expect it.\n");
 
-    DestroyWindow(window2);
-
-    if (winetest_interactive)
-    {
-        /* As soon as window looses focus to other process window there are no good and sure ways to make the process
-         * foreground again through WINAPI (thus blocking any further tests, so once setting, e. g., desktop window as
-         * foregroung the app window should be set to foreground manually. */
-        ShowWindow(thread_params.thread_window, SW_HIDE);
-        SetActiveWindow(window1);
-        SetForegroundWindow(window1);
-        test_window = GetForegroundWindow();
-        ok(test_window == window1, "Expected foreground window %p, got %p\n",
-                window1, test_window);
-        app_activated = app_deactivated = FALSE;
-        activate_app_lparam = 0;
-        trace("Now switch to any other window manually either way, like alt+tab, clicking other window, Win key + D.\n");
-        while (GetForegroundWindow() == window1)
-        {
-            while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
-            Sleep(10);
-        }
-        while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
-        ok(!app_activated, "Received WM_ACTIVATEAPP(1), did not expect it.\n");
-        ok(app_deactivated, "Expected WM_ACTIVATEAPP(0), did not receive it.\n");
-        ok(activate_app_lparam && activate_app_lparam != GetCurrentThreadId(),
-                "got %Iu, tid %lu.\n", activate_app_lparam, tid);
-
-        /* Switch to desktop window from the same thread. */
-        trace("Now switch to test window manually.\n");
-        while (GetForegroundWindow() != window1)
-        {
-            while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
-            Sleep(10);
-        }
-        Sleep(30);
-        while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
-        check_wnd_state(window1, window1, window1, 0);
-        app_activated = app_deactivated = FALSE;
-        activate_app_lparam = 0;
-        SetForegroundWindow(GetDesktopWindow());
-        test_window = GetForegroundWindow();
-        ok(test_window != window1, "Got the same foregorund window.\n");
-        while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
-        ok(!app_activated, "Received WM_ACTIVATEAPP(1), did not expect it.\n");
-        ok(app_deactivated, "Expected WM_ACTIVATEAPP(0), did not receive it.\n");
-        ok(activate_app_lparam && activate_app_lparam != GetCurrentThreadId() && activate_app_lparam != tid,
-                "got %Iu, tid %lu.\n", activate_app_lparam, tid);
-
-        /* Switch to desktop window from the other thread. */
-        trace("Now switch to test window manually, again.\n");
-        while (GetForegroundWindow() != window1)
-        {
-            while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
-            Sleep(10);
-        }
-        Sleep(30);
-        while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
-        check_wnd_state(window1, window1, window1, 0);
-        app_activated = app_deactivated = FALSE;
-        activate_app_lparam = 0;
-        PostThreadMessageA(tid, thread_params.msg_command, SET_FOREGROUND_DESKTOP, 0);
-        WaitForSingleObject(thread_params.command_executed, INFINITE);
-        test_window = GetForegroundWindow();
-        ok(test_window != window2, "Got the same foregorund window.\n");
-        Sleep(30);
-        while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
-        ok(!app_activated, "Received WM_ACTIVATEAPP(1), did not expect it.\n");
-        ok(app_deactivated, "Expected WM_ACTIVATEAPP(0), did not receive it.\n");
-        ok(activate_app_lparam && activate_app_lparam != tid, "got %Iu, tid %lu.\n", activate_app_lparam, tid);
-        trace("Switch to test window manually, for the last time for now.\n");
-        while (GetForegroundWindow() != window1)
-        {
-            while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
-            Sleep(10);
-        }
-        while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
-    }
-
     PostThreadMessageA(tid, thread_params.msg_quit, 0, 0);
     WaitForSingleObject(thread, INFINITE);
 
     CloseHandle(thread_params.command_executed);
+    DestroyWindow(window2);
 }
 
 static LRESULT WINAPI winproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
