@@ -3445,12 +3445,12 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, UNI
                 status = STATUS_SUCCESS;
                 goto done;
             }
-        }
-        if (find_loaded)
-        {
-            TRACE( "Skipping file search for %s.\n", debugstr_w(libname) );
-            status = STATUS_DLL_NOT_FOUND;
-            goto done;
+            if (find_loaded)
+            {
+                TRACE( "Skipping file search for %s.\n", debugstr_w(libname) );
+                status = STATUS_DLL_NOT_FOUND;
+                goto done;
+            }
         }
         if (!fullname && rb_get( &known_dlls, libname ))
         {
