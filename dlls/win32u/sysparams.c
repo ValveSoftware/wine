@@ -220,6 +220,8 @@ static const WCHAR guid_devinterface_monitorW[] =
     {'{','E','6','F','0','7','B','5','F','-','E','E','9','7','-','4','A','9','0','-',
      'B','0','7','6','-','3','3','F','5','7','B','F','4','E','A','A','7','}',0};
 
+static const UINT32 qdc_retrieve_flags_mask = QDC_ALL_PATHS | QDC_ONLY_ACTIVE_PATHS | QDC_DATABASE_CURRENT;
+
 #define NEXT_DEVMODEW(mode) ((DEVMODEW *)((char *)((mode) + 1) + (mode)->dmDriverExtra))
 
 /* Cached display device information */
@@ -2442,7 +2444,7 @@ LONG WINAPI NtUserGetDisplayConfigBufferSizes( UINT32 flags, UINT32 *num_path_in
         skip_update = TRUE;
     }
 
-    switch (flags)
+    switch (flags & qdc_retrieve_flags_mask)
     {
     case QDC_ALL_PATHS:
     case QDC_ONLY_ACTIVE_PATHS:
@@ -2452,8 +2454,14 @@ LONG WINAPI NtUserGetDisplayConfigBufferSizes( UINT32 flags, UINT32 *num_path_in
         return ERROR_INVALID_PARAMETER;
     }
 
+    if ((flags & ~(qdc_retrieve_flags_mask | QDC_VIRTUAL_MODE_AWARE)))
+    {
+        FIXME( "unsupported flags %#x.\n", flags );
+        return ERROR_INVALID_PARAMETER;
+    }
+
     /* FIXME: semi-stub */
-    if (flags != QDC_ONLY_ACTIVE_PATHS)
+    if ((flags & qdc_retrieve_flags_mask) != QDC_ONLY_ACTIVE_PATHS)
         FIXME( "only returning active paths\n" );
 
     /* NtUserGetDisplayConfigBufferSizes() is called by display drivers to trigger display settings update. */
@@ -2473,6 +2481,8 @@ LONG WINAPI NtUserGetDisplayConfigBufferSizes( UINT32 flags, UINT32 *num_path_in
 
     *num_path_info = count;
     *num_mode_info = count * 2;
+    if (flags & QDC_VIRTUAL_MODE_AWARE)
+        *num_mode_info += count;
     TRACE( "returning %u paths %u modes\n", *num_path_info, *num_mode_info );
     return ERROR_SUCCESS;
 }
