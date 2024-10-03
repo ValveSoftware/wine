@@ -255,6 +255,14 @@ static const USAGE_AND_PAGE g920_absolute_usages[] =
     {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_Z},  /* brake */
     {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_RZ}, /* clutch */
 };
+static const USAGE_AND_PAGE hotas_x_absolute_usages[] =
+{
+    {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_X},
+    {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_Y},
+    {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_Z}, /* throttle */
+    {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_RZ}, /* yaw */
+    {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_SLIDER}, /* throttle rocker */
+};
 static const USAGE_AND_PAGE absolute_axis_usages[] =
 {
     {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_X},
@@ -281,10 +289,17 @@ static const USAGE_AND_PAGE relative_axis_usages[] =
 
 static int get_absolute_usages(struct sdl_device *impl, const USAGE_AND_PAGE **absolute_usages)
 {
-    if (is_logitech_g920(pSDL_JoystickGetVendor(impl->sdl_joystick), pSDL_JoystickGetProduct(impl->sdl_joystick)))
+    int vid = pSDL_JoystickGetVendor(impl->sdl_joystick);
+    int pid = pSDL_JoystickGetProduct(impl->sdl_joystick);
+    if (is_logitech_g920(vid, pid))
     {
         *absolute_usages = g920_absolute_usages;
         return ARRAY_SIZE(g920_absolute_usages);
+    }
+    if (is_thrustmaster_hotas_x(vid, pid))
+    {
+        *absolute_usages = hotas_x_absolute_usages;
+        return ARRAY_SIZE(hotas_x_absolute_usages);
     }
 
     *absolute_usages = absolute_axis_usages;
