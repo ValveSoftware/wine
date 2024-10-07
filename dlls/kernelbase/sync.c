@@ -1202,7 +1202,6 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetQueuedCompletionStatus( HANDLE port, LPDWORD co
     }
 
     if (status == STATUS_TIMEOUT) SetLastError( WAIT_TIMEOUT );
-    else if (status == ERROR_WAIT_NO_CHILDREN) SetLastError( ERROR_ABANDONED_WAIT_0 );
     else SetLastError( RtlNtStatusToDosError(status) );
     return FALSE;
 }
@@ -1224,7 +1223,6 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetQueuedCompletionStatusEx( HANDLE port, OVERLAPP
     if (ret == STATUS_SUCCESS) return TRUE;
     else if (ret == STATUS_TIMEOUT) SetLastError( WAIT_TIMEOUT );
     else if (ret == STATUS_USER_APC) SetLastError( WAIT_IO_COMPLETION );
-    else if (ret == ERROR_WAIT_NO_CHILDREN) SetLastError( ERROR_ABANDONED_WAIT_0 );
     else SetLastError( RtlNtStatusToDosError(ret) );
     return FALSE;
 }
