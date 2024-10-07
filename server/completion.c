@@ -56,14 +56,11 @@ struct type_descr completion_type =
     },
 };
 
-struct completion;
-
 struct completion_wait
 {
-    struct object      obj;
-    struct completion *completion;
-    struct list        queue;
-    unsigned int       depth;
+    struct object  obj;
+    struct list    queue;
+    unsigned int   depth;
 };
 
 struct completion
@@ -74,7 +71,6 @@ struct completion
 
 static void completion_wait_dump( struct object*, int );
 static int completion_wait_signaled( struct object *obj, struct wait_queue_entry *entry );
-static void completion_wait_satisfied( struct object *obj, struct wait_queue_entry *entry );
 static void completion_wait_destroy( struct object * );
 
 static const struct object_ops completion_wait_ops =
@@ -87,7 +83,7 @@ static const struct object_ops completion_wait_ops =
     completion_wait_signaled,       /* signaled */
     NULL,                           /* get_esync_fd */
     NULL,                           /* get_fsync_idx */
-    completion_wait_satisfied,      /* satisfied */
+    no_satisfied,                   /* satisfied */
     no_signal,                      /* signal */
     no_get_fd,                      /* get_fd */
     default_map_access,             /* map_access */
@@ -167,15 +163,7 @@ static int completion_wait_signaled( struct object *obj, struct wait_queue_entry
     struct completion_wait *wait = (struct completion_wait *)obj;
 
     assert( obj->ops == &completion_wait_ops );
-    return !wait->completion || !list_empty( &wait->queue );
-}
-
-static void completion_wait_satisfied( struct object *obj, struct wait_queue_entry *entry )
-{
-    struct completion_wait *wait = (struct completion_wait *)obj;
-
-    assert( obj->ops == &completion_wait_ops );
-    if (!wait->completion) make_wait_abandoned( entry );
+    return !list_empty( &wait->queue );
 }
 
 static void completion_dump( struct object *obj, int verbose )
@@ -207,8 +195,6 @@ static void completion_destroy( struct object *obj )
     struct completion *completion = (struct completion *)obj;
 
     assert( obj->ops == &completion_ops );
-    completion->wait->completion = NULL;
-    wake_up( &completion->wait->obj, 0 );
     release_object( &completion->wait->obj );
 }
 
@@ -227,7 +213,6 @@ static struct completion *create_completion( struct object *root, const struct u
         return NULL;
     }
 
-    completion->wait->completion = completion;
     list_init( &completion->wait->queue );
     completion->wait->depth = 0;
     return completion;
