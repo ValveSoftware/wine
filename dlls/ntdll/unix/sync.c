@@ -1597,6 +1597,16 @@ NTSTATUS WINAPI NtWaitForSingleObject( HANDLE handle, BOOLEAN alertable, const L
     return NtWaitForMultipleObjects( 1, &handle, FALSE, alertable, timeout );
 }
 
+NTSTATUS wait_internal_server( HANDLE handle, BOOLEAN alertable, const LARGE_INTEGER *timeout )
+{
+    select_op_t select_op;
+    UINT flags = SELECT_INTERRUPTIBLE;
+
+    if (alertable) flags |= SELECT_ALERTABLE;
+    select_op.wait.op = SELECT_WAIT;
+    select_op.wait.handles[0] = wine_server_obj_handle( handle );
+    return server_wait( &select_op, offsetof( select_op_t, wait.handles[1] ), flags, timeout );
+}
 
 /******************************************************************
  *		NtSignalAndWaitForSingleObject (NTDLL.@)
@@ -2047,7 +2057,7 @@ NTSTATUS WINAPI NtRemoveIoCompletion( HANDLE handle, ULONG_PTR *key, ULONG_PTR *
     }
     SERVER_END_REQ;
     if (status != STATUS_PENDING) return status;
-    if (!timeout || timeout->QuadPart) status = NtWaitForSingleObject( wait_handle, FALSE, timeout );
+    if (!timeout || timeout->QuadPart) status = wait_internal_server( wait_handle, FALSE, timeout );
     else                               status = STATUS_TIMEOUT;
     if (status != WAIT_OBJECT_0) return status;
 
@@ -2109,7 +2119,7 @@ NTSTATUS WINAPI NtRemoveIoCompletionEx( HANDLE handle, FILE_IO_COMPLETION_INFORM
         assert( status == STATUS_USER_APC );
         goto done;
     }
-    if (!timeout || timeout->QuadPart) status = NtWaitForSingleObject( wait_handle, alertable, timeout );
+    if (!timeout || timeout->QuadPart) status = wait_internal_server( wait_handle, alertable, timeout );
     else                               status = STATUS_TIMEOUT;
     if (status != WAIT_OBJECT_0) goto done;
 
