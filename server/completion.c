@@ -30,7 +30,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
-#include <unistd.h>
+
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
 #include "windef.h"
@@ -40,8 +40,7 @@
 #include "file.h"
 #include "handle.h"
 #include "request.h"
-#include "esync.h"
-#include "fsync.h"
+
 
 static const WCHAR completion_name[] = {'I','o','C','o','m','p','l','e','t','i','o','n'};
 
@@ -65,8 +64,6 @@ struct completion_wait
     struct completion *completion;
     struct list        queue;
     unsigned int       depth;
-    int                esync_fd;
-    unsigned int       fsync_idx;
 };
 
 struct completion
@@ -78,8 +75,6 @@ struct completion
 static void completion_wait_dump( struct object*, int );
 static int completion_wait_signaled( struct object *obj, struct wait_queue_entry *entry );
 static void completion_wait_satisfied( struct object *obj, struct wait_queue_entry *entry );
-static int completion_wait_get_esync_fd( struct object *obj, enum esync_type *type );
-static unsigned int completion_wait_get_fsync_idx( struct object *obj, enum fsync_type *type );
 static void completion_wait_destroy( struct object * );
 
 static const struct object_ops completion_wait_ops =
@@ -90,8 +85,8 @@ static const struct object_ops completion_wait_ops =
     add_queue,                      /* add_queue */
     remove_queue,                   /* remove_queue */
     completion_wait_signaled,       /* signaled */
-    completion_wait_get_esync_fd,   /* get_esync_fd */
-    completion_wait_get_fsync_idx,  /* get_fsync_idx */
+    NULL,                           /* get_esync_fd */
+    NULL,                           /* get_fsync_idx */
     completion_wait_satisfied,      /* satisfied */
     no_signal,                      /* signal */
     no_get_fd,                      /* get_fd */
@@ -111,8 +106,6 @@ static const struct object_ops completion_wait_ops =
 static void completion_dump( struct object*, int );
 static int completion_add_queue( struct object *obj, struct wait_queue_entry *entry );
 static void completion_remove_queue( struct object *obj, struct wait_queue_entry *entry );
-static int completion_get_esync_fd( struct object *obj, enum esync_type *type );
-static unsigned int completion_get_fsync_idx( struct object *obj, enum fsync_type *type );
 static void completion_destroy( struct object * );
 
 static const struct object_ops completion_ops =
@@ -123,8 +116,8 @@ static const struct object_ops completion_ops =
     completion_add_queue,      /* add_queue */
     completion_remove_queue,   /* remove_queue */
     NULL,                      /* signaled */
-    completion_get_esync_fd,   /* get_esync_fd */
-    completion_get_fsync_idx,  /* get_fsync_idx */
+    NULL,                      /* get_esync_fd */
+    NULL,                      /* get_fsync_idx */
     no_satisfied,              /* satisfied */
     no_signal,                 /* signal */
     no_get_fd,                 /* get_fd */
@@ -159,11 +152,6 @@ static void completion_wait_destroy( struct object *obj)
     {
         free( tmp );
     }
-
-    if (do_esync())
-        close( wait->esync_fd );
-
-    if (wait->fsync_idx) fsync_free_shm_idx( wait->fsync_idx );
 }
 
 static void completion_wait_dump( struct object *obj, int verbose )
@@ -180,23 +168,6 @@ static int completion_wait_signaled( struct object *obj, struct wait_queue_entry
 
     assert( obj->ops == &completion_wait_ops );
     return !wait->completion || !list_empty( &wait->queue );
-}
-
-static int completion_wait_get_esync_fd( struct object *obj, enum esync_type *type )
-{
-    struct completion_wait *wait = (struct completion_wait *)obj;
-
-    *type = ESYNC_MANUAL_SERVER;
-    return wait->esync_fd;
-}
-
-static unsigned int completion_wait_get_fsync_idx( struct object *obj, enum fsync_type *type )
-{
-    struct completion_wait *wait = (struct completion_wait *)obj;
-
-    assert( obj->ops == &completion_wait_ops );
-    *type = FSYNC_MANUAL_SERVER;
-    return wait->fsync_idx;
 }
 
 static void completion_wait_satisfied( struct object *obj, struct wait_queue_entry *entry )
@@ -238,22 +209,6 @@ static void completion_remove_queue( struct object *obj, struct wait_queue_entry
     completion->wait->obj.ops->remove_queue( &completion->wait->obj, entry );
 }
 
-static int completion_get_esync_fd( struct object *obj, enum esync_type *type )
-{
-    struct completion *completion = (struct completion *)obj;
-
-    assert( obj->ops == &completion_ops );
-    return completion->wait->obj.ops->get_esync_fd( &completion->wait->obj, type );
-}
-
-static unsigned int completion_get_fsync_idx( struct object *obj, enum fsync_type *type )
-{
-    struct completion *completion = (struct completion *)obj;
-
-    assert( obj->ops == &completion_ops );
-    return completion->wait->obj.ops->get_fsync_idx( &completion->wait->obj, type );
-}
-
 static void completion_destroy( struct object *obj )
 {
     struct completion *completion = (struct completion *)obj;
@@ -282,14 +237,6 @@ static struct completion *create_completion( struct object *root, const struct u
     completion->wait->completion = completion;
     list_init( &completion->wait->queue );
     completion->wait->depth = 0;
-    completion->wait->fsync_idx = 0;
-
-    if (do_fsync())
-        completion->wait->fsync_idx = fsync_alloc_shm( 0, 0 );
-
-    if (do_esync())
-        completion->wait->esync_fd = esync_create_fd( 0, 0 );
-
     return completion;
 }
 
@@ -313,7 +260,6 @@ void add_completion( struct completion *completion, apc_param_t ckey, apc_param_
 
     list_add_tail( &completion->wait->queue, &msg->queue_entry );
     completion->wait->depth++;
-
     wake_up( &completion->wait->obj, 1 );
 }
 
@@ -387,18 +333,7 @@ DECL_HANDLER(remove_completion)
 
     entry = list_head( &wait->queue );
     if (!entry)
-    {
-        if (wait->completion)
-        {
-            if (do_fsync() || do_esync())
-            {
-                /* completion_wait_satisfied is not called, so lock completion here. */
-                current->locked_completion = grab_object( wait );
-            }
-            set_error( STATUS_PENDING );
-        }
-        else set_error( STATUS_ABANDONED_WAIT_0 );
-    }
+        set_error( STATUS_PENDING );
     else
     {
         list_remove( entry );
@@ -409,15 +344,6 @@ DECL_HANDLER(remove_completion)
         reply->status = msg->status;
         reply->information = msg->information;
         free( msg );
-
-        if (!completion_wait_signaled( &wait->obj, NULL ))
-        {
-            if (do_fsync())
-                fsync_clear( &wait->obj );
-
-            if (do_esync())
-                esync_clear( wait->esync_fd );
-        }
     }
 
     release_object( wait );
