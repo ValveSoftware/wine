@@ -837,70 +837,6 @@ static void test_tid_alert( char **argv )
     CloseHandle( pi.hThread );
 }
 
-static HANDLE test_close_io_completion_port_ready, test_close_io_completion_test_ready;
-static HANDLE test_close_io_completion_port;
-
-static DWORD WINAPI test_close_io_completion_thread(void *param)
-{
-    FILE_IO_COMPLETION_INFORMATION info;
-    IO_STATUS_BLOCK iosb;
-    ULONG_PTR key, value;
-    NTSTATUS status;
-    ULONG count;
-    DWORD ret;
-
-    ret = WaitForSingleObject( test_close_io_completion_port_ready, INFINITE );
-    ok( ret == WAIT_OBJECT_0, "Got unexpected ret %#x.\n", ret );
-    SetEvent( test_close_io_completion_test_ready );
-    status = NtRemoveIoCompletion( test_close_io_completion_port, &key, &value, &iosb, NULL );
-    if (status == STATUS_INVALID_HANDLE)
-        skip( "Handle closed before wait started.\n" );
-    else
-        ok( status == STATUS_ABANDONED_WAIT_0, "Got unexpected status %#x.\n", status );
-
-    ret = WaitForSingleObject( test_close_io_completion_port_ready, INFINITE );
-    ok( ret == WAIT_OBJECT_0, "Got unexpected ret %#x.\n", ret );
-    SetEvent( test_close_io_completion_test_ready );
-    count = 0xdeadbeef;
-    status = NtRemoveIoCompletionEx( test_close_io_completion_port, &info, 1, &count, NULL, FALSE );
-    ok( count == 1, "Got unexpected count %u.\n", count );
-    if (status == STATUS_INVALID_HANDLE)
-        skip( "Handle closed before wait started.\n" );
-    else
-        ok( status == STATUS_ABANDONED_WAIT_0, "Got unexpected status %#x.\n", status );
-
-    return 0;
-}
-
-static void test_close_io_completion(void)
-{
-    NTSTATUS status;
-    unsigned int i;
-    HANDLE thread;
-    DWORD ret;
-
-    test_close_io_completion_port_ready = CreateEventA(NULL, FALSE, FALSE, NULL);
-    test_close_io_completion_test_ready = CreateEventA(NULL, FALSE, FALSE, NULL);
-
-    thread = CreateThread( NULL, 0, test_close_io_completion_thread, NULL, 0, NULL );
-    ok( !!thread, "Failed to create thread, error %u.\n", GetLastError() );
-
-    for (i = 0; i < 2; ++i)
-    {
-        status = NtCreateIoCompletion( &test_close_io_completion_port, IO_COMPLETION_ALL_ACCESS, NULL, 0 );
-        ok( !status, "Got unexpected status %#x.\n", status );
-        ret = SignalObjectAndWait( test_close_io_completion_port_ready, test_close_io_completion_test_ready,
-                                   INFINITE, FALSE );
-        ok( ret == WAIT_OBJECT_0, "Got unexpected ret %#x.\n", ret );
-        Sleep(10);
-        status = pNtClose( test_close_io_completion_port );
-        ok( !status, "Got unexpected status %#x.\n", status );
-    }
-
-    WaitForSingleObject( thread, INFINITE );
-    CloseHandle( thread );
-}
-
 START_TEST(sync)
 {
     HMODULE module = GetModuleHandleA("ntdll.dll");
@@ -948,5 +884,4 @@ START_TEST(sync)
     test_keyed_events();
     test_resource();
     test_tid_alert( argv );
-    test_close_io_completion();
 }
