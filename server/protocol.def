@@ -3843,7 +3843,6 @@ typedef union
 /* get completion from completion port queue */
 @REQ(remove_completion)
     obj_handle_t handle;          /* port handle */
-    int          waited;          /* port was just successfully waited on */
 @REPLY
     apc_param_t   ckey;           /* completion key */
     apc_param_t   cvalue;         /* completion value */
