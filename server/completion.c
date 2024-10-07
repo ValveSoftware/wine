@@ -35,6 +35,8 @@
 #include "file.h"
 #include "handle.h"
 #include "request.h"
+#include "esync.h"
+#include "fsync.h"
 
 
 static const WCHAR completion_name[] = {'I','o','C','o','m','p','l','e','t','i','o','n'};
@@ -77,6 +79,8 @@ struct completion
     struct list    wait_queue;
     unsigned int   depth;
     int            closed;
+    int                esync_fd;
+    unsigned int       fsync_idx;
 };
 
 static void completion_wait_dump( struct object*, int );
@@ -151,12 +155,19 @@ static void completion_wait_satisfied( struct object *obj, struct wait_queue_ent
     msg = LIST_ENTRY( msg_entry, struct comp_msg, queue_entry );
     --wait->completion->depth;
     list_remove( &msg->queue_entry );
+    if (list_empty( &wait->completion->queue ))
+    {
+        if (do_esync()) esync_clear( wait->completion->esync_fd );
+        if (do_fsync()) fsync_clear( &wait->completion->obj );
+    }
     if (wait->msg) free( wait->msg );
     wait->msg = msg;
 }
 
 static void completion_dump( struct object*, int );
 static int completion_signaled( struct object *obj, struct wait_queue_entry *entry );
+static int completion_get_esync_fd( struct object *obj, enum esync_type *type );
+static unsigned int completion_get_fsync_idx( struct object *obj, enum fsync_type *type );
 static int completion_close_handle( struct object *obj, struct process *process, obj_handle_t handle );
 static void completion_destroy( struct object * );
 
@@ -168,8 +179,8 @@ static const struct object_ops completion_ops =
     add_queue,                 /* add_queue */
     remove_queue,              /* remove_queue */
     completion_signaled,       /* signaled */
-    NULL,                      /* get_esync_fd */
-    NULL,                      /* get_fsync_idx */
+    completion_get_esync_fd,   /* get_esync_fd */
+    completion_get_fsync_idx,  /* get_fsync_idx */
     no_satisfied,              /* satisfied */
     no_signal,                 /* signal */
     no_get_fd,                 /* get_fd */
@@ -191,6 +202,9 @@ static void completion_destroy( struct object *obj)
     struct completion *completion = (struct completion *) obj;
     struct comp_msg *tmp, *next;
 
+    if (do_esync()) close( completion->esync_fd );
+    if (completion->fsync_idx) fsync_free_shm_idx( completion->fsync_idx );
+
     LIST_FOR_EACH_ENTRY_SAFE( tmp, next, &completion->queue, struct comp_msg, queue_entry )
     {
         free( tmp );
@@ -210,6 +224,23 @@ static int completion_signaled( struct object *obj, struct wait_queue_entry *ent
     struct completion *completion = (struct completion *)obj;
 
     return !list_empty( &completion->queue ) || completion->closed;
+}
+
+static int completion_get_esync_fd( struct object *obj, enum esync_type *type )
+{
+    struct completion *completion = (struct completion *)obj;
+
+    *type = ESYNC_MANUAL_SERVER;
+    return completion->esync_fd;
+}
+
+static unsigned int completion_get_fsync_idx( struct object *obj, enum fsync_type *type )
+{
+    struct completion *completion = (struct completion *)obj;
+
+    assert( obj->ops == &completion_ops );
+    *type = FSYNC_MANUAL_SERVER;
+    return completion->fsync_idx;
 }
 
 static int completion_close_handle( struct object *obj, struct process *process, obj_handle_t handle )
@@ -282,7 +313,9 @@ static struct completion *create_completion( struct object *root, const struct u
             completion->closed = 0;
         }
     }
-
+    if (do_esync()) completion->esync_fd = esync_create_fd( 0, 0 );
+    completion->fsync_idx = 0;
+    if (do_fsync()) completion->fsync_idx = fsync_alloc_shm( 0, 0 );
     return completion;
 }
 
@@ -394,6 +427,11 @@ DECL_HANDLER(remove_completion)
         reply->information = msg->information;
         free( msg );
         reply->wait_handle = 0;
+        if (list_empty( &completion->queue ))
+        {
+            if (do_esync()) esync_clear( completion->esync_fd );
+            if (do_fsync()) fsync_clear( &completion->obj );
+        }
     }
 
     release_object( completion );
