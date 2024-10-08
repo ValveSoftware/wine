@@ -2042,6 +2042,12 @@ NTSTATUS WINAPI NtRemoveIoCompletion( HANDLE handle, ULONG_PTR *key, ULONG_PTR *
 
     TRACE( "(%p, %p, %p, %p, %p)\n", handle, key, value, io, timeout );
 
+    if (timeout && !timeout->QuadPart && (do_esync() || do_fsync()))
+    {
+        status = NtWaitForSingleObject( handle, FALSE, timeout );
+        if (status != WAIT_OBJECT_0) return status;
+    }
+
     SERVER_START_REQ( remove_completion )
     {
         req->handle = wine_server_obj_handle( handle );
@@ -2088,6 +2094,12 @@ NTSTATUS WINAPI NtRemoveIoCompletionEx( HANDLE handle, FILE_IO_COMPLETION_INFORM
     ULONG i = 0;
 
     TRACE( "%p %p %u %p %p %u\n", handle, info, (int)count, written, timeout, alertable );
+
+    if (timeout && !timeout->QuadPart && (do_esync() || do_fsync()))
+    {
+        status = NtWaitForSingleObject( handle, alertable, timeout );
+        if (status != WAIT_OBJECT_0) goto done;
+    }
 
     while (i < count)
     {
