@@ -31,6 +31,7 @@ struct thread_apc;
 struct debug_obj;
 struct debug_event;
 struct msg_queue;
+struct completion_wait;
 
 enum run_state
 {
@@ -98,6 +99,7 @@ struct thread
     queue_shm_t           *queue_shared;  /* thread queue shared memory ptr */
     struct object         *input_shared_mapping; /* thread input shared memory mapping */
     input_shm_t           *input_shared;  /* thread input shared memory ptr */
+    struct completion_wait *completion_wait; /* completion port wait object the thread is associated with */
 };
 
 extern struct thread *current;
