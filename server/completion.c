@@ -343,23 +343,25 @@ DECL_HANDLER(remove_completion)
     struct completion* completion = get_completion_obj( current->process, req->handle, IO_COMPLETION_MODIFY_STATE );
     struct list *entry;
     struct comp_msg *msg;
+    BOOL alerted;
 
     if (!completion) return;
 
     entry = list_head( &completion->queue );
     if (current->completion_wait && current->completion_wait->completion != completion)
         cleanup_thread_completion( current );
+    alerted = req->alertable && !list_empty( &current->user_apc ) && !(entry && current->completion_wait);
     if (!current->completion_wait && !(current->completion_wait = create_completion_wait( completion, current )))
     {
         release_object( completion );
         return;
     }
-    if (!entry)
+    if (alerted || !entry)
     {
         list_remove( &current->completion_wait->wait_queue_entry );
         list_add_head( &completion->wait_queue, &current->completion_wait->wait_queue_entry );
         reply->wait_handle = current->completion_wait->handle;
-        set_error( STATUS_PENDING );
+        set_error( alerted ? STATUS_USER_APC : STATUS_PENDING );
     }
     else
     {
