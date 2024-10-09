@@ -110,14 +110,19 @@ static INT WPRINTF_ParseFormatA( LPCSTR format, WPRINTF_FORMAT *res )
             p++;
         }
     }
-    if (*p == 'l') { res->flags |= WPRINTF_LONG; p++; }
-    else if (*p == 'h') { res->flags |= WPRINTF_SHORT; p++; }
-    else if (*p == 'w') { res->flags |= WPRINTF_WIDE; p++; }
-    else if (*p == 'I')
+    while (*p && strchr("lhwI", *p))
     {
-        if (p[1] == '6' && p[2] == '4') { res->flags |= WPRINTF_I64; p += 3; }
-        else if (p[1] == '3' && p[2] == '2') p += 3;
-        else { res->flags |= WPRINTF_INTPTR; p++; }
+        switch (*p)
+        {
+        case 'l': res->flags |= WPRINTF_LONG; ++p; break;
+        case 'I':
+            if (p[1] == '6' && p[2] == '4') { res->flags |= WPRINTF_I64; p += 3; }
+            else if (p[1] == '3' && p[2] == '2') p += 3;
+            else { res->flags |= WPRINTF_INTPTR; p++; }
+            break;
+        case 'h': res->flags |= WPRINTF_SHORT; ++p; break;
+        case 'w': res->flags |= WPRINTF_WIDE; ++p; break;
+        }
     }
     switch(*p)
     {
@@ -192,14 +197,19 @@ static INT WPRINTF_ParseFormatW( LPCWSTR format, WPRINTF_FORMAT *res )
             p++;
         }
     }
-    if (*p == 'l') { res->flags |= WPRINTF_LONG; p++; }
-    else if (*p == 'h') { res->flags |= WPRINTF_SHORT; p++; }
-    else if (*p == 'w') { res->flags |= WPRINTF_WIDE; p++; }
-    else if (*p == 'I')
+    while (*p && strchr("lhwI", *p))
     {
-        if (p[1] == '6' && p[2] == '4') { res->flags |= WPRINTF_I64; p += 3; }
-        else if (p[1] == '3' && p[2] == '2') p += 3;
-        else { res->flags |= WPRINTF_INTPTR; p++; }
+        switch (*p)
+        {
+        case 'l': res->flags |= WPRINTF_LONG; ++p; break;
+        case 'I':
+            if (p[1] == '6' && p[2] == '4') { res->flags |= WPRINTF_I64; p += 3; }
+            else if (p[1] == '3' && p[2] == '2') p += 3;
+            else { res->flags |= WPRINTF_INTPTR; p++; }
+            break;
+        case 'h': res->flags |= WPRINTF_SHORT; ++p; break;
+        case 'w': res->flags |= WPRINTF_WIDE; ++p; break;
+        }
     }
     switch(*p)
     {
