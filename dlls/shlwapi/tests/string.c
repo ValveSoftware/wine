@@ -1773,6 +1773,11 @@ static void test_printf_format(void)
         { "%I64llu", sizeof(ULONG64), "10", NULL, 10 },
         { "%I64s", sizeof(ULONG_PTR), "str", NULL, (ULONG_PTR)"str", L"str" },
         { "%q%u", sizeof(ULONG), "q10", NULL, 10 },
+        { "%u% ", sizeof(ULONG), "10", NULL, 10 },
+        { "%  ll u", 0, " u", NULL, 10 },
+        { "% llu", sizeof(ULONG64), "10", NULL, 10 },
+        { "%# llx", sizeof(ULONG64), "0xa", NULL, 10 },
+        { "%  #llx", sizeof(ULONG64), "0xa", NULL, 10 },
     };
     WCHAR ws[256], expectedw[256], specw[256];
     unsigned int i, j;
