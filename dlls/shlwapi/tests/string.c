@@ -1689,6 +1689,112 @@ static void test_StrCatChainW(void)
     ok(buf[5] == 'e', "Expected buf[5] = 'e', got %x\n", buf[5]);
 }
 
+static void test_printf_format(void)
+{
+    const struct
+    {
+        const char *spec;
+        unsigned int arg_size;
+        const char *expected;
+        const WCHAR *expectedw;
+        ULONG64 arg;
+        const void *argw;
+    }
+    tests[] =
+    {
+        { "%qu", 0, "qu", NULL, 10 },
+        { "%lu", sizeof(ULONG), "10", NULL, 10 },
+        { "%#lx", sizeof(ULONG), "0xa", NULL, 10 },
+        { "%hu", sizeof(ULONG), "10", NULL, 10 },
+        { "%s", sizeof(ULONG_PTR), "str", NULL, (ULONG_PTR)"str", L"str" },
+        { "%S", sizeof(ULONG_PTR), "str", NULL, (ULONG_PTR)L"str", "str" },
+        { "%ls", sizeof(ULONG_PTR), "str", NULL, (ULONG_PTR)L"str" },
+        { "%lS", sizeof(ULONG_PTR), "str", NULL, (ULONG_PTR)L"str" },
+        { "%hs", sizeof(ULONG_PTR), "str", NULL, (ULONG_PTR)"str" },
+        { "%hS", sizeof(ULONG_PTR), "str", NULL, (ULONG_PTR)"str" },
+        { "%ws", sizeof(ULONG_PTR), "str", NULL, (ULONG_PTR)L"str" },
+        { "%c", sizeof(SHORT), "\xc8", L"\x95c8", 0x95c8 },
+        { "%lc", sizeof(SHORT), "\x3f", L"\x95c8", 0x95c8 },
+        { "%C", sizeof(SHORT), "\x3f", L"\xc8", 0x95c8 },
+        { "%lC", sizeof(SHORT), "\x3f", L"\x95c8", 0x95c8 },
+        { "%hc", sizeof(BYTE), "\xc8", L"\xc8", 0x95c8 },
+        { "%I64u", sizeof(ULONG64), "10", NULL, 10 },
+        { "%I64s", sizeof(ULONG_PTR), "str", NULL, (ULONG_PTR)"str", L"str" },
+        { "%q%u", sizeof(ULONG), "q10", NULL, 10 },
+    };
+    WCHAR ws[256], expectedw[256], specw[256];
+    unsigned int i, j;
+    char expected[256], spec[256], s[256];
+    int len;
+
+    if (!is_locale_english())
+    {
+        /* The test is not designed for testing locale but some of the test expected results depend on locale. */
+        skip("An English locale is required for the printf tests.\n");
+        return;
+    }
+
+    for (i = 0; i < ARRAY_SIZE(tests); ++i)
+    {
+        strcpy(spec, tests[i].spec);
+        winetest_push_context("%s", spec);
+        strcat(spec,"|%s");
+        *s = 0;
+        *ws = 0;
+        j = 0;
+        do
+            specw[j] = spec[j];
+        while (specw[j++]);
+        switch (tests[i].arg_size)
+        {
+            case 0:
+                wnsprintfA(s, ARRAY_SIZE(s), spec, "end");
+                if (tests[i].argw)
+                    len = wnsprintfW(ws, ARRAY_SIZE(ws), specw, L"end");
+                else
+                    len = wnsprintfW(ws, ARRAY_SIZE(ws), specw, L"end");
+                break;
+            case 1:
+            case 2:
+            case 4:
+                wnsprintfA(s, ARRAY_SIZE(s), spec, (ULONG)tests[i].arg, "end");
+                if (tests[i].argw)
+                    len = wnsprintfW(ws, ARRAY_SIZE(ws), specw, tests[i].argw, L"end");
+                else
+                    len = wnsprintfW(ws, ARRAY_SIZE(ws), specw, (ULONG)tests[i].arg, L"end");
+                break;
+            case 8:
+                wnsprintfA(s, ARRAY_SIZE(s), spec, (ULONG64)tests[i].arg, "end");
+                if (tests[i].argw)
+                    len = wnsprintfW(ws, ARRAY_SIZE(ws), specw, tests[i].argw, L"end");
+                else
+                    len = wnsprintfW(ws, ARRAY_SIZE(ws), specw, (ULONG64)tests[i].arg, L"end");
+                break;
+            default:
+                len = 0;
+                ok(0, "unknown length %u.\n", tests[i].arg_size);
+                break;
+        }
+        strcpy(expected, tests[i].expected);
+        strcat(expected, "|end");
+        ok(len == strlen(expected), "got len %d, expected %Id.\n", len, strlen(expected));
+        ok(!strcmp(s, expected), "got %s, expected %s.\n", debugstr_a(s), debugstr_a(expected));
+        if (tests[i].expectedw)
+        {
+            wcscpy(expectedw, tests[i].expectedw);
+            wcscat(expectedw, L"|end");
+        }
+        else
+        {
+            for (j = 0; j < len; ++j)
+                expectedw[j] = expected[j];
+        }
+        expectedw[len] = 0;
+        ok(!wcscmp(ws, expectedw), "got %s, expected %s.\n", debugstr_w(ws), debugstr_w(expectedw));
+        winetest_pop_context();
+    }
+}
+
 START_TEST(string)
 {
   HMODULE hShlwapi;
@@ -1777,6 +1883,7 @@ START_TEST(string)
   test_StrStrNW();
   test_StrStrNIW();
   test_StrCatChainW();
+  test_printf_format();
 
   CoUninitialize();
 }
