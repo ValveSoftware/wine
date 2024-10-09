@@ -114,7 +114,7 @@ static INT WPRINTF_ParseFormatA( LPCSTR format, WPRINTF_FORMAT *res )
     {
         switch (*p)
         {
-        case 'l': res->flags |= WPRINTF_LONG; ++p; break;
+        case 'l': res->flags |= WPRINTF_LONG | WPRINTF_WIDE; ++p; break;
         case 'I':
             if (p[1] == '6' && p[2] == '4') { res->flags |= WPRINTF_I64; p += 3; }
             else if (p[1] == '3' && p[2] == '2') p += 3;
@@ -127,20 +127,20 @@ static INT WPRINTF_ParseFormatA( LPCSTR format, WPRINTF_FORMAT *res )
     switch(*p)
     {
     case 'c':
-        res->type = (res->flags & WPRINTF_LONG) ? WPR_WCHAR : WPR_CHAR;
+        res->type = (res->flags & WPRINTF_WIDE) ? WPR_WCHAR : WPR_CHAR;
         break;
     case 'C':
-        res->type = (res->flags & WPRINTF_SHORT) ? WPR_CHAR : WPR_WCHAR;
+        res->type = (res->flags & (WPRINTF_SHORT | WPRINTF_WIDE)) == WPRINTF_SHORT ? WPR_CHAR : WPR_WCHAR;
         break;
     case 'd':
     case 'i':
         res->type = WPR_SIGNED;
         break;
     case 's':
-        res->type = (res->flags & (WPRINTF_LONG |WPRINTF_WIDE)) ? WPR_WSTRING : WPR_STRING;
+        res->type = (res->flags & WPRINTF_WIDE) ? WPR_WSTRING : WPR_STRING;
         break;
     case 'S':
-        res->type = (res->flags & (WPRINTF_SHORT|WPRINTF_WIDE)) ? WPR_STRING : WPR_WSTRING;
+        res->type = (res->flags & (WPRINTF_SHORT | WPRINTF_WIDE)) == WPRINTF_SHORT ? WPR_STRING : WPR_WSTRING;
         break;
     case 'u':
         res->type = WPR_UNSIGNED;
@@ -201,7 +201,7 @@ static INT WPRINTF_ParseFormatW( LPCWSTR format, WPRINTF_FORMAT *res )
     {
         switch (*p)
         {
-        case 'l': res->flags |= WPRINTF_LONG; ++p; break;
+        case 'l': res->flags |= WPRINTF_LONG | WPRINTF_WIDE; ++p; break;
         case 'I':
             if (p[1] == '6' && p[2] == '4') { res->flags |= WPRINTF_I64; p += 3; }
             else if (p[1] == '3' && p[2] == '2') p += 3;
@@ -217,17 +217,17 @@ static INT WPRINTF_ParseFormatW( LPCWSTR format, WPRINTF_FORMAT *res )
         res->type = (res->flags & WPRINTF_SHORT) ? WPR_CHAR : WPR_WCHAR;
         break;
     case 'C':
-        res->type = (res->flags & WPRINTF_LONG) ? WPR_WCHAR : WPR_CHAR;
+        res->type = (res->flags & (WPRINTF_SHORT | WPRINTF_WIDE)) == WPRINTF_WIDE ? WPR_WCHAR : WPR_CHAR;
         break;
     case 'd':
     case 'i':
         res->type = WPR_SIGNED;
         break;
     case 's':
-        res->type = ((res->flags & WPRINTF_SHORT) && !(res->flags & WPRINTF_WIDE)) ? WPR_STRING : WPR_WSTRING;
+        res->type = (res->flags & WPRINTF_SHORT) ? WPR_STRING : WPR_WSTRING;
         break;
     case 'S':
-        res->type = (res->flags & (WPRINTF_LONG|WPRINTF_WIDE)) ? WPR_WSTRING : WPR_STRING;
+        res->type = (res->flags & (WPRINTF_SHORT | WPRINTF_WIDE)) == WPRINTF_WIDE ? WPR_WSTRING : WPR_STRING;
         break;
     case 'u':
         res->type = WPR_UNSIGNED;
