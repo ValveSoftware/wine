@@ -95,7 +95,7 @@ static INT WPRINTF_ParseFormatA( LPCSTR format, WPRINTF_FORMAT *res )
     res->width = 0;
     res->precision = 0;
     if (*p == '-') { res->flags |= WPRINTF_LEFTALIGN; p++; }
-    if (*p == '#') { res->flags |= WPRINTF_PREFIX_HEX; p++; }
+    while (*p == '#') { res->flags |= WPRINTF_PREFIX_HEX; p++; }
     while (*p == ' ') ++p;
     if (*p == '0') { res->flags |= WPRINTF_ZEROPAD; p++; }
     while ((*p >= '0') && (*p <= '9'))  /* width field */
@@ -192,7 +192,7 @@ static INT WPRINTF_ParseFormatW( LPCWSTR format, WPRINTF_FORMAT *res )
     res->width = 0;
     res->precision = 0;
     if (*p == '-') { res->flags |= WPRINTF_LEFTALIGN; p++; }
-    if (*p == '#') { res->flags |= WPRINTF_PREFIX_HEX; p++; }
+    while (*p == '#') { res->flags |= WPRINTF_PREFIX_HEX; p++; }
     while (*p == ' ') ++p;
     if (*p == '0') { res->flags |= WPRINTF_ZEROPAD; p++; }
     while ((*p >= '0') && (*p <= '9'))  /* width field */

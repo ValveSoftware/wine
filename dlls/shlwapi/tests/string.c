@@ -1714,6 +1714,8 @@ static void test_printf_format(void)
         { "%hhu", sizeof(ULONG), "10", NULL, 10 },
         { "%hwu", sizeof(ULONG), "10", NULL, 10 },
         { "%whu", sizeof(ULONG), "10", NULL, 10 },
+        { "%##lhllwlx", sizeof(ULONG64), "0x1000000010", NULL, 0x1000000010 },
+        { "%##lhlwlx", sizeof(ULONG), "0x10", NULL, 0x1000000010 },
         { "%04lhlwllx", sizeof(ULONG64), "1000000010", NULL, 0x1000000010 },
         { "%s", sizeof(ULONG_PTR), "str", NULL, (ULONG_PTR)"str", L"str" },
         { "%S", sizeof(ULONG_PTR), "str", NULL, (ULONG_PTR)L"str", "str" },
