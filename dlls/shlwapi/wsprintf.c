@@ -114,7 +114,15 @@ static INT WPRINTF_ParseFormatA( LPCSTR format, WPRINTF_FORMAT *res )
     {
         switch (*p)
         {
-        case 'l': res->flags |= WPRINTF_LONG | WPRINTF_WIDE; ++p; break;
+        case 'l':
+            ++p;
+            if (*p == 'l')
+            {
+                res->flags |= WPRINTF_I64;
+                ++p;
+            }
+            else res->flags |= WPRINTF_LONG | WPRINTF_WIDE;
+            break;
         case 'I':
             if (p[1] == '6' && p[2] == '4') { res->flags |= WPRINTF_I64; p += 3; }
             else if (p[1] == '3' && p[2] == '2') p += 3;
@@ -201,7 +209,15 @@ static INT WPRINTF_ParseFormatW( LPCWSTR format, WPRINTF_FORMAT *res )
     {
         switch (*p)
         {
-        case 'l': res->flags |= WPRINTF_LONG | WPRINTF_WIDE; ++p; break;
+        case 'l':
+            ++p;
+            if (*p == 'l')
+            {
+                res->flags |= WPRINTF_I64;
+                ++p;
+            }
+            else res->flags |= WPRINTF_LONG | WPRINTF_WIDE;
+            break;
         case 'I':
             if (p[1] == '6' && p[2] == '4') { res->flags |= WPRINTF_I64; p += 3; }
             else if (p[1] == '3' && p[2] == '2') p += 3;
