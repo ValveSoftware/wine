@@ -483,6 +483,7 @@ INT WINAPI wvnsprintfA( LPSTR buffer, INT maxlen, LPCSTR spec, va_list args )
             p += len - sign;
             break;
         case WPR_UNKNOWN:
+            if (*spec) *p++ = *spec++;
             continue;
         }
         if (format.flags & WPRINTF_LEFTALIGN)
@@ -603,6 +604,7 @@ INT WINAPI wvnsprintfW( LPWSTR buffer, INT maxlen, LPCWSTR spec, va_list args )
             for (i = sign; i < len; i++) *p++ = (BYTE)number[i];
             break;
         case WPR_UNKNOWN:
+            if (*spec) *p++ = *spec++;
             continue;
         }
         if (format.flags & WPRINTF_LEFTALIGN)
