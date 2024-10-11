@@ -4651,6 +4651,11 @@ void loader_init( CONTEXT *context, void **entry )
             ERR( "Enabling heap zero hack.\n" );
             heap_zero_hack = TRUE;
         }
+        if (get_env( L"WINE_HEAP_TOP_DOWN", env_str, sizeof(env_str)) && env_str[0] == L'1')
+        {
+            ERR( "Enabling heap top down hack.\n" );
+            heap_top_down_hack = TRUE;
+        }
 
         peb->ProcessHeap        = RtlCreateHeap( heap_flags, NULL, 0, 0, NULL, NULL );
 
