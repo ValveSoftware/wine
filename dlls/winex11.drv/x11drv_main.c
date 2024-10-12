@@ -1401,8 +1401,18 @@ done:
 
 NTSTATUS X11DRV_D3DKMTQueryAdapterInfo( D3DKMT_QUERYADAPTERINFO *desc )
 {
+    const struct vulkan_funcs *vulkan_funcs = get_vulkan_driver(WINE_VULKAN_DRIVER_VERSION);
+    PFN_vkGetPhysicalDeviceProperties2KHR pvkGetPhysicalDeviceProperties2KHR;
+    VkPhysicalDeviceDriverPropertiesKHR driverProperties;
+    VkPhysicalDeviceProperties2KHR properties2;
     NTSTATUS status = STATUS_INVALID_PARAMETER;
     struct x11_d3dkmt_adapter *adapter;
+
+    if (!vulkan_funcs)
+    {
+        WARN("Vulkan is unavailable.\n");
+        return STATUS_UNSUCCESSFUL;
+    }
 
     pthread_mutex_lock(&d3dkmt_mutex);
     LIST_FOR_EACH_ENTRY(adapter, &x11_d3dkmt_adapters, struct x11_d3dkmt_adapter, entry)
@@ -1410,10 +1420,50 @@ NTSTATUS X11DRV_D3DKMTQueryAdapterInfo( D3DKMT_QUERYADAPTERINFO *desc )
         if (adapter->handle != desc->hAdapter)
             continue;
 
+        if (!(pvkGetPhysicalDeviceProperties2KHR = (void *)vulkan_funcs->p_vkGetInstanceProcAddr(d3dkmt_vk_instance, "vkGetPhysicalDeviceProperties2KHR")))
+        {
+            WARN("Failed to load vkGetPhysicalDeviceProperties2KHR.\n");
+            status = STATUS_UNSUCCESSFUL;
+            goto done;
+        }
+
+        memset(&driverProperties, 0, sizeof(driverProperties));
+        memset(&properties2, 0, sizeof(properties2));
+        driverProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES_KHR;
+        properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR;
+        properties2.pNext = &driverProperties;
+        pvkGetPhysicalDeviceProperties2KHR(adapter->vk_device, &properties2);
+
+        if (desc->Type == KMTQAITYPE_WDDM_2_7_CAPS)
+        {
+            /*
+             * Advertise Hardware-Scheduling as enabled for NVIDIA Adapters. NVIDIA driver does
+             * userspace submission.
+             */
+            D3DKMT_WDDM_2_7_CAPS *data = desc->pPrivateDriverData;
+            if (driverProperties.driverID == VK_DRIVER_ID_NVIDIA_PROPRIETARY)
+            {
+                data->HwSchEnabled = 1;
+                data->HwSchSupported = 1;
+                data->HwSchEnabledByDefault = 1;
+                status = STATUS_SUCCESS;
+                goto done;
+            }
+            else
+            {
+                data->HwSchEnabled = 0;
+                data->HwSchSupported = 0;
+                data->HwSchEnabledByDefault = 0;
+                status = STATUS_SUCCESS;
+                goto done;
+            }
+        }
+
         FIXME("desc %p, type %d stub\n", desc, desc->Type);
         status = STATUS_NOT_IMPLEMENTED;
         break;
     }
+done:
     pthread_mutex_unlock(&d3dkmt_mutex);
     return status;
 }
