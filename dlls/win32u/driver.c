@@ -554,6 +554,11 @@ static NTSTATUS nulldrv_D3DKMTOpenAdapterFromLuid( D3DKMT_OPENADAPTERFROMLUID *d
     return STATUS_PROCEDURE_NOT_FOUND;
 }
 
+static NTSTATUS nulldrv_D3DKMTQueryAdapterInfo( D3DKMT_QUERYADAPTERINFO *desc )
+{
+    return STATUS_PROCEDURE_NOT_FOUND;
+}
+
 static NTSTATUS nulldrv_D3DKMTQueryVideoMemoryInfo( D3DKMT_QUERYVIDEOMEMORYINFO *desc )
 {
     return STATUS_PROCEDURE_NOT_FOUND;
@@ -658,6 +663,7 @@ const struct gdi_dc_funcs null_driver =
     nulldrv_D3DKMTCheckVidPnExclusiveOwnership, /* pD3DKMTCheckVidPnExclusiveOwnership */
     nulldrv_D3DKMTCloseAdapter,         /* pD3DKMTCloseAdapter */
     nulldrv_D3DKMTOpenAdapterFromLuid,  /* pD3DKMTOpenAdapterFromLuid */
+    nulldrv_D3DKMTQueryAdapterInfo,     /* pD3DKMTQueryAdapterInfo */
     nulldrv_D3DKMTQueryVideoMemoryInfo, /* pD3DKMTQueryVideoMemoryInfo */
     nulldrv_D3DKMTSetVidPnSourceOwner,  /* pD3DKMTSetVidPnSourceOwner */
 
@@ -1637,11 +1643,14 @@ NTSTATUS WINAPI NtGdiDdDDIDestroyDevice( const D3DKMT_DESTROYDEVICE *desc )
  */
 NTSTATUS WINAPI NtGdiDdDDIQueryAdapterInfo( D3DKMT_QUERYADAPTERINFO *desc )
 {
-    if (!desc)
+    TRACE("(%p)\n", desc);
+
+    if (!desc || !desc->hAdapter)
         return STATUS_INVALID_PARAMETER;
 
-    FIXME("desc %p, type %d stub\n", desc, desc->Type);
-    return STATUS_NOT_IMPLEMENTED;
+    if (!get_display_driver()->pD3DKMTQueryAdapterInfo)
+        return STATUS_PROCEDURE_NOT_FOUND;
+    return get_display_driver()->pD3DKMTQueryAdapterInfo(desc);
 }
 
 /******************************************************************************

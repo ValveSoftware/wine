@@ -1399,6 +1399,25 @@ done:
     return status;
 }
 
+NTSTATUS X11DRV_D3DKMTQueryAdapterInfo( D3DKMT_QUERYADAPTERINFO *desc )
+{
+    NTSTATUS status = STATUS_INVALID_PARAMETER;
+    struct x11_d3dkmt_adapter *adapter;
+
+    pthread_mutex_lock(&d3dkmt_mutex);
+    LIST_FOR_EACH_ENTRY(adapter, &x11_d3dkmt_adapters, struct x11_d3dkmt_adapter, entry)
+    {
+        if (adapter->handle != desc->hAdapter)
+            continue;
+
+        FIXME("desc %p, type %d stub\n", desc, desc->Type);
+        status = STATUS_NOT_IMPLEMENTED;
+        break;
+    }
+    pthread_mutex_unlock(&d3dkmt_mutex);
+    return status;
+}
+
 NTSTATUS X11DRV_D3DKMTQueryVideoMemoryInfo( D3DKMT_QUERYVIDEOMEMORYINFO *desc )
 {
     const struct vulkan_funcs *vulkan_funcs = get_vulkan_driver(WINE_VULKAN_DRIVER_VERSION);
