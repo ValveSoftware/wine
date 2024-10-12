@@ -971,10 +971,78 @@ done:
     return status;
 }
 
-NTSTATUS WINAPI D3DKMTEnumAdapters2( const void *param )
+NTSTATUS WINAPI D3DKMTEnumAdapters2( D3DKMT_ENUMADAPTERS2 *enumAdapters )
 {
-    FIXME( "param %p stub.\n", param );
-    return STATUS_NOT_SUPPORTED;
+    NTSTATUS status = STATUS_SUCCESS;
+    SP_DEVINFO_DATA device_data;
+    DEVPROPTYPE type;
+    HDEVINFO devinfo;
+    UINT dev_count = 0;
+    HANDLE mutex;
+
+    TRACE("(%p)\n", enumAdapters);
+
+    mutex = get_display_device_init_mutex();
+    devinfo = SetupDiGetClassDevsW(&GUID_DEVCLASS_DISPLAY, L"PCI", NULL, 0);
+    device_data.cbSize = sizeof(device_data);
+
+    while(SetupDiEnumDeviceInfo(devinfo, dev_count++, &device_data))
+    {
+        D3DKMT_OPENADAPTERFROMLUID luid_desc;
+        UINT dev_idx = dev_count - 1;
+        D3DKMT_ADAPTERINFO *adapter;
+
+        TRACE("Device: %u\n", dev_idx);
+
+        /* If nothing to write, just pass through the loop */
+        if (!enumAdapters->pAdapters)
+            continue;
+
+        adapter = (D3DKMT_ADAPTERINFO*)(enumAdapters->pAdapters + dev_idx);
+
+        if (SetupDiGetDevicePropertyW(devinfo, &device_data, &DEVPROPKEY_GPU_LUID, &type,
+                (BYTE *)&luid_desc.AdapterLuid, sizeof(luid_desc.AdapterLuid), NULL, 0))
+        {
+            /* NumOfSources appears to be in reference to displays. This could mean connected
+             * displays, maximum number of "heads", surfaces for direct scanout, or something else
+             * entirely. It's not clear from the MSDN page what kind of value is actually expected
+             * here.
+             *
+             * bPrecisePresentRegionsPreferred sounds like a scanout-level optimization. Again, MSDN
+             * isn't very descriptive about what this really means. Given that it's typical for
+             * modern GPUs to scanout an entire surface at once, leave this falsey.
+             */
+            adapter->NumOfSources = 0;
+            adapter->bPrecisePresentRegionsPreferred = FALSE;
+            FIXME("NumOfSources and bPrecisePresentRegionsPreferred not set, need implementation.\n");
+
+            if ((status = NtGdiDdDDIOpenAdapterFromLuid(&luid_desc)))
+                break;
+
+            adapter->AdapterLuid = luid_desc.AdapterLuid;
+            adapter->hAdapter = luid_desc.hAdapter;
+
+            TRACE("hAdapter: %u AdapterLuid: %08lx:%08lx NumOfSources: %lu bPrecisePresentRegionsPreferred: %d\n",
+                  adapter->hAdapter,
+                  adapter->AdapterLuid.HighPart,
+                  adapter->AdapterLuid.LowPart,
+                  adapter->NumOfSources,
+                  adapter->bPrecisePresentRegionsPreferred);
+        }
+        else
+        {
+            TRACE("no known adapter\n");
+        }
+    }
+    /* decrement dev count to actual count */
+    dev_count--;
+    SetupDiDestroyDeviceInfoList(devinfo);
+    release_display_device_init_mutex(mutex);
+
+    TRACE("Devices enumerated: %u\n", dev_count);
+    enumAdapters->NumAdapters = dev_count;
+
+    return status;
 }
 
 /***********************************************************************
