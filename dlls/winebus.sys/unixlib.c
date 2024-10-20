@@ -84,9 +84,14 @@ BOOL is_logitech_g920(WORD vid, WORD pid)
     return vid == 0x046D && pid == 0xC262;
 }
 
+BOOL is_thrustmaster_hotas_x(WORD vid, WORD pid)
+{
+    return vid == 0x044F && pid == 0xB108;
+}
+
 static BOOL is_thrustmaster_hotas(WORD vid, WORD pid)
 {
-    return vid == 0x044F && (pid == 0xB679 || pid == 0xB687 || pid == 0xB10A);
+    return vid == 0x044F && (pid == 0xB679 || pid == 0xB687 || pid == 0xB10A || pid == 0xB108);
 }
 
 static BOOL is_simucube_wheel(WORD vid, WORD pid)
