@@ -190,6 +190,8 @@ typedef enum UErrorCode
 }
 UErrorCode;
 
+const char * U_EXPORT2 u_errorName(UErrorCode code);
+
 int32_t U_EXPORT2 ucal_getTimeZoneIDForWindowsID( const UChar *win_id, int32_t len, const char *region, UChar *id,
                                                   int32_t ret_len, UErrorCode *status );
 
