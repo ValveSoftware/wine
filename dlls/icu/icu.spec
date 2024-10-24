@@ -246,7 +246,7 @@
 #@ stub ucal_getTZDataVersion
 #@ stub ucal_getTimeZoneDisplayName
 #@ stub ucal_getTimeZoneID
-#@ stub ucal_getTimeZoneIDForWindowsID
+@ cdecl ucal_getTimeZoneIDForWindowsID(ptr long ptr ptr long ptr)
 #@ stub ucal_getTimeZoneTransitionDate
 #@ stub ucal_getType
 #@ stub ucal_getWeekendTransition
