@@ -1,1031 +1,1031 @@
-#@ stub CloseDefaultICUGroupingLetters
-#@ stub GetDefaultICUGroupingLetters
-#@ stub GetICUGroupingLetter
-#@ stub SortCloseHandle
-#@ stub SortGetHandle
-#@ stub SortGetSearchKey
-#@ stub UCNV_FROM_U_CALLBACK_ESCAPE
-#@ stub UCNV_FROM_U_CALLBACK_SKIP
-#@ stub UCNV_FROM_U_CALLBACK_STOP
-#@ stub UCNV_FROM_U_CALLBACK_SUBSTITUTE
-#@ stub UCNV_TO_U_CALLBACK_ESCAPE
-#@ stub UCNV_TO_U_CALLBACK_SKIP
-#@ stub UCNV_TO_U_CALLBACK_STOP
-#@ stub UCNV_TO_U_CALLBACK_SUBSTITUTE
-#@ stub u_UCharsToChars
-#@ stub u_austrcpy
-#@ stub u_austrncpy
-#@ stub u_catclose
-#@ stub u_catgets
-#@ stub u_catopen
-#@ stub u_charAge
-#@ stub u_charDigitValue
-#@ stub u_charDirection
-#@ stub u_charFromName
-#@ stub u_charMirror
-#@ stub u_charName
-#@ stub u_charType
-#@ stub u_charsToUChars
-#@ stub u_cleanup
-#@ stub u_countChar32
-#@ stub u_digit
-#@ stub u_enumCharNames
-#@ stub u_enumCharTypes
-#@ stub u_errorName
-#@ stub u_foldCase
-#@ stub u_forDigit
-#@ stub u_formatMessage
-#@ stub u_formatMessageWithError
-#@ stub u_getBidiPairedBracket
-#@ stub u_getBinaryPropertySet
-#@ stub u_getCombiningClass
-#@ stub u_getDataVersion
-#@ stub u_getFC_NFKC_Closure
-#@ stub u_getIntPropertyMap
-#@ stub u_getIntPropertyMaxValue
-#@ stub u_getIntPropertyMinValue
-#@ stub u_getIntPropertyValue
-#@ stub u_getNumericValue
-#@ stub u_getPropertyEnum
-#@ stub u_getPropertyName
-#@ stub u_getPropertyValueEnum
-#@ stub u_getPropertyValueName
-#@ stub u_getUnicodeVersion
-#@ stub u_getVersion
-#@ stub u_hasBinaryProperty
-#@ stub u_init
-#@ stub u_isIDIgnorable
-#@ stub u_isIDPart
-#@ stub u_isIDStart
-#@ stub u_isISOControl
-#@ stub u_isJavaIDPart
-#@ stub u_isJavaIDStart
-#@ stub u_isJavaSpaceChar
-#@ stub u_isMirrored
-#@ stub u_isUAlphabetic
-#@ stub u_isULowercase
-#@ stub u_isUUppercase
-#@ stub u_isUWhiteSpace
-#@ stub u_isWhitespace
-#@ stub u_isalnum
-#@ stub u_isalpha
-#@ stub u_isbase
-#@ stub u_isblank
-#@ stub u_iscntrl
-#@ stub u_isdefined
-#@ stub u_isdigit
-#@ stub u_isgraph
-#@ stub u_islower
-#@ stub u_isprint
-#@ stub u_ispunct
-#@ stub u_isspace
-#@ stub u_istitle
-#@ stub u_isupper
-#@ stub u_isxdigit
-#@ stub u_memcasecmp
-#@ stub u_memchr
-#@ stub u_memchr32
-#@ stub u_memcmp
-#@ stub u_memcmpCodePointOrder
-#@ stub u_memcpy
-#@ stub u_memmove
-#@ stub u_memrchr
-#@ stub u_memrchr32
-#@ stub u_memset
-#@ stub u_parseMessage
-#@ stub u_parseMessageWithError
-#@ stub u_setMemoryFunctions
-#@ stub u_shapeArabic
-#@ stub u_strCaseCompare
-#@ stub u_strCompare
-#@ stub u_strCompareIter
-#@ stub u_strFindFirst
-#@ stub u_strFindLast
-#@ stub u_strFoldCase
-#@ stub u_strFromJavaModifiedUTF8WithSub
-#@ stub u_strFromUTF32
-#@ stub u_strFromUTF32WithSub
-#@ stub u_strFromUTF8
-#@ stub u_strFromUTF8Lenient
-#@ stub u_strFromUTF8WithSub
-#@ stub u_strFromWCS
-#@ stub u_strHasMoreChar32Than
-#@ stub u_strToJavaModifiedUTF8
-#@ stub u_strToLower
-#@ stub u_strToTitle
-#@ stub u_strToUTF32
-#@ stub u_strToUTF32WithSub
-#@ stub u_strToUTF8
-#@ stub u_strToUTF8WithSub
-#@ stub u_strToUpper
-#@ stub u_strToWCS
-#@ stub u_strcasecmp
-#@ stub u_strcat
-#@ stub u_strchr
-#@ stub u_strchr32
-#@ stub u_strcmp
-#@ stub u_strcmpCodePointOrder
-#@ stub u_strcpy
-#@ stub u_strcspn
-#@ stub u_strlen
-#@ stub u_strncasecmp
-#@ stub u_strncat
-#@ stub u_strncmp
-#@ stub u_strncmpCodePointOrder
-#@ stub u_strncpy
-#@ stub u_strpbrk
-#@ stub u_strrchr
-#@ stub u_strrchr32
-#@ stub u_strrstr
-#@ stub u_strspn
-#@ stub u_strstr
-#@ stub u_strtok_r
-#@ stub u_tolower
-#@ stub u_totitle
-#@ stub u_toupper
-#@ stub u_uastrcpy
-#@ stub u_uastrncpy
-#@ stub u_unescape
-#@ stub u_unescapeAt
-#@ stub u_versionFromString
-#@ stub u_versionFromUString
-#@ stub u_versionToString
-#@ stub u_vformatMessage
-#@ stub u_vformatMessageWithError
-#@ stub u_vparseMessage
-#@ stub u_vparseMessageWithError
-#@ stub ubidi_close
-#@ stub ubidi_countParagraphs
-#@ stub ubidi_countRuns
-#@ stub ubidi_getBaseDirection
-#@ stub ubidi_getClassCallback
-#@ stub ubidi_getCustomizedClass
-#@ stub ubidi_getDirection
-#@ stub ubidi_getLength
-#@ stub ubidi_getLevelAt
-#@ stub ubidi_getLevels
-#@ stub ubidi_getLogicalIndex
-#@ stub ubidi_getLogicalMap
-#@ stub ubidi_getLogicalRun
-#@ stub ubidi_getParaLevel
-#@ stub ubidi_getParagraph
-#@ stub ubidi_getParagraphByIndex
-#@ stub ubidi_getProcessedLength
-#@ stub ubidi_getReorderingMode
-#@ stub ubidi_getReorderingOptions
-#@ stub ubidi_getResultLength
-#@ stub ubidi_getText
-#@ stub ubidi_getVisualIndex
-#@ stub ubidi_getVisualMap
-#@ stub ubidi_getVisualRun
-#@ stub ubidi_invertMap
-#@ stub ubidi_isInverse
-#@ stub ubidi_isOrderParagraphsLTR
-#@ stub ubidi_open
-#@ stub ubidi_openSized
-#@ stub ubidi_orderParagraphsLTR
-#@ stub ubidi_reorderLogical
-#@ stub ubidi_reorderVisual
-#@ stub ubidi_setClassCallback
-#@ stub ubidi_setContext
-#@ stub ubidi_setInverse
-#@ stub ubidi_setLine
-#@ stub ubidi_setPara
-#@ stub ubidi_setReorderingMode
-#@ stub ubidi_setReorderingOptions
-#@ stub ubidi_writeReordered
-#@ stub ubidi_writeReverse
-#@ stub ubiditransform_close
-#@ stub ubiditransform_open
-#@ stub ubiditransform_transform
-#@ stub ublock_getCode
-#@ stub ubrk_close
-#@ stub ubrk_countAvailable
-#@ stub ubrk_current
-#@ stub ubrk_first
-#@ stub ubrk_following
-#@ stub ubrk_getAvailable
-#@ stub ubrk_getBinaryRules
-#@ stub ubrk_getLocaleByType
-#@ stub ubrk_getRuleStatus
-#@ stub ubrk_getRuleStatusVec
-#@ stub ubrk_isBoundary
-#@ stub ubrk_last
-#@ stub ubrk_next
-#@ stub ubrk_open
-#@ stub ubrk_openBinaryRules
-#@ stub ubrk_openRules
-#@ stub ubrk_preceding
-#@ stub ubrk_previous
-#@ stub ubrk_refreshUText
-#@ stub ubrk_safeClone
-#@ stub ubrk_setText
-#@ stub ubrk_setUText
-#@ stub ucal_add
-#@ stub ucal_clear
-#@ stub ucal_clearField
-#@ stub ucal_clone
-#@ stub ucal_close
-#@ stub ucal_countAvailable
-#@ stub ucal_equivalentTo
-#@ stub ucal_get
-#@ stub ucal_getAttribute
-#@ stub ucal_getAvailable
-#@ stub ucal_getCanonicalTimeZoneID
-#@ stub ucal_getDSTSavings
-#@ stub ucal_getDayOfWeekType
-#@ stub ucal_getDefaultTimeZone
-#@ stub ucal_getFieldDifference
-#@ stub ucal_getGregorianChange
-#@ stub ucal_getHostTimeZone
-#@ stub ucal_getKeywordValuesForLocale
-#@ stub ucal_getLimit
-#@ stub ucal_getLocaleByType
-#@ stub ucal_getMillis
-#@ stub ucal_getNow
-#@ stub ucal_getTZDataVersion
-#@ stub ucal_getTimeZoneDisplayName
-#@ stub ucal_getTimeZoneID
-#@ stub ucal_getTimeZoneIDForWindowsID
-#@ stub ucal_getTimeZoneTransitionDate
-#@ stub ucal_getType
-#@ stub ucal_getWeekendTransition
-#@ stub ucal_getWindowsTimeZoneID
-#@ stub ucal_inDaylightTime
-#@ stub ucal_isSet
-#@ stub ucal_isWeekend
-#@ stub ucal_open
-#@ stub ucal_openCountryTimeZones
-#@ stub ucal_openTimeZoneIDEnumeration
-#@ stub ucal_openTimeZones
-#@ stub ucal_roll
-#@ stub ucal_set
-#@ stub ucal_setAttribute
-#@ stub ucal_setDate
-#@ stub ucal_setDateTime
-#@ stub ucal_setDefaultTimeZone
-#@ stub ucal_setGregorianChange
-#@ stub ucal_setMillis
-#@ stub ucal_setTimeZone
-#@ stub ucasemap_close
-#@ stub ucasemap_getBreakIterator
-#@ stub ucasemap_getLocale
-#@ stub ucasemap_getOptions
-#@ stub ucasemap_open
-#@ stub ucasemap_setBreakIterator
-#@ stub ucasemap_setLocale
-#@ stub ucasemap_setOptions
-#@ stub ucasemap_toTitle
-#@ stub ucasemap_utf8FoldCase
-#@ stub ucasemap_utf8ToLower
-#@ stub ucasemap_utf8ToTitle
-#@ stub ucasemap_utf8ToUpper
-#@ stub ucfpos_close
-#@ stub ucfpos_constrainCategory
-#@ stub ucfpos_constrainField
-#@ stub ucfpos_getCategory
-#@ stub ucfpos_getField
-#@ stub ucfpos_getIndexes
-#@ stub ucfpos_getInt64IterationContext
-#@ stub ucfpos_matchesField
-#@ stub ucfpos_open
-#@ stub ucfpos_reset
-#@ stub ucfpos_setInt64IterationContext
-#@ stub ucfpos_setState
-#@ stub ucnv_cbFromUWriteBytes
-#@ stub ucnv_cbFromUWriteSub
-#@ stub ucnv_cbFromUWriteUChars
-#@ stub ucnv_cbToUWriteSub
-#@ stub ucnv_cbToUWriteUChars
-#@ stub ucnv_close
-#@ stub ucnv_compareNames
-#@ stub ucnv_convert
-#@ stub ucnv_convertEx
-#@ stub ucnv_countAliases
-#@ stub ucnv_countAvailable
-#@ stub ucnv_countStandards
-#@ stub ucnv_detectUnicodeSignature
-#@ stub ucnv_fixFileSeparator
-#@ stub ucnv_flushCache
-#@ stub ucnv_fromAlgorithmic
-#@ stub ucnv_fromUChars
-#@ stub ucnv_fromUCountPending
-#@ stub ucnv_fromUnicode
-#@ stub ucnv_getAlias
-#@ stub ucnv_getAliases
-#@ stub ucnv_getAvailableName
-#@ stub ucnv_getCCSID
-#@ stub ucnv_getCanonicalName
-#@ stub ucnv_getDefaultName
-#@ stub ucnv_getDisplayName
-#@ stub ucnv_getFromUCallBack
-#@ stub ucnv_getInvalidChars
-#@ stub ucnv_getInvalidUChars
-#@ stub ucnv_getMaxCharSize
-#@ stub ucnv_getMinCharSize
-#@ stub ucnv_getName
-#@ stub ucnv_getNextUChar
-#@ stub ucnv_getPlatform
-#@ stub ucnv_getStandard
-#@ stub ucnv_getStandardName
-#@ stub ucnv_getStarters
-#@ stub ucnv_getSubstChars
-#@ stub ucnv_getToUCallBack
-#@ stub ucnv_getType
-#@ stub ucnv_getUnicodeSet
-#@ stub ucnv_isAmbiguous
-#@ stub ucnv_isFixedWidth
-#@ stub ucnv_open
-#@ stub ucnv_openAllNames
-#@ stub ucnv_openCCSID
-#@ stub ucnv_openPackage
-#@ stub ucnv_openStandardNames
-#@ stub ucnv_openU
-#@ stub ucnv_reset
-#@ stub ucnv_resetFromUnicode
-#@ stub ucnv_resetToUnicode
-#@ stub ucnv_safeClone
-#@ stub ucnv_setDefaultName
-#@ stub ucnv_setFallback
-#@ stub ucnv_setFromUCallBack
-#@ stub ucnv_setSubstChars
-#@ stub ucnv_setSubstString
-#@ stub ucnv_setToUCallBack
-#@ stub ucnv_toAlgorithmic
-#@ stub ucnv_toUChars
-#@ stub ucnv_toUCountPending
-#@ stub ucnv_toUnicode
-#@ stub ucnv_usesFallback
-#@ stub ucnvsel_close
-#@ stub ucnvsel_open
-#@ stub ucnvsel_openFromSerialized
-#@ stub ucnvsel_selectForString
-#@ stub ucnvsel_selectForUTF8
-#@ stub ucnvsel_serialize
-#@ stub ucol_cloneBinary
-#@ stub ucol_close
-#@ stub ucol_closeElements
-#@ stub ucol_countAvailable
-#@ stub ucol_equal
-#@ stub ucol_getAttribute
-#@ stub ucol_getAvailable
-#@ stub ucol_getBound
-#@ stub ucol_getContractionsAndExpansions
-#@ stub ucol_getDisplayName
-#@ stub ucol_getEquivalentReorderCodes
-#@ stub ucol_getFunctionalEquivalent
-#@ stub ucol_getKeywordValues
-#@ stub ucol_getKeywordValuesForLocale
-#@ stub ucol_getKeywords
-#@ stub ucol_getLocaleByType
-#@ stub ucol_getMaxExpansion
-#@ stub ucol_getMaxVariable
-#@ stub ucol_getOffset
-#@ stub ucol_getReorderCodes
-#@ stub ucol_getRules
-#@ stub ucol_getRulesEx
-#@ stub ucol_getSortKey
-#@ stub ucol_getStrength
-#@ stub ucol_getTailoredSet
-#@ stub ucol_getUCAVersion
-#@ stub ucol_getVariableTop
-#@ stub ucol_getVersion
-#@ stub ucol_greater
-#@ stub ucol_greaterOrEqual
-#@ stub ucol_keyHashCode
-#@ stub ucol_mergeSortkeys
-#@ stub ucol_next
-#@ stub ucol_nextSortKeyPart
-#@ stub ucol_open
-#@ stub ucol_openAvailableLocales
-#@ stub ucol_openBinary
-#@ stub ucol_openElements
-#@ stub ucol_openRules
-#@ stub ucol_previous
-#@ stub ucol_primaryOrder
-#@ stub ucol_reset
-#@ stub ucol_safeClone
-#@ stub ucol_secondaryOrder
-#@ stub ucol_setAttribute
-#@ stub ucol_setMaxVariable
-#@ stub ucol_setOffset
-#@ stub ucol_setReorderCodes
-#@ stub ucol_setStrength
-#@ stub ucol_setText
-#@ stub ucol_strcoll
-#@ stub ucol_strcollIter
-#@ stub ucol_strcollUTF8
-#@ stub ucol_tertiaryOrder
-#@ stub ucpmap_get
-#@ stub ucpmap_getRange
-#@ stub ucptrie_close
-#@ stub ucptrie_get
-#@ stub ucptrie_getRange
-#@ stub ucptrie_getType
-#@ stub ucptrie_getValueWidth
-#@ stub ucptrie_internalSmallIndex
-#@ stub ucptrie_internalSmallU8Index
-#@ stub ucptrie_internalU8PrevIndex
-#@ stub ucptrie_openFromBinary
-#@ stub ucptrie_toBinary
-#@ stub ucsdet_close
-#@ stub ucsdet_detect
-#@ stub ucsdet_detectAll
-#@ stub ucsdet_enableInputFilter
-#@ stub ucsdet_getAllDetectableCharsets
-#@ stub ucsdet_getConfidence
-#@ stub ucsdet_getLanguage
-#@ stub ucsdet_getName
-#@ stub ucsdet_getUChars
-#@ stub ucsdet_isInputFilterEnabled
-#@ stub ucsdet_open
-#@ stub ucsdet_setDeclaredEncoding
-#@ stub ucsdet_setText
-#@ stub ucurr_countCurrencies
-#@ stub ucurr_forLocale
-#@ stub ucurr_forLocaleAndDate
-#@ stub ucurr_getDefaultFractionDigits
-#@ stub ucurr_getDefaultFractionDigitsForUsage
-#@ stub ucurr_getKeywordValuesForLocale
-#@ stub ucurr_getName
-#@ stub ucurr_getNumericCode
-#@ stub ucurr_getPluralName
-#@ stub ucurr_getRoundingIncrement
-#@ stub ucurr_getRoundingIncrementForUsage
-#@ stub ucurr_isAvailable
-#@ stub ucurr_openISOCurrencies
-#@ stub ucurr_register
-#@ stub ucurr_unregister
-#@ stub udat_adoptNumberFormat
-#@ stub udat_adoptNumberFormatForFields
-#@ stub udat_applyPattern
-#@ stub udat_clone
-#@ stub udat_close
-#@ stub udat_countAvailable
-#@ stub udat_countSymbols
-#@ stub udat_format
-#@ stub udat_formatCalendar
-#@ stub udat_formatCalendarForFields
-#@ stub udat_formatForFields
-#@ stub udat_get2DigitYearStart
-#@ stub udat_getAvailable
-#@ stub udat_getBooleanAttribute
-#@ stub udat_getCalendar
-#@ stub udat_getContext
-#@ stub udat_getLocaleByType
-#@ stub udat_getNumberFormat
-#@ stub udat_getNumberFormatForField
-#@ stub udat_getSymbols
-#@ stub udat_isLenient
-#@ stub udat_open
-#@ stub udat_parse
-#@ stub udat_parseCalendar
-#@ stub udat_set2DigitYearStart
-#@ stub udat_setBooleanAttribute
-#@ stub udat_setCalendar
-#@ stub udat_setContext
-#@ stub udat_setLenient
-#@ stub udat_setNumberFormat
-#@ stub udat_setSymbols
-#@ stub udat_toCalendarDateField
-#@ stub udat_toPattern
-#@ stub udatpg_addPattern
-#@ stub udatpg_clone
-#@ stub udatpg_close
-#@ stub udatpg_getAppendItemFormat
-#@ stub udatpg_getAppendItemName
-#@ stub udatpg_getBaseSkeleton
-#@ stub udatpg_getBestPattern
-#@ stub udatpg_getBestPatternWithOptions
-#@ stub udatpg_getDateTimeFormat
-#@ stub udatpg_getDecimal
-#@ stub udatpg_getFieldDisplayName
-#@ stub udatpg_getPatternForSkeleton
-#@ stub udatpg_getSkeleton
-#@ stub udatpg_open
-#@ stub udatpg_openBaseSkeletons
-#@ stub udatpg_openEmpty
-#@ stub udatpg_openSkeletons
-#@ stub udatpg_replaceFieldTypes
-#@ stub udatpg_replaceFieldTypesWithOptions
-#@ stub udatpg_setAppendItemFormat
-#@ stub udatpg_setAppendItemName
-#@ stub udatpg_setDateTimeFormat
-#@ stub udatpg_setDecimal
-#@ stub udtitvfmt_close
-#@ stub udtitvfmt_closeResult
-#@ stub udtitvfmt_format
-#@ stub udtitvfmt_open
-#@ stub udtitvfmt_openResult
-#@ stub udtitvfmt_resultAsValue
-#@ stub uenum_close
-#@ stub uenum_count
-#@ stub uenum_next
-#@ stub uenum_openCharStringsEnumeration
-#@ stub uenum_openUCharStringsEnumeration
-#@ stub uenum_reset
-#@ stub uenum_unext
-#@ stub ufieldpositer_close
-#@ stub ufieldpositer_next
-#@ stub ufieldpositer_open
-#@ stub ufmt_close
-#@ stub ufmt_getArrayItemByIndex
-#@ stub ufmt_getArrayLength
-#@ stub ufmt_getDate
-#@ stub ufmt_getDecNumChars
-#@ stub ufmt_getDouble
-#@ stub ufmt_getInt64
-#@ stub ufmt_getLong
-#@ stub ufmt_getObject
-#@ stub ufmt_getType
-#@ stub ufmt_getUChars
-#@ stub ufmt_isNumeric
-#@ stub ufmt_open
-#@ stub ufmtval_getString
-#@ stub ufmtval_nextPosition
-#@ stub ugender_getInstance
-#@ stub ugender_getListGender
-#@ stub uidna_close
-#@ stub uidna_labelToASCII
-#@ stub uidna_labelToASCII_UTF8
-#@ stub uidna_labelToUnicode
-#@ stub uidna_labelToUnicodeUTF8
-#@ stub uidna_nameToASCII
-#@ stub uidna_nameToASCII_UTF8
-#@ stub uidna_nameToUnicode
-#@ stub uidna_nameToUnicodeUTF8
-#@ stub uidna_openUTS46
-#@ stub uiter_current32
-#@ stub uiter_getState
-#@ stub uiter_next32
-#@ stub uiter_previous32
-#@ stub uiter_setState
-#@ stub uiter_setString
-#@ stub uiter_setUTF16BE
-#@ stub uiter_setUTF8
-#@ stub uldn_close
-#@ stub uldn_getContext
-#@ stub uldn_getDialectHandling
-#@ stub uldn_getLocale
-#@ stub uldn_keyDisplayName
-#@ stub uldn_keyValueDisplayName
-#@ stub uldn_languageDisplayName
-#@ stub uldn_localeDisplayName
-#@ stub uldn_open
-#@ stub uldn_openForContext
-#@ stub uldn_regionDisplayName
-#@ stub uldn_scriptCodeDisplayName
-#@ stub uldn_scriptDisplayName
-#@ stub uldn_variantDisplayName
-#@ stub ulistfmt_close
-#@ stub ulistfmt_closeResult
-#@ stub ulistfmt_format
-#@ stub ulistfmt_formatStringsToResult
-#@ stub ulistfmt_open
-#@ stub ulistfmt_openForType
-#@ stub ulistfmt_openResult
-#@ stub ulistfmt_resultAsValue
-#@ stub uloc_acceptLanguage
-#@ stub uloc_acceptLanguageFromHTTP
-#@ stub uloc_addLikelySubtags
-#@ stub uloc_canonicalize
-#@ stub uloc_countAvailable
-#@ stub uloc_forLanguageTag
-#@ stub uloc_getAvailable
-#@ stub uloc_getBaseName
-#@ stub uloc_getCharacterOrientation
-#@ stub uloc_getCountry
-#@ stub uloc_getDefault
-#@ stub uloc_getDisplayCountry
-#@ stub uloc_getDisplayKeyword
-#@ stub uloc_getDisplayKeywordValue
-#@ stub uloc_getDisplayLanguage
-#@ stub uloc_getDisplayName
-#@ stub uloc_getDisplayScript
-#@ stub uloc_getDisplayVariant
-#@ stub uloc_getISO3Country
-#@ stub uloc_getISO3Language
-#@ stub uloc_getISOCountries
-#@ stub uloc_getISOLanguages
-#@ stub uloc_getKeywordValue
-#@ stub uloc_getLCID
-#@ stub uloc_getLanguage
-#@ stub uloc_getLineOrientation
-#@ stub uloc_getLocaleForLCID
-#@ stub uloc_getName
-#@ stub uloc_getParent
-#@ stub uloc_getScript
-#@ stub uloc_getVariant
-#@ stub uloc_isRightToLeft
-#@ stub uloc_minimizeSubtags
-#@ stub uloc_openAvailableByType
-#@ stub uloc_openKeywords
-#@ stub uloc_setDefault
-#@ stub uloc_setKeywordValue
-#@ stub uloc_toLanguageTag
-#@ stub uloc_toLegacyKey
-#@ stub uloc_toLegacyType
-#@ stub uloc_toUnicodeLocaleKey
-#@ stub uloc_toUnicodeLocaleType
-#@ stub ulocdata_close
-#@ stub ulocdata_getCLDRVersion
-#@ stub ulocdata_getDelimiter
-#@ stub ulocdata_getExemplarSet
-#@ stub ulocdata_getLocaleDisplayPattern
-#@ stub ulocdata_getLocaleSeparator
-#@ stub ulocdata_getMeasurementSystem
-#@ stub ulocdata_getNoSubstitute
-#@ stub ulocdata_getPaperSize
-#@ stub ulocdata_open
-#@ stub ulocdata_setNoSubstitute
-#@ stub umsg_applyPattern
-#@ stub umsg_autoQuoteApostrophe
-#@ stub umsg_clone
-#@ stub umsg_close
-#@ stub umsg_format
-#@ stub umsg_getLocale
-#@ stub umsg_open
-#@ stub umsg_parse
-#@ stub umsg_setLocale
-#@ stub umsg_toPattern
-#@ stub umsg_vformat
-#@ stub umsg_vparse
-#@ stub umutablecptrie_buildImmutable
-#@ stub umutablecptrie_clone
-#@ stub umutablecptrie_close
-#@ stub umutablecptrie_fromUCPMap
-#@ stub umutablecptrie_fromUCPTrie
-#@ stub umutablecptrie_get
-#@ stub umutablecptrie_getRange
-#@ stub umutablecptrie_open
-#@ stub umutablecptrie_set
-#@ stub umutablecptrie_setRange
-#@ stub unorm2_append
-#@ stub unorm2_close
-#@ stub unorm2_composePair
-#@ stub unorm2_getCombiningClass
-#@ stub unorm2_getDecomposition
-#@ stub unorm2_getInstance
-#@ stub unorm2_getNFCInstance
-#@ stub unorm2_getNFDInstance
-#@ stub unorm2_getNFKCCasefoldInstance
-#@ stub unorm2_getNFKCInstance
-#@ stub unorm2_getNFKDInstance
-#@ stub unorm2_getRawDecomposition
-#@ stub unorm2_hasBoundaryAfter
-#@ stub unorm2_hasBoundaryBefore
-#@ stub unorm2_isInert
-#@ stub unorm2_isNormalized
-#@ stub unorm2_normalize
-#@ stub unorm2_normalizeSecondAndAppend
-#@ stub unorm2_openFiltered
-#@ stub unorm2_quickCheck
-#@ stub unorm2_spanQuickCheckYes
-#@ stub unorm_compare
-#@ stub unum_applyPattern
-#@ stub unum_clone
-#@ stub unum_close
-#@ stub unum_countAvailable
-#@ stub unum_format
-#@ stub unum_formatDecimal
-#@ stub unum_formatDouble
-#@ stub unum_formatDoubleCurrency
-#@ stub unum_formatDoubleForFields
-#@ stub unum_formatInt64
-#@ stub unum_formatUFormattable
-#@ stub unum_getAttribute
-#@ stub unum_getAvailable
-#@ stub unum_getContext
-#@ stub unum_getDoubleAttribute
-#@ stub unum_getLocaleByType
-#@ stub unum_getSymbol
-#@ stub unum_getTextAttribute
-#@ stub unum_open
-#@ stub unum_parse
-#@ stub unum_parseDecimal
-#@ stub unum_parseDouble
-#@ stub unum_parseDoubleCurrency
-#@ stub unum_parseInt64
-#@ stub unum_parseToUFormattable
-#@ stub unum_setAttribute
-#@ stub unum_setContext
-#@ stub unum_setDoubleAttribute
-#@ stub unum_setSymbol
-#@ stub unum_setTextAttribute
-#@ stub unum_toPattern
-#@ stub unumf_close
-#@ stub unumf_closeResult
-#@ stub unumf_formatDecimal
-#@ stub unumf_formatDouble
-#@ stub unumf_formatInt
-#@ stub unumf_openForSkeletonAndLocale
-#@ stub unumf_openForSkeletonAndLocaleWithError
-#@ stub unumf_openResult
-#@ stub unumf_resultAsValue
-#@ stub unumf_resultGetAllFieldPositions
-#@ stub unumf_resultNextFieldPosition
-#@ stub unumf_resultToString
-#@ stub unumsys_close
-#@ stub unumsys_getDescription
-#@ stub unumsys_getName
-#@ stub unumsys_getRadix
-#@ stub unumsys_isAlgorithmic
-#@ stub unumsys_open
-#@ stub unumsys_openAvailableNames
-#@ stub unumsys_openByName
-#@ stub uplrules_close
-#@ stub uplrules_getKeywords
-#@ stub uplrules_open
-#@ stub uplrules_openForType
-#@ stub uplrules_select
-#@ stub uplrules_selectFormatted
-#@ stub uregex_appendReplacement
-#@ stub uregex_appendReplacementUText
-#@ stub uregex_appendTail
-#@ stub uregex_appendTailUText
-#@ stub uregex_clone
-#@ stub uregex_close
-#@ stub uregex_end
-#@ stub uregex_end64
-#@ stub uregex_find
-#@ stub uregex_find64
-#@ stub uregex_findNext
-#@ stub uregex_flags
-#@ stub uregex_getFindProgressCallback
-#@ stub uregex_getMatchCallback
-#@ stub uregex_getStackLimit
-#@ stub uregex_getText
-#@ stub uregex_getTimeLimit
-#@ stub uregex_getUText
-#@ stub uregex_group
-#@ stub uregex_groupCount
-#@ stub uregex_groupNumberFromCName
-#@ stub uregex_groupNumberFromName
-#@ stub uregex_groupUText
-#@ stub uregex_hasAnchoringBounds
-#@ stub uregex_hasTransparentBounds
-#@ stub uregex_hitEnd
-#@ stub uregex_lookingAt
-#@ stub uregex_lookingAt64
-#@ stub uregex_matches
-#@ stub uregex_matches64
-#@ stub uregex_open
-#@ stub uregex_openC
-#@ stub uregex_openUText
-#@ stub uregex_pattern
-#@ stub uregex_patternUText
-#@ stub uregex_refreshUText
-#@ stub uregex_regionEnd
-#@ stub uregex_regionEnd64
-#@ stub uregex_regionStart
-#@ stub uregex_regionStart64
-#@ stub uregex_replaceAll
-#@ stub uregex_replaceAllUText
-#@ stub uregex_replaceFirst
-#@ stub uregex_replaceFirstUText
-#@ stub uregex_requireEnd
-#@ stub uregex_reset
-#@ stub uregex_reset64
-#@ stub uregex_setFindProgressCallback
-#@ stub uregex_setMatchCallback
-#@ stub uregex_setRegion
-#@ stub uregex_setRegion64
-#@ stub uregex_setRegionAndStart
-#@ stub uregex_setStackLimit
-#@ stub uregex_setText
-#@ stub uregex_setTimeLimit
-#@ stub uregex_setUText
-#@ stub uregex_split
-#@ stub uregex_splitUText
-#@ stub uregex_start
-#@ stub uregex_start64
-#@ stub uregex_useAnchoringBounds
-#@ stub uregex_useTransparentBounds
-#@ stub uregion_areEqual
-#@ stub uregion_contains
-#@ stub uregion_getAvailable
-#@ stub uregion_getContainedRegions
-#@ stub uregion_getContainedRegionsOfType
-#@ stub uregion_getContainingRegion
-#@ stub uregion_getContainingRegionOfType
-#@ stub uregion_getNumericCode
-#@ stub uregion_getPreferredValues
-#@ stub uregion_getRegionCode
-#@ stub uregion_getRegionFromCode
-#@ stub uregion_getRegionFromNumericCode
-#@ stub uregion_getType
-#@ stub ureldatefmt_close
-#@ stub ureldatefmt_closeResult
-#@ stub ureldatefmt_combineDateAndTime
-#@ stub ureldatefmt_format
-#@ stub ureldatefmt_formatNumeric
-#@ stub ureldatefmt_formatNumericToResult
-#@ stub ureldatefmt_formatToResult
-#@ stub ureldatefmt_open
-#@ stub ureldatefmt_openResult
-#@ stub ureldatefmt_resultAsValue
-#@ stub ures_close
-#@ stub ures_getBinary
-#@ stub ures_getByIndex
-#@ stub ures_getByKey
-#@ stub ures_getInt
-#@ stub ures_getIntVector
-#@ stub ures_getKey
-#@ stub ures_getLocaleByType
-#@ stub ures_getNextResource
-#@ stub ures_getNextString
-#@ stub ures_getSize
-#@ stub ures_getString
-#@ stub ures_getStringByIndex
-#@ stub ures_getStringByKey
-#@ stub ures_getType
-#@ stub ures_getUInt
-#@ stub ures_getUTF8String
-#@ stub ures_getUTF8StringByIndex
-#@ stub ures_getUTF8StringByKey
-#@ stub ures_getVersion
-#@ stub ures_hasNext
-#@ stub ures_open
-#@ stub ures_openAvailableLocales
-#@ stub ures_openDirect
-#@ stub ures_openU
-#@ stub ures_resetIterator
-#@ stub uscript_breaksBetweenLetters
-#@ stub uscript_getCode
-#@ stub uscript_getName
-#@ stub uscript_getSampleString
-#@ stub uscript_getScript
-#@ stub uscript_getScriptExtensions
-#@ stub uscript_getShortName
-#@ stub uscript_getUsage
-#@ stub uscript_hasScript
-#@ stub uscript_isCased
-#@ stub uscript_isRightToLeft
-#@ stub usearch_close
-#@ stub usearch_first
-#@ stub usearch_following
-#@ stub usearch_getAttribute
-#@ stub usearch_getBreakIterator
-#@ stub usearch_getCollator
-#@ stub usearch_getMatchedLength
-#@ stub usearch_getMatchedStart
-#@ stub usearch_getMatchedText
-#@ stub usearch_getOffset
-#@ stub usearch_getPattern
-#@ stub usearch_getText
-#@ stub usearch_last
-#@ stub usearch_next
-#@ stub usearch_open
-#@ stub usearch_openFromCollator
-#@ stub usearch_preceding
-#@ stub usearch_previous
-#@ stub usearch_reset
-#@ stub usearch_setAttribute
-#@ stub usearch_setBreakIterator
-#@ stub usearch_setCollator
-#@ stub usearch_setOffset
-#@ stub usearch_setPattern
-#@ stub usearch_setText
-#@ stub uset_add
-#@ stub uset_addAll
-#@ stub uset_addAllCodePoints
-#@ stub uset_addRange
-#@ stub uset_addString
-#@ stub uset_applyIntPropertyValue
-#@ stub uset_applyPattern
-#@ stub uset_applyPropertyAlias
-#@ stub uset_charAt
-#@ stub uset_clear
-#@ stub uset_clone
-#@ stub uset_cloneAsThawed
-#@ stub uset_close
-#@ stub uset_closeOver
-#@ stub uset_compact
-#@ stub uset_complement
-#@ stub uset_complementAll
-#@ stub uset_contains
-#@ stub uset_containsAll
-#@ stub uset_containsAllCodePoints
-#@ stub uset_containsNone
-#@ stub uset_containsRange
-#@ stub uset_containsSome
-#@ stub uset_containsString
-#@ stub uset_equals
-#@ stub uset_freeze
-#@ stub uset_getItem
-#@ stub uset_getItemCount
-#@ stub uset_getSerializedRange
-#@ stub uset_getSerializedRangeCount
-#@ stub uset_getSerializedSet
-#@ stub uset_indexOf
-#@ stub uset_isEmpty
-#@ stub uset_isFrozen
-#@ stub uset_open
-#@ stub uset_openEmpty
-#@ stub uset_openPattern
-#@ stub uset_openPatternOptions
-#@ stub uset_remove
-#@ stub uset_removeAll
-#@ stub uset_removeAllStrings
-#@ stub uset_removeRange
-#@ stub uset_removeString
-#@ stub uset_resemblesPattern
-#@ stub uset_retain
-#@ stub uset_retainAll
-#@ stub uset_serialize
-#@ stub uset_serializedContains
-#@ stub uset_set
-#@ stub uset_setSerializedToOne
-#@ stub uset_size
-#@ stub uset_span
-#@ stub uset_spanBack
-#@ stub uset_spanBackUTF8
-#@ stub uset_spanUTF8
-#@ stub uset_toPattern
-#@ stub uspoof_areConfusable
-#@ stub uspoof_areConfusableUTF8
-#@ stub uspoof_check
-#@ stub uspoof_check2
-#@ stub uspoof_check2UTF8
-#@ stub uspoof_checkUTF8
-#@ stub uspoof_clone
-#@ stub uspoof_close
-#@ stub uspoof_closeCheckResult
-#@ stub uspoof_getAllowedChars
-#@ stub uspoof_getAllowedLocales
-#@ stub uspoof_getCheckResultChecks
-#@ stub uspoof_getCheckResultNumerics
-#@ stub uspoof_getCheckResultRestrictionLevel
-#@ stub uspoof_getChecks
-#@ stub uspoof_getInclusionSet
-#@ stub uspoof_getRecommendedSet
-#@ stub uspoof_getRestrictionLevel
-#@ stub uspoof_getSkeleton
-#@ stub uspoof_getSkeletonUTF8
-#@ stub uspoof_open
-#@ stub uspoof_openCheckResult
-#@ stub uspoof_openFromSerialized
-#@ stub uspoof_openFromSource
-#@ stub uspoof_serialize
-#@ stub uspoof_setAllowedChars
-#@ stub uspoof_setAllowedLocales
-#@ stub uspoof_setChecks
-#@ stub uspoof_setRestrictionLevel
-#@ stub usprep_close
-#@ stub usprep_open
-#@ stub usprep_openByType
-#@ stub usprep_prepare
-#@ stub utext_char32At
-#@ stub utext_clone
-#@ stub utext_close
-#@ stub utext_copy
-#@ stub utext_current32
-#@ stub utext_equals
-#@ stub utext_extract
-#@ stub utext_freeze
-#@ stub utext_getNativeIndex
-#@ stub utext_getPreviousNativeIndex
-#@ stub utext_hasMetaData
-#@ stub utext_isLengthExpensive
-#@ stub utext_isWritable
-#@ stub utext_moveIndex32
-#@ stub utext_nativeLength
-#@ stub utext_next32
-#@ stub utext_next32From
-#@ stub utext_openUChars
-#@ stub utext_openUTF8
-#@ stub utext_previous32
-#@ stub utext_previous32From
-#@ stub utext_replace
-#@ stub utext_setNativeIndex
-#@ stub utext_setup
-#@ stub utf8_appendCharSafeBody
-#@ stub utf8_back1SafeBody
-#@ stub utf8_nextCharSafeBody
-#@ stub utf8_prevCharSafeBody
-#@ stub utmscale_fromInt64
-#@ stub utmscale_getTimeScaleValue
-#@ stub utmscale_toInt64
-#@ stub utrace_format
-#@ stub utrace_functionName
-#@ stub utrace_getFunctions
-#@ stub utrace_getLevel
-#@ stub utrace_setFunctions
-#@ stub utrace_setLevel
-#@ stub utrace_vformat
-#@ stub utrans_clone
-#@ stub utrans_close
-#@ stub utrans_countAvailableIDs
-#@ stub utrans_getSourceSet
-#@ stub utrans_getUnicodeID
-#@ stub utrans_openIDs
-#@ stub utrans_openInverse
-#@ stub utrans_openU
-#@ stub utrans_register
-#@ stub utrans_setFilter
-#@ stub utrans_toRules
-#@ stub utrans_trans
-#@ stub utrans_transIncremental
-#@ stub utrans_transIncrementalUChars
-#@ stub utrans_transUChars
-#@ stub utrans_unregisterID
+@ stub CloseDefaultICUGroupingLetters
+@ stub GetDefaultICUGroupingLetters
+@ stub GetICUGroupingLetter
+@ stub SortCloseHandle
+@ stub SortGetHandle
+@ stub SortGetSearchKey
+@ cdecl -norelay UCNV_FROM_U_CALLBACK_ESCAPE() icuuc68.UCNV_FROM_U_CALLBACK_ESCAPE_68
+@ cdecl -norelay UCNV_FROM_U_CALLBACK_SKIP() icuuc68.UCNV_FROM_U_CALLBACK_SKIP_68
+@ cdecl -norelay UCNV_FROM_U_CALLBACK_STOP() icuuc68.UCNV_FROM_U_CALLBACK_STOP_68
+@ cdecl -norelay UCNV_FROM_U_CALLBACK_SUBSTITUTE() icuuc68.UCNV_FROM_U_CALLBACK_SUBSTITUTE_68
+@ cdecl -norelay UCNV_TO_U_CALLBACK_ESCAPE() icuuc68.UCNV_TO_U_CALLBACK_ESCAPE_68
+@ cdecl -norelay UCNV_TO_U_CALLBACK_SKIP() icuuc68.UCNV_TO_U_CALLBACK_SKIP_68
+@ cdecl -norelay UCNV_TO_U_CALLBACK_STOP() icuuc68.UCNV_TO_U_CALLBACK_STOP_68
+@ cdecl -norelay UCNV_TO_U_CALLBACK_SUBSTITUTE() icuuc68.UCNV_TO_U_CALLBACK_SUBSTITUTE_68
+@ cdecl -norelay u_UCharsToChars() icuuc68.u_UCharsToChars_68
+@ cdecl -norelay u_austrcpy() icuuc68.u_austrcpy_68
+@ cdecl -norelay u_austrncpy() icuuc68.u_austrncpy_68
+@ cdecl -norelay u_catclose() icuuc68.u_catclose_68
+@ cdecl -norelay u_catgets() icuuc68.u_catgets_68
+@ cdecl -norelay u_catopen() icuuc68.u_catopen_68
+@ cdecl -norelay u_charAge() icuuc68.u_charAge_68
+@ cdecl -norelay u_charDigitValue() icuuc68.u_charDigitValue_68
+@ cdecl -norelay u_charDirection() icuuc68.u_charDirection_68
+@ cdecl -norelay u_charFromName() icuuc68.u_charFromName_68
+@ cdecl -norelay u_charMirror() icuuc68.u_charMirror_68
+@ cdecl -norelay u_charName() icuuc68.u_charName_68
+@ cdecl -norelay u_charType() icuuc68.u_charType_68
+@ cdecl -norelay u_charsToUChars() icuuc68.u_charsToUChars_68
+@ cdecl -norelay u_cleanup() icuuc68.u_cleanup_68
+@ cdecl -norelay u_countChar32() icuuc68.u_countChar32_68
+@ cdecl -norelay u_digit() icuuc68.u_digit_68
+@ cdecl -norelay u_enumCharNames() icuuc68.u_enumCharNames_68
+@ cdecl -norelay u_enumCharTypes() icuuc68.u_enumCharTypes_68
+@ cdecl -norelay u_errorName() icuuc68.u_errorName_68
+@ cdecl -norelay u_foldCase() icuuc68.u_foldCase_68
+@ cdecl -norelay u_forDigit() icuuc68.u_forDigit_68
+@ cdecl -norelay u_formatMessage() icuin68.u_formatMessage_68
+@ cdecl -norelay u_formatMessageWithError() icuin68.u_formatMessageWithError_68
+@ cdecl -norelay u_getBidiPairedBracket() icuuc68.u_getBidiPairedBracket_68
+@ cdecl -norelay u_getBinaryPropertySet() icuuc68.u_getBinaryPropertySet_68
+@ cdecl -norelay u_getCombiningClass() icuuc68.u_getCombiningClass_68
+@ cdecl -norelay u_getDataVersion() icuuc68.u_getDataVersion_68
+@ cdecl -norelay u_getFC_NFKC_Closure() icuuc68.u_getFC_NFKC_Closure_68
+@ cdecl -norelay u_getIntPropertyMap() icuuc68.u_getIntPropertyMap_68
+@ cdecl -norelay u_getIntPropertyMaxValue() icuuc68.u_getIntPropertyMaxValue_68
+@ cdecl -norelay u_getIntPropertyMinValue() icuuc68.u_getIntPropertyMinValue_68
+@ cdecl -norelay u_getIntPropertyValue() icuuc68.u_getIntPropertyValue_68
+@ cdecl -norelay u_getNumericValue() icuuc68.u_getNumericValue_68
+@ cdecl -norelay u_getPropertyEnum() icuuc68.u_getPropertyEnum_68
+@ cdecl -norelay u_getPropertyName() icuuc68.u_getPropertyName_68
+@ cdecl -norelay u_getPropertyValueEnum() icuuc68.u_getPropertyValueEnum_68
+@ cdecl -norelay u_getPropertyValueName() icuuc68.u_getPropertyValueName_68
+@ cdecl -norelay u_getUnicodeVersion() icuuc68.u_getUnicodeVersion_68
+@ cdecl -norelay u_getVersion() icuuc68.u_getVersion_68
+@ cdecl -norelay u_hasBinaryProperty() icuuc68.u_hasBinaryProperty_68
+@ cdecl -norelay u_init() icuuc68.u_init_68
+@ cdecl -norelay u_isIDIgnorable() icuuc68.u_isIDIgnorable_68
+@ cdecl -norelay u_isIDPart() icuuc68.u_isIDPart_68
+@ cdecl -norelay u_isIDStart() icuuc68.u_isIDStart_68
+@ cdecl -norelay u_isISOControl() icuuc68.u_isISOControl_68
+@ cdecl -norelay u_isJavaIDPart() icuuc68.u_isJavaIDPart_68
+@ cdecl -norelay u_isJavaIDStart() icuuc68.u_isJavaIDStart_68
+@ cdecl -norelay u_isJavaSpaceChar() icuuc68.u_isJavaSpaceChar_68
+@ cdecl -norelay u_isMirrored() icuuc68.u_isMirrored_68
+@ cdecl -norelay u_isUAlphabetic() icuuc68.u_isUAlphabetic_68
+@ cdecl -norelay u_isULowercase() icuuc68.u_isULowercase_68
+@ cdecl -norelay u_isUUppercase() icuuc68.u_isUUppercase_68
+@ cdecl -norelay u_isUWhiteSpace() icuuc68.u_isUWhiteSpace_68
+@ cdecl -norelay u_isWhitespace() icuuc68.u_isWhitespace_68
+@ cdecl -norelay u_isalnum() icuuc68.u_isalnum_68
+@ cdecl -norelay u_isalpha() icuuc68.u_isalpha_68
+@ cdecl -norelay u_isbase() icuuc68.u_isbase_68
+@ cdecl -norelay u_isblank() icuuc68.u_isblank_68
+@ cdecl -norelay u_iscntrl() icuuc68.u_iscntrl_68
+@ cdecl -norelay u_isdefined() icuuc68.u_isdefined_68
+@ cdecl -norelay u_isdigit() icuuc68.u_isdigit_68
+@ cdecl -norelay u_isgraph() icuuc68.u_isgraph_68
+@ cdecl -norelay u_islower() icuuc68.u_islower_68
+@ cdecl -norelay u_isprint() icuuc68.u_isprint_68
+@ cdecl -norelay u_ispunct() icuuc68.u_ispunct_68
+@ cdecl -norelay u_isspace() icuuc68.u_isspace_68
+@ cdecl -norelay u_istitle() icuuc68.u_istitle_68
+@ cdecl -norelay u_isupper() icuuc68.u_isupper_68
+@ cdecl -norelay u_isxdigit() icuuc68.u_isxdigit_68
+@ cdecl -norelay u_memcasecmp() icuuc68.u_memcasecmp_68
+@ cdecl -norelay u_memchr() icuuc68.u_memchr_68
+@ cdecl -norelay u_memchr32() icuuc68.u_memchr32_68
+@ cdecl -norelay u_memcmp() icuuc68.u_memcmp_68
+@ cdecl -norelay u_memcmpCodePointOrder() icuuc68.u_memcmpCodePointOrder_68
+@ cdecl -norelay u_memcpy() icuuc68.u_memcpy_68
+@ cdecl -norelay u_memmove() icuuc68.u_memmove_68
+@ cdecl -norelay u_memrchr() icuuc68.u_memrchr_68
+@ cdecl -norelay u_memrchr32() icuuc68.u_memrchr32_68
+@ cdecl -norelay u_memset() icuuc68.u_memset_68
+@ cdecl -norelay u_parseMessage() icuin68.u_parseMessage_68
+@ cdecl -norelay u_parseMessageWithError() icuin68.u_parseMessageWithError_68
+@ cdecl -norelay u_setMemoryFunctions() icuuc68.u_setMemoryFunctions_68
+@ cdecl -norelay u_shapeArabic() icuuc68.u_shapeArabic_68
+@ cdecl -norelay u_strCaseCompare() icuuc68.u_strCaseCompare_68
+@ cdecl -norelay u_strCompare() icuuc68.u_strCompare_68
+@ cdecl -norelay u_strCompareIter() icuuc68.u_strCompareIter_68
+@ cdecl -norelay u_strFindFirst() icuuc68.u_strFindFirst_68
+@ cdecl -norelay u_strFindLast() icuuc68.u_strFindLast_68
+@ cdecl -norelay u_strFoldCase() icuuc68.u_strFoldCase_68
+@ cdecl -norelay u_strFromJavaModifiedUTF8WithSub() icuuc68.u_strFromJavaModifiedUTF8WithSub_68
+@ cdecl -norelay u_strFromUTF32() icuuc68.u_strFromUTF32_68
+@ cdecl -norelay u_strFromUTF32WithSub() icuuc68.u_strFromUTF32WithSub_68
+@ cdecl -norelay u_strFromUTF8() icuuc68.u_strFromUTF8_68
+@ cdecl -norelay u_strFromUTF8Lenient() icuuc68.u_strFromUTF8Lenient_68
+@ cdecl -norelay u_strFromUTF8WithSub() icuuc68.u_strFromUTF8WithSub_68
+@ cdecl -norelay u_strFromWCS() icuuc68.u_strFromWCS_68
+@ cdecl -norelay u_strHasMoreChar32Than() icuuc68.u_strHasMoreChar32Than_68
+@ cdecl -norelay u_strToJavaModifiedUTF8() icuuc68.u_strToJavaModifiedUTF8_68
+@ cdecl -norelay u_strToLower() icuuc68.u_strToLower_68
+@ cdecl -norelay u_strToTitle() icuuc68.u_strToTitle_68
+@ cdecl -norelay u_strToUTF32() icuuc68.u_strToUTF32_68
+@ cdecl -norelay u_strToUTF32WithSub() icuuc68.u_strToUTF32WithSub_68
+@ cdecl -norelay u_strToUTF8() icuuc68.u_strToUTF8_68
+@ cdecl -norelay u_strToUTF8WithSub() icuuc68.u_strToUTF8WithSub_68
+@ cdecl -norelay u_strToUpper() icuuc68.u_strToUpper_68
+@ cdecl -norelay u_strToWCS() icuuc68.u_strToWCS_68
+@ cdecl -norelay u_strcasecmp() icuuc68.u_strcasecmp_68
+@ cdecl -norelay u_strcat() icuuc68.u_strcat_68
+@ cdecl -norelay u_strchr() icuuc68.u_strchr_68
+@ cdecl -norelay u_strchr32() icuuc68.u_strchr32_68
+@ cdecl -norelay u_strcmp() icuuc68.u_strcmp_68
+@ cdecl -norelay u_strcmpCodePointOrder() icuuc68.u_strcmpCodePointOrder_68
+@ cdecl -norelay u_strcpy() icuuc68.u_strcpy_68
+@ cdecl -norelay u_strcspn() icuuc68.u_strcspn_68
+@ cdecl -norelay u_strlen() icuuc68.u_strlen_68
+@ cdecl -norelay u_strncasecmp() icuuc68.u_strncasecmp_68
+@ cdecl -norelay u_strncat() icuuc68.u_strncat_68
+@ cdecl -norelay u_strncmp() icuuc68.u_strncmp_68
+@ cdecl -norelay u_strncmpCodePointOrder() icuuc68.u_strncmpCodePointOrder_68
+@ cdecl -norelay u_strncpy() icuuc68.u_strncpy_68
+@ cdecl -norelay u_strpbrk() icuuc68.u_strpbrk_68
+@ cdecl -norelay u_strrchr() icuuc68.u_strrchr_68
+@ cdecl -norelay u_strrchr32() icuuc68.u_strrchr32_68
+@ cdecl -norelay u_strrstr() icuuc68.u_strrstr_68
+@ cdecl -norelay u_strspn() icuuc68.u_strspn_68
+@ cdecl -norelay u_strstr() icuuc68.u_strstr_68
+@ cdecl -norelay u_strtok_r() icuuc68.u_strtok_r_68
+@ cdecl -norelay u_tolower() icuuc68.u_tolower_68
+@ cdecl -norelay u_totitle() icuuc68.u_totitle_68
+@ cdecl -norelay u_toupper() icuuc68.u_toupper_68
+@ cdecl -norelay u_uastrcpy() icuuc68.u_uastrcpy_68
+@ cdecl -norelay u_uastrncpy() icuuc68.u_uastrncpy_68
+@ cdecl -norelay u_unescape() icuuc68.u_unescape_68
+@ cdecl -norelay u_unescapeAt() icuuc68.u_unescapeAt_68
+@ cdecl -norelay u_versionFromString() icuuc68.u_versionFromString_68
+@ cdecl -norelay u_versionFromUString() icuuc68.u_versionFromUString_68
+@ cdecl -norelay u_versionToString() icuuc68.u_versionToString_68
+@ cdecl -norelay u_vformatMessage() icuin68.u_vformatMessage_68
+@ cdecl -norelay u_vformatMessageWithError() icuin68.u_vformatMessageWithError_68
+@ cdecl -norelay u_vparseMessage() icuin68.u_vparseMessage_68
+@ cdecl -norelay u_vparseMessageWithError() icuin68.u_vparseMessageWithError_68
+@ cdecl -norelay ubidi_close() icuuc68.ubidi_close_68
+@ cdecl -norelay ubidi_countParagraphs() icuuc68.ubidi_countParagraphs_68
+@ cdecl -norelay ubidi_countRuns() icuuc68.ubidi_countRuns_68
+@ cdecl -norelay ubidi_getBaseDirection() icuuc68.ubidi_getBaseDirection_68
+@ cdecl -norelay ubidi_getClassCallback() icuuc68.ubidi_getClassCallback_68
+@ cdecl -norelay ubidi_getCustomizedClass() icuuc68.ubidi_getCustomizedClass_68
+@ cdecl -norelay ubidi_getDirection() icuuc68.ubidi_getDirection_68
+@ cdecl -norelay ubidi_getLength() icuuc68.ubidi_getLength_68
+@ cdecl -norelay ubidi_getLevelAt() icuuc68.ubidi_getLevelAt_68
+@ cdecl -norelay ubidi_getLevels() icuuc68.ubidi_getLevels_68
+@ cdecl -norelay ubidi_getLogicalIndex() icuuc68.ubidi_getLogicalIndex_68
+@ cdecl -norelay ubidi_getLogicalMap() icuuc68.ubidi_getLogicalMap_68
+@ cdecl -norelay ubidi_getLogicalRun() icuuc68.ubidi_getLogicalRun_68
+@ cdecl -norelay ubidi_getParaLevel() icuuc68.ubidi_getParaLevel_68
+@ cdecl -norelay ubidi_getParagraph() icuuc68.ubidi_getParagraph_68
+@ cdecl -norelay ubidi_getParagraphByIndex() icuuc68.ubidi_getParagraphByIndex_68
+@ cdecl -norelay ubidi_getProcessedLength() icuuc68.ubidi_getProcessedLength_68
+@ cdecl -norelay ubidi_getReorderingMode() icuuc68.ubidi_getReorderingMode_68
+@ cdecl -norelay ubidi_getReorderingOptions() icuuc68.ubidi_getReorderingOptions_68
+@ cdecl -norelay ubidi_getResultLength() icuuc68.ubidi_getResultLength_68
+@ cdecl -norelay ubidi_getText() icuuc68.ubidi_getText_68
+@ cdecl -norelay ubidi_getVisualIndex() icuuc68.ubidi_getVisualIndex_68
+@ cdecl -norelay ubidi_getVisualMap() icuuc68.ubidi_getVisualMap_68
+@ cdecl -norelay ubidi_getVisualRun() icuuc68.ubidi_getVisualRun_68
+@ cdecl -norelay ubidi_invertMap() icuuc68.ubidi_invertMap_68
+@ cdecl -norelay ubidi_isInverse() icuuc68.ubidi_isInverse_68
+@ cdecl -norelay ubidi_isOrderParagraphsLTR() icuuc68.ubidi_isOrderParagraphsLTR_68
+@ cdecl -norelay ubidi_open() icuuc68.ubidi_open_68
+@ cdecl -norelay ubidi_openSized() icuuc68.ubidi_openSized_68
+@ cdecl -norelay ubidi_orderParagraphsLTR() icuuc68.ubidi_orderParagraphsLTR_68
+@ cdecl -norelay ubidi_reorderLogical() icuuc68.ubidi_reorderLogical_68
+@ cdecl -norelay ubidi_reorderVisual() icuuc68.ubidi_reorderVisual_68
+@ cdecl -norelay ubidi_setClassCallback() icuuc68.ubidi_setClassCallback_68
+@ cdecl -norelay ubidi_setContext() icuuc68.ubidi_setContext_68
+@ cdecl -norelay ubidi_setInverse() icuuc68.ubidi_setInverse_68
+@ cdecl -norelay ubidi_setLine() icuuc68.ubidi_setLine_68
+@ cdecl -norelay ubidi_setPara() icuuc68.ubidi_setPara_68
+@ cdecl -norelay ubidi_setReorderingMode() icuuc68.ubidi_setReorderingMode_68
+@ cdecl -norelay ubidi_setReorderingOptions() icuuc68.ubidi_setReorderingOptions_68
+@ cdecl -norelay ubidi_writeReordered() icuuc68.ubidi_writeReordered_68
+@ cdecl -norelay ubidi_writeReverse() icuuc68.ubidi_writeReverse_68
+@ cdecl -norelay ubiditransform_close() icuuc68.ubiditransform_close_68
+@ cdecl -norelay ubiditransform_open() icuuc68.ubiditransform_open_68
+@ cdecl -norelay ubiditransform_transform() icuuc68.ubiditransform_transform_68
+@ cdecl -norelay ublock_getCode() icuuc68.ublock_getCode_68
+@ cdecl -norelay ubrk_close() icuuc68.ubrk_close_68
+@ cdecl -norelay ubrk_countAvailable() icuuc68.ubrk_countAvailable_68
+@ cdecl -norelay ubrk_current() icuuc68.ubrk_current_68
+@ cdecl -norelay ubrk_first() icuuc68.ubrk_first_68
+@ cdecl -norelay ubrk_following() icuuc68.ubrk_following_68
+@ cdecl -norelay ubrk_getAvailable() icuuc68.ubrk_getAvailable_68
+@ cdecl -norelay ubrk_getBinaryRules() icuuc68.ubrk_getBinaryRules_68
+@ cdecl -norelay ubrk_getLocaleByType() icuuc68.ubrk_getLocaleByType_68
+@ cdecl -norelay ubrk_getRuleStatus() icuuc68.ubrk_getRuleStatus_68
+@ cdecl -norelay ubrk_getRuleStatusVec() icuuc68.ubrk_getRuleStatusVec_68
+@ cdecl -norelay ubrk_isBoundary() icuuc68.ubrk_isBoundary_68
+@ cdecl -norelay ubrk_last() icuuc68.ubrk_last_68
+@ cdecl -norelay ubrk_next() icuuc68.ubrk_next_68
+@ cdecl -norelay ubrk_open() icuuc68.ubrk_open_68
+@ cdecl -norelay ubrk_openBinaryRules() icuuc68.ubrk_openBinaryRules_68
+@ cdecl -norelay ubrk_openRules() icuuc68.ubrk_openRules_68
+@ cdecl -norelay ubrk_preceding() icuuc68.ubrk_preceding_68
+@ cdecl -norelay ubrk_previous() icuuc68.ubrk_previous_68
+@ cdecl -norelay ubrk_refreshUText() icuuc68.ubrk_refreshUText_68
+@ cdecl -norelay ubrk_safeClone() icuuc68.ubrk_safeClone_68
+@ cdecl -norelay ubrk_setText() icuuc68.ubrk_setText_68
+@ cdecl -norelay ubrk_setUText() icuuc68.ubrk_setUText_68
+@ cdecl -norelay ucal_add() icuin68.ucal_add_68
+@ cdecl -norelay ucal_clear() icuin68.ucal_clear_68
+@ cdecl -norelay ucal_clearField() icuin68.ucal_clearField_68
+@ cdecl -norelay ucal_clone() icuin68.ucal_clone_68
+@ cdecl -norelay ucal_close() icuin68.ucal_close_68
+@ cdecl -norelay ucal_countAvailable() icuin68.ucal_countAvailable_68
+@ cdecl -norelay ucal_equivalentTo() icuin68.ucal_equivalentTo_68
+@ cdecl -norelay ucal_get() icuin68.ucal_get_68
+@ cdecl -norelay ucal_getAttribute() icuin68.ucal_getAttribute_68
+@ cdecl -norelay ucal_getAvailable() icuin68.ucal_getAvailable_68
+@ cdecl -norelay ucal_getCanonicalTimeZoneID() icuin68.ucal_getCanonicalTimeZoneID_68
+@ cdecl -norelay ucal_getDSTSavings() icuin68.ucal_getDSTSavings_68
+@ cdecl -norelay ucal_getDayOfWeekType() icuin68.ucal_getDayOfWeekType_68
+@ cdecl -norelay ucal_getDefaultTimeZone() icuin68.ucal_getDefaultTimeZone_68
+@ cdecl -norelay ucal_getFieldDifference() icuin68.ucal_getFieldDifference_68
+@ cdecl -norelay ucal_getGregorianChange() icuin68.ucal_getGregorianChange_68
+@ cdecl -norelay ucal_getHostTimeZone() icuin68.ucal_getHostTimeZone_68
+@ cdecl -norelay ucal_getKeywordValuesForLocale() icuin68.ucal_getKeywordValuesForLocale_68
+@ cdecl -norelay ucal_getLimit() icuin68.ucal_getLimit_68
+@ cdecl -norelay ucal_getLocaleByType() icuin68.ucal_getLocaleByType_68
+@ cdecl -norelay ucal_getMillis() icuin68.ucal_getMillis_68
+@ cdecl -norelay ucal_getNow() icuin68.ucal_getNow_68
+@ cdecl -norelay ucal_getTZDataVersion() icuin68.ucal_getTZDataVersion_68
+@ cdecl -norelay ucal_getTimeZoneDisplayName() icuin68.ucal_getTimeZoneDisplayName_68
+@ cdecl -norelay ucal_getTimeZoneID() icuin68.ucal_getTimeZoneID_68
+@ cdecl -norelay ucal_getTimeZoneIDForWindowsID() icuin68.ucal_getTimeZoneIDForWindowsID_68
+@ cdecl -norelay ucal_getTimeZoneTransitionDate() icuin68.ucal_getTimeZoneTransitionDate_68
+@ cdecl -norelay ucal_getType() icuin68.ucal_getType_68
+@ cdecl -norelay ucal_getWeekendTransition() icuin68.ucal_getWeekendTransition_68
+@ cdecl -norelay ucal_getWindowsTimeZoneID() icuin68.ucal_getWindowsTimeZoneID_68
+@ cdecl -norelay ucal_inDaylightTime() icuin68.ucal_inDaylightTime_68
+@ cdecl -norelay ucal_isSet() icuin68.ucal_isSet_68
+@ cdecl -norelay ucal_isWeekend() icuin68.ucal_isWeekend_68
+@ cdecl -norelay ucal_open() icuin68.ucal_open_68
+@ cdecl -norelay ucal_openCountryTimeZones() icuin68.ucal_openCountryTimeZones_68
+@ cdecl -norelay ucal_openTimeZoneIDEnumeration() icuin68.ucal_openTimeZoneIDEnumeration_68
+@ cdecl -norelay ucal_openTimeZones() icuin68.ucal_openTimeZones_68
+@ cdecl -norelay ucal_roll() icuin68.ucal_roll_68
+@ cdecl -norelay ucal_set() icuin68.ucal_set_68
+@ cdecl -norelay ucal_setAttribute() icuin68.ucal_setAttribute_68
+@ cdecl -norelay ucal_setDate() icuin68.ucal_setDate_68
+@ cdecl -norelay ucal_setDateTime() icuin68.ucal_setDateTime_68
+@ cdecl -norelay ucal_setDefaultTimeZone() icuin68.ucal_setDefaultTimeZone_68
+@ cdecl -norelay ucal_setGregorianChange() icuin68.ucal_setGregorianChange_68
+@ cdecl -norelay ucal_setMillis() icuin68.ucal_setMillis_68
+@ cdecl -norelay ucal_setTimeZone() icuin68.ucal_setTimeZone_68
+@ cdecl -norelay ucasemap_close() icuuc68.ucasemap_close_68
+@ cdecl -norelay ucasemap_getBreakIterator() icuuc68.ucasemap_getBreakIterator_68
+@ cdecl -norelay ucasemap_getLocale() icuuc68.ucasemap_getLocale_68
+@ cdecl -norelay ucasemap_getOptions() icuuc68.ucasemap_getOptions_68
+@ cdecl -norelay ucasemap_open() icuuc68.ucasemap_open_68
+@ cdecl -norelay ucasemap_setBreakIterator() icuuc68.ucasemap_setBreakIterator_68
+@ cdecl -norelay ucasemap_setLocale() icuuc68.ucasemap_setLocale_68
+@ cdecl -norelay ucasemap_setOptions() icuuc68.ucasemap_setOptions_68
+@ cdecl -norelay ucasemap_toTitle() icuuc68.ucasemap_toTitle_68
+@ cdecl -norelay ucasemap_utf8FoldCase() icuuc68.ucasemap_utf8FoldCase_68
+@ cdecl -norelay ucasemap_utf8ToLower() icuuc68.ucasemap_utf8ToLower_68
+@ cdecl -norelay ucasemap_utf8ToTitle() icuuc68.ucasemap_utf8ToTitle_68
+@ cdecl -norelay ucasemap_utf8ToUpper() icuuc68.ucasemap_utf8ToUpper_68
+@ cdecl -norelay ucfpos_close() icuin68.ucfpos_close_68
+@ cdecl -norelay ucfpos_constrainCategory() icuin68.ucfpos_constrainCategory_68
+@ cdecl -norelay ucfpos_constrainField() icuin68.ucfpos_constrainField_68
+@ cdecl -norelay ucfpos_getCategory() icuin68.ucfpos_getCategory_68
+@ cdecl -norelay ucfpos_getField() icuin68.ucfpos_getField_68
+@ cdecl -norelay ucfpos_getIndexes() icuin68.ucfpos_getIndexes_68
+@ cdecl -norelay ucfpos_getInt64IterationContext() icuin68.ucfpos_getInt64IterationContext_68
+@ cdecl -norelay ucfpos_matchesField() icuin68.ucfpos_matchesField_68
+@ cdecl -norelay ucfpos_open() icuin68.ucfpos_open_68
+@ cdecl -norelay ucfpos_reset() icuin68.ucfpos_reset_68
+@ cdecl -norelay ucfpos_setInt64IterationContext() icuin68.ucfpos_setInt64IterationContext_68
+@ cdecl -norelay ucfpos_setState() icuin68.ucfpos_setState_68
+@ cdecl -norelay ucnv_cbFromUWriteBytes() icuuc68.ucnv_cbFromUWriteBytes_68
+@ cdecl -norelay ucnv_cbFromUWriteSub() icuuc68.ucnv_cbFromUWriteSub_68
+@ cdecl -norelay ucnv_cbFromUWriteUChars() icuuc68.ucnv_cbFromUWriteUChars_68
+@ cdecl -norelay ucnv_cbToUWriteSub() icuuc68.ucnv_cbToUWriteSub_68
+@ cdecl -norelay ucnv_cbToUWriteUChars() icuuc68.ucnv_cbToUWriteUChars_68
+@ cdecl -norelay ucnv_close() icuuc68.ucnv_close_68
+@ cdecl -norelay ucnv_compareNames() icuuc68.ucnv_compareNames_68
+@ cdecl -norelay ucnv_convert() icuuc68.ucnv_convert_68
+@ cdecl -norelay ucnv_convertEx() icuuc68.ucnv_convertEx_68
+@ cdecl -norelay ucnv_countAliases() icuuc68.ucnv_countAliases_68
+@ cdecl -norelay ucnv_countAvailable() icuuc68.ucnv_countAvailable_68
+@ cdecl -norelay ucnv_countStandards() icuuc68.ucnv_countStandards_68
+@ cdecl -norelay ucnv_detectUnicodeSignature() icuuc68.ucnv_detectUnicodeSignature_68
+@ cdecl -norelay ucnv_fixFileSeparator() icuuc68.ucnv_fixFileSeparator_68
+@ cdecl -norelay ucnv_flushCache() icuuc68.ucnv_flushCache_68
+@ cdecl -norelay ucnv_fromAlgorithmic() icuuc68.ucnv_fromAlgorithmic_68
+@ cdecl -norelay ucnv_fromUChars() icuuc68.ucnv_fromUChars_68
+@ cdecl -norelay ucnv_fromUCountPending() icuuc68.ucnv_fromUCountPending_68
+@ cdecl -norelay ucnv_fromUnicode() icuuc68.ucnv_fromUnicode_68
+@ cdecl -norelay ucnv_getAlias() icuuc68.ucnv_getAlias_68
+@ cdecl -norelay ucnv_getAliases() icuuc68.ucnv_getAliases_68
+@ cdecl -norelay ucnv_getAvailableName() icuuc68.ucnv_getAvailableName_68
+@ cdecl -norelay ucnv_getCCSID() icuuc68.ucnv_getCCSID_68
+@ cdecl -norelay ucnv_getCanonicalName() icuuc68.ucnv_getCanonicalName_68
+@ cdecl -norelay ucnv_getDefaultName() icuuc68.ucnv_getDefaultName_68
+@ cdecl -norelay ucnv_getDisplayName() icuuc68.ucnv_getDisplayName_68
+@ cdecl -norelay ucnv_getFromUCallBack() icuuc68.ucnv_getFromUCallBack_68
+@ cdecl -norelay ucnv_getInvalidChars() icuuc68.ucnv_getInvalidChars_68
+@ cdecl -norelay ucnv_getInvalidUChars() icuuc68.ucnv_getInvalidUChars_68
+@ cdecl -norelay ucnv_getMaxCharSize() icuuc68.ucnv_getMaxCharSize_68
+@ cdecl -norelay ucnv_getMinCharSize() icuuc68.ucnv_getMinCharSize_68
+@ cdecl -norelay ucnv_getName() icuuc68.ucnv_getName_68
+@ cdecl -norelay ucnv_getNextUChar() icuuc68.ucnv_getNextUChar_68
+@ cdecl -norelay ucnv_getPlatform() icuuc68.ucnv_getPlatform_68
+@ cdecl -norelay ucnv_getStandard() icuuc68.ucnv_getStandard_68
+@ cdecl -norelay ucnv_getStandardName() icuuc68.ucnv_getStandardName_68
+@ cdecl -norelay ucnv_getStarters() icuuc68.ucnv_getStarters_68
+@ cdecl -norelay ucnv_getSubstChars() icuuc68.ucnv_getSubstChars_68
+@ cdecl -norelay ucnv_getToUCallBack() icuuc68.ucnv_getToUCallBack_68
+@ cdecl -norelay ucnv_getType() icuuc68.ucnv_getType_68
+@ cdecl -norelay ucnv_getUnicodeSet() icuuc68.ucnv_getUnicodeSet_68
+@ cdecl -norelay ucnv_isAmbiguous() icuuc68.ucnv_isAmbiguous_68
+@ cdecl -norelay ucnv_isFixedWidth() icuuc68.ucnv_isFixedWidth_68
+@ cdecl -norelay ucnv_open() icuuc68.ucnv_open_68
+@ cdecl -norelay ucnv_openAllNames() icuuc68.ucnv_openAllNames_68
+@ cdecl -norelay ucnv_openCCSID() icuuc68.ucnv_openCCSID_68
+@ cdecl -norelay ucnv_openPackage() icuuc68.ucnv_openPackage_68
+@ cdecl -norelay ucnv_openStandardNames() icuuc68.ucnv_openStandardNames_68
+@ cdecl -norelay ucnv_openU() icuuc68.ucnv_openU_68
+@ cdecl -norelay ucnv_reset() icuuc68.ucnv_reset_68
+@ cdecl -norelay ucnv_resetFromUnicode() icuuc68.ucnv_resetFromUnicode_68
+@ cdecl -norelay ucnv_resetToUnicode() icuuc68.ucnv_resetToUnicode_68
+@ cdecl -norelay ucnv_safeClone() icuuc68.ucnv_safeClone_68
+@ cdecl -norelay ucnv_setDefaultName() icuuc68.ucnv_setDefaultName_68
+@ cdecl -norelay ucnv_setFallback() icuuc68.ucnv_setFallback_68
+@ cdecl -norelay ucnv_setFromUCallBack() icuuc68.ucnv_setFromUCallBack_68
+@ cdecl -norelay ucnv_setSubstChars() icuuc68.ucnv_setSubstChars_68
+@ cdecl -norelay ucnv_setSubstString() icuuc68.ucnv_setSubstString_68
+@ cdecl -norelay ucnv_setToUCallBack() icuuc68.ucnv_setToUCallBack_68
+@ cdecl -norelay ucnv_toAlgorithmic() icuuc68.ucnv_toAlgorithmic_68
+@ cdecl -norelay ucnv_toUChars() icuuc68.ucnv_toUChars_68
+@ cdecl -norelay ucnv_toUCountPending() icuuc68.ucnv_toUCountPending_68
+@ cdecl -norelay ucnv_toUnicode() icuuc68.ucnv_toUnicode_68
+@ cdecl -norelay ucnv_usesFallback() icuuc68.ucnv_usesFallback_68
+@ cdecl -norelay ucnvsel_close() icuuc68.ucnvsel_close_68
+@ cdecl -norelay ucnvsel_open() icuuc68.ucnvsel_open_68
+@ cdecl -norelay ucnvsel_openFromSerialized() icuuc68.ucnvsel_openFromSerialized_68
+@ cdecl -norelay ucnvsel_selectForString() icuuc68.ucnvsel_selectForString_68
+@ cdecl -norelay ucnvsel_selectForUTF8() icuuc68.ucnvsel_selectForUTF8_68
+@ cdecl -norelay ucnvsel_serialize() icuuc68.ucnvsel_serialize_68
+@ cdecl -norelay ucol_cloneBinary() icuin68.ucol_cloneBinary_68
+@ cdecl -norelay ucol_close() icuin68.ucol_close_68
+@ cdecl -norelay ucol_closeElements() icuin68.ucol_closeElements_68
+@ cdecl -norelay ucol_countAvailable() icuin68.ucol_countAvailable_68
+@ cdecl -norelay ucol_equal() icuin68.ucol_equal_68
+@ cdecl -norelay ucol_getAttribute() icuin68.ucol_getAttribute_68
+@ cdecl -norelay ucol_getAvailable() icuin68.ucol_getAvailable_68
+@ cdecl -norelay ucol_getBound() icuin68.ucol_getBound_68
+@ cdecl -norelay ucol_getContractionsAndExpansions() icuin68.ucol_getContractionsAndExpansions_68
+@ cdecl -norelay ucol_getDisplayName() icuin68.ucol_getDisplayName_68
+@ cdecl -norelay ucol_getEquivalentReorderCodes() icuin68.ucol_getEquivalentReorderCodes_68
+@ cdecl -norelay ucol_getFunctionalEquivalent() icuin68.ucol_getFunctionalEquivalent_68
+@ cdecl -norelay ucol_getKeywordValues() icuin68.ucol_getKeywordValues_68
+@ cdecl -norelay ucol_getKeywordValuesForLocale() icuin68.ucol_getKeywordValuesForLocale_68
+@ cdecl -norelay ucol_getKeywords() icuin68.ucol_getKeywords_68
+@ cdecl -norelay ucol_getLocaleByType() icuin68.ucol_getLocaleByType_68
+@ cdecl -norelay ucol_getMaxExpansion() icuin68.ucol_getMaxExpansion_68
+@ cdecl -norelay ucol_getMaxVariable() icuin68.ucol_getMaxVariable_68
+@ cdecl -norelay ucol_getOffset() icuin68.ucol_getOffset_68
+@ cdecl -norelay ucol_getReorderCodes() icuin68.ucol_getReorderCodes_68
+@ cdecl -norelay ucol_getRules() icuin68.ucol_getRules_68
+@ cdecl -norelay ucol_getRulesEx() icuin68.ucol_getRulesEx_68
+@ cdecl -norelay ucol_getSortKey() icuin68.ucol_getSortKey_68
+@ cdecl -norelay ucol_getStrength() icuin68.ucol_getStrength_68
+@ cdecl -norelay ucol_getTailoredSet() icuin68.ucol_getTailoredSet_68
+@ cdecl -norelay ucol_getUCAVersion() icuin68.ucol_getUCAVersion_68
+@ cdecl -norelay ucol_getVariableTop() icuin68.ucol_getVariableTop_68
+@ cdecl -norelay ucol_getVersion() icuin68.ucol_getVersion_68
+@ cdecl -norelay ucol_greater() icuin68.ucol_greater_68
+@ cdecl -norelay ucol_greaterOrEqual() icuin68.ucol_greaterOrEqual_68
+@ cdecl -norelay ucol_keyHashCode() icuin68.ucol_keyHashCode_68
+@ cdecl -norelay ucol_mergeSortkeys() icuin68.ucol_mergeSortkeys_68
+@ cdecl -norelay ucol_next() icuin68.ucol_next_68
+@ cdecl -norelay ucol_nextSortKeyPart() icuin68.ucol_nextSortKeyPart_68
+@ cdecl -norelay ucol_open() icuin68.ucol_open_68
+@ cdecl -norelay ucol_openAvailableLocales() icuin68.ucol_openAvailableLocales_68
+@ cdecl -norelay ucol_openBinary() icuin68.ucol_openBinary_68
+@ cdecl -norelay ucol_openElements() icuin68.ucol_openElements_68
+@ cdecl -norelay ucol_openRules() icuin68.ucol_openRules_68
+@ cdecl -norelay ucol_previous() icuin68.ucol_previous_68
+@ cdecl -norelay ucol_primaryOrder() icuin68.ucol_primaryOrder_68
+@ cdecl -norelay ucol_reset() icuin68.ucol_reset_68
+@ cdecl -norelay ucol_safeClone() icuin68.ucol_safeClone_68
+@ cdecl -norelay ucol_secondaryOrder() icuin68.ucol_secondaryOrder_68
+@ cdecl -norelay ucol_setAttribute() icuin68.ucol_setAttribute_68
+@ cdecl -norelay ucol_setMaxVariable() icuin68.ucol_setMaxVariable_68
+@ cdecl -norelay ucol_setOffset() icuin68.ucol_setOffset_68
+@ cdecl -norelay ucol_setReorderCodes() icuin68.ucol_setReorderCodes_68
+@ cdecl -norelay ucol_setStrength() icuin68.ucol_setStrength_68
+@ cdecl -norelay ucol_setText() icuin68.ucol_setText_68
+@ cdecl -norelay ucol_strcoll() icuin68.ucol_strcoll_68
+@ cdecl -norelay ucol_strcollIter() icuin68.ucol_strcollIter_68
+@ cdecl -norelay ucol_strcollUTF8() icuin68.ucol_strcollUTF8_68
+@ cdecl -norelay ucol_tertiaryOrder() icuin68.ucol_tertiaryOrder_68
+@ cdecl -norelay ucpmap_get() icuuc68.ucpmap_get_68
+@ cdecl -norelay ucpmap_getRange() icuuc68.ucpmap_getRange_68
+@ cdecl -norelay ucptrie_close() icuuc68.ucptrie_close_68
+@ cdecl -norelay ucptrie_get() icuuc68.ucptrie_get_68
+@ cdecl -norelay ucptrie_getRange() icuuc68.ucptrie_getRange_68
+@ cdecl -norelay ucptrie_getType() icuuc68.ucptrie_getType_68
+@ cdecl -norelay ucptrie_getValueWidth() icuuc68.ucptrie_getValueWidth_68
+@ cdecl -norelay ucptrie_internalSmallIndex() icuuc68.ucptrie_internalSmallIndex_68
+@ cdecl -norelay ucptrie_internalSmallU8Index() icuuc68.ucptrie_internalSmallU8Index_68
+@ cdecl -norelay ucptrie_internalU8PrevIndex() icuuc68.ucptrie_internalU8PrevIndex_68
+@ cdecl -norelay ucptrie_openFromBinary() icuuc68.ucptrie_openFromBinary_68
+@ cdecl -norelay ucptrie_toBinary() icuuc68.ucptrie_toBinary_68
+@ cdecl -norelay ucsdet_close() icuin68.ucsdet_close_68
+@ cdecl -norelay ucsdet_detect() icuin68.ucsdet_detect_68
+@ cdecl -norelay ucsdet_detectAll() icuin68.ucsdet_detectAll_68
+@ cdecl -norelay ucsdet_enableInputFilter() icuin68.ucsdet_enableInputFilter_68
+@ cdecl -norelay ucsdet_getAllDetectableCharsets() icuin68.ucsdet_getAllDetectableCharsets_68
+@ cdecl -norelay ucsdet_getConfidence() icuin68.ucsdet_getConfidence_68
+@ cdecl -norelay ucsdet_getLanguage() icuin68.ucsdet_getLanguage_68
+@ cdecl -norelay ucsdet_getName() icuin68.ucsdet_getName_68
+@ cdecl -norelay ucsdet_getUChars() icuin68.ucsdet_getUChars_68
+@ cdecl -norelay ucsdet_isInputFilterEnabled() icuin68.ucsdet_isInputFilterEnabled_68
+@ cdecl -norelay ucsdet_open() icuin68.ucsdet_open_68
+@ cdecl -norelay ucsdet_setDeclaredEncoding() icuin68.ucsdet_setDeclaredEncoding_68
+@ cdecl -norelay ucsdet_setText() icuin68.ucsdet_setText_68
+@ cdecl -norelay ucurr_countCurrencies() icuuc68.ucurr_countCurrencies_68
+@ cdecl -norelay ucurr_forLocale() icuuc68.ucurr_forLocale_68
+@ cdecl -norelay ucurr_forLocaleAndDate() icuuc68.ucurr_forLocaleAndDate_68
+@ cdecl -norelay ucurr_getDefaultFractionDigits() icuuc68.ucurr_getDefaultFractionDigits_68
+@ cdecl -norelay ucurr_getDefaultFractionDigitsForUsage() icuuc68.ucurr_getDefaultFractionDigitsForUsage_68
+@ cdecl -norelay ucurr_getKeywordValuesForLocale() icuuc68.ucurr_getKeywordValuesForLocale_68
+@ cdecl -norelay ucurr_getName() icuuc68.ucurr_getName_68
+@ cdecl -norelay ucurr_getNumericCode() icuuc68.ucurr_getNumericCode_68
+@ cdecl -norelay ucurr_getPluralName() icuuc68.ucurr_getPluralName_68
+@ cdecl -norelay ucurr_getRoundingIncrement() icuuc68.ucurr_getRoundingIncrement_68
+@ cdecl -norelay ucurr_getRoundingIncrementForUsage() icuuc68.ucurr_getRoundingIncrementForUsage_68
+@ cdecl -norelay ucurr_isAvailable() icuuc68.ucurr_isAvailable_68
+@ cdecl -norelay ucurr_openISOCurrencies() icuuc68.ucurr_openISOCurrencies_68
+@ cdecl -norelay ucurr_register() icuuc68.ucurr_register_68
+@ cdecl -norelay ucurr_unregister() icuuc68.ucurr_unregister_68
+@ cdecl -norelay udat_adoptNumberFormat() icuin68.udat_adoptNumberFormat_68
+@ cdecl -norelay udat_adoptNumberFormatForFields() icuin68.udat_adoptNumberFormatForFields_68
+@ cdecl -norelay udat_applyPattern() icuin68.udat_applyPattern_68
+@ cdecl -norelay udat_clone() icuin68.udat_clone_68
+@ cdecl -norelay udat_close() icuin68.udat_close_68
+@ cdecl -norelay udat_countAvailable() icuin68.udat_countAvailable_68
+@ cdecl -norelay udat_countSymbols() icuin68.udat_countSymbols_68
+@ cdecl -norelay udat_format() icuin68.udat_format_68
+@ cdecl -norelay udat_formatCalendar() icuin68.udat_formatCalendar_68
+@ cdecl -norelay udat_formatCalendarForFields() icuin68.udat_formatCalendarForFields_68
+@ cdecl -norelay udat_formatForFields() icuin68.udat_formatForFields_68
+@ cdecl -norelay udat_get2DigitYearStart() icuin68.udat_get2DigitYearStart_68
+@ cdecl -norelay udat_getAvailable() icuin68.udat_getAvailable_68
+@ cdecl -norelay udat_getBooleanAttribute() icuin68.udat_getBooleanAttribute_68
+@ cdecl -norelay udat_getCalendar() icuin68.udat_getCalendar_68
+@ cdecl -norelay udat_getContext() icuin68.udat_getContext_68
+@ cdecl -norelay udat_getLocaleByType() icuin68.udat_getLocaleByType_68
+@ cdecl -norelay udat_getNumberFormat() icuin68.udat_getNumberFormat_68
+@ cdecl -norelay udat_getNumberFormatForField() icuin68.udat_getNumberFormatForField_68
+@ cdecl -norelay udat_getSymbols() icuin68.udat_getSymbols_68
+@ cdecl -norelay udat_isLenient() icuin68.udat_isLenient_68
+@ cdecl -norelay udat_open() icuin68.udat_open_68
+@ cdecl -norelay udat_parse() icuin68.udat_parse_68
+@ cdecl -norelay udat_parseCalendar() icuin68.udat_parseCalendar_68
+@ cdecl -norelay udat_set2DigitYearStart() icuin68.udat_set2DigitYearStart_68
+@ cdecl -norelay udat_setBooleanAttribute() icuin68.udat_setBooleanAttribute_68
+@ cdecl -norelay udat_setCalendar() icuin68.udat_setCalendar_68
+@ cdecl -norelay udat_setContext() icuin68.udat_setContext_68
+@ cdecl -norelay udat_setLenient() icuin68.udat_setLenient_68
+@ cdecl -norelay udat_setNumberFormat() icuin68.udat_setNumberFormat_68
+@ cdecl -norelay udat_setSymbols() icuin68.udat_setSymbols_68
+@ cdecl -norelay udat_toCalendarDateField() icuin68.udat_toCalendarDateField_68
+@ cdecl -norelay udat_toPattern() icuin68.udat_toPattern_68
+@ cdecl -norelay udatpg_addPattern() icuin68.udatpg_addPattern_68
+@ cdecl -norelay udatpg_clone() icuin68.udatpg_clone_68
+@ cdecl -norelay udatpg_close() icuin68.udatpg_close_68
+@ cdecl -norelay udatpg_getAppendItemFormat() icuin68.udatpg_getAppendItemFormat_68
+@ cdecl -norelay udatpg_getAppendItemName() icuin68.udatpg_getAppendItemName_68
+@ cdecl -norelay udatpg_getBaseSkeleton() icuin68.udatpg_getBaseSkeleton_68
+@ cdecl -norelay udatpg_getBestPattern() icuin68.udatpg_getBestPattern_68
+@ cdecl -norelay udatpg_getBestPatternWithOptions() icuin68.udatpg_getBestPatternWithOptions_68
+@ cdecl -norelay udatpg_getDateTimeFormat() icuin68.udatpg_getDateTimeFormat_68
+@ cdecl -norelay udatpg_getDecimal() icuin68.udatpg_getDecimal_68
+@ cdecl -norelay udatpg_getFieldDisplayName() icuin68.udatpg_getFieldDisplayName_68
+@ cdecl -norelay udatpg_getPatternForSkeleton() icuin68.udatpg_getPatternForSkeleton_68
+@ cdecl -norelay udatpg_getSkeleton() icuin68.udatpg_getSkeleton_68
+@ cdecl -norelay udatpg_open() icuin68.udatpg_open_68
+@ cdecl -norelay udatpg_openBaseSkeletons() icuin68.udatpg_openBaseSkeletons_68
+@ cdecl -norelay udatpg_openEmpty() icuin68.udatpg_openEmpty_68
+@ cdecl -norelay udatpg_openSkeletons() icuin68.udatpg_openSkeletons_68
+@ cdecl -norelay udatpg_replaceFieldTypes() icuin68.udatpg_replaceFieldTypes_68
+@ cdecl -norelay udatpg_replaceFieldTypesWithOptions() icuin68.udatpg_replaceFieldTypesWithOptions_68
+@ cdecl -norelay udatpg_setAppendItemFormat() icuin68.udatpg_setAppendItemFormat_68
+@ cdecl -norelay udatpg_setAppendItemName() icuin68.udatpg_setAppendItemName_68
+@ cdecl -norelay udatpg_setDateTimeFormat() icuin68.udatpg_setDateTimeFormat_68
+@ cdecl -norelay udatpg_setDecimal() icuin68.udatpg_setDecimal_68
+@ cdecl -norelay udtitvfmt_close() icuin68.udtitvfmt_close_68
+@ cdecl -norelay udtitvfmt_closeResult() icuin68.udtitvfmt_closeResult_68
+@ cdecl -norelay udtitvfmt_format() icuin68.udtitvfmt_format_68
+@ cdecl -norelay udtitvfmt_open() icuin68.udtitvfmt_open_68
+@ cdecl -norelay udtitvfmt_openResult() icuin68.udtitvfmt_openResult_68
+@ cdecl -norelay udtitvfmt_resultAsValue() icuin68.udtitvfmt_resultAsValue_68
+@ cdecl -norelay uenum_close() icuuc68.uenum_close_68
+@ cdecl -norelay uenum_count() icuuc68.uenum_count_68
+@ cdecl -norelay uenum_next() icuuc68.uenum_next_68
+@ cdecl -norelay uenum_openCharStringsEnumeration() icuuc68.uenum_openCharStringsEnumeration_68
+@ cdecl -norelay uenum_openUCharStringsEnumeration() icuuc68.uenum_openUCharStringsEnumeration_68
+@ cdecl -norelay uenum_reset() icuuc68.uenum_reset_68
+@ cdecl -norelay uenum_unext() icuuc68.uenum_unext_68
+@ cdecl -norelay ufieldpositer_close() icuin68.ufieldpositer_close_68
+@ cdecl -norelay ufieldpositer_next() icuin68.ufieldpositer_next_68
+@ cdecl -norelay ufieldpositer_open() icuin68.ufieldpositer_open_68
+@ cdecl -norelay ufmt_close() icuin68.ufmt_close_68
+@ cdecl -norelay ufmt_getArrayItemByIndex() icuin68.ufmt_getArrayItemByIndex_68
+@ cdecl -norelay ufmt_getArrayLength() icuin68.ufmt_getArrayLength_68
+@ cdecl -norelay ufmt_getDate() icuin68.ufmt_getDate_68
+@ cdecl -norelay ufmt_getDecNumChars() icuin68.ufmt_getDecNumChars_68
+@ cdecl -norelay ufmt_getDouble() icuin68.ufmt_getDouble_68
+@ cdecl -norelay ufmt_getInt64() icuin68.ufmt_getInt64_68
+@ cdecl -norelay ufmt_getLong() icuin68.ufmt_getLong_68
+@ cdecl -norelay ufmt_getObject() icuin68.ufmt_getObject_68
+@ cdecl -norelay ufmt_getType() icuin68.ufmt_getType_68
+@ cdecl -norelay ufmt_getUChars() icuin68.ufmt_getUChars_68
+@ cdecl -norelay ufmt_isNumeric() icuin68.ufmt_isNumeric_68
+@ cdecl -norelay ufmt_open() icuin68.ufmt_open_68
+@ cdecl -norelay ufmtval_getString() icuin68.ufmtval_getString_68
+@ cdecl -norelay ufmtval_nextPosition() icuin68.ufmtval_nextPosition_68
+@ cdecl -norelay ugender_getInstance() icuin68.ugender_getInstance_68
+@ cdecl -norelay ugender_getListGender() icuin68.ugender_getListGender_68
+@ cdecl -norelay uidna_close() icuuc68.uidna_close_68
+@ cdecl -norelay uidna_labelToASCII() icuuc68.uidna_labelToASCII_68
+@ cdecl -norelay uidna_labelToASCII_UTF8() icuuc68.uidna_labelToASCII_UTF8_68
+@ cdecl -norelay uidna_labelToUnicode() icuuc68.uidna_labelToUnicode_68
+@ cdecl -norelay uidna_labelToUnicodeUTF8() icuuc68.uidna_labelToUnicodeUTF8_68
+@ cdecl -norelay uidna_nameToASCII() icuuc68.uidna_nameToASCII_68
+@ cdecl -norelay uidna_nameToASCII_UTF8() icuuc68.uidna_nameToASCII_UTF8_68
+@ cdecl -norelay uidna_nameToUnicode() icuuc68.uidna_nameToUnicode_68
+@ cdecl -norelay uidna_nameToUnicodeUTF8() icuuc68.uidna_nameToUnicodeUTF8_68
+@ cdecl -norelay uidna_openUTS46() icuuc68.uidna_openUTS46_68
+@ cdecl -norelay uiter_current32() icuuc68.uiter_current32_68
+@ cdecl -norelay uiter_getState() icuuc68.uiter_getState_68
+@ cdecl -norelay uiter_next32() icuuc68.uiter_next32_68
+@ cdecl -norelay uiter_previous32() icuuc68.uiter_previous32_68
+@ cdecl -norelay uiter_setState() icuuc68.uiter_setState_68
+@ cdecl -norelay uiter_setString() icuuc68.uiter_setString_68
+@ cdecl -norelay uiter_setUTF16BE() icuuc68.uiter_setUTF16BE_68
+@ cdecl -norelay uiter_setUTF8() icuuc68.uiter_setUTF8_68
+@ cdecl -norelay uldn_close() icuuc68.uldn_close_68
+@ cdecl -norelay uldn_getContext() icuuc68.uldn_getContext_68
+@ cdecl -norelay uldn_getDialectHandling() icuuc68.uldn_getDialectHandling_68
+@ cdecl -norelay uldn_getLocale() icuuc68.uldn_getLocale_68
+@ cdecl -norelay uldn_keyDisplayName() icuuc68.uldn_keyDisplayName_68
+@ cdecl -norelay uldn_keyValueDisplayName() icuuc68.uldn_keyValueDisplayName_68
+@ cdecl -norelay uldn_languageDisplayName() icuuc68.uldn_languageDisplayName_68
+@ cdecl -norelay uldn_localeDisplayName() icuuc68.uldn_localeDisplayName_68
+@ cdecl -norelay uldn_open() icuuc68.uldn_open_68
+@ cdecl -norelay uldn_openForContext() icuuc68.uldn_openForContext_68
+@ cdecl -norelay uldn_regionDisplayName() icuuc68.uldn_regionDisplayName_68
+@ cdecl -norelay uldn_scriptCodeDisplayName() icuuc68.uldn_scriptCodeDisplayName_68
+@ cdecl -norelay uldn_scriptDisplayName() icuuc68.uldn_scriptDisplayName_68
+@ cdecl -norelay uldn_variantDisplayName() icuuc68.uldn_variantDisplayName_68
+@ cdecl -norelay ulistfmt_close() icuin68.ulistfmt_close_68
+@ cdecl -norelay ulistfmt_closeResult() icuin68.ulistfmt_closeResult_68
+@ cdecl -norelay ulistfmt_format() icuin68.ulistfmt_format_68
+@ cdecl -norelay ulistfmt_formatStringsToResult() icuin68.ulistfmt_formatStringsToResult_68
+@ cdecl -norelay ulistfmt_open() icuin68.ulistfmt_open_68
+@ cdecl -norelay ulistfmt_openForType() icuin68.ulistfmt_openForType_68
+@ cdecl -norelay ulistfmt_openResult() icuin68.ulistfmt_openResult_68
+@ cdecl -norelay ulistfmt_resultAsValue() icuin68.ulistfmt_resultAsValue_68
+@ cdecl -norelay uloc_acceptLanguage() icuuc68.uloc_acceptLanguage_68
+@ cdecl -norelay uloc_acceptLanguageFromHTTP() icuuc68.uloc_acceptLanguageFromHTTP_68
+@ cdecl -norelay uloc_addLikelySubtags() icuuc68.uloc_addLikelySubtags_68
+@ cdecl -norelay uloc_canonicalize() icuuc68.uloc_canonicalize_68
+@ cdecl -norelay uloc_countAvailable() icuuc68.uloc_countAvailable_68
+@ cdecl -norelay uloc_forLanguageTag() icuuc68.uloc_forLanguageTag_68
+@ cdecl -norelay uloc_getAvailable() icuuc68.uloc_getAvailable_68
+@ cdecl -norelay uloc_getBaseName() icuuc68.uloc_getBaseName_68
+@ cdecl -norelay uloc_getCharacterOrientation() icuuc68.uloc_getCharacterOrientation_68
+@ cdecl -norelay uloc_getCountry() icuuc68.uloc_getCountry_68
+@ cdecl -norelay uloc_getDefault() icuuc68.uloc_getDefault_68
+@ cdecl -norelay uloc_getDisplayCountry() icuuc68.uloc_getDisplayCountry_68
+@ cdecl -norelay uloc_getDisplayKeyword() icuuc68.uloc_getDisplayKeyword_68
+@ cdecl -norelay uloc_getDisplayKeywordValue() icuuc68.uloc_getDisplayKeywordValue_68
+@ cdecl -norelay uloc_getDisplayLanguage() icuuc68.uloc_getDisplayLanguage_68
+@ cdecl -norelay uloc_getDisplayName() icuuc68.uloc_getDisplayName_68
+@ cdecl -norelay uloc_getDisplayScript() icuuc68.uloc_getDisplayScript_68
+@ cdecl -norelay uloc_getDisplayVariant() icuuc68.uloc_getDisplayVariant_68
+@ cdecl -norelay uloc_getISO3Country() icuuc68.uloc_getISO3Country_68
+@ cdecl -norelay uloc_getISO3Language() icuuc68.uloc_getISO3Language_68
+@ cdecl -norelay uloc_getISOCountries() icuuc68.uloc_getISOCountries_68
+@ cdecl -norelay uloc_getISOLanguages() icuuc68.uloc_getISOLanguages_68
+@ cdecl -norelay uloc_getKeywordValue() icuuc68.uloc_getKeywordValue_68
+@ cdecl -norelay uloc_getLCID() icuuc68.uloc_getLCID_68
+@ cdecl -norelay uloc_getLanguage() icuuc68.uloc_getLanguage_68
+@ cdecl -norelay uloc_getLineOrientation() icuuc68.uloc_getLineOrientation_68
+@ cdecl -norelay uloc_getLocaleForLCID() icuuc68.uloc_getLocaleForLCID_68
+@ cdecl -norelay uloc_getName() icuuc68.uloc_getName_68
+@ cdecl -norelay uloc_getParent() icuuc68.uloc_getParent_68
+@ cdecl -norelay uloc_getScript() icuuc68.uloc_getScript_68
+@ cdecl -norelay uloc_getVariant() icuuc68.uloc_getVariant_68
+@ cdecl -norelay uloc_isRightToLeft() icuuc68.uloc_isRightToLeft_68
+@ cdecl -norelay uloc_minimizeSubtags() icuuc68.uloc_minimizeSubtags_68
+@ cdecl -norelay uloc_openAvailableByType() icuuc68.uloc_openAvailableByType_68
+@ cdecl -norelay uloc_openKeywords() icuuc68.uloc_openKeywords_68
+@ cdecl -norelay uloc_setDefault() icuuc68.uloc_setDefault_68
+@ cdecl -norelay uloc_setKeywordValue() icuuc68.uloc_setKeywordValue_68
+@ cdecl -norelay uloc_toLanguageTag() icuuc68.uloc_toLanguageTag_68
+@ cdecl -norelay uloc_toLegacyKey() icuuc68.uloc_toLegacyKey_68
+@ cdecl -norelay uloc_toLegacyType() icuuc68.uloc_toLegacyType_68
+@ cdecl -norelay uloc_toUnicodeLocaleKey() icuuc68.uloc_toUnicodeLocaleKey_68
+@ cdecl -norelay uloc_toUnicodeLocaleType() icuuc68.uloc_toUnicodeLocaleType_68
+@ cdecl -norelay ulocdata_close() icuin68.ulocdata_close_68
+@ cdecl -norelay ulocdata_getCLDRVersion() icuin68.ulocdata_getCLDRVersion_68
+@ cdecl -norelay ulocdata_getDelimiter() icuin68.ulocdata_getDelimiter_68
+@ cdecl -norelay ulocdata_getExemplarSet() icuin68.ulocdata_getExemplarSet_68
+@ cdecl -norelay ulocdata_getLocaleDisplayPattern() icuin68.ulocdata_getLocaleDisplayPattern_68
+@ cdecl -norelay ulocdata_getLocaleSeparator() icuin68.ulocdata_getLocaleSeparator_68
+@ cdecl -norelay ulocdata_getMeasurementSystem() icuin68.ulocdata_getMeasurementSystem_68
+@ cdecl -norelay ulocdata_getNoSubstitute() icuin68.ulocdata_getNoSubstitute_68
+@ cdecl -norelay ulocdata_getPaperSize() icuin68.ulocdata_getPaperSize_68
+@ cdecl -norelay ulocdata_open() icuin68.ulocdata_open_68
+@ cdecl -norelay ulocdata_setNoSubstitute() icuin68.ulocdata_setNoSubstitute_68
+@ cdecl -norelay umsg_applyPattern() icuin68.umsg_applyPattern_68
+@ cdecl -norelay umsg_autoQuoteApostrophe() icuin68.umsg_autoQuoteApostrophe_68
+@ cdecl -norelay umsg_clone() icuin68.umsg_clone_68
+@ cdecl -norelay umsg_close() icuin68.umsg_close_68
+@ cdecl -norelay umsg_format() icuin68.umsg_format_68
+@ cdecl -norelay umsg_getLocale() icuin68.umsg_getLocale_68
+@ cdecl -norelay umsg_open() icuin68.umsg_open_68
+@ cdecl -norelay umsg_parse() icuin68.umsg_parse_68
+@ cdecl -norelay umsg_setLocale() icuin68.umsg_setLocale_68
+@ cdecl -norelay umsg_toPattern() icuin68.umsg_toPattern_68
+@ cdecl -norelay umsg_vformat() icuin68.umsg_vformat_68
+@ cdecl -norelay umsg_vparse() icuin68.umsg_vparse_68
+@ cdecl -norelay umutablecptrie_buildImmutable() icuuc68.umutablecptrie_buildImmutable_68
+@ cdecl -norelay umutablecptrie_clone() icuuc68.umutablecptrie_clone_68
+@ cdecl -norelay umutablecptrie_close() icuuc68.umutablecptrie_close_68
+@ cdecl -norelay umutablecptrie_fromUCPMap() icuuc68.umutablecptrie_fromUCPMap_68
+@ cdecl -norelay umutablecptrie_fromUCPTrie() icuuc68.umutablecptrie_fromUCPTrie_68
+@ cdecl -norelay umutablecptrie_get() icuuc68.umutablecptrie_get_68
+@ cdecl -norelay umutablecptrie_getRange() icuuc68.umutablecptrie_getRange_68
+@ cdecl -norelay umutablecptrie_open() icuuc68.umutablecptrie_open_68
+@ cdecl -norelay umutablecptrie_set() icuuc68.umutablecptrie_set_68
+@ cdecl -norelay umutablecptrie_setRange() icuuc68.umutablecptrie_setRange_68
+@ cdecl -norelay unorm2_append() icuuc68.unorm2_append_68
+@ cdecl -norelay unorm2_close() icuuc68.unorm2_close_68
+@ cdecl -norelay unorm2_composePair() icuuc68.unorm2_composePair_68
+@ cdecl -norelay unorm2_getCombiningClass() icuuc68.unorm2_getCombiningClass_68
+@ cdecl -norelay unorm2_getDecomposition() icuuc68.unorm2_getDecomposition_68
+@ cdecl -norelay unorm2_getInstance() icuuc68.unorm2_getInstance_68
+@ cdecl -norelay unorm2_getNFCInstance() icuuc68.unorm2_getNFCInstance_68
+@ cdecl -norelay unorm2_getNFDInstance() icuuc68.unorm2_getNFDInstance_68
+@ cdecl -norelay unorm2_getNFKCCasefoldInstance() icuuc68.unorm2_getNFKCCasefoldInstance_68
+@ cdecl -norelay unorm2_getNFKCInstance() icuuc68.unorm2_getNFKCInstance_68
+@ cdecl -norelay unorm2_getNFKDInstance() icuuc68.unorm2_getNFKDInstance_68
+@ cdecl -norelay unorm2_getRawDecomposition() icuuc68.unorm2_getRawDecomposition_68
+@ cdecl -norelay unorm2_hasBoundaryAfter() icuuc68.unorm2_hasBoundaryAfter_68
+@ cdecl -norelay unorm2_hasBoundaryBefore() icuuc68.unorm2_hasBoundaryBefore_68
+@ cdecl -norelay unorm2_isInert() icuuc68.unorm2_isInert_68
+@ cdecl -norelay unorm2_isNormalized() icuuc68.unorm2_isNormalized_68
+@ cdecl -norelay unorm2_normalize() icuuc68.unorm2_normalize_68
+@ cdecl -norelay unorm2_normalizeSecondAndAppend() icuuc68.unorm2_normalizeSecondAndAppend_68
+@ cdecl -norelay unorm2_openFiltered() icuuc68.unorm2_openFiltered_68
+@ cdecl -norelay unorm2_quickCheck() icuuc68.unorm2_quickCheck_68
+@ cdecl -norelay unorm2_spanQuickCheckYes() icuuc68.unorm2_spanQuickCheckYes_68
+@ cdecl -norelay unorm_compare() icuuc68.unorm_compare_68
+@ cdecl -norelay unum_applyPattern() icuin68.unum_applyPattern_68
+@ cdecl -norelay unum_clone() icuin68.unum_clone_68
+@ cdecl -norelay unum_close() icuin68.unum_close_68
+@ cdecl -norelay unum_countAvailable() icuin68.unum_countAvailable_68
+@ cdecl -norelay unum_format() icuin68.unum_format_68
+@ cdecl -norelay unum_formatDecimal() icuin68.unum_formatDecimal_68
+@ cdecl -norelay unum_formatDouble() icuin68.unum_formatDouble_68
+@ cdecl -norelay unum_formatDoubleCurrency() icuin68.unum_formatDoubleCurrency_68
+@ cdecl -norelay unum_formatDoubleForFields() icuin68.unum_formatDoubleForFields_68
+@ cdecl -norelay unum_formatInt64() icuin68.unum_formatInt64_68
+@ cdecl -norelay unum_formatUFormattable() icuin68.unum_formatUFormattable_68
+@ cdecl -norelay unum_getAttribute() icuin68.unum_getAttribute_68
+@ cdecl -norelay unum_getAvailable() icuin68.unum_getAvailable_68
+@ cdecl -norelay unum_getContext() icuin68.unum_getContext_68
+@ cdecl -norelay unum_getDoubleAttribute() icuin68.unum_getDoubleAttribute_68
+@ cdecl -norelay unum_getLocaleByType() icuin68.unum_getLocaleByType_68
+@ cdecl -norelay unum_getSymbol() icuin68.unum_getSymbol_68
+@ cdecl -norelay unum_getTextAttribute() icuin68.unum_getTextAttribute_68
+@ cdecl -norelay unum_open() icuin68.unum_open_68
+@ cdecl -norelay unum_parse() icuin68.unum_parse_68
+@ cdecl -norelay unum_parseDecimal() icuin68.unum_parseDecimal_68
+@ cdecl -norelay unum_parseDouble() icuin68.unum_parseDouble_68
+@ cdecl -norelay unum_parseDoubleCurrency() icuin68.unum_parseDoubleCurrency_68
+@ cdecl -norelay unum_parseInt64() icuin68.unum_parseInt64_68
+@ cdecl -norelay unum_parseToUFormattable() icuin68.unum_parseToUFormattable_68
+@ cdecl -norelay unum_setAttribute() icuin68.unum_setAttribute_68
+@ cdecl -norelay unum_setContext() icuin68.unum_setContext_68
+@ cdecl -norelay unum_setDoubleAttribute() icuin68.unum_setDoubleAttribute_68
+@ cdecl -norelay unum_setSymbol() icuin68.unum_setSymbol_68
+@ cdecl -norelay unum_setTextAttribute() icuin68.unum_setTextAttribute_68
+@ cdecl -norelay unum_toPattern() icuin68.unum_toPattern_68
+@ cdecl -norelay unumf_close() icuin68.unumf_close_68
+@ cdecl -norelay unumf_closeResult() icuin68.unumf_closeResult_68
+@ cdecl -norelay unumf_formatDecimal() icuin68.unumf_formatDecimal_68
+@ cdecl -norelay unumf_formatDouble() icuin68.unumf_formatDouble_68
+@ cdecl -norelay unumf_formatInt() icuin68.unumf_formatInt_68
+@ cdecl -norelay unumf_openForSkeletonAndLocale() icuin68.unumf_openForSkeletonAndLocale_68
+@ cdecl -norelay unumf_openForSkeletonAndLocaleWithError() icuin68.unumf_openForSkeletonAndLocaleWithError_68
+@ cdecl -norelay unumf_openResult() icuin68.unumf_openResult_68
+@ cdecl -norelay unumf_resultAsValue() icuin68.unumf_resultAsValue_68
+@ cdecl -norelay unumf_resultGetAllFieldPositions() icuin68.unumf_resultGetAllFieldPositions_68
+@ cdecl -norelay unumf_resultNextFieldPosition() icuin68.unumf_resultNextFieldPosition_68
+@ cdecl -norelay unumf_resultToString() icuin68.unumf_resultToString_68
+@ cdecl -norelay unumsys_close() icuin68.unumsys_close_68
+@ cdecl -norelay unumsys_getDescription() icuin68.unumsys_getDescription_68
+@ cdecl -norelay unumsys_getName() icuin68.unumsys_getName_68
+@ cdecl -norelay unumsys_getRadix() icuin68.unumsys_getRadix_68
+@ cdecl -norelay unumsys_isAlgorithmic() icuin68.unumsys_isAlgorithmic_68
+@ cdecl -norelay unumsys_open() icuin68.unumsys_open_68
+@ cdecl -norelay unumsys_openAvailableNames() icuin68.unumsys_openAvailableNames_68
+@ cdecl -norelay unumsys_openByName() icuin68.unumsys_openByName_68
+@ cdecl -norelay uplrules_close() icuin68.uplrules_close_68
+@ cdecl -norelay uplrules_getKeywords() icuin68.uplrules_getKeywords_68
+@ cdecl -norelay uplrules_open() icuin68.uplrules_open_68
+@ cdecl -norelay uplrules_openForType() icuin68.uplrules_openForType_68
+@ cdecl -norelay uplrules_select() icuin68.uplrules_select_68
+@ cdecl -norelay uplrules_selectFormatted() icuin68.uplrules_selectFormatted_68
+@ cdecl -norelay uregex_appendReplacement() icuin68.uregex_appendReplacement_68
+@ cdecl -norelay uregex_appendReplacementUText() icuin68.uregex_appendReplacementUText_68
+@ cdecl -norelay uregex_appendTail() icuin68.uregex_appendTail_68
+@ cdecl -norelay uregex_appendTailUText() icuin68.uregex_appendTailUText_68
+@ cdecl -norelay uregex_clone() icuin68.uregex_clone_68
+@ cdecl -norelay uregex_close() icuin68.uregex_close_68
+@ cdecl -norelay uregex_end() icuin68.uregex_end_68
+@ cdecl -norelay uregex_end64() icuin68.uregex_end64_68
+@ cdecl -norelay uregex_find() icuin68.uregex_find_68
+@ cdecl -norelay uregex_find64() icuin68.uregex_find64_68
+@ cdecl -norelay uregex_findNext() icuin68.uregex_findNext_68
+@ cdecl -norelay uregex_flags() icuin68.uregex_flags_68
+@ cdecl -norelay uregex_getFindProgressCallback() icuin68.uregex_getFindProgressCallback_68
+@ cdecl -norelay uregex_getMatchCallback() icuin68.uregex_getMatchCallback_68
+@ cdecl -norelay uregex_getStackLimit() icuin68.uregex_getStackLimit_68
+@ cdecl -norelay uregex_getText() icuin68.uregex_getText_68
+@ cdecl -norelay uregex_getTimeLimit() icuin68.uregex_getTimeLimit_68
+@ cdecl -norelay uregex_getUText() icuin68.uregex_getUText_68
+@ cdecl -norelay uregex_group() icuin68.uregex_group_68
+@ cdecl -norelay uregex_groupCount() icuin68.uregex_groupCount_68
+@ cdecl -norelay uregex_groupNumberFromCName() icuin68.uregex_groupNumberFromCName_68
+@ cdecl -norelay uregex_groupNumberFromName() icuin68.uregex_groupNumberFromName_68
+@ cdecl -norelay uregex_groupUText() icuin68.uregex_groupUText_68
+@ cdecl -norelay uregex_hasAnchoringBounds() icuin68.uregex_hasAnchoringBounds_68
+@ cdecl -norelay uregex_hasTransparentBounds() icuin68.uregex_hasTransparentBounds_68
+@ cdecl -norelay uregex_hitEnd() icuin68.uregex_hitEnd_68
+@ cdecl -norelay uregex_lookingAt() icuin68.uregex_lookingAt_68
+@ cdecl -norelay uregex_lookingAt64() icuin68.uregex_lookingAt64_68
+@ cdecl -norelay uregex_matches() icuin68.uregex_matches_68
+@ cdecl -norelay uregex_matches64() icuin68.uregex_matches64_68
+@ cdecl -norelay uregex_open() icuin68.uregex_open_68
+@ cdecl -norelay uregex_openC() icuin68.uregex_openC_68
+@ cdecl -norelay uregex_openUText() icuin68.uregex_openUText_68
+@ cdecl -norelay uregex_pattern() icuin68.uregex_pattern_68
+@ cdecl -norelay uregex_patternUText() icuin68.uregex_patternUText_68
+@ cdecl -norelay uregex_refreshUText() icuin68.uregex_refreshUText_68
+@ cdecl -norelay uregex_regionEnd() icuin68.uregex_regionEnd_68
+@ cdecl -norelay uregex_regionEnd64() icuin68.uregex_regionEnd64_68
+@ cdecl -norelay uregex_regionStart() icuin68.uregex_regionStart_68
+@ cdecl -norelay uregex_regionStart64() icuin68.uregex_regionStart64_68
+@ cdecl -norelay uregex_replaceAll() icuin68.uregex_replaceAll_68
+@ cdecl -norelay uregex_replaceAllUText() icuin68.uregex_replaceAllUText_68
+@ cdecl -norelay uregex_replaceFirst() icuin68.uregex_replaceFirst_68
+@ cdecl -norelay uregex_replaceFirstUText() icuin68.uregex_replaceFirstUText_68
+@ cdecl -norelay uregex_requireEnd() icuin68.uregex_requireEnd_68
+@ cdecl -norelay uregex_reset() icuin68.uregex_reset_68
+@ cdecl -norelay uregex_reset64() icuin68.uregex_reset64_68
+@ cdecl -norelay uregex_setFindProgressCallback() icuin68.uregex_setFindProgressCallback_68
+@ cdecl -norelay uregex_setMatchCallback() icuin68.uregex_setMatchCallback_68
+@ cdecl -norelay uregex_setRegion() icuin68.uregex_setRegion_68
+@ cdecl -norelay uregex_setRegion64() icuin68.uregex_setRegion64_68
+@ cdecl -norelay uregex_setRegionAndStart() icuin68.uregex_setRegionAndStart_68
+@ cdecl -norelay uregex_setStackLimit() icuin68.uregex_setStackLimit_68
+@ cdecl -norelay uregex_setText() icuin68.uregex_setText_68
+@ cdecl -norelay uregex_setTimeLimit() icuin68.uregex_setTimeLimit_68
+@ cdecl -norelay uregex_setUText() icuin68.uregex_setUText_68
+@ cdecl -norelay uregex_split() icuin68.uregex_split_68
+@ cdecl -norelay uregex_splitUText() icuin68.uregex_splitUText_68
+@ cdecl -norelay uregex_start() icuin68.uregex_start_68
+@ cdecl -norelay uregex_start64() icuin68.uregex_start64_68
+@ cdecl -norelay uregex_useAnchoringBounds() icuin68.uregex_useAnchoringBounds_68
+@ cdecl -norelay uregex_useTransparentBounds() icuin68.uregex_useTransparentBounds_68
+@ cdecl -norelay uregion_areEqual() icuin68.uregion_areEqual_68
+@ cdecl -norelay uregion_contains() icuin68.uregion_contains_68
+@ cdecl -norelay uregion_getAvailable() icuin68.uregion_getAvailable_68
+@ cdecl -norelay uregion_getContainedRegions() icuin68.uregion_getContainedRegions_68
+@ cdecl -norelay uregion_getContainedRegionsOfType() icuin68.uregion_getContainedRegionsOfType_68
+@ cdecl -norelay uregion_getContainingRegion() icuin68.uregion_getContainingRegion_68
+@ cdecl -norelay uregion_getContainingRegionOfType() icuin68.uregion_getContainingRegionOfType_68
+@ cdecl -norelay uregion_getNumericCode() icuin68.uregion_getNumericCode_68
+@ cdecl -norelay uregion_getPreferredValues() icuin68.uregion_getPreferredValues_68
+@ cdecl -norelay uregion_getRegionCode() icuin68.uregion_getRegionCode_68
+@ cdecl -norelay uregion_getRegionFromCode() icuin68.uregion_getRegionFromCode_68
+@ cdecl -norelay uregion_getRegionFromNumericCode() icuin68.uregion_getRegionFromNumericCode_68
+@ cdecl -norelay uregion_getType() icuin68.uregion_getType_68
+@ cdecl -norelay ureldatefmt_close() icuin68.ureldatefmt_close_68
+@ cdecl -norelay ureldatefmt_closeResult() icuin68.ureldatefmt_closeResult_68
+@ cdecl -norelay ureldatefmt_combineDateAndTime() icuin68.ureldatefmt_combineDateAndTime_68
+@ cdecl -norelay ureldatefmt_format() icuin68.ureldatefmt_format_68
+@ cdecl -norelay ureldatefmt_formatNumeric() icuin68.ureldatefmt_formatNumeric_68
+@ cdecl -norelay ureldatefmt_formatNumericToResult() icuin68.ureldatefmt_formatNumericToResult_68
+@ cdecl -norelay ureldatefmt_formatToResult() icuin68.ureldatefmt_formatToResult_68
+@ cdecl -norelay ureldatefmt_open() icuin68.ureldatefmt_open_68
+@ cdecl -norelay ureldatefmt_openResult() icuin68.ureldatefmt_openResult_68
+@ cdecl -norelay ureldatefmt_resultAsValue() icuin68.ureldatefmt_resultAsValue_68
+@ cdecl -norelay ures_close() icuuc68.ures_close_68
+@ cdecl -norelay ures_getBinary() icuuc68.ures_getBinary_68
+@ cdecl -norelay ures_getByIndex() icuuc68.ures_getByIndex_68
+@ cdecl -norelay ures_getByKey() icuuc68.ures_getByKey_68
+@ cdecl -norelay ures_getInt() icuuc68.ures_getInt_68
+@ cdecl -norelay ures_getIntVector() icuuc68.ures_getIntVector_68
+@ cdecl -norelay ures_getKey() icuuc68.ures_getKey_68
+@ cdecl -norelay ures_getLocaleByType() icuuc68.ures_getLocaleByType_68
+@ cdecl -norelay ures_getNextResource() icuuc68.ures_getNextResource_68
+@ cdecl -norelay ures_getNextString() icuuc68.ures_getNextString_68
+@ cdecl -norelay ures_getSize() icuuc68.ures_getSize_68
+@ cdecl -norelay ures_getString() icuuc68.ures_getString_68
+@ cdecl -norelay ures_getStringByIndex() icuuc68.ures_getStringByIndex_68
+@ cdecl -norelay ures_getStringByKey() icuuc68.ures_getStringByKey_68
+@ cdecl -norelay ures_getType() icuuc68.ures_getType_68
+@ cdecl -norelay ures_getUInt() icuuc68.ures_getUInt_68
+@ cdecl -norelay ures_getUTF8String() icuuc68.ures_getUTF8String_68
+@ cdecl -norelay ures_getUTF8StringByIndex() icuuc68.ures_getUTF8StringByIndex_68
+@ cdecl -norelay ures_getUTF8StringByKey() icuuc68.ures_getUTF8StringByKey_68
+@ cdecl -norelay ures_getVersion() icuuc68.ures_getVersion_68
+@ cdecl -norelay ures_hasNext() icuuc68.ures_hasNext_68
+@ cdecl -norelay ures_open() icuuc68.ures_open_68
+@ cdecl -norelay ures_openAvailableLocales() icuuc68.ures_openAvailableLocales_68
+@ cdecl -norelay ures_openDirect() icuuc68.ures_openDirect_68
+@ cdecl -norelay ures_openU() icuuc68.ures_openU_68
+@ cdecl -norelay ures_resetIterator() icuuc68.ures_resetIterator_68
+@ cdecl -norelay uscript_breaksBetweenLetters() icuuc68.uscript_breaksBetweenLetters_68
+@ cdecl -norelay uscript_getCode() icuuc68.uscript_getCode_68
+@ cdecl -norelay uscript_getName() icuuc68.uscript_getName_68
+@ cdecl -norelay uscript_getSampleString() icuuc68.uscript_getSampleString_68
+@ cdecl -norelay uscript_getScript() icuuc68.uscript_getScript_68
+@ cdecl -norelay uscript_getScriptExtensions() icuuc68.uscript_getScriptExtensions_68
+@ cdecl -norelay uscript_getShortName() icuuc68.uscript_getShortName_68
+@ cdecl -norelay uscript_getUsage() icuuc68.uscript_getUsage_68
+@ cdecl -norelay uscript_hasScript() icuuc68.uscript_hasScript_68
+@ cdecl -norelay uscript_isCased() icuuc68.uscript_isCased_68
+@ cdecl -norelay uscript_isRightToLeft() icuuc68.uscript_isRightToLeft_68
+@ cdecl -norelay usearch_close() icuin68.usearch_close_68
+@ cdecl -norelay usearch_first() icuin68.usearch_first_68
+@ cdecl -norelay usearch_following() icuin68.usearch_following_68
+@ cdecl -norelay usearch_getAttribute() icuin68.usearch_getAttribute_68
+@ cdecl -norelay usearch_getBreakIterator() icuin68.usearch_getBreakIterator_68
+@ cdecl -norelay usearch_getCollator() icuin68.usearch_getCollator_68
+@ cdecl -norelay usearch_getMatchedLength() icuin68.usearch_getMatchedLength_68
+@ cdecl -norelay usearch_getMatchedStart() icuin68.usearch_getMatchedStart_68
+@ cdecl -norelay usearch_getMatchedText() icuin68.usearch_getMatchedText_68
+@ cdecl -norelay usearch_getOffset() icuin68.usearch_getOffset_68
+@ cdecl -norelay usearch_getPattern() icuin68.usearch_getPattern_68
+@ cdecl -norelay usearch_getText() icuin68.usearch_getText_68
+@ cdecl -norelay usearch_last() icuin68.usearch_last_68
+@ cdecl -norelay usearch_next() icuin68.usearch_next_68
+@ cdecl -norelay usearch_open() icuin68.usearch_open_68
+@ cdecl -norelay usearch_openFromCollator() icuin68.usearch_openFromCollator_68
+@ cdecl -norelay usearch_preceding() icuin68.usearch_preceding_68
+@ cdecl -norelay usearch_previous() icuin68.usearch_previous_68
+@ cdecl -norelay usearch_reset() icuin68.usearch_reset_68
+@ cdecl -norelay usearch_setAttribute() icuin68.usearch_setAttribute_68
+@ cdecl -norelay usearch_setBreakIterator() icuin68.usearch_setBreakIterator_68
+@ cdecl -norelay usearch_setCollator() icuin68.usearch_setCollator_68
+@ cdecl -norelay usearch_setOffset() icuin68.usearch_setOffset_68
+@ cdecl -norelay usearch_setPattern() icuin68.usearch_setPattern_68
+@ cdecl -norelay usearch_setText() icuin68.usearch_setText_68
+@ cdecl -norelay uset_add() icuuc68.uset_add_68
+@ cdecl -norelay uset_addAll() icuuc68.uset_addAll_68
+@ cdecl -norelay uset_addAllCodePoints() icuuc68.uset_addAllCodePoints_68
+@ cdecl -norelay uset_addRange() icuuc68.uset_addRange_68
+@ cdecl -norelay uset_addString() icuuc68.uset_addString_68
+@ cdecl -norelay uset_applyIntPropertyValue() icuuc68.uset_applyIntPropertyValue_68
+@ cdecl -norelay uset_applyPattern() icuuc68.uset_applyPattern_68
+@ cdecl -norelay uset_applyPropertyAlias() icuuc68.uset_applyPropertyAlias_68
+@ cdecl -norelay uset_charAt() icuuc68.uset_charAt_68
+@ cdecl -norelay uset_clear() icuuc68.uset_clear_68
+@ cdecl -norelay uset_clone() icuuc68.uset_clone_68
+@ cdecl -norelay uset_cloneAsThawed() icuuc68.uset_cloneAsThawed_68
+@ cdecl -norelay uset_close() icuuc68.uset_close_68
+@ cdecl -norelay uset_closeOver() icuuc68.uset_closeOver_68
+@ cdecl -norelay uset_compact() icuuc68.uset_compact_68
+@ cdecl -norelay uset_complement() icuuc68.uset_complement_68
+@ cdecl -norelay uset_complementAll() icuuc68.uset_complementAll_68
+@ cdecl -norelay uset_contains() icuuc68.uset_contains_68
+@ cdecl -norelay uset_containsAll() icuuc68.uset_containsAll_68
+@ cdecl -norelay uset_containsAllCodePoints() icuuc68.uset_containsAllCodePoints_68
+@ cdecl -norelay uset_containsNone() icuuc68.uset_containsNone_68
+@ cdecl -norelay uset_containsRange() icuuc68.uset_containsRange_68
+@ cdecl -norelay uset_containsSome() icuuc68.uset_containsSome_68
+@ cdecl -norelay uset_containsString() icuuc68.uset_containsString_68
+@ cdecl -norelay uset_equals() icuuc68.uset_equals_68
+@ cdecl -norelay uset_freeze() icuuc68.uset_freeze_68
+@ cdecl -norelay uset_getItem() icuuc68.uset_getItem_68
+@ cdecl -norelay uset_getItemCount() icuuc68.uset_getItemCount_68
+@ cdecl -norelay uset_getSerializedRange() icuuc68.uset_getSerializedRange_68
+@ cdecl -norelay uset_getSerializedRangeCount() icuuc68.uset_getSerializedRangeCount_68
+@ cdecl -norelay uset_getSerializedSet() icuuc68.uset_getSerializedSet_68
+@ cdecl -norelay uset_indexOf() icuuc68.uset_indexOf_68
+@ cdecl -norelay uset_isEmpty() icuuc68.uset_isEmpty_68
+@ cdecl -norelay uset_isFrozen() icuuc68.uset_isFrozen_68
+@ cdecl -norelay uset_open() icuuc68.uset_open_68
+@ cdecl -norelay uset_openEmpty() icuuc68.uset_openEmpty_68
+@ cdecl -norelay uset_openPattern() icuuc68.uset_openPattern_68
+@ cdecl -norelay uset_openPatternOptions() icuuc68.uset_openPatternOptions_68
+@ cdecl -norelay uset_remove() icuuc68.uset_remove_68
+@ cdecl -norelay uset_removeAll() icuuc68.uset_removeAll_68
+@ cdecl -norelay uset_removeAllStrings() icuuc68.uset_removeAllStrings_68
+@ cdecl -norelay uset_removeRange() icuuc68.uset_removeRange_68
+@ cdecl -norelay uset_removeString() icuuc68.uset_removeString_68
+@ cdecl -norelay uset_resemblesPattern() icuuc68.uset_resemblesPattern_68
+@ cdecl -norelay uset_retain() icuuc68.uset_retain_68
+@ cdecl -norelay uset_retainAll() icuuc68.uset_retainAll_68
+@ cdecl -norelay uset_serialize() icuuc68.uset_serialize_68
+@ cdecl -norelay uset_serializedContains() icuuc68.uset_serializedContains_68
+@ cdecl -norelay uset_set() icuuc68.uset_set_68
+@ cdecl -norelay uset_setSerializedToOne() icuuc68.uset_setSerializedToOne_68
+@ cdecl -norelay uset_size() icuuc68.uset_size_68
+@ cdecl -norelay uset_span() icuuc68.uset_span_68
+@ cdecl -norelay uset_spanBack() icuuc68.uset_spanBack_68
+@ cdecl -norelay uset_spanBackUTF8() icuuc68.uset_spanBackUTF8_68
+@ cdecl -norelay uset_spanUTF8() icuuc68.uset_spanUTF8_68
+@ cdecl -norelay uset_toPattern() icuuc68.uset_toPattern_68
+@ cdecl -norelay uspoof_areConfusable() icuin68.uspoof_areConfusable_68
+@ cdecl -norelay uspoof_areConfusableUTF8() icuin68.uspoof_areConfusableUTF8_68
+@ cdecl -norelay uspoof_check() icuin68.uspoof_check_68
+@ cdecl -norelay uspoof_check2() icuin68.uspoof_check2_68
+@ cdecl -norelay uspoof_check2UTF8() icuin68.uspoof_check2UTF8_68
+@ cdecl -norelay uspoof_checkUTF8() icuin68.uspoof_checkUTF8_68
+@ cdecl -norelay uspoof_clone() icuin68.uspoof_clone_68
+@ cdecl -norelay uspoof_close() icuin68.uspoof_close_68
+@ cdecl -norelay uspoof_closeCheckResult() icuin68.uspoof_closeCheckResult_68
+@ cdecl -norelay uspoof_getAllowedChars() icuin68.uspoof_getAllowedChars_68
+@ cdecl -norelay uspoof_getAllowedLocales() icuin68.uspoof_getAllowedLocales_68
+@ cdecl -norelay uspoof_getCheckResultChecks() icuin68.uspoof_getCheckResultChecks_68
+@ cdecl -norelay uspoof_getCheckResultNumerics() icuin68.uspoof_getCheckResultNumerics_68
+@ cdecl -norelay uspoof_getCheckResultRestrictionLevel() icuin68.uspoof_getCheckResultRestrictionLevel_68
+@ cdecl -norelay uspoof_getChecks() icuin68.uspoof_getChecks_68
+@ cdecl -norelay uspoof_getInclusionSet() icuin68.uspoof_getInclusionSet_68
+@ cdecl -norelay uspoof_getRecommendedSet() icuin68.uspoof_getRecommendedSet_68
+@ cdecl -norelay uspoof_getRestrictionLevel() icuin68.uspoof_getRestrictionLevel_68
+@ cdecl -norelay uspoof_getSkeleton() icuin68.uspoof_getSkeleton_68
+@ cdecl -norelay uspoof_getSkeletonUTF8() icuin68.uspoof_getSkeletonUTF8_68
+@ cdecl -norelay uspoof_open() icuin68.uspoof_open_68
+@ cdecl -norelay uspoof_openCheckResult() icuin68.uspoof_openCheckResult_68
+@ cdecl -norelay uspoof_openFromSerialized() icuin68.uspoof_openFromSerialized_68
+@ cdecl -norelay uspoof_openFromSource() icuin68.uspoof_openFromSource_68
+@ cdecl -norelay uspoof_serialize() icuin68.uspoof_serialize_68
+@ cdecl -norelay uspoof_setAllowedChars() icuin68.uspoof_setAllowedChars_68
+@ cdecl -norelay uspoof_setAllowedLocales() icuin68.uspoof_setAllowedLocales_68
+@ cdecl -norelay uspoof_setChecks() icuin68.uspoof_setChecks_68
+@ cdecl -norelay uspoof_setRestrictionLevel() icuin68.uspoof_setRestrictionLevel_68
+@ cdecl -norelay usprep_close() icuuc68.usprep_close_68
+@ cdecl -norelay usprep_open() icuuc68.usprep_open_68
+@ cdecl -norelay usprep_openByType() icuuc68.usprep_openByType_68
+@ cdecl -norelay usprep_prepare() icuuc68.usprep_prepare_68
+@ cdecl -norelay utext_char32At() icuuc68.utext_char32At_68
+@ cdecl -norelay utext_clone() icuuc68.utext_clone_68
+@ cdecl -norelay utext_close() icuuc68.utext_close_68
+@ cdecl -norelay utext_copy() icuuc68.utext_copy_68
+@ cdecl -norelay utext_current32() icuuc68.utext_current32_68
+@ cdecl -norelay utext_equals() icuuc68.utext_equals_68
+@ cdecl -norelay utext_extract() icuuc68.utext_extract_68
+@ cdecl -norelay utext_freeze() icuuc68.utext_freeze_68
+@ cdecl -norelay utext_getNativeIndex() icuuc68.utext_getNativeIndex_68
+@ cdecl -norelay utext_getPreviousNativeIndex() icuuc68.utext_getPreviousNativeIndex_68
+@ cdecl -norelay utext_hasMetaData() icuuc68.utext_hasMetaData_68
+@ cdecl -norelay utext_isLengthExpensive() icuuc68.utext_isLengthExpensive_68
+@ cdecl -norelay utext_isWritable() icuuc68.utext_isWritable_68
+@ cdecl -norelay utext_moveIndex32() icuuc68.utext_moveIndex32_68
+@ cdecl -norelay utext_nativeLength() icuuc68.utext_nativeLength_68
+@ cdecl -norelay utext_next32() icuuc68.utext_next32_68
+@ cdecl -norelay utext_next32From() icuuc68.utext_next32From_68
+@ cdecl -norelay utext_openUChars() icuuc68.utext_openUChars_68
+@ cdecl -norelay utext_openUTF8() icuuc68.utext_openUTF8_68
+@ cdecl -norelay utext_previous32() icuuc68.utext_previous32_68
+@ cdecl -norelay utext_previous32From() icuuc68.utext_previous32From_68
+@ cdecl -norelay utext_replace() icuuc68.utext_replace_68
+@ cdecl -norelay utext_setNativeIndex() icuuc68.utext_setNativeIndex_68
+@ cdecl -norelay utext_setup() icuuc68.utext_setup_68
+@ cdecl -norelay utf8_appendCharSafeBody() icuuc68.utf8_appendCharSafeBody_68
+@ cdecl -norelay utf8_back1SafeBody() icuuc68.utf8_back1SafeBody_68
+@ cdecl -norelay utf8_nextCharSafeBody() icuuc68.utf8_nextCharSafeBody_68
+@ cdecl -norelay utf8_prevCharSafeBody() icuuc68.utf8_prevCharSafeBody_68
+@ cdecl -norelay utmscale_fromInt64() icuin68.utmscale_fromInt64_68
+@ cdecl -norelay utmscale_getTimeScaleValue() icuin68.utmscale_getTimeScaleValue_68
+@ cdecl -norelay utmscale_toInt64() icuin68.utmscale_toInt64_68
+@ cdecl -norelay utrace_format() icuuc68.utrace_format_68
+@ cdecl -norelay utrace_functionName() icuuc68.utrace_functionName_68
+@ cdecl -norelay utrace_getFunctions() icuuc68.utrace_getFunctions_68
+@ cdecl -norelay utrace_getLevel() icuuc68.utrace_getLevel_68
+@ cdecl -norelay utrace_setFunctions() icuuc68.utrace_setFunctions_68
+@ cdecl -norelay utrace_setLevel() icuuc68.utrace_setLevel_68
+@ cdecl -norelay utrace_vformat() icuuc68.utrace_vformat_68
+@ cdecl -norelay utrans_clone() icuin68.utrans_clone_68
+@ cdecl -norelay utrans_close() icuin68.utrans_close_68
+@ cdecl -norelay utrans_countAvailableIDs() icuin68.utrans_countAvailableIDs_68
+@ cdecl -norelay utrans_getSourceSet() icuin68.utrans_getSourceSet_68
+@ cdecl -norelay utrans_getUnicodeID() icuin68.utrans_getUnicodeID_68
+@ cdecl -norelay utrans_openIDs() icuin68.utrans_openIDs_68
+@ cdecl -norelay utrans_openInverse() icuin68.utrans_openInverse_68
+@ cdecl -norelay utrans_openU() icuin68.utrans_openU_68
+@ cdecl -norelay utrans_register() icuin68.utrans_register_68
+@ cdecl -norelay utrans_setFilter() icuin68.utrans_setFilter_68
+@ cdecl -norelay utrans_toRules() icuin68.utrans_toRules_68
+@ cdecl -norelay utrans_trans() icuin68.utrans_trans_68
+@ cdecl -norelay utrans_transIncremental() icuin68.utrans_transIncremental_68
+@ cdecl -norelay utrans_transIncrementalUChars() icuin68.utrans_transIncrementalUChars_68
+@ cdecl -norelay utrans_transUChars() icuin68.utrans_transUChars_68
+@ cdecl -norelay utrans_unregisterID() icuin68.utrans_unregisterID_68
