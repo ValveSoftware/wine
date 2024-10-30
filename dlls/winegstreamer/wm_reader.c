@@ -31,6 +31,7 @@ struct wm_stream
     WORD index;
     bool eos;
     bool read_compressed;
+    bool demux_compressed;
 
     struct wg_parser_buffer current_buffer;
     DWORD current_buffer_offset;
@@ -2580,9 +2581,16 @@ static HRESULT WINAPI reader_SetReadStreamSamples(IWMSyncReader2 *iface, WORD st
         return E_INVALIDARG;
     }
 
-    if (stream->read_compressed != compressed)
+    stream->read_compressed = compressed;
+
     {
-        stream->read_compressed = compressed;
+        const char *sgi = getenv("SteamGameId");
+        if (sgi && !strcmp(sgi, "638160")) compressed = FALSE;
+    }
+
+    if (stream->demux_compressed != compressed)
+    {
+        stream->demux_compressed = compressed;
         reinit_stream(reader, compressed);
     }
 
@@ -2633,7 +2641,7 @@ static HRESULT WINAPI reader_SetStreamsSelected(IWMSyncReader2 *iface,
                 FIXME("Ignoring selection %#x for stream %u; treating as enabled.\n",
                         selections[i], stream_numbers[i]);
             TRACE("Enabling stream %u.\n", stream_numbers[i]);
-            if (stream->read_compressed)
+            if (stream->demux_compressed)
             {
                 struct wg_format format;
                 wg_parser_stream_get_current_format(stream->wg_stream, &format);
