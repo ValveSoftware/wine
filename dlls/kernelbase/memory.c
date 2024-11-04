@@ -640,8 +640,21 @@ BOOL WINAPI DECLSPEC_HOTPATCH WriteProcessMemory( HANDLE process, void *addr, co
 
     if (!VirtualQueryEx( process, addr, &info, sizeof(info) ))
     {
-        close_cross_process_connection( list );
-        return FALSE;
+        HANDLE process_alt;
+        BOOL alt_ok = FALSE;
+
+        if (GetLastError() == ERROR_ACCESS_DENIED &&
+            DuplicateHandle( GetCurrentProcess(), process, GetCurrentProcess(), &process_alt,
+                             PROCESS_QUERY_INFORMATION, FALSE, 0 ))
+        {
+            alt_ok = VirtualQueryEx( process_alt, addr, &info, sizeof(info) );
+            CloseHandle( process_alt );
+        }
+        if (!alt_ok)
+        {
+            close_cross_process_connection( list );
+            return FALSE;
+        }
     }
 
     switch (info.Protect & ~(PAGE_GUARD | PAGE_NOCACHE))
