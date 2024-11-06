@@ -1007,6 +1007,23 @@ static int registry_entry_cmp( const void *a, const void *b )
     return strcmp( entry_a->name, entry_b->name );
 }
 
+static BOOL ignore_extenstions_for_get_proc_address(void)
+{
+    static int cached = -1;
+
+    if (cached == -1)
+    {
+        const char *sgi;
+
+        cached = (sgi = getenv( "SteamGameId" )) && (
+                 !strcmp( sgi, "2293310" )
+                 || !strcmp( sgi, "2914160" )
+                 );
+    }
+
+    return cached;
+}
+
 PROC wrap_wglGetProcAddress( TEB *teb, LPCSTR name )
 {
     const struct registry_entry entry = {.name = name}, *found;
@@ -1034,7 +1051,7 @@ PROC wrap_wglGetProcAddress( TEB *teb, LPCSTR name )
     {
         void *driver_func = funcs->p_wglGetProcAddress( name );
 
-        if (!is_any_extension_supported( ctx, found->extension ))
+        if (!ignore_extenstions_for_get_proc_address() && !is_any_extension_supported( ctx, found->extension ))
         {
             unsigned int i;
             static const struct { const char *name, *alt; } alternatives[] =
