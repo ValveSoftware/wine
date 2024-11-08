@@ -18,6 +18,8 @@
 
 #include "d3dx_helpers.h"
 
+#define D3DERR_INVALIDCALL  0x8876086c
+
 extern HRESULT load_file(const WCHAR *path, void **data, DWORD *size);
 
 extern HRESULT get_image_info(const void *data, SIZE_T size, D3DX10_IMAGE_INFO *img_info);
