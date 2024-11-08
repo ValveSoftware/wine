@@ -2968,6 +2968,50 @@ static void test_D3DXLoadSurface(IDirect3DDevice9 *device)
         hr = IDirect3DSurface9_UnlockRect(surf);
         ok(hr == D3D_OK, "Failed to unlock surface, hr %#lx.\n", hr);
 
+        /* Test SRGB filter flags. */
+        SetRect(&rect, 0, 0, 2, 2);
+        hr = D3DXLoadSurfaceFromMemory(surf, NULL, NULL, pixdata_a8r8g8b8, D3DFMT_A8R8G8B8, 8, NULL, &rect,
+                D3DX_FILTER_NONE | D3DX_FILTER_SRGB_IN, 0);
+        ok(hr == D3D_OK, "Unexpected hr %#lx.\n", hr);
+
+        /* SRGB in, no SRGB out. */
+        hr = IDirect3DSurface9_LockRect(surf, &lockrect, NULL, D3DLOCK_READONLY);
+        ok(hr == D3D_OK, "Failed to lock surface, hr %#lx.\n", hr);
+        todo_wine check_pixel_4bpp(&lockrect, 0, 0, 0x00010306);
+        todo_wine check_pixel_4bpp(&lockrect, 1, 0, 0x40141e2a);
+        todo_wine check_pixel_4bpp(&lockrect, 0, 1, 0x80495b71);
+        todo_wine check_pixel_4bpp(&lockrect, 1, 1, 0xc0a3c0ff);
+        hr = IDirect3DSurface9_UnlockRect(surf);
+        ok(hr == D3D_OK, "Failed to unlock surface, hr %#lx.\n", hr);
+
+        hr = D3DXLoadSurfaceFromMemory(surf, NULL, NULL, pixdata_a8r8g8b8, D3DFMT_A8R8G8B8, 8, NULL, &rect,
+                D3DX_FILTER_NONE | D3DX_FILTER_SRGB_OUT, 0);
+        ok(hr == D3D_OK, "Unexpected hr %#lx.\n", hr);
+
+        /* No SRGB in, SRGB out. */
+        hr = IDirect3DSurface9_LockRect(surf, &lockrect, NULL, D3DLOCK_READONLY);
+        ok(hr == D3D_OK, "Failed to lock surface, hr %#lx.\n", hr);
+        todo_wine check_pixel_4bpp(&lockrect, 0, 0, 0x00486377);
+        todo_wine check_pixel_4bpp(&lockrect, 1, 0, 0x4097a4af);
+        todo_wine check_pixel_4bpp(&lockrect, 0, 1, 0x80c5ced7);
+        todo_wine check_pixel_4bpp(&lockrect, 1, 1, 0xc0e8f0ff);
+        hr = IDirect3DSurface9_UnlockRect(surf);
+        ok(hr == D3D_OK, "Failed to unlock surface, hr %#lx.\n", hr);
+
+        hr = D3DXLoadSurfaceFromMemory(surf, NULL, NULL, pixdata_a8r8g8b8, D3DFMT_A8R8G8B8, 8, NULL, &rect,
+                D3DX_FILTER_NONE | D3DX_FILTER_SRGB_IN | D3DX_FILTER_SRGB_OUT, 0);
+        ok(hr == D3D_OK, "Unexpected hr %#lx.\n", hr);
+
+        /* SRGB in, SRGB out, no changes. */
+        hr = IDirect3DSurface9_LockRect(surf, &lockrect, NULL, D3DLOCK_READONLY);
+        ok(hr == D3D_OK, "Failed to lock surface, hr %#lx.\n", hr);
+        check_pixel_4bpp(&lockrect, 0, 0, pixdata_a8r8g8b8[0]);
+        check_pixel_4bpp(&lockrect, 1, 0, pixdata_a8r8g8b8[1]);
+        check_pixel_4bpp(&lockrect, 0, 1, pixdata_a8r8g8b8[2]);
+        check_pixel_4bpp(&lockrect, 1, 1, pixdata_a8r8g8b8[3]);
+        hr = IDirect3DSurface9_UnlockRect(surf);
+        ok(hr == D3D_OK, "Failed to unlock surface, hr %#lx.\n", hr);
+
         check_release((IUnknown*)surf, 0);
     }
 
