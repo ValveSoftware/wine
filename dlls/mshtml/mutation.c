@@ -438,6 +438,7 @@ compat_mode_t lock_document_mode(HTMLDocumentNode *doc)
 static void set_document_mode(HTMLDocumentNode *doc, compat_mode_t document_mode, BOOL emulate_mode, BOOL lock)
 {
     compat_mode_t max_compat_mode;
+    const char *sgi;
 
     if(doc->document_mode_locked) {
         WARN("attempting to set document mode %d on locked document %p\n", document_mode, doc);
@@ -454,6 +455,9 @@ static void set_document_mode(HTMLDocumentNode *doc, compat_mode_t document_mode
              document_mode, max_compat_mode);
         document_mode = max_compat_mode;
     }
+
+    if ((sgi = getenv("SteamGameId")) && (!strcmp(sgi, "39210")))
+        document_mode = COMPAT_MODE_IE11;
 
     doc->document_mode = document_mode;
     doc->emulate_mode = emulate_mode;
