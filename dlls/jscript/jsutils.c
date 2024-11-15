@@ -1105,3 +1105,30 @@ HRESULT create_jscaller(script_ctx_t *ctx)
     ctx->jscaller = ret;
     return S_OK;
 }
+
+void hack_pump_messages(void)
+{
+    static BOOL initialized;
+    static HWND hwnd;
+    static DWORD last;
+    DWORD tick;
+    MSG msg;
+
+    if (!initialized)
+    {
+        const char *sgi = getenv("SteamGameId");
+        if (sgi && !strcmp(sgi, "39210")) hwnd = FindWindowW(NULL, L"FFXIVLauncher");
+        if (hwnd) ERR("HACK: injecting PeekMessage into mshtml / jscript processing.\n");
+        initialized = TRUE;
+    }
+    if (!hwnd) return;
+
+    tick = GetTickCount();
+    if (tick - last < 50) return;
+    last = tick;
+    if (PeekMessageW(&msg, hwnd, WM_TIMER, WM_TIMER, PM_REMOVE))
+    {
+        TRACE("dispatching WM_TIMER.\n");
+        DispatchMessageW(&msg);
+    }
+}

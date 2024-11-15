@@ -2772,5 +2772,6 @@ HRESULT compile_script(script_ctx_t *ctx, const WCHAR *code, UINT64 source_conte
     }
 
     *ret = compiler.code;
+    hack_pump_messages();
     return S_OK;
 }
