@@ -891,6 +891,33 @@ static void NSAPI nsDocumentObserver_StyleRuleRemoved(nsIDocumentObserver *iface
 {
 }
 
+static void hack_pump_messages(void)
+{
+    static BOOL initialized;
+    static HWND hwnd;
+    static DWORD last;
+    DWORD tick;
+    MSG msg;
+
+    if (!initialized)
+    {
+        const char *sgi = getenv("SteamGameId");
+        if (sgi && !strcmp(sgi, "39210")) hwnd = FindWindowW(NULL, L"FFXIVLauncher");
+        if (hwnd) ERR("HACK: injecting PeekMessage into mshtml / jscript processing.\n");
+        initialized = TRUE;
+    }
+    if (!hwnd) return;
+
+    tick = GetTickCount();
+    if (tick - last < 50) return;
+    last = tick;
+    if (PeekMessageW(&msg, hwnd, WM_TIMER, WM_TIMER, PM_REMOVE))
+    {
+        TRACE("dispatching WM_TIMER.\n");
+        DispatchMessageW(&msg);
+    }
+}
+
 static void NSAPI nsDocumentObserver_BindToDocument(nsIDocumentObserver *iface, nsIDocument *aDocument,
         nsIContent *aContent)
 {
@@ -904,6 +931,8 @@ static void NSAPI nsDocumentObserver_BindToDocument(nsIDocumentObserver *iface, 
     nsresult nsres;
 
     TRACE("(%p)->(%p %p)\n", This, aDocument, aContent);
+
+    hack_pump_messages();
 
     if(This->document_mode < COMPAT_MODE_IE10) {
         nsres = nsIContent_QueryInterface(aContent, &IID_nsIDOMComment, (void**)&nscomment);
