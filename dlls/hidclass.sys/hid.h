@@ -48,6 +48,8 @@ struct device
     WCHAR container_id[MAX_GUID_STRING_LEN];
     const GUID *class_guid;
 
+    HANDLE steam_overlay_event;
+
     BOOL is_fdo;
 };
 
@@ -133,6 +135,8 @@ typedef struct _minidriver
 
     PDRIVER_ADD_DEVICE AddDevice;
     PDRIVER_DISPATCH PNPDispatch;
+
+    HANDLE steam_overlay_event;
 } minidriver;
 
 void call_minidriver( ULONG code, DEVICE_OBJECT *device, void *in_buff, ULONG in_size,

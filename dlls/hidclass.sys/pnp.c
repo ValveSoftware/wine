@@ -171,6 +171,8 @@ static NTSTATUS WINAPI driver_add_device(DRIVER_OBJECT *driver, DEVICE_OBJECT *b
     if (get_device_id( bus_pdo, BusQueryContainerID, fdo->base.container_id ))
         fdo->base.container_id[0] = 0;
 
+    fdo->base.steam_overlay_event = minidriver->steam_overlay_event;
+
     is_xinput_class = !wcsncmp(device_id, L"WINEXINPUT\\", 7) && wcsstr(device_id, L"&XI_") != NULL;
     if (is_xinput_class) fdo->base.class_guid = &GUID_DEVINTERFACE_WINEXINPUT;
     else fdo->base.class_guid = &GUID_DEVINTERFACE_HID;
@@ -313,6 +315,8 @@ static NTSTATUS create_child_pdos( minidriver *minidriver, DEVICE_OBJECT *device
         pdo->information.VersionNumber = fdo->attrs.VersionNumber;
         pdo->information.Polled = minidriver->minidriver.DevicesArePolled;
         pdo->information.DescriptorSize = pdo->collection_desc->PreparsedDataLength;
+
+        pdo->base.steam_overlay_event = minidriver->steam_overlay_event;
 
         page = pdo->collection_desc->UsagePage;
         usage = pdo->collection_desc->Usage;
@@ -692,6 +696,8 @@ static void WINAPI driver_unload(DRIVER_OBJECT *driver)
         if (md->DriverUnload)
             md->DriverUnload(md->minidriver.DriverObject);
         list_remove(&md->entry);
+
+        CloseHandle(md->steam_overlay_event);
         free(md);
     }
 }
@@ -706,6 +712,8 @@ NTSTATUS WINAPI HidRegisterMinidriver(HID_MINIDRIVER_REGISTRATION *registration)
 
     if (!(driver = calloc(1, sizeof(*driver))))
         return STATUS_NO_MEMORY;
+
+    driver->steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
 
     driver->DriverUnload = registration->DriverObject->DriverUnload;
     registration->DriverObject->DriverUnload = driver_unload;
