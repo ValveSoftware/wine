@@ -333,6 +333,12 @@ static HRESULT try_create_wg_transform(struct video_decoder *decoder, IMFMediaTy
     if (SUCCEEDED(IMFAttributes_GetUINT32(decoder->attributes, &MF_LOW_LATENCY, &low_latency)))
         decoder->wg_transform_attrs.low_latency = !!low_latency;
 
+    {
+        const char *sgi;
+        if ((sgi = getenv("SteamGameId")) && (!strcmp(sgi, "2009100") || !strcmp(sgi, "2555360") || !strcmp(sgi, "1630110")))
+            decoder->wg_transform_attrs.low_latency = FALSE;
+    }
+
     return wg_transform_create_mf(decoder->input_type, output_type, &decoder->wg_transform_attrs, &decoder->wg_transform);
 }
 
