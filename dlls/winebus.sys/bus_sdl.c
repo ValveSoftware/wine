@@ -284,9 +284,9 @@ static const USAGE_AND_PAGE relative_axis_usages[] =
     {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_WHEEL},
 };
 
-static int get_absolute_usages(struct sdl_device *impl, const USAGE_AND_PAGE **absolute_usages)
+static int get_absolute_usages(const struct device_desc *desc, const USAGE_AND_PAGE **absolute_usages)
 {
-    if (pSDL_JoystickGetVendor(impl->sdl_joystick) == 0x046D && pSDL_JoystickGetProduct(impl->sdl_joystick) == 0xC262)
+    if (desc->vid == 0x046d && desc->pid == 0xc262)
     {
         *absolute_usages = g920_absolute_usages;
         return ARRAY_SIZE(g920_absolute_usages);
@@ -296,7 +296,7 @@ static int get_absolute_usages(struct sdl_device *impl, const USAGE_AND_PAGE **a
     return ARRAY_SIZE(absolute_axis_usages);
 }
 
-static NTSTATUS build_joystick_report_descriptor(struct unix_device *iface)
+static NTSTATUS build_joystick_report_descriptor(struct unix_device *iface, const struct device_desc *desc)
 {
     const USAGE_AND_PAGE device_usage = {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_JOYSTICK};
     struct sdl_device *impl = impl_from_unix_device(iface);
@@ -304,7 +304,7 @@ static NTSTATUS build_joystick_report_descriptor(struct unix_device *iface)
     USAGE_AND_PAGE physical_usage;
 
     const USAGE_AND_PAGE *absolute_usages = NULL;
-    size_t absolute_usages_count = get_absolute_usages(impl, &absolute_usages);
+    size_t absolute_usages_count = get_absolute_usages(desc, &absolute_usages);
 
     axis_count = pSDL_JoystickNumAxes(impl->sdl_joystick);
     if (options->split_controllers) axis_count = min(6, axis_count - impl->axis_offset);
@@ -1045,7 +1045,7 @@ static void sdl_add_device(unsigned int index)
         impl->axis_offset = axis_offset;
 
         if (impl->sdl_controller) status = build_controller_report_descriptor(&impl->unix_device);
-        else status = build_joystick_report_descriptor(&impl->unix_device);
+        else status = build_joystick_report_descriptor(&impl->unix_device, &desc);
         if (status)
         {
             list_remove(&impl->unix_device.entry);
