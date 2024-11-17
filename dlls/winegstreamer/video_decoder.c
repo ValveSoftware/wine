@@ -1656,6 +1656,12 @@ static HRESULT video_decoder_create_with_types(const GUID *const *input_types, U
                     &MFT_DECODER_EXPOSE_OUTPUT_TYPES_IN_NATIVE_ORDER, FALSE)))
         goto failed;
 
+    {
+        const char *sgi;
+        if ((sgi = getenv("SteamGameId")) && ((!strcmp(sgi, "2009100")) || (!strcmp(sgi, "2555360"))))
+            IMFAttributes_SetUINT32(decoder->attributes, &MF_SA_D3D11_AWARE, FALSE);
+    }
+
     if (FAILED(hr = MFCreateAttributes(&decoder->output_attributes, 0)))
         goto failed;
     if (FAILED(hr = wg_sample_queue_create(&decoder->wg_sample_queue)))
