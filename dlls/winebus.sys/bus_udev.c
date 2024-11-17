@@ -1698,6 +1698,12 @@ static void udev_add_device(struct udev_device *dev, int fd)
         close(fd);
         return;
     }
+    if (is_sdl_ignored_device(desc.vid, desc.pid))
+    {
+        TRACE("evdev %s: ignoring %s, in SDL ignore list\n", debugstr_a(devnode), debugstr_device_desc(&desc));
+        close(fd);
+        return;
+    }
 
     if ((desc.is_hidraw = !strcmp(subsystem, "hidraw")) && !hidraw_device_create(dev, fd, devnode, desc)) return;
     if (!strcmp(subsystem, "input") && !lnxev_device_create(dev, fd, devnode, desc)) return;

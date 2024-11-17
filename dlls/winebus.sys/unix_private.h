@@ -269,4 +269,6 @@ extern void hid_device_drop_report(struct unix_device *iface);
 
 extern void hid_device_set_effect_state(struct unix_device *iface, BYTE index, BYTE flags);
 
+extern BOOL is_sdl_ignored_device(WORD vid, WORD pid);
+
 #endif /* __WINEBUS_UNIX_PRIVATE_H */

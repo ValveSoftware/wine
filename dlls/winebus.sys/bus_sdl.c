@@ -927,6 +927,21 @@ static BOOL set_report_from_controller_event(struct sdl_device *impl, SDL_Event 
     return FALSE;
 }
 
+/* logic from SDL2's SDL_ShouldIgnoreGameController */
+BOOL is_sdl_ignored_device(WORD vid, WORD pid)
+{
+    const char *whitelist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT");
+    const char *blacklist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES");
+    char needle[16];
+
+    if (vid == 0x056a) return TRUE; /* all Wacom devices */
+
+    sprintf(needle, "0x%04x/0x%04x", vid, pid);
+    if (whitelist) return strcasestr(whitelist, needle) == NULL;
+    if (blacklist) return strcasestr(blacklist, needle) != NULL;
+    return FALSE;
+}
+
 static void sdl_add_device(unsigned int index)
 {
     struct device_desc desc =
@@ -973,6 +988,14 @@ static void sdl_add_device(unsigned int index)
         desc.vid = 0x01;
         desc.pid = pSDL_JoystickInstanceID(joystick) + 1;
         desc.version = 0;
+    }
+
+    if (is_sdl_ignored_device(desc.vid, desc.pid))
+    {
+        TRACE("ignoring %s\n", debugstr_device_desc(&desc));
+        if (controller) pSDL_GameControllerClose(controller);
+        pSDL_JoystickClose(joystick);
+        return;
     }
 
     if (pSDL_JoystickGetSerial && (sdl_serial = pSDL_JoystickGetSerial(joystick)))
