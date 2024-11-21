@@ -1039,6 +1039,7 @@ static void add_system_dll_path_var( WCHAR **env, SIZE_T *pos, SIZE_T *size )
  */
 static void add_dynamic_environment( WCHAR **env, SIZE_T *pos, SIZE_T *size )
 {
+    const char *var;
     unsigned int i;
     char str[22];
 
@@ -1068,6 +1069,9 @@ static void add_dynamic_environment( WCHAR **env, SIZE_T *pos, SIZE_T *size )
     append_envA( env, pos, size, "WINEUSERLOCALE", user_locale );
     append_envA( env, pos, size, "SystemDrive", "C:" );
     append_envA( env, pos, size, "SystemRoot", "C:\\windows" );
+
+    if ((var = getenv( "VR_CONFIG_PATH" ))) add_path_var( env, pos, size, "VR_CONFIG_PATH", var );
+    if ((var = getenv( "VR_LOG_PATH" ))) add_path_var( env, pos, size, "VR_LOG_PATH", var );
 }
 
 
