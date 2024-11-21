@@ -278,6 +278,15 @@ static unsigned int get_joystick_index( const WCHAR *device_path )
     return i;
 }
 
+static BOOL get_default_joystick_device_path( WCHAR *device_path )
+{
+    BOOL ret;
+
+    EnterCriticalSection( &joystick_devices_crit );
+    if ((ret = !!joystick_device_count)) wcscpy( device_path, joystick_devices[0].device_path );
+    LeaveCriticalSection( &joystick_devices_crit );
+    return ret;
+}
 
 static inline struct hid_joystick_effect *impl_from_IDirectInputEffect( IDirectInputEffect *iface )
 {
@@ -2154,8 +2163,15 @@ HRESULT hid_joystick_create_device( struct dinput *dinput, const GUID *guid, IDi
     impl->base.read_event = CreateEventW( NULL, TRUE, FALSE, NULL );
 
     if (memcmp( device_path_guid.Data4, guid->Data4, sizeof(device_path_guid.Data4) ))
+    {
+        /* Let hid_joystick_device_open() populate joystick devices before checking for default joystick GUID. */
         hr = hid_joystick_device_open( -1, guid, &impl->base.instance, impl->device_path, &impl->device, &impl->preparsed,
                                        &attrs, &impl->caps, dinput->dwVersion );
+        if (hr == DIERR_DEVICENOTREG && IsEqualGUID( guid, &GUID_Joystick )
+            && get_default_joystick_device_path( impl->device_path ))
+            hr = hid_joystick_device_try_open( impl->device_path, &impl->device, &impl->preparsed, &attrs,
+                                               &impl->caps, &impl->base.instance, dinput->dwVersion );
+    }
     else
     {
         impl->wgi_device = TRUE;
