@@ -243,6 +243,42 @@ struct hid_joystick_effect
     char *set_envelope_buf;
 };
 
+struct joystick_device
+{
+    WCHAR device_path[MAX_PATH];
+};
+
+static CRITICAL_SECTION joystick_devices_crit;
+static CRITICAL_SECTION_DEBUG joystick_devices_crit_debug =
+{
+    0, 0, &joystick_devices_crit,
+    { &joystick_devices_crit_debug.ProcessLocksList, &joystick_devices_crit_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": joystick_devices_crit") }
+};
+static CRITICAL_SECTION joystick_devices_crit = { &joystick_devices_crit_debug, -1, 0, 0, 0, 0 };
+
+static struct joystick_device *joystick_devices;
+static unsigned int joystick_device_count;
+
+static unsigned int get_joystick_index( const WCHAR *device_path )
+{
+    unsigned int i;
+
+    EnterCriticalSection( &joystick_devices_crit );
+    for (i = 0; i < joystick_device_count; ++i)
+        if (!wcsicmp( joystick_devices[i].device_path, device_path )) break;
+
+    if (i == joystick_device_count)
+    {
+        ++joystick_device_count;
+        joystick_devices = realloc( joystick_devices, sizeof(*joystick_devices) * joystick_device_count );
+        wcscpy( joystick_devices[i].device_path, device_path );
+    }
+    LeaveCriticalSection( &joystick_devices_crit );
+    return i;
+}
+
+
 static inline struct hid_joystick_effect *impl_from_IDirectInputEffect( IDirectInputEffect *iface )
 {
     return CONTAINING_RECORD( iface, struct hid_joystick_effect, IDirectInputEffect_iface );
@@ -848,7 +884,7 @@ static HRESULT hid_joystick_get_property( IDirectInputDevice8W *iface, DWORD pro
     case (DWORD_PTR)DIPROP_JOYSTICKID:
     {
         DIPROPDWORD *value = (DIPROPDWORD *)header;
-        value->dwData = impl->base.instance.guidInstance.Data3;
+        value->dwData = get_joystick_index( impl->device_path );
         return DI_OK;
     }
     case (DWORD_PTR)DIPROP_GUIDANDPATH:
@@ -1700,6 +1736,8 @@ static HRESULT hid_joystick_device_open( int index, const GUID *guid, DIDEVICEIN
                                                      attrs, caps, instance, version )))
                 continue;
         }
+        /* Assign joystick index if the device path is first seen. */
+        get_joystick_index( detail->DevicePath );
 
         /* enumerate device by GUID */
         if (IsEqualGUID( guid, &instance->guidProduct ) || IsEqualGUID( guid, &instance->guidInstance )) break;
