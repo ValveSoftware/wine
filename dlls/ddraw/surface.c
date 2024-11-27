@@ -68,6 +68,7 @@ HRESULT ddraw_surface_update_frontbuffer(struct ddraw_surface *surface,
     struct wined3d_texture *dst_texture, *wined3d_texture;
     struct ddraw *ddraw = surface->ddraw;
     HDC surface_dc, screen_dc;
+    HWND dest_window = NULL;
     int x, y, w, h;
     HRESULT hr;
     BOOL ret;
@@ -169,7 +170,9 @@ HRESULT ddraw_surface_update_frontbuffer(struct ddraw_surface *surface,
     if (surface->palette)
         wined3d_palette_apply_to_dc(surface->palette->wined3d_palette, surface_dc);
 
-    if (!(screen_dc = GetDC(NULL)))
+    if (ddraw->cooperative_level & DDSCL_EXCLUSIVE && ddraw->dest_window)
+        dest_window = ddraw->dest_window;
+    if (!(screen_dc = GetDCEx(dest_window, NULL, DCX_WINDOW | DCX_CACHE)))
     {
         wined3d_texture_release_dc(wined3d_texture, surface->sub_resource_idx, surface_dc);
         ERR("Failed to get screen DC.\n");
@@ -183,7 +186,7 @@ HRESULT ddraw_surface_update_frontbuffer(struct ddraw_surface *surface,
         ret = BitBlt(screen_dc, x, y, w, h,
                 surface_dc, x, y, SRCCOPY);
 
-    ReleaseDC(NULL, screen_dc);
+    ReleaseDC(dest_window, screen_dc);
     wined3d_texture_release_dc(wined3d_texture, surface->sub_resource_idx, surface_dc);
 
     if (!ret)
@@ -4659,7 +4662,6 @@ static HRESULT WINAPI ddraw_surface7_SetClipper(IDirectDrawSurface7 *iface,
             ddraw_set_swapchain_window(This->ddraw, This->ddraw->dest_window);
         }
     }
-
     wined3d_mutex_unlock();
 
     return DD_OK;
