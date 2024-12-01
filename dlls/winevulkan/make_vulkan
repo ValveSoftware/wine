@@ -2733,6 +2733,11 @@ class VkGenerator(object):
 
     def generate_vulkan_h(self, f):
         self._generate_copyright(f)
+
+        f.write("#if 0\n")
+        f.write("#pragma makedep install\n")
+        f.write("#endif\n\n")
+
         f.write("#ifndef __WINE_VULKAN_H\n")
         f.write("#define __WINE_VULKAN_H\n\n")
 
