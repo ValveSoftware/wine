@@ -166,6 +166,7 @@ static INT64 last_query_display_time;
 static UINT64 monitor_update_serial;
 static pthread_mutex_t display_lock = PTHREAD_MUTEX_INITIALIZER;
 
+static BOOL emulate_modelist = TRUE;
 static BOOL emulate_modeset = TRUE;
 BOOL decorated_mode = TRUE;
 UINT64 thunk_lock_callback = 0;
@@ -2169,6 +2170,23 @@ static void add_modes( const DEVMODEW *current, UINT host_modes_count, const DEV
         modes = current;
         modes_count = 1;
     }
+    else if (emulate_modelist)
+    {
+        physical = *current;
+        if ((virtual_modes = get_virtual_modes( current, &physical, host_modes, host_modes_count, &virtual_count )))
+        {
+            modes_count = virtual_count;
+            modes = virtual_modes;
+        }
+
+        /* HACK: Gamescope doesn't really changes the display mode, pretend it changed to what was requested */
+        if (user_driver->pHasWindowManager( "steamcompmgr" ) && read_source_mode( source->key, ENUM_CURRENT_SETTINGS, &virtual ))
+        {
+            WARN( "Faking current mode to %s\n", debugstr_devmodew(&virtual) );
+            current = &virtual;
+            detached = *current;
+        }
+    }
 
     physical = modes_count == 1 ? *modes : *current;
     if (ctx->is_primary) ctx->primary = *current;
@@ -2180,7 +2198,7 @@ static void add_modes( const DEVMODEW *current, UINT host_modes_count, const DEV
     if (modes_count > 1 || current == &detached)
     {
         reg_delete_value( source->key, physicalW );
-        virtual_modes = NULL;
+        if (!emulate_modelist) virtual_modes = NULL;
     }
     else
     {
@@ -4341,7 +4359,7 @@ static LONG apply_display_settings( struct source *target, const DEVMODEW *devmo
     struct source *primary, *source;
     DEVMODEW *mode, *displays;
     HWND restorer_window;
-    LONG ret;
+    UINT ret;
 
     if (!lock_display_devices( FALSE )) return DISP_CHANGE_FAILED;
     if (!(displays = get_display_settings( target, devmode )))
@@ -4371,6 +4389,7 @@ static LONG apply_display_settings( struct source *target, const DEVMODEW *devmo
     /* use the default implementation in virtual desktop mode */
     if (is_virtual_desktop() || emulate_modeset) ret = DISP_CHANGE_SUCCESSFUL;
     else ret = user_driver->pChangeDisplaySettings( displays, primary_name, hwnd, flags, lparam );
+    if (ret != DISP_CHANGE_SUCCESSFUL) WARN( "Failed to change display settings, ret %d\n", ret );
 
     if (ret == DISP_CHANGE_SUCCESSFUL)
     {
@@ -5942,6 +5961,8 @@ void sysparams_init(void)
         grab_fullscreen = IS_OPTION_TRUE( buffer[0] );
     if (!get_config_key( hkey, appkey, "Decorated", buffer, sizeof(buffer) ))
         decorated_mode = IS_OPTION_TRUE( buffer[0] );
+    if (!get_config_key( hkey, appkey, "EmulateModelist", buffer, sizeof(buffer) ))
+        emulate_modelist = !IS_OPTION_TRUE( buffer[0] );
     if (!get_config_key( hkey, appkey, "EmulateModeset", buffer, sizeof(buffer) ))
         emulate_modeset = !IS_OPTION_TRUE( buffer[0] );
 
