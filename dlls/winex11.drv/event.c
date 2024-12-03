@@ -1336,6 +1336,12 @@ static void handle_net_supporting_wm_check_notify( XPropertyEvent *event )
 {
     struct x11drv_thread_data *data = x11drv_thread_data();
 
+    if (data->window_manager)
+    {
+        XFree( data->window_manager );
+        data->window_manager = NULL;
+    }
+
     if (event->state == PropertyNewValue) net_supporting_wm_check_init( data );
 }
 

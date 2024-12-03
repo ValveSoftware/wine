@@ -414,6 +414,7 @@ struct x11drv_thread_data
     Atom    *net_supported;        /* list of _NET_SUPPORTED atoms */
     int      net_supported_count;  /* number of _NET_SUPPORTED atoms */
     UINT     net_wm_state_mask;    /* mask of supported _NET_WM_STATE *bits */
+    char    *window_manager;       /* name of the supporting window manager */
 #ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
     XIValuatorClassInfo x_valuator;
     XIValuatorClassInfo y_valuator;
@@ -501,6 +502,7 @@ enum x11drv_atoms
     XATOM_WM_PROTOCOLS,
     XATOM_WM_DELETE_WINDOW,
     XATOM_WM_HINTS,
+    XATOM_WM_NAME,
     XATOM_WM_NORMAL_HINTS,
     XATOM_WM_STATE,
     XATOM_WM_TAKE_FOCUS,

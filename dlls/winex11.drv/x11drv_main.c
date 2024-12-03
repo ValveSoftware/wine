@@ -121,6 +121,7 @@ const char * const X11DRV_atom_names[NB_XATOMS - FIRST_XATOM] =
     "WM_PROTOCOLS",
     "WM_DELETE_WINDOW",
     "WM_HINTS",
+    "WM_NAME",
     "WM_NORMAL_HINTS",
     "WM_STATE",
     "WM_TAKE_FOCUS",
@@ -696,6 +697,7 @@ void X11DRV_ThreadDetach(void)
         if (data->xim) XCloseIM( data->xim );
         if (data->font_set) XFreeFontSet( data->display, data->font_set );
         if (data->net_supported) XFree( data->net_supported );
+        if (data->window_manager) XFree( data->window_manager );
         XSync( gdi_display, False ); /* make sure XReparentWindow requests have completed before closing the thread display */
         XCloseDisplay( data->display );
         free( data );
