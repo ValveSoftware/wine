@@ -406,6 +406,7 @@ struct user_driver_funcs
     LRESULT (*pDesktopWindowProc)(HWND,UINT,WPARAM,LPARAM);
     void    (*pDestroyWindow)(HWND);
     void    (*pFlashWindowEx)(FLASHWINFO*);
+    BOOL    (*pHasWindowManager)(const char *);
     void    (*pGetDC)(HDC,HWND,HWND,const RECT *,const RECT *,DWORD);
     BOOL    (*pProcessEvents)(DWORD);
     void    (*pReleaseDC)(HWND,HDC);

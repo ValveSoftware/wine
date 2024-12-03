@@ -229,6 +229,7 @@ extern BOOL X11DRV_CreateWindow( HWND hwnd );
 extern LRESULT X11DRV_DesktopWindowProc( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp );
 extern void X11DRV_DestroyWindow( HWND hwnd );
 extern void X11DRV_FlashWindowEx( PFLASHWINFO pfinfo );
+extern BOOL X11DRV_HasWindowManager( const char *name );
 extern void X11DRV_GetDC( HDC hdc, HWND hwnd, HWND top, const RECT *win_rect,
                           const RECT *top_rect, DWORD flags );
 extern void X11DRV_ReleaseDC( HWND hwnd, HDC hdc );

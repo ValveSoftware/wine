@@ -3782,6 +3782,12 @@ void net_supporting_wm_check_init( struct x11drv_thread_data *data )
     }
 }
 
+BOOL X11DRV_HasWindowManager( const char *name )
+{
+    struct x11drv_thread_data *data = x11drv_init_thread_data();
+    return data->window_manager && !strcmp( data->window_manager, name );
+}
+
 void init_win_context(void)
 {
     init_recursive_mutex( &win_data_mutex );
