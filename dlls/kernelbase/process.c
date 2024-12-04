@@ -598,6 +598,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     }
     options[] =
     {
+        {L"Willful.exe", L" --disable_direct_composition=1"},
         {L"Banyu Lintar Angin - Little Storm -.exe", L" --disable_direct_composition=1"},
         {L"Super\\Super.exe", L" --disable_direct_composition=1"},
         {L"A Raven Monologue.exe", L" --use-angle=d3d9"},
