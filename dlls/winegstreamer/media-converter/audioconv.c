@@ -304,14 +304,14 @@ static void dump_fozdb_discard_transcoded(void)
 
     FOZDB_FOR_EACH_TAG_ENTRY(entry, AUDIO_CONV_FOZ_TAG_STREAM, dump_fozdb.fozdb)
     {
-        uint32_t chunks_size, i;
+        uint32_t i;
         size_t read_size;
 
-        if (fozdb_entry_size(dump_fozdb.fozdb, AUDIO_CONV_FOZ_TAG_STREAM, &entry->key.hash, &chunks_size) == CONV_OK)
+        if (entry->full_size)
         {
-            uint8_t *buffer = calloc(1, chunks_size);
+            uint8_t *buffer = calloc(1, entry->full_size);
             if (fozdb_read_entry_data(dump_fozdb.fozdb, AUDIO_CONV_FOZ_TAG_STREAM, &entry->key.hash,
-                    0, buffer, chunks_size, &read_size, true) == CONV_OK)
+                    0, buffer, entry->full_size, &read_size, true) == CONV_OK)
             {
                 struct rb_tree stream_chunks = {fozdb_entry_compare};
                 bool has_all = true;
