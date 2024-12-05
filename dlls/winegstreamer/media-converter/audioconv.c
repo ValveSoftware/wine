@@ -272,11 +272,10 @@ static void dump_fozdb_discard_transcoded(void)
     struct rb_tree chunks_to_discard = {fozdb_entry_compare};
     struct rb_tree chunks_to_keep = {fozdb_entry_compare};
     struct rb_tree chunks = {fozdb_entry_compare};
-    struct fozdb_hash chunk_id, *stream_id;
-    struct fozdb_entry *chunk;
+    struct fozdb_entry *entry, *chunk;
+    struct fozdb_hash chunk_id;
     struct fozdb *read_fozdb;
     char *read_fozdb_path;
-    GHashTableIter iter;
     int ret;
 
     if (dump_fozdb.already_cleaned)
@@ -303,16 +302,15 @@ static void dump_fozdb_discard_transcoded(void)
         return;
     }
 
-    fozdb_iter_tag(dump_fozdb.fozdb, AUDIO_CONV_FOZ_TAG_STREAM, &iter);
-    while (g_hash_table_iter_next(&iter, (void *)&stream_id, NULL))
+    FOZDB_FOR_EACH_TAG_ENTRY(entry, AUDIO_CONV_FOZ_TAG_STREAM, dump_fozdb.fozdb)
     {
         uint32_t chunks_size, i;
         size_t read_size;
 
-        if (fozdb_entry_size(dump_fozdb.fozdb, AUDIO_CONV_FOZ_TAG_STREAM, stream_id, &chunks_size) == CONV_OK)
+        if (fozdb_entry_size(dump_fozdb.fozdb, AUDIO_CONV_FOZ_TAG_STREAM, &entry->key.hash, &chunks_size) == CONV_OK)
         {
             uint8_t *buffer = calloc(1, chunks_size);
-            if (fozdb_read_entry_data(dump_fozdb.fozdb, AUDIO_CONV_FOZ_TAG_STREAM, stream_id,
+            if (fozdb_read_entry_data(dump_fozdb.fozdb, AUDIO_CONV_FOZ_TAG_STREAM, &entry->key.hash,
                     0, buffer, chunks_size, &read_size, true) == CONV_OK)
             {
                 struct rb_tree stream_chunks = {fozdb_entry_compare};
@@ -344,7 +342,7 @@ static void dump_fozdb_discard_transcoded(void)
                 }
 
                 if (has_all)
-                    fozdb_entry_put(&chunks_to_discard, AUDIO_CONV_FOZ_TAG_STREAM, stream_id);
+                    fozdb_entry_put(&chunks_to_discard, AUDIO_CONV_FOZ_TAG_STREAM, &entry->key.hash);
 
                 rb_destroy(&stream_chunks, fozdb_entry_destroy, NULL);
             }
@@ -605,13 +603,12 @@ static int stream_state_write_to_foz(struct stream_state *state)
     if (!found)
     {
         /* Are there any recorded streams of which this stream is a subset? */
-        struct fozdb_hash *stream_id;
-        GHashTableIter stream_ids;
+        struct fozdb_entry *entry;
 
-        fozdb_iter_tag(dump_fozdb.fozdb, AUDIO_CONV_FOZ_TAG_STREAM, &stream_ids);
-        while (g_hash_table_iter_next(&stream_ids, (void **)&stream_id, NULL))
+        RB_FOR_EACH_ENTRY(entry, &dump_fozdb.fozdb->entries, struct fozdb_entry, entry)
         {
-            if (stream_state_is_stream_subset(state, dump_fozdb.fozdb, stream_id))
+            if (entry->key.tag != AUDIO_CONV_FOZ_TAG_STREAM) continue;
+            if (stream_state_is_stream_subset(state, dump_fozdb.fozdb, &entry->key.hash))
             {
                 found = true;
                 break;

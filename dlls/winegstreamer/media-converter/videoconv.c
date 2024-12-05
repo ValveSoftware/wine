@@ -176,10 +176,9 @@ static int dump_fozdb_open_video(bool create)
 static void dump_fozdb_discard_transcoded(void)
 {
     struct rb_tree to_discard_chunks = {fozdb_entry_compare};
-    struct fozdb_hash *stream_id;
+    struct fozdb_entry *entry;
     struct fozdb *read_fozdb;
     char *read_fozdb_path;
-    GHashTableIter iter;
     int ret;
 
     if (dump_fozdb.already_cleaned)
@@ -206,19 +205,18 @@ static void dump_fozdb_discard_transcoded(void)
         return;
     }
 
-    fozdb_iter_tag(dump_fozdb.fozdb, VIDEO_CONV_FOZ_TAG_STREAM, &iter);
-    while (g_hash_table_iter_next(&iter, (void **)&stream_id, NULL))
+    FOZDB_FOR_EACH_TAG_ENTRY(entry, VIDEO_CONV_FOZ_TAG_STREAM, dump_fozdb.fozdb)
     {
         struct fozdb_hash chunk_id;
         uint32_t chunks_size, i;
         size_t read_size;
 
-        if (fozdb_has_entry(read_fozdb, VIDEO_CONV_FOZ_TAG_OGVDATA, stream_id))
+        if (fozdb_has_entry(read_fozdb, VIDEO_CONV_FOZ_TAG_OGVDATA, &entry->key.hash))
         {
-            if (fozdb_entry_size(dump_fozdb.fozdb, VIDEO_CONV_FOZ_TAG_STREAM, stream_id, &chunks_size) == CONV_OK)
+            if (fozdb_entry_size(dump_fozdb.fozdb, VIDEO_CONV_FOZ_TAG_STREAM, &entry->key.hash, &chunks_size) == CONV_OK)
             {
                 uint8_t *buffer = calloc(1, chunks_size);
-                if (fozdb_read_entry_data(dump_fozdb.fozdb, VIDEO_CONV_FOZ_TAG_STREAM, stream_id,
+                if (fozdb_read_entry_data(dump_fozdb.fozdb, VIDEO_CONV_FOZ_TAG_STREAM, &entry->key.hash,
                         0, buffer, chunks_size, &read_size, true) == CONV_OK)
                 {
                     for (i = 0; i < read_size / sizeof(chunk_id); ++i)
@@ -230,7 +228,7 @@ static void dump_fozdb_discard_transcoded(void)
                 free(buffer);
             }
 
-            fozdb_entry_put(&to_discard_chunks, VIDEO_CONV_FOZ_TAG_STREAM, stream_id);
+            fozdb_entry_put(&to_discard_chunks, VIDEO_CONV_FOZ_TAG_STREAM, &entry->key.hash);
         }
     }
 

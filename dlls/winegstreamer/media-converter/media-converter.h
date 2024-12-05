@@ -113,11 +113,24 @@ struct fozdb_entry
 {
     struct rb_entry entry;
     struct fozdb_key key;
+
+    uint32_t size;
+    uint32_t compression;
+    uint32_t crc;
+    uint32_t full_size;
+
+    uint64_t offset;
 };
 
 extern int fozdb_entry_compare( const void *key, const struct rb_entry *ptr );
 extern void fozdb_entry_destroy( struct rb_entry *entry, void *context );
 extern struct fozdb_entry *fozdb_entry_put( struct rb_tree *tree, uint32_t tag, const struct fozdb_hash *hash );
+
+extern struct rb_entry *fozdb_tag_head( struct rb_tree *tree, uint32_t tag );
+#define FOZDB_FOR_EACH_TAG_ENTRY( e, t, d )                                                       \
+    for ((e) = RB_ENTRY_VALUE( fozdb_tag_head( (&(d)->entries), t ), struct fozdb_entry, entry ); \
+         (e) != RB_ENTRY_VALUE( 0, struct fozdb_entry, entry ) && (e)->key.tag == (t);            \
+         (e) = RB_ENTRY_VALUE( rb_next( &e->entry ), struct fozdb_entry, entry ))
 
 struct dump_fozdb
 {
@@ -129,10 +142,10 @@ struct dump_fozdb
 struct fozdb
 {
     const char *file_name;
+    struct rb_tree entries;
     int file;
     bool read_only;
     uint64_t write_pos;
-    GHashTable **seen_blobs;
     uint32_t num_tags;
 };
 
@@ -177,7 +190,6 @@ extern void fozdb_release(struct fozdb *db);
 extern int fozdb_prepare(struct fozdb *db);
 extern bool fozdb_has_entry(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash);
 extern int fozdb_entry_size(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash, uint32_t *size);
-extern void fozdb_iter_tag(struct fozdb *db, uint32_t tag, GHashTableIter *iter);
 extern int fozdb_read_entry_data(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash,
         uint64_t offset, uint8_t *buffer, size_t size, size_t *read_size, bool with_crc);
 extern int fozdb_write_entry(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash,
