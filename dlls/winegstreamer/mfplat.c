@@ -121,6 +121,7 @@ static const IClassFactoryVtbl class_factory_vtbl =
     class_factory_LockServer,
 };
 
+static const GUID CLSID_GStreamerAudioDecoder = {0x480b1517, 0xc8e9, 0x4eae, {0xb0, 0x06, 0xe6, 0x30, 0x07, 0x18, 0xd8, 0x5d}};
 static const GUID CLSID_GStreamerByteStreamHandler = {0x317df618, 0x5e5a, 0x468a, {0x9f, 0x15, 0xd8, 0x27, 0xa9, 0xa0, 0x81, 0x62}};
 static const GUID CLSID_wg_video_processor = {0xd527607f,0x89cb,0x4e94,{0x95,0x71,0xbc,0xfe,0x62,0x17,0x56,0x13}};
 static const GUID CLSID_wg_aac_decoder = {0xe7889a8a,0x2083,0x4844,{0x83,0x70,0x5e,0xe3,0x49,0xb1,0x45,0x03}};
@@ -135,6 +136,7 @@ static const struct class_object
 class_objects[] =
 {
     { &CLSID_wg_video_processor, &video_processor_create },
+    { &CLSID_GStreamerAudioDecoder, &audio_decoder_create },
     { &CLSID_GStreamerByteStreamHandler, &gstreamer_byte_stream_handler_create },
     { &CLSID_wg_aac_decoder, &aac_decoder_create },
     { &CLSID_wg_h264_decoder, &h264_decoder_create },

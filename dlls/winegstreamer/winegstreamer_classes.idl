@@ -79,6 +79,12 @@ coclass GStreamerByteStreamHandler {}
 
 [
     threading(both),
+    uuid(480b1517-c8e9-4eae-b006-e6300718d85d)
+]
+coclass GStreamerAudioDecoder {}
+
+[
+    threading(both),
     uuid(5b4d4e54-0620-4cf9-94ae-7823965c28b6)
 ]
 coclass wg_wma_decoder {};
