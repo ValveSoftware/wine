@@ -1790,6 +1790,7 @@ HRESULT WINAPI winegstreamer_create_video_decoder(IMFTransform **out)
 
 extern const GUID MEDIASUBTYPE_VC1S;
 extern const GUID MEDIASUBTYPE_WMV_Unknown;
+extern const GUID MFVideoFormat_theora;
 static const GUID *const wmv_decoder_input_types[] =
 {
     &MEDIASUBTYPE_WMV1,
@@ -1801,6 +1802,7 @@ static const GUID *const wmv_decoder_input_types[] =
     &MEDIASUBTYPE_WVC1,
     &MEDIASUBTYPE_WMV3,
     &MEDIASUBTYPE_VC1S,
+    &MFVideoFormat_theora,
 };
 static const GUID *const wmv_decoder_output_types[] =
 {

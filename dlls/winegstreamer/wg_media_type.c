@@ -63,6 +63,7 @@ DEFINE_MEDIATYPE_GUID(MFVideoFormat_CVID,MAKEFOURCC('c','v','i','d'));
 DEFINE_MEDIATYPE_GUID(MFVideoFormat_IV50,MAKEFOURCC('I','V','5','0'));
 DEFINE_MEDIATYPE_GUID(MFVideoFormat_VC1S,MAKEFOURCC('V','C','1','S'));
 DEFINE_MEDIATYPE_GUID(MFVideoFormat_ABGR32,D3DFMT_A8B8G8R8);
+DEFINE_MEDIATYPE_GUID(MFVideoFormat_theora,MAKEFOURCC('t','h','e','o'));
 
 static void init_caps_codec_data(GstCaps *caps, const void *codec_data, int codec_data_size)
 {
@@ -349,6 +350,14 @@ static void init_caps_from_video_mpeg(GstCaps *caps, const struct mpeg_video_for
     gst_caps_set_simple(caps, "parsed", G_TYPE_BOOLEAN, TRUE, NULL);
 }
 
+static void init_caps_from_video_theora(GstCaps *caps, const MFVIDEOFORMAT *format, UINT format_size)
+{
+    init_caps_codec_data(caps, format + 1, format_size - sizeof(*format));
+
+    gst_structure_remove_field(gst_caps_get_structure(caps, 0), "format");
+    gst_structure_set_name(gst_caps_get_structure(caps, 0), "video/x-theora");
+}
+
 static void init_caps_from_video_subtype(GstCaps *caps, const GUID *subtype, const void *format, UINT format_size)
 {
     if (IsEqualGUID(subtype, &MFVideoFormat_CVID))
@@ -369,6 +378,8 @@ static void init_caps_from_video_subtype(GstCaps *caps, const GUID *subtype, con
         return init_caps_from_video_indeo(caps, format, format_size);
     if (IsEqualGUID(subtype, &MEDIASUBTYPE_MPEG1Payload))
         return init_caps_from_video_mpeg(caps, format, format_size);
+    if (IsEqualGUID(subtype, &MFVideoFormat_theora))
+        return init_caps_from_video_theora(caps, format, format_size);
 
     GST_FIXME("Unsupported subtype " WG_GUID_FORMAT, WG_GUID_ARGS(*subtype));
 }
