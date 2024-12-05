@@ -20,6 +20,7 @@
 #pragma makedep unix
 #endif
 
+#include "config.h"
 #include "media-converter.h"
 
 static uint64_t rotl64(uint64_t value, uint8_t shift)

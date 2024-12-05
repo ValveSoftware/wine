@@ -24,6 +24,7 @@
 #include <string.h>
 #include <utime.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <inttypes.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -32,9 +33,22 @@
 #include "unix_private.h"
 #include "wine/rbtree.h"
 
+#ifdef _WINEDMO
+
+#define GST_ERROR(fmt, ...) ERR(fmt "\n", ## __VA_ARGS__)
+#define GST_WARNING(fmt, ...) WARN(fmt "\n", ## __VA_ARGS__)
+#define GST_INFO(fmt, ...) TRACE(fmt "\n", ## __VA_ARGS__)
+#define GST_DEBUG(fmt, ...) TRACE(fmt "\n", ## __VA_ARGS__)
+typedef struct gst_buffer GstBuffer; /* not used */
+extern size_t gst_buffer_extract(GstBuffer*,size_t,void*,size_t); /* not used */
+
+#else /* _WINEDMO */
+
 GST_DEBUG_CATEGORY_EXTERN(media_converter_debug);
 #undef GST_CAT_DEFAULT
 #define GST_CAT_DEFAULT media_converter_debug
+
+#endif /* _WINEDMO */
 
 typedef int (*data_read_callback)(void *data_reader, uint8_t *buffer, size_t size, size_t *read_size);
 
@@ -125,6 +139,7 @@ struct fozdb_entry
 extern int fozdb_entry_compare( const void *key, const struct rb_entry *ptr );
 extern void fozdb_entry_destroy( struct rb_entry *entry, void *context );
 extern struct fozdb_entry *fozdb_entry_put( struct rb_tree *tree, uint32_t tag, const struct fozdb_hash *hash );
+extern struct fozdb_entry *fozdb_entry_get( struct rb_tree *tree, uint32_t tag, const struct fozdb_hash *hash );
 
 extern struct rb_entry *fozdb_tag_head( struct rb_tree *tree, uint32_t tag );
 #define FOZDB_FOR_EACH_TAG_ENTRY( e, t, d )                                                       \

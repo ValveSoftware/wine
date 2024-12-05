@@ -32,7 +32,17 @@
 #pragma makedep unix
 #endif
 
+#include "config.h"
+
 #include "media-converter.h"
+
+#ifdef _WINEDMO
+
+#include <errno.h>
+#include "wine/debug.h"
+WINE_DEFAULT_DEBUG_CHANNEL(dmo);
+
+#endif /* _WINEDMO */
 
 /* Fossilize StreamArchive database format version 6:
  *
@@ -120,6 +130,15 @@ struct fozdb_entry *fozdb_entry_put( struct rb_tree *tree, uint32_t tag, const s
 
     entry->key = key;
     return entry;
+}
+
+struct fozdb_entry *fozdb_entry_get( struct rb_tree *tree, uint32_t tag, const struct fozdb_hash *hash )
+{
+    struct fozdb_key key = {.tag = tag, .hash = *hash};
+    struct rb_entry *ptr;
+
+    if (!(ptr = rb_get( tree, &key ))) return NULL;
+    return RB_ENTRY_VALUE( ptr, struct fozdb_entry, entry );
 }
 
 struct rb_entry *fozdb_tag_head( struct rb_tree *tree, uint32_t tag )

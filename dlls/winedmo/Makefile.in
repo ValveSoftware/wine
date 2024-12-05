@@ -4,9 +4,15 @@ IMPORTLIB = winedmo
 IMPORTS   = mfuuid
 UNIX_CFLAGS  = $(FFMPEG_CFLAGS)
 UNIX_LIBS    = $(FFMPEG_LIBS) $(PTHREAD_LIBS)
+PARENTSRC = ../winegstreamer
+EXTRADEFS = -D_WINEDMO
 
 SOURCES = \
 	main.c \
+	media-converter/fossilize.c \
+	media-converter/murmur3.c \
+	media-converter/lib.c \
 	unix_demuxer.c \
+	unix_demuxer_mediaconv.c \
 	unix_media_type.c \
 	unixlib.c

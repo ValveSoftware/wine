@@ -43,6 +43,7 @@ struct stream
 struct demuxer
 {
     AVFormatContext *ctx;
+    struct stream_context *stream_context;
     struct stream *streams;
 
     AVPacket *last_packet; /* last read packet */
@@ -98,9 +99,9 @@ NTSTATUS demuxer_check( void *arg )
     else if (!strcmp( params->mime_type, "audio/mp3" )) format = av_find_input_format( "mp3" );
 
     if (format) TRACE( "Found format %s (%s)\n", format->name, format->long_name );
-    else FIXME( "Unsupported MIME type %s\n", debugstr_a(params->mime_type) );
+    else WARN( "Found MIME type %s\n", debugstr_a(params->mime_type) );
 
-    return format ? STATUS_SUCCESS : STATUS_NOT_SUPPORTED;
+    return STATUS_SUCCESS;
 }
 
 static NTSTATUS demuxer_create_streams( struct demuxer *demuxer )
@@ -144,11 +145,17 @@ NTSTATUS demuxer_create( void *arg )
 
     TRACE( "context %p, url %s, mime %s\n", params->context, debugstr_a(params->url), debugstr_a(params->mime_type) );
 
+    mediaconv_demuxer_init();
+
     if (!(demuxer = calloc( 1, sizeof(*demuxer) ))) return STATUS_NO_MEMORY;
+    demuxer->stream_context = params->context;
+
     if (!(demuxer->ctx = avformat_alloc_context())) goto failed;
     if (!(demuxer->ctx->pb = avio_alloc_context( NULL, 0, 0, params->context, unix_read_callback, NULL, unix_seek_callback ))) goto failed;
 
     if ((ret = avformat_open_input( &demuxer->ctx, NULL, NULL, NULL )) < 0)
+        WARN( "Failed to open input, error %s.\n", debugstr_averr(ret) );
+    if ((ret = mediaconv_demuxer_open( &demuxer->ctx, params->context ) < 0))
     {
         ERR( "Failed to open input, error %s.\n", debugstr_averr(ret) );
         goto failed;
@@ -199,6 +206,8 @@ failed:
         av_bsf_free( &demuxer->streams[i].filter );
     free( demuxer->streams );
     free( demuxer );
+
+    mediaconv_demuxer_exit();
     return STATUS_UNSUCCESSFUL;
 }
 
@@ -210,7 +219,7 @@ NTSTATUS demuxer_destroy( void *arg )
 
     TRACE( "demuxer %p\n", demuxer );
 
-    params->context = demuxer->ctx->pb->opaque;
+    params->context = demuxer->stream_context;
     avio_context_free( &demuxer->ctx->pb );
     avformat_free_context( demuxer->ctx );
     for (i = 0; i < demuxer->ctx->nb_streams; i++)
@@ -218,6 +227,7 @@ NTSTATUS demuxer_destroy( void *arg )
     free( demuxer->streams );
     free( demuxer );
 
+    mediaconv_demuxer_exit();
     return STATUS_SUCCESS;
 }
 

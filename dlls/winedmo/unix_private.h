@@ -31,12 +31,18 @@
 # include <libavcodec/bsf.h>
 #endif
 #else
+typedef struct AVFormatContext AVFormatContext;
 typedef struct AVCodecParameters AVCodecParameters;
 typedef struct AVRational AVRational;
 #endif /* HAVE_FFMPEG */
 
 #include "unixlib.h"
 #include "wine/debug.h"
+
+/* media-converter/demuxer.c */
+extern void mediaconv_demuxer_init(void);
+extern void mediaconv_demuxer_exit(void);
+extern int mediaconv_demuxer_open( AVFormatContext **ctx, struct stream_context *context );
 
 /* unixlib.c */
 extern int64_t unix_seek_callback( void *opaque, int64_t offset, int whence );
