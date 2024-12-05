@@ -102,7 +102,7 @@ static inline const char *debugstr_fozdb_hash_( char *buffer, const struct fozdb
     return buffer;
 }
 
-struct entry_name
+struct fozdb_key
 {
     uint32_t tag;
     struct fozdb_hash hash;
@@ -265,9 +265,9 @@ static inline bool file_exists(const char *file_path)
     return access(file_path, F_OK) == 0;
 }
 
-static inline struct entry_name *entry_name_create(uint32_t tag, struct fozdb_hash *hash)
+static inline struct fozdb_key *entry_name_create(uint32_t tag, struct fozdb_hash *hash)
 {
-    struct entry_name *entry = calloc(1, sizeof(*entry));
+    struct fozdb_key *entry = calloc(1, sizeof(*entry));
     entry->tag = tag;
     entry->hash = *hash;
     return entry;
@@ -275,7 +275,7 @@ static inline struct entry_name *entry_name_create(uint32_t tag, struct fozdb_ha
 
 static inline gint entry_name_compare(const void *a, const void *b)
 {
-    return memcmp(a, b, sizeof(struct entry_name));
+    return memcmp(a, b, sizeof(struct fozdb_key));
 }
 
 static inline uint32_t bytes_to_uint32(const uint8_t *bytes)

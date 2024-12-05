@@ -329,7 +329,7 @@ static void dump_fozdb_discard_transcoded(void)
 
                 for (list_iter = stream_chunks; list_iter; list_iter = list_iter->next)
                 {
-                    struct entry_name *entry = list_iter->data;
+                    struct fozdb_key *entry = list_iter->data;
                     if (has_all)
                     {
                         chunks_to_discard = g_list_append(chunks_to_discard,
@@ -358,7 +358,7 @@ static void dump_fozdb_discard_transcoded(void)
 
     for (list_iter = chunks_to_discard; list_iter; list_iter = list_iter->next)
     {
-        struct entry_name *entry = list_iter->data;
+        struct fozdb_key *entry = list_iter->data;
         if (!g_list_find_custom(chunks_to_keep, entry, entry_name_compare))
             chunks = g_list_append(chunks, entry_name_create(entry->tag, &entry->hash));
     }

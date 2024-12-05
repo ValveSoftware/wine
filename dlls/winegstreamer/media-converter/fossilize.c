@@ -272,7 +272,7 @@ static bool fozdb_write_entry_name(struct fozdb *db, uint32_t tag, struct fozdb_
 
 /* Copy an entry to write_pos. */
 static int fozdb_copy_entry(struct fozdb *db,
-        struct entry_name *name, struct payload_header *header, uint64_t entry_data_offset)
+        struct fozdb_key *key, struct payload_header *header, uint64_t entry_data_offset)
 {
     uint64_t read_offset, entry_end = entry_data_offset + header->size;
     ssize_t read_size;
@@ -285,7 +285,7 @@ static int fozdb_copy_entry(struct fozdb *db,
     }
 
     /* Write entry name. */
-    if (!fozdb_write_entry_name(db, name->tag, &name->hash))
+    if (!fozdb_write_entry_name(db, key->tag, &key->hash))
         return CONV_ERROR_WRITE_FAILED;
     db->write_pos += ENTRY_NAME_SIZE;
 
@@ -677,15 +677,15 @@ int fozdb_discard_entries(struct fozdb *db, GList *to_discard_names)
     {
         struct payload_header header;
         uint64_t entry_data_offset;
-        struct entry_name name;
+        struct fozdb_key key;
         bool truncated;
 
-        if ((ret = fozdb_read_entry_tag_hash_header(db, &name.tag, &name.hash, &header) < 0))
+        if ((ret = fozdb_read_entry_tag_hash_header(db, &key.tag, &key.hash, &header) < 0))
             return CONV_ERROR_READ_FAILED;
         entry_data_offset = lseek(db->file, 0, SEEK_CUR);
 
         /* Check if entry should be discarded. */
-        if (g_list_find_custom(to_discard_names, &name, entry_name_compare))
+        if (g_list_find_custom(to_discard_names, &key, entry_name_compare))
         {
             if (!fozdb_seek_to_next_entry(db, &header, &truncated))
                 return CONV_ERROR_SEEK_FAILED;
@@ -706,7 +706,7 @@ int fozdb_discard_entries(struct fozdb *db, GList *to_discard_names)
             else
             {
                 /* We're offset, so we have to rewrite. */
-                if ((ret = fozdb_copy_entry(db, &name, &header, entry_data_offset)) < 0)
+                if ((ret = fozdb_copy_entry(db, &key, &header, entry_data_offset)) < 0)
                     return ret;
             }
         }
