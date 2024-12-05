@@ -34,6 +34,14 @@ WINE_DEFAULT_DEBUG_CHANNEL(dmo);
 #include "initguid.h"
 
 DEFINE_MEDIATYPE_GUID(MFAudioFormat_RAW_AAC,WAVE_FORMAT_RAW_AAC1);
+static const GUID CLSID_WineAudioDecoder = {0x480b1517,0xc8e9,0x4eaf,{0xb0,0x06,0xe6,0x30,0x07,0x18,0xd8,0x5d}};
+
+static HRESULT WINAPI audio_decoder_factory_CreateInstance(IClassFactory *iface, IUnknown *outer,
+        REFIID riid, void **out)
+{
+    static const GUID CLSID_GStreamerAudioDecoder = {0x480b1517,0xc8e9,0x4eae,{0xb0,0x06,0xe6,0x30,0x07,0x18,0xd8,0x5d}};
+    return CoCreateInstance(&CLSID_GStreamerAudioDecoder, outer, CLSCTX_INPROC_SERVER, riid, out);
+}
 
 static HRESULT WINAPI aac_decoder_factory_CreateInstance(IClassFactory *iface, IUnknown *outer,
         REFIID riid, void **out)
@@ -71,6 +79,17 @@ static const IClassFactoryVtbl aac_decoder_factory_vtbl =
 
 static IClassFactory aac_decoder_factory = {&aac_decoder_factory_vtbl};
 
+static const IClassFactoryVtbl audio_decoder_factory_vtbl =
+{
+    class_factory_QueryInterface,
+    class_factory_AddRef,
+    class_factory_Release,
+    audio_decoder_factory_CreateInstance,
+    class_factory_LockServer,
+};
+
+static IClassFactory audio_decoder_factory = {&audio_decoder_factory_vtbl};
+
 /***********************************************************************
  *              DllGetClassObject (msauddecmft.@)
  */
@@ -78,6 +97,8 @@ HRESULT WINAPI DllGetClassObject(REFCLSID clsid, REFIID riid, void **out)
 {
     if (IsEqualGUID(clsid, &CLSID_MSAACDecMFT))
         return IClassFactory_QueryInterface(&aac_decoder_factory, riid, out);
+    if (IsEqualGUID(clsid, &CLSID_WineAudioDecoder))
+        return IClassFactory_QueryInterface(&audio_decoder_factory, riid, out);
 
     *out = NULL;
     FIXME("Unknown clsid %s.\n", debugstr_guid(clsid));
@@ -100,6 +121,15 @@ HRESULT WINAPI DllRegisterServer(void)
         {MFMediaType_Audio, MFAudioFormat_Float},
         {MFMediaType_Audio, MFAudioFormat_PCM},
     };
+    MFT_REGISTER_TYPE_INFO audio_decoder_mft_inputs[] =
+    {
+        {MFMediaType_Audio, MFAudioFormat_Vorbis},
+    };
+    MFT_REGISTER_TYPE_INFO audio_decoder_mft_outputs[] =
+    {
+        {MFMediaType_Audio, MFAudioFormat_Float},
+        {MFMediaType_Audio, MFAudioFormat_PCM},
+    };
     HRESULT hr;
 
     TRACE("\n");
@@ -110,6 +140,11 @@ HRESULT WINAPI DllRegisterServer(void)
             (WCHAR *)L"Microsoft AAC Audio Decoder MFT", MFT_ENUM_FLAG_SYNCMFT,
             ARRAY_SIZE(aac_decoder_mft_inputs), aac_decoder_mft_inputs,
             ARRAY_SIZE(aac_decoder_mft_outputs), aac_decoder_mft_outputs, NULL)))
+        return hr;
+    if (FAILED(hr = MFTRegister(CLSID_WineAudioDecoder, MFT_CATEGORY_AUDIO_DECODER,
+            (WCHAR *)L"Wine Audio Decoder", MFT_ENUM_FLAG_SYNCMFT,
+            ARRAY_SIZE(audio_decoder_mft_inputs), audio_decoder_mft_inputs,
+            ARRAY_SIZE(audio_decoder_mft_outputs), audio_decoder_mft_outputs, NULL)))
         return hr;
 
     return S_OK;
@@ -127,6 +162,8 @@ HRESULT WINAPI DllUnregisterServer(void)
     if (FAILED(hr = __wine_unregister_resources()))
         return hr;
     if (FAILED(hr = MFTUnregister(CLSID_MSAACDecMFT)))
+        return hr;
+    if (FAILED(hr = MFTUnregister(CLSID_WineAudioDecoder)))
         return hr;
 
     return S_OK;

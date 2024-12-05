@@ -23,3 +23,9 @@
     uuid(32d186a7-218f-4c75-8876-dd77273a8999)
 ]
 coclass CMSAACDecMFT {}
+
+[
+    threading(both),
+    uuid(480b1517-c8e9-4eaf-b006-e6300718d85d)
+]
+coclass WineAudioDecoder {}
