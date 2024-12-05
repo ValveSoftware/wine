@@ -520,6 +520,74 @@ static GstCaps *transform_get_parsed_caps(GstCaps *caps, const char *media_type)
     return parsed_caps;
 }
 
+static GstBuffer *caps_get_buffer(const GstCaps *caps, const char *name, UINT32 *buffer_size)
+{
+    const GstStructure *structure = gst_caps_get_structure(caps, 0);
+    const GValue *buffer_value;
+
+    if ((buffer_value = gst_structure_get_value(structure, name)))
+    {
+        GstBuffer *buffer = gst_value_get_buffer(buffer_value);
+        *buffer_size = gst_buffer_get_size(buffer);
+        return buffer;
+    }
+
+    *buffer_size = 0;
+    return NULL;
+}
+
+static void push_vorbis_headers(struct wg_transform *transform)
+{
+    const uint8_t *ptr, *beg, *end;
+    GstBuffer *codec_data, *hdr;
+    UINT32 codec_data_size;
+    GstBufferMapInfo info;
+    int i, count, len;
+
+    if (!(codec_data = caps_get_buffer(transform->input_caps, "codec_data",
+            &codec_data_size)) || !codec_data_size) return;
+    gst_buffer_map(codec_data, &info, GST_MAP_READ);
+    ptr = info.data;
+    end = ptr + info.size;
+
+    for (len = 0, i = 0, count = *ptr++; ptr < end && i < count; i++)
+    {
+        while (ptr < end && *ptr++ == 0xff) len += 0xff;
+        len += ptr[-1];
+        GST_DEBUG("buffer %d: %u bytes", i, len);
+    }
+    if (len > end - ptr) goto failed;
+    beg = ptr;
+    ptr = info.data;
+
+    GST_DEBUG("%u stream headers, total length=%u bytes", count + 1, codec_data_size);
+    for (len = 0, i = 0, count = *ptr++; ptr < end && i < count; i++, len = 0)
+    {
+        while (ptr < end && *ptr++ == 0xff) len += 0xff;
+        len += ptr[-1];
+
+        if (!(hdr = gst_buffer_new_memdup(beg, len))) break;
+        GST_DEBUG("buffer %d: %u bytes", i, len);
+        GST_BUFFER_FLAG_SET(hdr, GST_BUFFER_FLAG_HEADER);
+        GST_MEMDUMP("data", beg, len);
+        gst_pad_push(transform->my_src, hdr);
+        beg += len;
+    }
+
+    if ((hdr = gst_buffer_new_memdup(beg, end - beg)))
+    {
+        GST_DEBUG("buffer %d: %zu bytes", i, end - beg);
+        GST_MEMDUMP("data", beg, end - beg);
+        GST_BUFFER_FLAG_SET(hdr, GST_BUFFER_FLAG_HEADER);
+        gst_pad_push(transform->my_src, hdr);
+    }
+
+failed:
+    gst_buffer_unmap(codec_data, &info);
+    gst_buffer_unref(codec_data);
+}
+
+
 static bool transform_create_decoder_elements(struct wg_transform *transform,
         const gchar *input_mime, const gchar *output_mime, GstElement **first, GstElement **last)
 {
@@ -775,6 +843,9 @@ NTSTATUS wg_transform_create(void *args)
     if (!(event = gst_event_new_segment(&transform->segment))
             || !push_event(transform->my_src, event))
         goto out;
+
+    if (!strcmp(input_mime, "audio/x-vorbis"))
+        push_vorbis_headers(transform);
 
     GST_INFO("Created winegstreamer transform %p.", transform);
     params->transform = (wg_transform_t)(ULONG_PTR)transform;
