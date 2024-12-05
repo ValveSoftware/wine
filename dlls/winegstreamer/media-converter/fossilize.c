@@ -101,6 +101,34 @@ struct payload_entry
     uint64_t offset;
 };
 
+int fozdb_entry_compare( const void *key, const struct rb_entry *ptr )
+{
+    const struct fozdb_entry *entry = RB_ENTRY_VALUE( ptr, const struct fozdb_entry, entry );
+    return memcmp( key, &entry->key, sizeof(entry->key) );
+}
+
+void fozdb_entry_destroy( struct rb_entry *entry, void *context )
+{
+    struct fozdb_entry *chunk = RB_ENTRY_VALUE( entry, struct fozdb_entry, entry );
+    free( chunk );
+}
+
+struct fozdb_entry *fozdb_entry_put( struct rb_tree *tree, uint32_t tag, const struct fozdb_hash *hash )
+{
+    struct fozdb_key key = {.tag = tag, .hash = *hash};
+    struct fozdb_entry *entry;
+
+    if (!(entry = malloc( sizeof(*entry) )) ||
+        rb_put( tree, &key, &entry->entry ))
+    {
+        free( entry );
+        return NULL;
+    }
+
+    entry->key = key;
+    return entry;
+}
+
 static guint hash_func(gconstpointer key)
 {
     const struct fozdb_hash *fozdb_hash = key;
@@ -648,13 +676,13 @@ int fozdb_write_entry(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash,
 }
 
 /* Rewrites the database, discarding entries listed. */
-int fozdb_discard_entries(struct fozdb *db, GList *to_discard_names)
+int fozdb_discard_entries(struct fozdb *db, struct rb_tree *to_discard)
 {
     uint8_t entry_name_and_header[ENTRY_NAME_SIZE + sizeof(struct payload_header)];
     uint64_t file_size;
     int i, ret;
 
-    GST_DEBUG("db %p, file_name %s, to_discard_entries %p.", db, db->file_name, to_discard_names);
+    GST_DEBUG("db %p, file_name %s, to_discard %p.", db, db->file_name, to_discard);
 
     /* Rewind the file and clear the entry tables. */
     if (lseek(db->file, 0, SEEK_SET) < 0)
@@ -685,7 +713,7 @@ int fozdb_discard_entries(struct fozdb *db, GList *to_discard_names)
         entry_data_offset = lseek(db->file, 0, SEEK_CUR);
 
         /* Check if entry should be discarded. */
-        if (g_list_find_custom(to_discard_names, &key, entry_name_compare))
+        if (rb_get(to_discard, &key))
         {
             if (!fozdb_seek_to_next_entry(db, &header, &truncated))
                 return CONV_ERROR_SEEK_FAILED;

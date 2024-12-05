@@ -269,8 +269,11 @@ static int dump_fozdb_open_audio(bool create)
 
 static void dump_fozdb_discard_transcoded(void)
 {
-    GList *chunks_to_discard = NULL, *chunks_to_keep = NULL, *chunks = NULL, *list_iter;
+    struct rb_tree chunks_to_discard = {fozdb_entry_compare};
+    struct rb_tree chunks_to_keep = {fozdb_entry_compare};
+    struct rb_tree chunks = {fozdb_entry_compare};
     struct fozdb_hash chunk_id, *stream_id;
+    struct fozdb_entry *chunk;
     struct fozdb *read_fozdb;
     char *read_fozdb_path;
     GHashTableIter iter;
@@ -312,7 +315,7 @@ static void dump_fozdb_discard_transcoded(void)
             if (fozdb_read_entry_data(dump_fozdb.fozdb, AUDIO_CONV_FOZ_TAG_STREAM, stream_id,
                     0, buffer, chunks_size, &read_size, true) == CONV_OK)
             {
-                GList *stream_chunks = NULL;
+                struct rb_tree stream_chunks = {fozdb_entry_compare};
                 bool has_all = true;
 
                 for (i = 0; i < read_size / sizeof(chunk_id); ++i)
@@ -323,55 +326,47 @@ static void dump_fozdb_discard_transcoded(void)
                         has_all = false;
                         break;
                     }
-                    stream_chunks = g_list_append(stream_chunks,
-                            entry_name_create(AUDIO_CONV_FOZ_TAG_AUDIODATA, &chunk_id));
+                    fozdb_entry_put(&stream_chunks, AUDIO_CONV_FOZ_TAG_AUDIODATA, &chunk_id);
                 }
 
-                for (list_iter = stream_chunks; list_iter; list_iter = list_iter->next)
+                RB_FOR_EACH_ENTRY(chunk, &stream_chunks, struct fozdb_entry, entry)
                 {
-                    struct fozdb_key *entry = list_iter->data;
                     if (has_all)
                     {
-                        chunks_to_discard = g_list_append(chunks_to_discard,
-                                entry_name_create(entry->tag, &entry->hash));
-                        chunks_to_discard = g_list_append(chunks_to_discard,
-                                entry_name_create(AUDIO_CONV_FOZ_TAG_CODECINFO, &entry->hash));
+                        fozdb_entry_put(&chunks_to_discard, chunk->key.tag, &chunk->key.hash);
+                        fozdb_entry_put(&chunks_to_discard, AUDIO_CONV_FOZ_TAG_CODECINFO, &chunk->key.hash);
                     }
                     else
                     {
-                        chunks_to_keep = g_list_append(chunks_to_keep,
-                                entry_name_create(entry->tag, &entry->hash));
-                        chunks_to_keep = g_list_append(chunks_to_keep,
-                                entry_name_create(AUDIO_CONV_FOZ_TAG_CODECINFO, &entry->hash));
+                        fozdb_entry_put(&chunks_to_keep, chunk->key.tag, &chunk->key.hash);
+                        fozdb_entry_put(&chunks_to_keep, AUDIO_CONV_FOZ_TAG_CODECINFO, &chunk->key.hash);
                     }
                 }
 
                 if (has_all)
-                    chunks_to_discard = g_list_append(chunks_to_discard,
-                            entry_name_create(AUDIO_CONV_FOZ_TAG_STREAM, stream_id));
+                    fozdb_entry_put(&chunks_to_discard, AUDIO_CONV_FOZ_TAG_STREAM, stream_id);
 
-                g_list_free_full(stream_chunks, free);
+                rb_destroy(&stream_chunks, fozdb_entry_destroy, NULL);
             }
             free(buffer);
         }
     }
 
-    for (list_iter = chunks_to_discard; list_iter; list_iter = list_iter->next)
+    RB_FOR_EACH_ENTRY(chunk, &chunks_to_discard, struct fozdb_entry, entry)
     {
-        struct fozdb_key *entry = list_iter->data;
-        if (!g_list_find_custom(chunks_to_keep, entry, entry_name_compare))
-            chunks = g_list_append(chunks, entry_name_create(entry->tag, &entry->hash));
+        if (!rb_get(&chunks_to_keep, chunk))
+            fozdb_entry_put(&chunks, chunk->key.tag, &chunk->key.hash);
     }
 
-    if ((ret = fozdb_discard_entries(dump_fozdb.fozdb, chunks)) < 0)
+    if ((ret = fozdb_discard_entries(dump_fozdb.fozdb, &chunks)) < 0)
     {
         GST_ERROR("Failed to discard entries, ret %d.", ret);
         dump_fozdb_close(&dump_fozdb);
     }
 
-    g_list_free_full(chunks, free);
-    g_list_free_full(chunks_to_keep, free);
-    g_list_free_full(chunks_to_discard, free);
+    rb_destroy(&chunks, fozdb_entry_destroy, NULL);
+    rb_destroy(&chunks_to_keep, fozdb_entry_destroy, NULL);
+    rb_destroy(&chunks_to_discard, fozdb_entry_destroy, NULL);
 }
 
 static bool need_transcode_head_create_from_caps(GstCaps *caps, struct need_transcode_head **out)

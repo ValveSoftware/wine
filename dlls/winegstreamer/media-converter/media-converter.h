@@ -30,6 +30,7 @@
 #include <sys/stat.h>
 
 #include "unix_private.h"
+#include "wine/rbtree.h"
 
 GST_DEBUG_CATEGORY_EXTERN(media_converter_debug);
 #undef GST_CAT_DEFAULT
@@ -108,6 +109,16 @@ struct fozdb_key
     struct fozdb_hash hash;
 };
 
+struct fozdb_entry
+{
+    struct rb_entry entry;
+    struct fozdb_key key;
+};
+
+extern int fozdb_entry_compare( const void *key, const struct rb_entry *ptr );
+extern void fozdb_entry_destroy( struct rb_entry *entry, void *context );
+extern struct fozdb_entry *fozdb_entry_put( struct rb_tree *tree, uint32_t tag, const struct fozdb_hash *hash );
+
 struct dump_fozdb
 {
     pthread_mutex_t mutex;
@@ -171,7 +182,7 @@ extern int fozdb_read_entry_data(struct fozdb *db, uint32_t tag, struct fozdb_ha
         uint64_t offset, uint8_t *buffer, size_t size, size_t *read_size, bool with_crc);
 extern int fozdb_write_entry(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash,
         void *data_src, data_read_callback read_callback, bool with_crc);
-extern int fozdb_discard_entries(struct fozdb *db, GList *to_discard_entries);
+extern int fozdb_discard_entries(struct fozdb *db, struct rb_tree *to_discard);
 
 static inline bool option_enabled(const char *env)
 {
@@ -263,19 +274,6 @@ static inline bool file_exists(const char *file_path)
     if (!file_path)
         return false;
     return access(file_path, F_OK) == 0;
-}
-
-static inline struct fozdb_key *entry_name_create(uint32_t tag, struct fozdb_hash *hash)
-{
-    struct fozdb_key *entry = calloc(1, sizeof(*entry));
-    entry->tag = tag;
-    entry->hash = *hash;
-    return entry;
-}
-
-static inline gint entry_name_compare(const void *a, const void *b)
-{
-    return memcmp(a, b, sizeof(struct fozdb_key));
 }
 
 static inline uint32_t bytes_to_uint32(const uint8_t *bytes)

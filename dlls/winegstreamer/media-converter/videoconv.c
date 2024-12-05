@@ -175,7 +175,7 @@ static int dump_fozdb_open_video(bool create)
 
 static void dump_fozdb_discard_transcoded(void)
 {
-    GList *to_discard_chunks = NULL;
+    struct rb_tree to_discard_chunks = {fozdb_entry_compare};
     struct fozdb_hash *stream_id;
     struct fozdb *read_fozdb;
     char *read_fozdb_path;
@@ -224,25 +224,23 @@ static void dump_fozdb_discard_transcoded(void)
                     for (i = 0; i < read_size / sizeof(chunk_id); ++i)
                     {
                         fozdb_hash_from_bytes(&chunk_id, buffer + i * sizeof(chunk_id));
-                        to_discard_chunks = g_list_append(to_discard_chunks,
-                                entry_name_create(VIDEO_CONV_FOZ_TAG_VIDEODATA, &chunk_id));
+                        fozdb_entry_put(&to_discard_chunks, VIDEO_CONV_FOZ_TAG_VIDEODATA, &chunk_id);
                     }
                 }
                 free(buffer);
             }
 
-            to_discard_chunks = g_list_append(to_discard_chunks,
-                    entry_name_create(VIDEO_CONV_FOZ_TAG_STREAM, stream_id));
+            fozdb_entry_put(&to_discard_chunks, VIDEO_CONV_FOZ_TAG_STREAM, stream_id);
         }
     }
 
-    if ((ret = fozdb_discard_entries(dump_fozdb.fozdb, to_discard_chunks)) < 0)
+    if ((ret = fozdb_discard_entries(dump_fozdb.fozdb, &to_discard_chunks)) < 0)
     {
         GST_ERROR("Failed to discard entries, ret %d.", ret);
         dump_fozdb_close(&dump_fozdb);
     }
 
-    g_list_free_full(to_discard_chunks, free);
+    rb_destroy(&to_discard_chunks, fozdb_entry_destroy, NULL);
 }
 
 struct pad_reader *pad_reader_create_with_stride(GstPad *pad, size_t stride)
