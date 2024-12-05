@@ -25,6 +25,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(dmo);
 
+extern GUID MFVideoFormat_theora;
 extern GUID MEDIASUBTYPE_WMV_Unknown;
 extern GUID MEDIASUBTYPE_VC1S;
 
@@ -65,6 +66,7 @@ HRESULT WINAPI DllRegisterServer(void)
         {MFMediaType_Video, MEDIASUBTYPE_WMVA},
         {MFMediaType_Video, MFVideoFormat_WVC1},
         {MFMediaType_Video, MEDIASUBTYPE_VC1S},
+        {MFMediaType_Video, MFVideoFormat_theora},
     };
     MFT_REGISTER_TYPE_INFO wmv_decoder_mft_outputs[] =
     {
@@ -104,6 +106,7 @@ HRESULT WINAPI DllRegisterServer(void)
         {.type = MEDIATYPE_Video, .subtype = MEDIASUBTYPE_WMVP},
         {.type = MEDIATYPE_Video, .subtype = MEDIASUBTYPE_WVP2},
         {.type = MEDIATYPE_Video, .subtype = MEDIASUBTYPE_VC1S},
+        {.type = MEDIATYPE_Video, .subtype = MFVideoFormat_theora},
     };
     HRESULT hr;
 
