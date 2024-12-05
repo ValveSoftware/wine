@@ -99,7 +99,7 @@ enum video_conv_state_flags
 
 struct video_conv_state
 {
-    struct payload_hash transcode_hash;
+    struct fozdb_hash transcode_hash;
     struct fozdb *read_fozdb;
     int blank_file;
     uint64_t upstream_duration;
@@ -149,7 +149,7 @@ void hashes_reader_init(struct hashes_reader *reader, GList *hashes)
 
 static int hashes_reader_read(void *reader, uint8_t *buffer, size_t size, size_t *read_size)
 {
-    struct payload_hash *hash = (struct payload_hash *)buffer;
+    struct fozdb_hash *hash = (struct fozdb_hash *)buffer;
     struct hashes_reader *hashes_reader = reader;
 
     if (!size)
@@ -161,7 +161,7 @@ static int hashes_reader_read(void *reader, uint8_t *buffer, size_t size, size_t
     if (!hashes_reader->current_hash)
         return CONV_ERROR_DATA_END;
 
-    *hash = *(struct payload_hash *)(hashes_reader->current_hash->data);
+    *hash = *(struct fozdb_hash *)(hashes_reader->current_hash->data);
     hashes_reader->current_hash = hashes_reader->current_hash->next;
 
     *read_size = sizeof(*hash);
@@ -176,7 +176,7 @@ static int dump_fozdb_open_video(bool create)
 static void dump_fozdb_discard_transcoded(void)
 {
     GList *to_discard_chunks = NULL;
-    struct payload_hash *stream_id;
+    struct fozdb_hash *stream_id;
     struct fozdb *read_fozdb;
     char *read_fozdb_path;
     GHashTableIter iter;
@@ -209,7 +209,7 @@ static void dump_fozdb_discard_transcoded(void)
     fozdb_iter_tag(dump_fozdb.fozdb, VIDEO_CONV_FOZ_TAG_STREAM, &iter);
     while (g_hash_table_iter_next(&iter, (void **)&stream_id, NULL))
     {
-        struct payload_hash chunk_id;
+        struct fozdb_hash chunk_id;
         uint32_t chunks_size, i;
         size_t read_size;
 
@@ -223,7 +223,7 @@ static void dump_fozdb_discard_transcoded(void)
                 {
                     for (i = 0; i < read_size / sizeof(chunk_id); ++i)
                     {
-                        payload_hash_from_bytes(&chunk_id, buffer + i * sizeof(chunk_id));
+                        fozdb_hash_from_bytes(&chunk_id, buffer + i * sizeof(chunk_id));
                         to_discard_chunks = g_list_append(to_discard_chunks,
                                 entry_name_create(VIDEO_CONV_FOZ_TAG_VIDEODATA, &chunk_id));
                     }
@@ -396,7 +396,7 @@ static void video_conv_state_release(struct video_conv_state *state)
 }
 
 /* Return true if the file is transcoded, false if not. */
-bool video_conv_state_begin_transcode(struct video_conv_state *state, struct payload_hash *hash)
+bool video_conv_state_begin_transcode(struct video_conv_state *state, struct fozdb_hash *hash)
 {
     GST_DEBUG("state %p, hash %s.", state, format_hash(hash));
 
@@ -582,7 +582,7 @@ static bool video_conv_get_downstream_range(VideoConv *conv, uint64_t offset, ui
     return true;
 }
 
-static bool video_conv_hash_upstream_data(VideoConv *conv, struct payload_hash *hash)
+static bool video_conv_hash_upstream_data(VideoConv *conv, struct fozdb_hash *hash)
 {
     bool ret = false;
 
@@ -613,7 +613,7 @@ static int video_conv_dump_upstream_chunk(VideoConv *conv, const void *buffer, s
         GList **chunk_hashes)
 {
     struct bytes_reader bytes_reader;
-    struct payload_hash *chunk_hash;
+    struct fozdb_hash *chunk_hash;
 
     bytes_reader_init(&bytes_reader, buffer, read_size);
     chunk_hash = calloc(1, sizeof(*chunk_hash));
@@ -625,7 +625,7 @@ static int video_conv_dump_upstream_chunk(VideoConv *conv, const void *buffer, s
             &bytes_reader, bytes_reader_read, true);
 }
 
-static int video_conv_dump_upstream_data(VideoConv *conv, struct payload_hash *hash)
+static int video_conv_dump_upstream_data(VideoConv *conv, struct fozdb_hash *hash)
 {
     struct hashes_reader chunk_hashes_reader;
     struct pad_reader *pad_reader = NULL;
@@ -683,7 +683,7 @@ done:
 static void video_conv_init_transcode(VideoConv *conv)
 {
     struct video_conv_state *state = conv->state;
-    struct payload_hash hash;
+    struct fozdb_hash hash;
     int ret;
 
     if (state->state_flags & VIDEO_CONV_HAS_TRANSCODED)
@@ -725,7 +725,7 @@ static uint32_t video_conv_get_state_flags(VideoConv *conv)
     return state_flags;
 }
 
-static gboolean video_conv_push_stream_start(VideoConv *conv, struct payload_hash *hash)
+static gboolean video_conv_push_stream_start(VideoConv *conv, struct fozdb_hash *hash)
 {
     struct video_conv_state *state;
 
@@ -802,7 +802,7 @@ static gboolean video_conv_sink_event_caps(VideoConv *conv, GstEvent *event)
 static gboolean video_conv_sink_event_eos(VideoConv *conv, GstEvent *event)
 {
     struct video_conv_state *state;
-    struct payload_hash hash;
+    struct fozdb_hash hash;
     uint32_t transcode_tag;
     uint32_t state_flags;
     int ret;
@@ -1178,7 +1178,7 @@ static gboolean video_conv_src_active_mode(GstPad *pad, GstObject *parent, GstPa
 {
     VideoConv *conv = VIDEO_CONV(parent);
     struct video_conv_state *state;
-    struct payload_hash hash;
+    struct fozdb_hash hash;
     uint32_t state_flags;
 
     GST_DEBUG_OBJECT(pad, "mode %s, active %d.", gst_pad_mode_get_name(mode), active);

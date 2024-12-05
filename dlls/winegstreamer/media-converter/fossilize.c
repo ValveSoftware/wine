@@ -96,24 +96,24 @@ struct payload_header
 
 struct payload_entry
 {
-    struct payload_hash hash;
+    struct fozdb_hash hash;
     struct payload_header header;
     uint64_t offset;
 };
 
 static guint hash_func(gconstpointer key)
 {
-    const struct payload_hash *payload_hash = key;
+    const struct fozdb_hash *fozdb_hash = key;
 
-    return payload_hash->hash[0]
-            ^ payload_hash->hash[1]
-            ^ payload_hash->hash[2]
-            ^ payload_hash->hash[3];
+    return fozdb_hash->hash[0]
+            ^ fozdb_hash->hash[1]
+            ^ fozdb_hash->hash[2]
+            ^ fozdb_hash->hash[3];
 }
 
 static gboolean hash_equal(gconstpointer a, gconstpointer b)
 {
-    return memcmp(a, b, sizeof(struct payload_hash)) == 0;
+    return memcmp(a, b, sizeof(struct fozdb_hash)) == 0;
 }
 
 static bool tag_from_ascii_bytes(uint32_t *tag, const uint8_t *ascii_bytes)
@@ -132,7 +132,7 @@ static bool tag_from_ascii_bytes(uint32_t *tag, const uint8_t *ascii_bytes)
     return true;
 }
 
-static bool hash_from_ascii_bytes(struct payload_hash *hash, const uint8_t *ascii_bytes)
+static bool hash_from_ascii_bytes(struct fozdb_hash *hash, const uint8_t *ascii_bytes)
 {
     unsigned int i;
 
@@ -162,7 +162,7 @@ static void tag_to_ascii_bytes(uint32_t tag, uint8_t *ascii_bytes)
     memcpy(ascii_bytes, buffer, sizeof(tag) * 2);
 }
 
-static void hash_to_ascii_bytes(const struct payload_hash *hash, uint8_t *ascii_bytes)
+static void hash_to_ascii_bytes(const struct fozdb_hash *hash, uint8_t *ascii_bytes)
 {
     char buffer[sizeof(*hash) * 2 + 1];
     sprintf(buffer, "%08x%08x%08x%08x", hash->hash[3], hash->hash[2], hash->hash[1], hash->hash[0]);
@@ -201,10 +201,10 @@ static int fozdb_read_file_header(struct fozdb *db)
 }
 
 static int fozdb_read_entry_tag_hash_header(struct fozdb *db,
-        uint32_t *out_tag, struct payload_hash *out_hash, struct payload_header *out_header)
+        uint32_t *out_tag, struct fozdb_hash *out_hash, struct payload_header *out_header)
 {
     uint8_t entry_name_and_header[ENTRY_NAME_SIZE + sizeof(struct payload_header)];
-    struct payload_hash hash;
+    struct fozdb_hash hash;
     uint32_t tag;
 
     if (!complete_read(db->file, entry_name_and_header, sizeof(entry_name_and_header)))
@@ -254,7 +254,7 @@ static bool fozdb_seek_to_next_entry(struct fozdb *db, struct payload_header *he
     return true;
 }
 
-static bool fozdb_write_entry_name(struct fozdb *db, uint32_t tag, struct payload_hash *hash)
+static bool fozdb_write_entry_name(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash)
 {
     uint8_t entry_name[ENTRY_NAME_SIZE];
 
@@ -473,14 +473,14 @@ int fozdb_prepare(struct fozdb *db)
     return CONV_OK;
 }
 
-bool fozdb_has_entry(struct fozdb *db, uint32_t tag, struct payload_hash *hash)
+bool fozdb_has_entry(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash)
 {
     if (tag >= db->num_tags)
         return false;
     return g_hash_table_contains(db->seen_blobs[tag], hash);
 }
 
-int fozdb_entry_size(struct fozdb *db, uint32_t tag, struct payload_hash *hash, uint32_t *size)
+int fozdb_entry_size(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash, uint32_t *size)
 {
     struct payload_entry *entry;
 
@@ -504,7 +504,7 @@ void fozdb_iter_tag(struct fozdb *db, uint32_t tag, GHashTableIter *iter)
     g_hash_table_iter_init(iter, db->seen_blobs[tag]);
 }
 
-int fozdb_read_entry_data(struct fozdb *db, uint32_t tag, struct payload_hash *hash,
+int fozdb_read_entry_data(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash,
         uint64_t offset, uint8_t *buffer, size_t size, size_t *read_size, bool with_crc)
 {
     struct payload_entry *entry;
@@ -544,7 +544,7 @@ int fozdb_read_entry_data(struct fozdb *db, uint32_t tag, struct payload_hash *h
     return CONV_OK;
 }
 
-int fozdb_write_entry(struct fozdb *db, uint32_t tag, struct payload_hash *hash,
+int fozdb_write_entry(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash,
         void *data_src, data_read_callback read_callback, bool with_crc)
 {
     struct payload_header header;

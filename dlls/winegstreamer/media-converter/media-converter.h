@@ -90,15 +90,22 @@ struct gst_buffer_reader
     size_t offset;
 };
 
-struct payload_hash
+struct fozdb_hash
 {
     uint32_t hash[4];
 };
 
+#define debugstr_fozdb_hash( hash ) debugstr_fozdb_hash_( (char[35]){0}, hash )
+static inline const char *debugstr_fozdb_hash_( char *buffer, const struct fozdb_hash *hash )
+{
+    sprintf( buffer, "0x%08x%08x%08x%08x", hash->hash[3], hash->hash[2], hash->hash[1], hash->hash[0] );
+    return buffer;
+}
+
 struct entry_name
 {
     uint32_t tag;
-    struct payload_hash hash;
+    struct fozdb_hash hash;
 };
 
 struct dump_fozdb
@@ -157,12 +164,12 @@ extern bool murmur3_x86_128(void *data_src, data_read_callback read_callback, ui
 extern int fozdb_create(const char *file_name, int open_flags, bool read_only, uint32_t num_tags, struct fozdb **out);
 extern void fozdb_release(struct fozdb *db);
 extern int fozdb_prepare(struct fozdb *db);
-extern bool fozdb_has_entry(struct fozdb *db, uint32_t tag, struct payload_hash *hash);
-extern int fozdb_entry_size(struct fozdb *db, uint32_t tag, struct payload_hash *hash, uint32_t *size);
+extern bool fozdb_has_entry(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash);
+extern int fozdb_entry_size(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash, uint32_t *size);
 extern void fozdb_iter_tag(struct fozdb *db, uint32_t tag, GHashTableIter *iter);
-extern int fozdb_read_entry_data(struct fozdb *db, uint32_t tag, struct payload_hash *hash,
+extern int fozdb_read_entry_data(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash,
         uint64_t offset, uint8_t *buffer, size_t size, size_t *read_size, bool with_crc);
-extern int fozdb_write_entry(struct fozdb *db, uint32_t tag, struct payload_hash *hash,
+extern int fozdb_write_entry(struct fozdb *db, uint32_t tag, struct fozdb_hash *hash,
         void *data_src, data_read_callback read_callback, bool with_crc);
 extern int fozdb_discard_entries(struct fozdb *db, GList *to_discard_entries);
 
@@ -181,7 +188,7 @@ static inline bool discarding_disabled(void)
     return option_enabled("MEDIACONV_DONT_DISCARD");
 }
 
-static inline const char *format_hash(struct payload_hash *hash)
+static inline const char *format_hash(struct fozdb_hash *hash)
 {
     int hash_str_size = 2 + sizeof(*hash) * 2 + 1;
     static char buffer[1024] = {};
@@ -258,7 +265,7 @@ static inline bool file_exists(const char *file_path)
     return access(file_path, F_OK) == 0;
 }
 
-static inline struct entry_name *entry_name_create(uint32_t tag, struct payload_hash *hash)
+static inline struct entry_name *entry_name_create(uint32_t tag, struct fozdb_hash *hash)
 {
     struct entry_name *entry = calloc(1, sizeof(*entry));
     entry->tag = tag;
@@ -279,7 +286,7 @@ static inline uint32_t bytes_to_uint32(const uint8_t *bytes)
             | ((uint32_t)bytes[3] << 24);
 }
 
-static inline void payload_hash_from_bytes(struct payload_hash *hash, uint8_t *bytes)
+static inline void fozdb_hash_from_bytes(struct fozdb_hash *hash, uint8_t *bytes)
 {
     hash->hash[0] = bytes_to_uint32(bytes + 0);
     hash->hash[1] = bytes_to_uint32(bytes + 4);
