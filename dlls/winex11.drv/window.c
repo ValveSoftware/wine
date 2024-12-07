@@ -938,7 +938,7 @@ static void window_set_mwm_hints( struct x11drv_win_data *data, const MwmHints *
     const MwmHints *old_hints = &data->pending_state.mwm_hints;
 
     data->desired_state.mwm_hints = *new_hints;
-    if (!data->whole_window) return; /* no window, nothing to update */
+    if (!data->whole_window || !data->managed) return; /* no window or not managed, nothing to update */
     if (!memcmp( old_hints, new_hints, sizeof(*new_hints) )) return; /* hints are the same, nothing to update */
 
     data->pending_state.mwm_hints = *new_hints;
@@ -990,8 +990,6 @@ static void set_mwm_hints( struct x11drv_win_data *data, UINT style, UINT ex_sty
     mwm_hints.flags = MWM_HINTS_FUNCTIONS | MWM_HINTS_DECORATIONS;
     mwm_hints.input_mode = 0;
     mwm_hints.status = 0;
-    TRACE( "%p setting mwm hints to %s (style %x exstyle %x)\n",
-           data->hwnd, debugstr_mwm_hints(&mwm_hints), style, ex_style );
     window_set_mwm_hints( data, &mwm_hints );
 }
 
@@ -1728,6 +1726,7 @@ static UINT window_update_client_state( struct x11drv_win_data *data )
 
     if (data->wm_state_serial) return 0; /* another WM_STATE update is pending, wait for it to complete */
     if (data->net_wm_state_serial) return 0; /* another _NET_WM_STATE update is pending, wait for it to complete */
+    if (data->mwm_hints_serial) return 0; /* another MWM_HINT update is pending, wait for it to complete */
     if (data->configure_serial) return 0; /* another config update is pending, wait for it to complete */
 
     new_style = old_style & ~(WS_VISIBLE | WS_MINIMIZE | WS_MAXIMIZE);
@@ -1780,6 +1779,7 @@ static UINT window_update_client_config( struct x11drv_win_data *data )
 
     if (data->wm_state_serial) return 0; /* another WM_STATE update is pending, wait for it to complete */
     if (data->net_wm_state_serial) return 0; /* another _NET_WM_STATE update is pending, wait for it to complete */
+    if (data->mwm_hints_serial) return 0; /* another MWM_HINT update is pending, wait for it to complete */
     if (data->configure_serial) return 0; /* another config update is pending, wait for it to complete */
 
     new_style = old_style & ~(WS_VISIBLE | WS_MINIMIZE | WS_MAXIMIZE);
@@ -2552,6 +2552,7 @@ static void destroy_whole_window( struct x11drv_win_data *data, BOOL already_des
     memset( &data->current_state, 0, sizeof(data->current_state) );
     data->wm_state_serial = 0;
     data->net_wm_state_serial = 0;
+    data->mwm_hints_serial = 0;
     data->configure_serial = 0;
 
     if (data->xic)

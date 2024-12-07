@@ -1307,7 +1307,6 @@ static void get_window_mwm_hints( Display *display, Window window, MwmHints *hin
     }
 }
 
-
 /***********************************************************************
  *           handle_wm_state_notify
  *
