@@ -1368,6 +1368,14 @@ static void update_net_wm_fullscreen_monitors( struct x11drv_win_data *data )
     window_set_net_wm_fullscreen_monitors( data, &monitors );
 }
 
+static BOOL use_kwin_hacks(void)
+{
+    const char *env;
+    if (!X11DRV_HasWindowManager( "KWin" ) || X11DRV_HasWindowManager( "xwayland" )) return FALSE;
+    if ((env = getenv( "WINE_USE_KWIN_HACKS" ))) return atoi( env );
+    return FALSE;
+}
+
 static void window_set_net_wm_state( struct x11drv_win_data *data, UINT new_state )
 {
     static const UINT fullscreen_mask = (1 << NET_WM_STATE_MAXIMIZED) | (1 << NET_WM_STATE_FULLSCREEN);
@@ -1379,6 +1387,11 @@ static void window_set_net_wm_state( struct x11drv_win_data *data, UINT new_stat
      */
     if (X11DRV_HasWindowManager( "steamcompmgr" )) new_state &= ~fullscreen_mask;
 
+    /* KWin sometimes combines NET_WM_STATE_FULLSCREEN with NET_WM_STATE_MAXIMIZED, but sometimes doesn't.
+     * Make sure we request both at the same time, so we don't get unexpected value when NET_WM_STATE_MAXIMIZED is added.
+     */
+    if (use_kwin_hacks() && (new_state & (1 << NET_WM_STATE_FULLSCREEN))) new_state |= (1 << NET_WM_STATE_MAXIMIZED);
+
     new_state &= x11drv_init_thread_data()->net_wm_state_mask;
     data->desired_state.net_wm_state = new_state;
     if (!data->whole_window || !data->managed || data->embedded) return; /* no window or not managed, nothing to update */
@@ -1389,6 +1402,14 @@ static void window_set_net_wm_state( struct x11drv_win_data *data, UINT new_stat
     if (window_needs_net_wm_state_change_delay( data ))
     {
         TRACE( "window %p/%lx is updating config/_MOTIF_WM_HINTS, delaying request\n", data->hwnd, data->whole_window );
+        return;
+    }
+
+    /* On KWin wait for _NET_WM_STATE changes to complete when they touch maximized / fullscreen states */
+    if (use_kwin_hacks() && data->pending_state.wm_state == NormalState &&
+        data->net_wm_state_serial && (old_state ^ new_state) & fullscreen_mask)
+    {
+        TRACE( "window %p/%lx is updating maximized/fullscreen _NET_WM_STATE, delaying request (KWin hack)\n", data->hwnd, data->whole_window );
         return;
     }
 
@@ -1457,9 +1478,11 @@ static void window_set_net_wm_state( struct x11drv_win_data *data, UINT new_stat
 
 static void window_set_config( struct x11drv_win_data *data, RECT rect, BOOL above )
 {
+    static const UINT fullscreen_mask = (1 << NET_WM_STATE_MAXIMIZED) | (1 << NET_WM_STATE_FULLSCREEN);
     UINT style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE ), mask = 0;
     const RECT *old_rect = &data->pending_state.rect;
-    BOOL old_above = data->pending_state.above;
+    BOOL old_above = data->pending_state.above, is_maximized;
+    unsigned long net_wm_state = -1;
     XWindowChanges changes;
     RECT *new_rect = &rect;
 
@@ -1486,6 +1509,27 @@ static void window_set_config( struct x11drv_win_data *data, RECT rect, BOOL abo
     {
         TRACE( "window %p/%lx is updating _NET_WM_STATE/_MOTIF_WM_HINTS, delaying request\n", data->hwnd, data->whole_window );
         return;
+    }
+
+    /* Kwin internal maximized state tracking gets bogus if a window configure request is sent to a maximized
+     * window, and it loses track of whether the window was maximized state.
+     *
+     * Moving a maximized window to a different monitor requires sending a configure request but KWin bug makes
+     * no difference to requests with only position changes, and they trigger it all the same.
+     *
+     * Instead, explicitly request an unmap / map sequence ourselves and track the corresponding events, overriding
+     * the Mutter generated sequence, while achieving the same thing and getting WM_TAKE_FOCUS event when the
+     * window is mapped again.
+     */
+    is_maximized = (data->net_wm_state_serial ? data->pending_state.net_wm_state : data->current_state.net_wm_state) & fullscreen_mask;
+    if (use_kwin_hacks() && data->managed && data->pending_state.wm_state == NormalState && is_maximized)
+    {
+        if (data->wm_state_serial) return; /* another WM_STATE update is pending, wait for it to complete */
+        if (data->net_wm_state_serial) return; /* another _NET_WM_STATE update is pending, wait for it to complete */
+        WARN( "window %p/%lx is maximized/fullscreen, temporarily restoring (KWin hack)\n", data->hwnd, data->whole_window );
+        data->net_wm_state_hack = 1;
+        net_wm_state = data->pending_state.net_wm_state;
+        window_set_net_wm_state( data, net_wm_state & ~fullscreen_mask );
     }
 
     if (old_rect->right - old_rect->left != new_rect->right - new_rect->left ||
@@ -1530,6 +1574,8 @@ static void window_set_config( struct x11drv_win_data *data, RECT rect, BOOL abo
            wine_dbgstr_rect(new_rect), mask, above, data->configure_serial );
     XReconfigureWMWindow( data->display, data->whole_window, data->vis.screen, mask, &changes );
     if (mask & (CWWidth | CWHeight)) clear_emulated_fullscreen_padding( data );
+
+    if (net_wm_state != -1) window_set_net_wm_state( data, net_wm_state );
 }
 
 /***********************************************************************
@@ -1618,6 +1664,11 @@ UINT get_window_net_wm_state( Display *display, Window window )
 
     if (!maximized_horz)
         new_state &= ~(1 << NET_WM_STATE_MAXIMIZED);
+
+    /* KWin sometimes combines NET_WM_STATE_FULLSCREEN with NET_WM_STATE_MAXIMIZED, but sometimes doesn't.
+     * Make sure both are always set in replies, so we don't change the win32 state unnecessarily.
+     */
+    if (use_kwin_hacks() && (new_state & (1 << NET_WM_STATE_FULLSCREEN))) new_state |= (1 << NET_WM_STATE_MAXIMIZED);
 
     return new_state;
 }
@@ -1803,6 +1854,11 @@ static UINT window_update_client_state( struct x11drv_win_data *data )
     if (data->current_state.wm_state != WithdrawnState) new_style |= WS_VISIBLE;
     if (data->current_state.wm_state == IconicState) new_style |= WS_MINIMIZE;
     if (data->current_state.net_wm_state & (1 << NET_WM_STATE_MAXIMIZED)) new_style |= WS_MAXIMIZE;
+
+    /* KWin sometimes combines NET_WM_STATE_FULLSCREEN with NET_WM_STATE_MAXIMIZED, but sometimes doesn't.
+     * Don't feed back the maximized state to the Win32 side as it confuses many applications.
+     */
+    if (use_kwin_hacks()) new_style = (new_style & ~WS_MAXIMIZE) | (old_style & WS_MAXIMIZE);
 
     if ((old_style & WS_MINIMIZE) && !(new_style & WS_MINIMIZE))
     {
@@ -2001,6 +2057,8 @@ void window_net_wm_state_notify( struct x11drv_win_data *data, unsigned long ser
     unsigned long *expect_serial = &data->net_wm_state_serial;
     const char *expected, *received, *prefix;
 
+    if (data->net_wm_state_hack) pending = desired = &value;
+
     prefix = wine_dbg_sprintf( "window %p/%lx ", data->hwnd, data->whole_window );
     received = wine_dbg_sprintf( "_NET_WM_STATE %#x/%lu", value, serial );
     expected = *expect_serial ? wine_dbg_sprintf( ", expected %#x/%lu", *pending, *expect_serial ) : "";
@@ -2008,6 +2066,7 @@ void window_net_wm_state_notify( struct x11drv_win_data *data, unsigned long ser
     if (!handle_state_change( serial, expect_serial, sizeof(value), &value, desired, pending,
                               current, expected, prefix, received, NULL ))
         return;
+    data->net_wm_state_hack = 0;
 
     /* send any pending changes from the desired state */
     window_request_desired_state( data );

@@ -693,6 +693,7 @@ struct x11drv_win_data
     UINT        parent_invalid : 1; /* is the parent host window possibly invalid */
     UINT        reparenting : 1; /* window is being reparented, likely from a decoration change */
     UINT        is_resizable : 1; /* window is allowed to be resized by the window manager */
+    UINT        net_wm_state_hack : 1; /* hacking around KWin sticky fullscreen windows */
     Window      embedder;       /* window id of embedder */
     Pixmap         icon_pixmap;
     Pixmap         icon_mask;
