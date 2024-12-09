@@ -666,7 +666,7 @@ HWND WINAPI NtUserSetParent( HWND hwnd, HWND parent )
         WCHAR name[32];
         UNICODE_STRING us = { 0, sizeof(name), name };
 
-        if (NtUserGetClassName( hwnd, FALSE, &us ) && !wcscmp( us.Buffer, u"SyberiaRenderWindowClass" ))
+        if (NtUserGetClassName( hwnd, FALSE, &us ) && ( !wcscmp( us.Buffer, u"SyberiaRenderWindowClass" ) || !wcscmp( us.Buffer, u"Post MortemRenderWindowClass" ) ))
         {
             ERR( "HACK: Hiding window.\n" );
             was_visible = FALSE;
