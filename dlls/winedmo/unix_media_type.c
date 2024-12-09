@@ -184,10 +184,14 @@ static NTSTATUS audio_format_from_codec_params( const AVCodecParameters *params,
 #endif
 
     format_tag = wave_format_tag_from_codec_id( params->codec_id );
-    if (format_tag == WAVE_FORMAT_EXTENSIBLE || format_tag >> 16 || (channels > 2 && channel_mask != 0))
+    if (format_tag == WAVE_FORMAT_EXTENSIBLE || format_tag >> 16 || (channels > 2 && channel_mask != 0) ||
+        params->codec_id == AV_CODEC_ID_VORBIS)
     {
         GUID subtype = MFAudioFormat_Base;
-        subtype.Data1 = format_tag;
+
+        if (params->codec_id == AV_CODEC_ID_VORBIS) subtype = MFAudioFormat_Vorbis;
+        else subtype.Data1 = format_tag;
+
         wave_format_size += sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
         return wave_format_extensible_from_codec_params( params, format, format_size, wave_format_size,
                                                          &subtype, channel_mask );
