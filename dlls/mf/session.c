@@ -2013,7 +2013,8 @@ static HRESULT session_set_current_topology(struct media_session *session, IMFTo
         return hr;
     }
 
-    session_collect_nodes(session);
+    if (FAILED(hr = session_collect_nodes(session)))
+        return hr;
 
     LIST_FOR_EACH_ENTRY(node, &session->presentation.nodes, struct topo_node, entry)
     {
