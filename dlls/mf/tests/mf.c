@@ -7302,6 +7302,7 @@ static void test_media_session_source_shutdown(void)
     HRESULT hr;
     enum
     {
+        TEST_TOPOLOGY,
         TEST_START,
         TEST_RESTART,
         TEST_PAUSE,
@@ -7314,7 +7315,7 @@ static void test_media_session_source_shutdown(void)
 
     /* These tests don't cover asynchronous shutdown, which is difficult to consistently test. */
 
-    for (shutdown_point = TEST_START; shutdown_point <= TEST_CLOSE; ++shutdown_point)
+    for (shutdown_point = TEST_TOPOLOGY; shutdown_point <= TEST_CLOSE; ++shutdown_point)
     {
         winetest_push_context("Test %d", shutdown_point);
 
@@ -7338,6 +7339,8 @@ static void test_media_session_source_shutdown(void)
         hr = MFCreateMediaSession(NULL, &session);
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
         topology = create_test_topology(source, sink_activate, &duration);
+        if (shutdown_point == TEST_TOPOLOGY)
+            IMFMediaSource_Shutdown(source);
         hr = IMFMediaSession_SetTopology(session, 0, topology);
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
         IMFTopology_Release(topology);
@@ -7350,7 +7353,7 @@ static void test_media_session_source_shutdown(void)
             IMFMediaSource_Shutdown(source);
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
         hr = wait_media_event(session, callback, MESessionStarted, 5000, &propvar);
-        ok(hr == (shutdown_point == TEST_START ? MF_E_INVALIDREQUEST : S_OK), "Unexpected hr %#lx.\n", hr);
+        ok(hr == (shutdown_point <= TEST_START ? MF_E_INVALIDREQUEST : S_OK), "Unexpected hr %#lx.\n", hr);
 
         switch (shutdown_point)
         {
