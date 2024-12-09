@@ -534,7 +534,7 @@ static void session_set_topo_status(struct media_session *session, HRESULT statu
     IMFMediaEvent *event;
     PROPVARIANT param;
 
-    if (topo_status == MF_TOPOSTATUS_INVALID)
+    if (topo_status == MF_TOPOSTATUS_INVALID || status == MF_E_SHUTDOWN)
         return;
 
     if (list_empty(&session->topologies))
