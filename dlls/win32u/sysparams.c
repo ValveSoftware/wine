@@ -2019,11 +2019,16 @@ static UINT add_screen_size( SIZE *sizes, UINT count, SIZE size )
     return 1;
 }
 
-static UINT add_virtual_mode( DEVMODEW *modes, UINT count, const DEVMODEW *mode )
+static UINT add_virtual_mode( DEVMODEW *modes, UINT count, const DEVMODEW *mode, BOOL center )
 {
-    TRACE( "adding mode %s\n", debugstr_devmodew(mode) );
+    TRACE( "adding %s\n", debugstr_devmodew(mode) );
+    modes[count++] = *mode;
+    if (!center) return 1;
+
     modes[count] = *mode;
-    return 1;
+    modes[count].dmFields |= DM_DISPLAYFIXEDOUTPUT;
+    modes[count].dmDisplayFixedOutput = DMDFO_CENTER;
+    return 2;
 }
 
 static SIZE *get_screen_sizes( const DEVMODEW *maximum, const DEVMODEW *modes, UINT modes_count,
@@ -2114,16 +2119,24 @@ static DEVMODEW *get_virtual_modes( const DEVMODEW *initial, const DEVMODEW *max
     SIZE *screen_sizes;
     BOOL vertical;
 
+    BOOL center_modes = FALSE;
+    const char *env;
+
     /* Check the ratio of dmPelsWidth to dmPelsHeight to determine whether the initial display mode
      * is in horizontal or vertical orientation. DMDO_DEFAULT is the natural orientation of the
      * device, which isn't necessarily a horizontal mode */
     vertical = initial->dmPelsHeight > initial->dmPelsWidth;
 
+    if ((env = getenv( "WINE_CENTER_DISPLAY_MODES" )))
+        center_modes = (env[0] != '0');
+    else if ((env = getenv( "SteamAppId" )))
+        center_modes = !strcmp( env, "359870" );
+
     freqs[1] = devmode_get( initial, DM_DISPLAYFREQUENCY );
     if (freqs[1] <= 60) freqs[1] = 0;
 
     if (!(screen_sizes = get_screen_sizes( maximum, host_modes, host_modes_count, &sizes_count ))) return NULL;
-    modes = malloc( ARRAY_SIZE(freqs) * ARRAY_SIZE(depths) * (sizes_count + 2) * sizeof(*modes) );
+    modes = malloc( 2 * ARRAY_SIZE(freqs) * ARRAY_SIZE(depths) * (sizes_count + 2) * sizeof(*modes) );
 
     for (i = 0; modes && i < ARRAY_SIZE(depths); ++i)
     for (f = 0; f < ARRAY_SIZE(freqs); ++f)
@@ -2146,18 +2159,18 @@ static DEVMODEW *get_virtual_modes( const DEVMODEW *initial, const DEVMODEW *max
             if (mode.dmPelsWidth > maximum->dmPelsWidth || mode.dmPelsHeight > maximum->dmPelsHeight) continue;
             if (mode.dmPelsWidth == maximum->dmPelsWidth && mode.dmPelsHeight == maximum->dmPelsHeight) continue;
             if (mode.dmPelsWidth == initial->dmPelsWidth && mode.dmPelsHeight == initial->dmPelsHeight) continue;
-            count += add_virtual_mode( modes, count, &mode );
+            count += add_virtual_mode( modes, count, &mode, center_modes );
         }
 
         mode.dmPelsWidth = vertical ? initial->dmPelsHeight : initial->dmPelsWidth;
         mode.dmPelsHeight = vertical ? initial->dmPelsWidth : initial->dmPelsHeight;
-        count += add_virtual_mode( modes, count, &mode );
+        count += add_virtual_mode( modes, count, &mode, center_modes );
 
         if (maximum->dmPelsWidth != initial->dmPelsWidth || maximum->dmPelsHeight != initial->dmPelsHeight)
         {
             mode.dmPelsWidth = vertical ? maximum->dmPelsHeight : maximum->dmPelsWidth;
             mode.dmPelsHeight = vertical ? maximum->dmPelsWidth : maximum->dmPelsHeight;
-            count += add_virtual_mode( modes, count, &mode );
+            count += add_virtual_mode( modes, count, &mode, center_modes );
         }
     }
 
