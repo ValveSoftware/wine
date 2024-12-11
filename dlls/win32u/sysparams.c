@@ -168,6 +168,7 @@ static pthread_mutex_t display_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static BOOL emulate_modelist = TRUE;
 static BOOL emulate_modeset = TRUE;
+static UINT limit_resolutions = 0;
 BOOL decorated_mode = TRUE;
 UINT64 thunk_lock_callback = 0;
 
@@ -2087,6 +2088,7 @@ static SIZE *get_screen_sizes( const DEVMODEW *maximum, const DEVMODEW *modes, U
         count += add_screen_size( sizes, count, size );
     }
 
+    if (limit_resolutions && count > limit_resolutions) count = limit_resolutions;
     *sizes_count = count;
     return sizes;
 }
@@ -5965,6 +5967,16 @@ void sysparams_init(void)
         emulate_modelist = !IS_OPTION_TRUE( buffer[0] );
     if (!get_config_key( hkey, appkey, "EmulateModeset", buffer, sizeof(buffer) ))
         emulate_modeset = !IS_OPTION_TRUE( buffer[0] );
+
+    {
+        const char *s;
+
+        if ((s = getenv( "PROTON_LIMIT_RESOLUTIONS" )))
+        {
+            limit_resolutions = atoi( s );
+            ERR( "HACK: limit_resolutions %u.\n", limit_resolutions );
+        }
+    }
 
 #undef IS_OPTION_TRUE
 
