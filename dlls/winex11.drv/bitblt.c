@@ -1831,6 +1831,10 @@ static BOOL x11drv_surface_flush( struct window_surface *window_surface, const R
 
     if (shape_changed)
     {
+        /* HACK: Do not shape layered windows on gamescope */
+        if (shape_bits && alpha_mask != 0 && X11DRV_HasWindowManager( "steamcompmgr" ))
+            shape_bits = 0;
+
 #ifdef HAVE_LIBXSHAPE
         if (!shape_bits)
             XShapeCombineMask( gdi_display, surface->window, ShapeBounding, 0, 0, None, ShapeSet );
