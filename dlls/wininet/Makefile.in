@@ -4,6 +4,7 @@ IMPORTLIB = wininet
 IMPORTS   = $(ZLIB_PE_LIBS) mpr shlwapi shell32 user32 ws2_32 advapi32
 EXTRAINCL = $(ZLIB_PE_CFLAGS)
 DELAYIMPORTS = secur32 crypt32 cryptui dhcpcsvc iphlpapi
+EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
 	cookie.c \

@@ -1,6 +1,7 @@
 MODULE    = msacm32.dll
 IMPORTLIB = msacm32
 IMPORTS   = winmm user32 advapi32
+EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
 	driver.c \

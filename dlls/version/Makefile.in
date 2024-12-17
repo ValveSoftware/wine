@@ -1,6 +1,7 @@
 MODULE    = version.dll
 IMPORTLIB = version
 IMPORTS   = kernelbase
+EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
 	version.c \
