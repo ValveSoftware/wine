@@ -243,6 +243,18 @@ static BOOL enable_fullscreen_hack( HWND hwnd )
 
 BOOL needs_offscreen_rendering( HWND hwnd )
 {
+    UINT style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
+    struct x11drv_win_data *data;
+    BOOL needs_offscreen;
+
+    if (!(data = get_win_data( hwnd ))) needs_offscreen = TRUE; /* window is in a different process */
+    else
+    {
+        needs_offscreen = (style & WS_VISIBLE) && !(style & WS_MINIMIZE) && !is_window_rect_mapped( &data->rects.visible );
+        release_win_data( data );
+    }
+    if (needs_offscreen) return needs_offscreen;
+
     if (NtUserGetDpiForWindow( hwnd ) != NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI ) && !enable_fullscreen_hack( hwnd )) return TRUE; /* needs DPI scaling */
     if (NtUserGetAncestor( hwnd, GA_PARENT ) != NtUserGetDesktopWindow()) return TRUE; /* child window, needs compositing */
     if (NtUserGetWindowRelative( hwnd, GW_CHILD )) return needs_client_window_clipping( hwnd ); /* window has children, needs compositing */
