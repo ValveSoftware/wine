@@ -552,6 +552,7 @@ int fozdb_read_entry_data(struct fozdb *db, uint32_t tag, struct fozdb_hash *has
     GST_DEBUG("db %p, file_name %s, tag %u, hash %s, offset %#"PRIx64", buffer %p, size %zu, read_size %p, with_crc %d.",
             db, db->file_name, tag, format_hash(hash), offset, buffer, size, read_size, with_crc);
 
+    *read_size = 0;
     if (tag >= db->num_tags)
         return CONV_ERROR_INVALID_TAG;
     if (!(ptr = rb_get(&db->entries, &key)))
