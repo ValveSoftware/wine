@@ -701,6 +701,9 @@ NTSTATUS WINAPI wow64_NtQueryInformationProcess( UINT *args )
         if (retlen) *retlen = sizeof(SECTION_IMAGE_INFORMATION32);
         return STATUS_INFO_LENGTH_MISMATCH;
 
+    case ProcessWineUnixDebuggerPid:
+        return NtQueryInformationProcess( handle, class, ptr, len, retlen );
+
     default:
         FIXME( "unsupported class %u\n", class );
         return STATUS_INVALID_INFO_CLASS;
