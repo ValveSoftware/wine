@@ -849,6 +849,31 @@ static void doc_navigate_proc(DocHost *This, task_header_t *t)
     }
 }
 
+static void hack_pump_messages(void)
+{
+    static int enabled = -1;
+    MSG msg;
+
+    if (enabled == -1)
+    {
+        const char *sgi = getenv("SteamGameId");
+
+        enabled = sgi && !strcmp(sgi, "2767030");
+        if (enabled)
+            ERR("HACK: injecting PeekMessage loop in async_doc_navigate.\n");
+    }
+
+    if (!enabled)
+        return;
+
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
+    {
+        TRACE("dispatching.\n");
+        DispatchMessageW(&msg);
+    }
+    TRACE("no more messages.\n");
+}
+
 static HRESULT async_doc_navigate(DocHost *This, LPCWSTR url, LPCWSTR headers, PBYTE post_data, ULONG post_data_size,
         BOOL async_notif)
 {
@@ -897,6 +922,7 @@ static HRESULT async_doc_navigate(DocHost *This, LPCWSTR url, LPCWSTR headers, P
 
     task->async_notif = async_notif;
     abort_dochost_tasks(This, doc_navigate_proc);
+    hack_pump_messages();
     push_dochost_task(This, &task->header, doc_navigate_proc, doc_navigate_task_destr, FALSE);
     return S_OK;
 }
