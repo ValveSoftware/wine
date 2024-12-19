@@ -820,6 +820,7 @@ static void update_visible_region( struct dce *dce )
     DWORD paint_flags = 0;
     size_t size = 256;
     RECT win_rect, top_rect;
+    UINT raw_dpi;
     WND *win;
 
     /* don't clip siblings if using parent clip region */
@@ -857,8 +858,6 @@ static void update_visible_region( struct dce *dce )
 
     if (status || !vis_rgn) return;
 
-    user_driver->pGetDC( dce->hdc, dce->hwnd, top_win, &win_rect, &top_rect, flags );
-
     if (dce->clip_rgn) NtGdiCombineRgn( vis_rgn, vis_rgn, dce->clip_rgn,
                                         (flags & DCX_INTERSECTRGN) ? RGN_AND : RGN_DIFF );
 
@@ -874,9 +873,27 @@ static void update_visible_region( struct dce *dce )
         }
     }
 
-    if (!surface) SetRectEmpty( &top_rect );
-    set_visible_region( dce->hdc, vis_rgn, &win_rect, &top_rect, surface );
-    if (surface) window_surface_release( surface );
+    if (surface)
+    {
+        user_driver->pGetDC( dce->hdc, dce->hwnd, top_win, &win_rect, &top_rect, flags );
+        set_visible_region( dce->hdc, vis_rgn, &win_rect, &top_rect, surface, 0, 0 );
+        window_surface_release( surface );
+    }
+    else
+    {
+        RECT window_rect, toplevel_rect;
+        UINT dpi;
+
+        get_win_monitor_dpi( top_win, &raw_dpi );
+        dpi = get_dpi_for_window( top_win );
+
+        window_rect = map_rect_virt_to_raw( win_rect, dpi );
+        toplevel_rect = map_rect_virt_to_raw( top_rect, dpi );
+        user_driver->pGetDC( dce->hdc, dce->hwnd, top_win, &window_rect, &toplevel_rect, flags );
+
+        SetRectEmpty( &top_rect );
+        set_visible_region( dce->hdc, vis_rgn, &win_rect, &top_rect, NULL, dpi, raw_dpi );
+    }
 }
 
 /***********************************************************************
@@ -886,7 +903,7 @@ static void release_dce( struct dce *dce )
 {
     if (!dce->hwnd) return;  /* already released */
 
-    set_visible_region( dce->hdc, 0, &dummy_surface.rect, &dummy_surface.rect, &dummy_surface );
+    set_visible_region( dce->hdc, 0, &dummy_surface.rect, &dummy_surface.rect, &dummy_surface, 0, 0 );
     user_driver->pReleaseDC( dce->hwnd, dce->hdc );
 
     if (dce->clip_rgn) NtGdiDeleteObjectApp( dce->clip_rgn );
