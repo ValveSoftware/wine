@@ -26,6 +26,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <fcntl.h>
+#include <linux/limits.h>
+#include <sys/stat.h>
 
 #include <piper/piper_c.h>
 
@@ -38,6 +41,35 @@
 #include "protontts_private.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(protontts);
+
+static inline void touch_tts_used_tag(void)
+{
+    const char *e;
+
+
+    if ((e = getenv("STEAM_COMPAT_TRANSCODED_MEDIA_PATH")))
+    {
+        char buffer[PATH_MAX];
+        int fd;
+
+        snprintf(buffer, sizeof(buffer), "%s/tts-used", e);
+
+        fd = open(buffer, O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+        if (fd == -1)
+        {
+            ERR("Failed to open/create \"%s/tts-used\"", e);
+            return;
+        }
+
+        futimens(fd, NULL);
+
+        close(fd);
+    }
+    else
+    {
+        ERR("STEAM_COMPAT_TRANSCODED_MEDIA_PATH not set, cannot create tts-used file");
+    }
+}
 
 struct tts_audio_buf
 {
@@ -79,6 +111,7 @@ static NTSTATUS process_attach(void *args)
         zero_bits = (ULONG_PTR)info.HighestUserAddress | 0x7fffffff;
     }
 #endif
+    touch_tts_used_tag();
     return STATUS_SUCCESS;
 }
 
