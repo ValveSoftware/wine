@@ -1505,6 +1505,7 @@ static HRESULT check_media_type(IMFMediaType *type, IMFMediaType *current)
 {
     static const GUID *required_attrs[] =
     {
+        &MF_MT_SUBTYPE,
         &MF_MT_AUDIO_SAMPLES_PER_SECOND,
         &MF_MT_AUDIO_NUM_CHANNELS,
         &MF_MT_AUDIO_BITS_PER_SAMPLE,
