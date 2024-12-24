@@ -180,6 +180,18 @@ static void init_caps_from_wave_format_vorbis(GstCaps *caps, const WAVEFORMATEX 
     gst_caps_set_simple(caps, "bitrate", G_TYPE_INT, format->nAvgBytesPerSec * 8, NULL);
 }
 
+static void init_caps_from_wave_format_opus(GstCaps *caps, const WAVEFORMATEX *format, UINT32 format_size)
+{
+    init_caps_codec_data(caps, format + 1, format->cbSize);
+
+    gst_structure_remove_field(gst_caps_get_structure(caps, 0), "format");
+    gst_structure_set_name(gst_caps_get_structure(caps, 0), "audio/x-opus");
+    gst_caps_set_simple(caps, "channel-mapping-family", G_TYPE_INT, 0, NULL);
+    gst_caps_set_simple(caps, "block_align", G_TYPE_INT, format->nBlockAlign, NULL);
+    gst_caps_set_simple(caps, "depth", G_TYPE_INT, format->wBitsPerSample, NULL);
+    gst_caps_set_simple(caps, "bitrate", G_TYPE_INT, format->nAvgBytesPerSec * 8, NULL);
+}
+
 static void init_caps_from_wave_format(GstCaps *caps, const GUID *subtype,
         const void *format, UINT32 format_size)
 {
@@ -201,6 +213,8 @@ static void init_caps_from_wave_format(GstCaps *caps, const GUID *subtype,
         return init_caps_from_wave_format_wma3(caps, format, format_size, 4);
     if (IsEqualGUID(subtype, &MFAudioFormat_Vorbis))
         return init_caps_from_wave_format_vorbis(caps, format, format_size);
+    if (IsEqualGUID(subtype, &MFAudioFormat_Opus))
+        return init_caps_from_wave_format_opus(caps, format, format_size);
 
     GST_FIXME("Unsupported subtype " WG_GUID_FORMAT, WG_GUID_ARGS(*subtype));
 }

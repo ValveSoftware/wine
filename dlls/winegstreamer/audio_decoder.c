@@ -668,6 +668,8 @@ static WAVEFORMATEXTENSIBLE audio_decoder_input_types[] =
     {.Format = {.wFormatTag = WAVE_FORMAT_EXTENSIBLE, .nChannels = 6, .nSamplesPerSec = 48000, .nAvgBytesPerSec = 1152000, \
                 .nBlockAlign = 24, .wBitsPerSample = 32, .cbSize = sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX)}, \
      .SubFormat = {0x8d2fd10b,0x5841,0x4a6b,{0x89,0x05,0x58,0x8f,0xec,0x1a,0xde,0xd9}}},
+    {.Format = {.wFormatTag = WAVE_FORMAT_OPUS, .nChannels = 6, .nSamplesPerSec = 48000, .nAvgBytesPerSec = 1152000,
+                .nBlockAlign = 24, .wBitsPerSample = 32, .cbSize = sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX)}},
 };
 
 HRESULT audio_decoder_create(REFIID riid, void **ret)
