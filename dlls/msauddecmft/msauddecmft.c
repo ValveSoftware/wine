@@ -124,6 +124,7 @@ HRESULT WINAPI DllRegisterServer(void)
     MFT_REGISTER_TYPE_INFO audio_decoder_mft_inputs[] =
     {
         {MFMediaType_Audio, MFAudioFormat_Vorbis},
+        {MFMediaType_Audio, MFAudioFormat_Opus},
     };
     MFT_REGISTER_TYPE_INFO audio_decoder_mft_outputs[] =
     {
