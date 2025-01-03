@@ -697,6 +697,8 @@ static VkResult win32u_vkCreateInstance( const VkInstanceCreateInfo *client_crea
         instance->obj.extensions.has_VK_WINE_openxr_instance_extensions = 0;
     }
 
+    pthread_key_create(&instance->obj.transient_object_handle, free);
+
     if ((res = convert_instance_create_info( &pool, create_info, instance ))) goto failed;
     if ((callback_info = pop_next_struct( (VkBaseOutStructure **)&create_info->pNext, VK_STRUCTURE_TYPE_CREATE_INFO_WINE_INSTANCE_CALLBACK )))
     {
@@ -756,6 +758,7 @@ static void win32u_vkDestroyInstance( VkInstance client_instance, const VkAlloca
     if (instance->objects.compare) pthread_rwlock_destroy( &instance->objects_lock );
     free_debug_utils_messengers( &instance->utils_messengers );
     free_debug_report_callbacks( &instance->report_callbacks );
+    pthread_key_delete(instance->obj.transient_object_handle);
     free( instance );
 }
 
@@ -1033,6 +1036,17 @@ static void win32u_vkGetDeviceQueue2( VkDevice client_device, const VkDeviceQueu
     *client_queue = device_find_queue( client_device, &info );
 }
 
+static void set_transient_client_handle(struct vulkan_instance *instance, uint64_t client_handle)
+{
+    uint64_t *handle = pthread_getspecific(instance->transient_object_handle);
+    if (!handle)
+    {
+        handle = malloc(sizeof(uint64_t));
+        pthread_setspecific(instance->transient_object_handle, handle);
+    }
+    *handle = client_handle;
+}
+
 static VkResult win32u_vkAllocateMemory( VkDevice client_device, const VkMemoryAllocateInfo *client_alloc_info,
                                          const VkAllocationCallbacks *allocator, VkDeviceMemory *ret )
 {
@@ -1153,6 +1167,7 @@ static VkResult win32u_vkAllocateMemory( VkDevice client_device, const VkMemoryA
         alloc_info->pNext = &fd_info;
     }
 
+    set_transient_client_handle(instance, (uintptr_t)&memory->obj.obj);
     if ((res = device->p_vkAllocateMemory( device->host.device, alloc_info, NULL, &host_device_memory ))) goto failed;
 
     if (export_info)

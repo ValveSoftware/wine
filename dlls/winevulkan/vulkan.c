@@ -66,6 +66,12 @@ static void append_debug_utils_object(const VkDebugUtilsObjectNameInfoEXT *objec
     dst->object_name_len = append_string(object->pObjectName, strings, strings_len);
 }
 
+static uint64_t get_transient_handle(struct vulkan_instance *instance)
+{
+    uint64_t *handle = pthread_getspecific(instance->transient_object_handle);
+    return handle && *handle;
+}
+
 static VkBool32 debug_utils_callback_conversion(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
     VkDebugUtilsMessageTypeFlagsEXT message_types,
     const VkDebugUtilsMessengerCallbackDataEXT *callback_data,
@@ -148,6 +154,8 @@ static VkBool32 debug_utils_callback_conversion(VkDebugUtilsMessageSeverityFlagB
         if (wine_vk_is_type_wrapped(objects[i].object_type))
         {
             objects[i].object_handle = object->instance->p_client_handle_from_host(object->instance, objects[i].object_handle);
+            if (!objects[i].object_handle)
+                objects[i].object_handle = get_transient_handle(object->instance);
             if (!objects[i].object_handle)
             {
                 WARN("handle conversion failed 0x%s\n", wine_dbgstr_longlong(callback_data->pObjects[i].objectHandle));
