@@ -2415,48 +2415,6 @@ static void media_engine_adjust_destination_for_ratio(const struct media_engine 
     }
 }
 
-static void media_engine_update_d3d11_frame_surface(ID3D11DeviceContext *context, struct media_engine *engine)
-{
-    D3D11_TEXTURE2D_DESC surface_desc;
-    IMFMediaBuffer *media_buffer;
-    IMFSample *sample;
-
-    if (!video_frame_sink_get_sample(engine->presentation.frame_sink, &sample))
-        return;
-
-    ID3D11Texture2D_GetDesc(engine->video_frame.d3d11.source, &surface_desc);
-
-    switch (surface_desc.Format)
-    {
-    case DXGI_FORMAT_B8G8R8A8_UNORM:
-    case DXGI_FORMAT_B8G8R8X8_UNORM:
-        surface_desc.Width *= 4;
-        break;
-    default:
-        FIXME("Unsupported format %#x.\n", surface_desc.Format);
-        surface_desc.Width = 0;
-    }
-
-    if (SUCCEEDED(IMFSample_ConvertToContiguousBuffer(sample, &media_buffer)))
-    {
-        BYTE *buffer;
-        DWORD buffer_size;
-        if (SUCCEEDED(IMFMediaBuffer_Lock(media_buffer, &buffer, NULL, &buffer_size)))
-        {
-            if (buffer_size == surface_desc.Width * surface_desc.Height)
-            {
-                ID3D11DeviceContext_UpdateSubresource(context, (ID3D11Resource *)engine->video_frame.d3d11.source,
-                        0, NULL, buffer, surface_desc.Width, 0);
-            }
-
-            IMFMediaBuffer_Unlock(media_buffer);
-        }
-        IMFMediaBuffer_Release(media_buffer);
-    }
-
-    IMFSample_Release(sample);
-}
-
 static HRESULT get_d3d11_resource_from_sample(IMFSample *sample, ID3D11Texture2D **resource, UINT *subresource)
 {
     IMFDXGIBuffer *dxgi_buffer;
@@ -2478,6 +2436,69 @@ static HRESULT get_d3d11_resource_from_sample(IMFSample *sample, ID3D11Texture2D
 
     IMFMediaBuffer_Release(buffer);
     return hr;
+}
+
+static void media_engine_update_d3d11_frame_surface(ID3D11DeviceContext *context, struct media_engine *engine)
+{
+    D3D11_TEXTURE2D_DESC surface_desc;
+    D3D11_TEXTURE2D_DESC src_desc;
+    IMFMediaBuffer *media_buffer;
+    ID3D11Texture2D *src_texture;
+    ID3D11Device *device;
+    IMFSample *sample;
+    UINT subresource;
+    HRESULT hr;
+
+    if (!video_frame_sink_get_sample(engine->presentation.frame_sink, &sample))
+        return;
+
+    ID3D11Texture2D_GetDesc(engine->video_frame.d3d11.source, &surface_desc);
+
+    switch (surface_desc.Format)
+    {
+    case DXGI_FORMAT_B8G8R8A8_UNORM:
+    case DXGI_FORMAT_B8G8R8X8_UNORM:
+        surface_desc.Width *= 4;
+        break;
+    default:
+        FIXME("Unsupported format %#x.\n", surface_desc.Format);
+        surface_desc.Width = 0;
+    }
+
+    if (SUCCEEDED(hr = get_d3d11_resource_from_sample(sample, &src_texture, &subresource)))
+    {
+
+        ID3D11Texture2D_GetDesc(src_texture, &src_desc);
+
+        if (SUCCEEDED(hr = media_engine_lock_d3d_device(engine, &device)))
+        {
+            ID3D11Device_GetImmediateContext(device, &context);
+            ID3D11DeviceContext_CopyResource(context, (ID3D11Resource *)engine->video_frame.d3d11.source, (ID3D11Resource *)src_texture);
+            ID3D11DeviceContext_Release(context);
+            media_engine_unlock_d3d_device(engine, device);
+        }
+
+        ID3D11Texture2D_Release(src_texture);
+    }
+
+    if (FAILED(hr) && SUCCEEDED(IMFSample_ConvertToContiguousBuffer(sample, &media_buffer)))
+    {
+        BYTE *buffer;
+        DWORD buffer_size;
+        if (SUCCEEDED(IMFMediaBuffer_Lock(media_buffer, &buffer, NULL, &buffer_size)))
+        {
+            if (buffer_size == surface_desc.Width * surface_desc.Height)
+            {
+                ID3D11DeviceContext_UpdateSubresource(context, (ID3D11Resource *)engine->video_frame.d3d11.source,
+                        0, NULL, buffer, surface_desc.Width, 0);
+            }
+
+            IMFMediaBuffer_Unlock(media_buffer);
+        }
+        IMFMediaBuffer_Release(media_buffer);
+    }
+
+    IMFSample_Release(sample);
 }
 
 static HRESULT media_engine_transfer_d3d11(struct media_engine *engine, ID3D11Texture2D *dst_texture,
