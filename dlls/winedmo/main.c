@@ -145,8 +145,8 @@ static void buffer_unlock( DMO_OUTPUT_DATA_BUFFER *buffer, struct sample *sample
     if (SUCCEEDED(hr = IMediaBuffer_QueryInterface( buffer->pBuffer, &IID_IMFSample, (void **)&object )))
     {
         if (sample->dts != INT64_MIN) IMFSample_SetUINT64( object, &MFSampleExtension_DecodeTimestamp, sample->dts );
-        if (sample->pts != INT64_MIN) IMFSample_SetSampleTime( object, sample->pts );
-        else if (sample->dts != INT64_MIN) IMFSample_SetSampleTime( object, sample->dts );
+        if (sample->pts != INT64_MIN) IMFSample_SetSampleTime( object, sample->pts < 0 ? 0 : sample->pts );
+        else if (sample->dts != INT64_MIN) IMFSample_SetSampleTime( object, sample->dts < 0 ? 0 : sample->dts );
         if (sample->duration != INT64_MIN) IMFSample_SetSampleDuration( object, sample->duration );
         if (sample->flags & SAMPLE_FLAG_SYNC_POINT) IMFSample_SetUINT32( object, &MFSampleExtension_CleanPoint, 1 );
         IMFSample_Release( object );
