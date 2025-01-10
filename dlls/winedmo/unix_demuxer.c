@@ -104,6 +104,22 @@ NTSTATUS demuxer_check( void *arg )
     return STATUS_SUCCESS;
 }
 
+static BOOL codec_is_big_endian_pcm(enum AVCodecID codec_id)
+{
+    switch (codec_id)
+    {
+    case AV_CODEC_ID_PCM_S16BE:
+    case AV_CODEC_ID_PCM_S24BE:
+    case AV_CODEC_ID_PCM_S32BE:
+    case AV_CODEC_ID_PCM_S64BE:
+    case AV_CODEC_ID_PCM_F32BE:
+    case AV_CODEC_ID_PCM_F64BE:
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
 static NTSTATUS demuxer_create_streams( struct demuxer *demuxer )
 {
     UINT i;
@@ -125,6 +141,14 @@ static NTSTATUS demuxer_create_streams( struct demuxer *demuxer )
                 av_bsf_init( stream->filter );
                 continue;
             }
+        }
+        else if (codec_is_big_endian_pcm(par->codec_id))
+        {
+            /* WAVEFORMATEX does not contain endianness info, so this needs to be converted here. */
+            if (av_bsf_alloc( &ff_pcm_byte_order_reverse_bsf, &stream->filter ) < 0) return STATUS_UNSUCCESSFUL;
+            avcodec_parameters_copy( stream->filter->par_in, par );
+            av_bsf_init( stream->filter );
+            continue;
         }
 
         av_bsf_get_null_filter( &stream->filter );
