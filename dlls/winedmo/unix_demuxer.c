@@ -188,6 +188,11 @@ NTSTATUS demuxer_create( void *arg )
         else if (!strcmp( ext, ".wmv" )) strcpy( params->mime_type, "video/x-ms-wmv" );
         else strcpy( params->mime_type, "video/x-ms-asf" );
     }
+    else if (strstr( format->name, "ogg" ))
+    {
+        if (!strcmp( ext, ".oga" ) || !strcmp( ext, ".opus" )) strcpy( params->mime_type, "audio/ogg" );
+        else strcpy( params->mime_type, "video/ogg" );
+    }
     else
     {
         FIXME( "Unknown MIME type for format %s, url %s\n", debugstr_a(format->name), debugstr_a(params->url) );
