@@ -584,7 +584,6 @@ static void push_vorbis_headers(struct wg_transform *transform)
 
 failed:
     gst_buffer_unmap(codec_data, &info);
-    gst_buffer_unref(codec_data);
 }
 
 
