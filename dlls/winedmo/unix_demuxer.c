@@ -135,6 +135,76 @@ static NTSTATUS demuxer_create_streams( struct demuxer *demuxer )
     return STATUS_SUCCESS;
 }
 
+static int next_mov_atom( struct stream_context *context, UINT32 *type, UINT64 *size )
+{
+    struct
+    {
+        UINT32 size;
+        UINT32 type;
+    } atom;
+    int ret;
+
+    if ((ret = unix_read_callback( context, (uint8_t *)&atom, sizeof(atom) )) < 0) return ret;
+    if (!(*size = RtlUlongByteSwap( atom.size )) || (*size > 1 && *size < sizeof(atom))) return -1;
+    if (*size == 1 && (ret = unix_read_callback( context, (uint8_t *)size, sizeof(*size) )) < 0) return ret;
+    *size -= sizeof(atom);
+    *type = atom.type;
+    return 0;
+}
+
+static void parse_stream_names( struct demuxer *demuxer, UINT32 root, UINT64 size, int index )
+{
+    struct stream_context *context = demuxer->ctx->pb->opaque;
+    UINT64 end = context->position + size;
+    UINT32 atom;
+    char *name;
+
+    TRACE( "demuxer %p, root %s\n", demuxer, debugstr_fourcc(root) );
+
+    while (context->position < end && !next_mov_atom( context, &atom, &size ))
+    {
+#define CASE(l,h) (((UINT64)(h) << 32) | (l))
+        switch (CASE(root, atom))
+        {
+        case CASE(MAKEFOURCC('r','o','o','t'), MAKEFOURCC('m','o','o','v')):
+            parse_stream_names( demuxer, atom, size, 0 );
+            break;
+        case CASE(MAKEFOURCC('m','o','o','v'), MAKEFOURCC('t','r','a','k')):
+            parse_stream_names( demuxer, atom, size, index++ );
+            break;
+        case CASE(MAKEFOURCC('t','r','a','k'), MAKEFOURCC('u','d','t','a')):
+            parse_stream_names( demuxer, atom, size, index );
+            break;
+        case CASE(MAKEFOURCC('u','d','t','a'), MAKEFOURCC('n','a','m','e')):
+            if ((name = calloc( 1, size + 1 )))
+            {
+                unix_read_callback( context, (uint8_t *)name, size );
+                TRACE( "found name %s for stream %u\n", debugstr_a(name), index );
+                av_dict_set( &demuxer->ctx->streams[index]->metadata, "name", name, 0 );
+                free( name );
+                break;
+            }
+            /* fallthrough */
+        default:
+            unix_seek_callback( context, size, SEEK_CUR );
+            break;
+#undef CASE
+        }
+    }
+}
+
+static void parse_mp4_streams_metadata( struct demuxer *demuxer )
+{
+    struct stream_context *context = demuxer->ctx->pb->opaque;
+    int64_t pos = context->position;
+
+    if (context->length == -1) return;
+
+    unix_seek_callback( context, 0, SEEK_SET );
+    parse_stream_names( demuxer, MAKEFOURCC('r','o','o','t'), context->length, 0 );
+    unix_seek_callback( context, pos, SEEK_SET );
+}
+
 NTSTATUS demuxer_create( void *arg )
 {
     struct demuxer_create_params *params = arg;
@@ -199,6 +269,7 @@ NTSTATUS demuxer_create( void *arg )
         strcpy( params->mime_type, "video/x-application" );
     }
 
+    if (strstr( format->name, "mp4" )) parse_mp4_streams_metadata( demuxer );
     return STATUS_SUCCESS;
 
 failed:
@@ -369,7 +440,8 @@ NTSTATUS demuxer_stream_name( void *arg )
 
     TRACE( "demuxer %p, stream %u\n", demuxer, params->stream );
 
-    if (!(tag = av_dict_get( stream->metadata, "title", NULL, AV_DICT_IGNORE_SUFFIX )))
+    if (!(tag = av_dict_get( stream->metadata, "title", NULL, AV_DICT_IGNORE_SUFFIX )) &&
+        !(tag = av_dict_get( stream->metadata, "name", NULL, AV_DICT_IGNORE_SUFFIX )))
         return STATUS_NOT_FOUND;
 
     lstrcpynA( params->buffer, tag->value, ARRAY_SIZE( params->buffer ) );
