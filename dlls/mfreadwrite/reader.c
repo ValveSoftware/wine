@@ -175,6 +175,9 @@ struct source_reader
     CONDITION_VARIABLE sample_event;
     CONDITION_VARIABLE state_event;
     CONDITION_VARIABLE stop_event;
+
+    BOOL flag_eos_for_all_streams;
+    DWORD next_stream_eos_index;
 };
 
 static inline struct source_reader *impl_from_IMFSourceReaderEx(IMFSourceReaderEx *iface)
@@ -1346,9 +1349,11 @@ static HRESULT source_reader_get_next_selected_stream(struct source_reader *read
     }
 
     /* If all selected streams reached EOS, use first selected. */
-    if (first_selected != ~0u)
+    if (first_selected != ~0u && min_ts == MAXLONGLONG)
     {
-        if (min_ts == MAXLONGLONG)
+        if (reader->flag_eos_for_all_streams)
+            *stream_index = reader->next_stream_eos_index++ % reader->stream_count;
+        else
             *stream_index = first_selected;
     }
 
@@ -2698,6 +2703,8 @@ static HRESULT create_source_reader_from_source(IMFMediaSource *source, IMFAttri
     unsigned int i;
     HRESULT hr;
 
+    const char *sgi;
+
     object = calloc(1, sizeof(*object));
     if (!object)
         return E_OUTOFMEMORY;
@@ -2817,6 +2824,16 @@ static HRESULT create_source_reader_from_source(IMFMediaSource *source, IMFAttri
             if (unk)
                 IUnknown_Release(unk);
         }
+    }
+
+    if (object->stream_count > 1 && (sgi = getenv("SteamGameId")) && strcmp(sgi, "462780") == 0)
+    {
+        /* Darksiders Warmastered Edition ends media sampling only when MF_SOURCE_READERF_ENDOFSTREAM
+         * is returned for all streams. If audio and video end simultaneously then ENDOFSTREAM is
+         * flagged only for stream 0, therefore the game depends on a slight time difference which
+         * usually does not occur for the fourth splash video. */
+        WARN("HACK: enabled flagging ENDOFSTREAM for all streams.\n");
+        object->flag_eos_for_all_streams = TRUE;
     }
 
     if (FAILED(hr = MFLockSharedWorkQueue(L"", 0, NULL, &object->queue)))
