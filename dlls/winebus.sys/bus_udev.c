@@ -200,7 +200,6 @@ struct lnxev_device
     int button_count;
     BOOL is_gamepad;
 
-    int haptics_state;
     pthread_cond_t haptics_cond;
     pthread_t haptics_thread;
     struct ff_effect haptics;
@@ -1026,18 +1025,17 @@ static void lnxev_device_destroy(struct unix_device *iface)
 static void *lnxev_device_haptics_thread(void *args)
 {
     struct lnxev_device *impl = lnxev_impl_from_unix_device(args);
+    struct ff_effect effect = {0};
 
     pthread_mutex_lock(&udev_cs);
 
     for (;;)
     {
-        struct ff_effect effect;
-
-        while (impl->haptics_state == 1) pthread_cond_wait(&impl->haptics_cond, &udev_cs);
-        if (!impl->haptics_state) break;
+        while (!memcmp(&effect, &impl->haptics, sizeof(effect)))
+            pthread_cond_wait(&impl->haptics_cond, &udev_cs);
+        if (impl->haptics.type == (__u16)-1) break;
 
         effect = impl->haptics;
-        impl->haptics_state = 1;
         pthread_mutex_unlock(&udev_cs);
 
         if (effect.type && (effect.id == -1 || ioctl(impl->base.device_fd, EVIOCSFF, &effect) == -1))
@@ -1066,7 +1064,7 @@ static NTSTATUS lnxev_device_start(struct unix_device *iface)
 
     pthread_mutex_lock(&udev_cs);
     start_polling_device(iface);
-    impl->haptics_state = 1;
+    impl->haptics.type = 0;
     pthread_mutex_unlock(&udev_cs);
 
     pthread_cond_init(&impl->haptics_cond, NULL);
@@ -1081,7 +1079,7 @@ static void lnxev_device_stop(struct unix_device *iface)
     pthread_mutex_lock(&udev_cs);
     stop_polling_device(iface);
     list_remove(&impl->base.unix_device.entry);
-    impl->haptics_state = 0;
+    impl->haptics.type = -1;
     pthread_mutex_unlock(&udev_cs);
     pthread_cond_signal(&impl->haptics_cond);
 
@@ -1119,7 +1117,6 @@ static NTSTATUS lnxev_device_haptics_start(struct unix_device *iface, UINT durat
     impl->haptics.replay.length = duration_ms;
     impl->haptics.u.rumble.strong_magnitude = rumble_intensity;
     impl->haptics.u.rumble.weak_magnitude = buzz_intensity;
-    impl->haptics_state = 2;
     pthread_mutex_unlock(&udev_cs);
     pthread_cond_signal(&impl->haptics_cond);
 
@@ -1137,7 +1134,6 @@ static NTSTATUS lnxev_device_haptics_stop(struct unix_device *iface)
     impl->haptics.replay.length = 0;
     impl->haptics.u.rumble.strong_magnitude = 0;
     impl->haptics.u.rumble.weak_magnitude = 0;
-    impl->haptics_state = 2;
     pthread_mutex_unlock(&udev_cs);
     pthread_cond_signal(&impl->haptics_cond);
 
