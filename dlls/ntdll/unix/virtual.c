@@ -353,6 +353,11 @@ static void *preload_reserve_end;
 static BOOL force_exec_prot;  /* whether to force PROT_EXEC on all PROT_READ mmaps */
 static BOOL enable_write_exceptions;  /* raise exception on writes to executable memory */
 
+#if defined(linux) && defined(__aarch64__)
+#define FEX_STATS_SHM_MAX_SIZE 0x400000
+static void *fex_stats_shm;
+#endif
+
 struct range_entry
 {
     void *base;
@@ -6331,6 +6336,49 @@ static unsigned int get_memory_image_info( HANDLE process, LPCVOID addr, MEMORY_
     return status;
 }
 
+#if defined(linux) && defined(__aarch64__)
+NTSTATUS get_memory_fex_stats_shm( HANDLE process, LPCVOID addr, MEMORY_FEX_STATS_SHM_INFORMATION *info,
+                                   SIZE_T len, SIZE_T *res_len)
+{
+    char buf[0x20];
+    int fd;
+    int oflag = O_RDWR;
+
+    if (len != sizeof(*info)) return STATUS_INFO_LENGTH_MISMATCH;
+    if (process != GetCurrentProcess()) return STATUS_INVALID_HANDLE;
+
+    sprintf( buf, "fex-%d-stats", getpid() );
+
+    if (!fex_stats_shm) {
+        fex_stats_shm = mmap( NULL, FEX_STATS_SHM_MAX_SIZE, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS |
+                              MAP_NORESERVE, -1, 0 );
+        if (fex_stats_shm == MAP_FAILED) {
+            fex_stats_shm = NULL;
+            return STATUS_INTERNAL_ERROR;
+        }
+
+        oflag |= O_CREAT | O_TRUNC;
+    }
+
+    fd = shm_open( buf, oflag, S_IRWXU | S_IRWXG | S_IRWXO );
+    if (fd == -1) return STATUS_INTERNAL_ERROR;
+
+    if (ftruncate( fd, info->map_size )) goto err;
+
+    if (mmap( fex_stats_shm, info->map_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
+              0 ) == MAP_FAILED) goto err;
+
+    close( fd );
+
+    info->shm_base = fex_stats_shm;
+    *res_len = len;
+    return STATUS_SUCCESS;
+
+err:
+    close( fd );
+    return STATUS_INTERNAL_ERROR;
+}
+#endif
 
 /***********************************************************************
  *             NtQueryVirtualMemory   (NTDLL.@)
@@ -6376,6 +6424,12 @@ NTSTATUS WINAPI NtQueryVirtualMemory( HANDLE process, LPCVOID addr,
             }
             return STATUS_INVALID_HANDLE;
 
+        case MemoryFexStatsShm:
+#if defined(linux) && defined(__aarch64__)
+            return get_memory_fex_stats_shm( process, addr, buffer, len, res_len );
+#else
+            return STATUS_INVALID_INFO_CLASS;
+#endif
         default:
             FIXME("(%p,%p,info_class=%d,%p,%ld,%p) Unknown information class\n",
                   process, addr, info_class, buffer, len, res_len);

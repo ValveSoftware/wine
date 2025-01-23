@@ -2323,6 +2323,7 @@ typedef enum _MEMORY_INFORMATION_CLASS {
     MemoryWineUnixFuncs = 1000,
     MemoryWineUnixWow64Funcs,
 #endif
+    MemoryFexStatsShm = 2000,
 } MEMORY_INFORMATION_CLASS;
 
 typedef struct _MEMORY_SECTION_NAME
@@ -2388,6 +2389,12 @@ typedef struct _MEMORY_IMAGE_INFORMATION
         };
     };
 } MEMORY_IMAGE_INFORMATION, *PMEMORY_IMAGE_INFORMATION;
+
+typedef struct _MEMORY_FEX_STATS_SHM_INFORMATION
+{
+    void *shm_base;
+    SIZE_T map_size;
+} MEMORY_FEX_STATS_SHM_INFORMATION, *PMEMORY_FEX_STATS_SHM_INFORMATION;
 
 typedef enum _MUTANT_INFORMATION_CLASS
 {
