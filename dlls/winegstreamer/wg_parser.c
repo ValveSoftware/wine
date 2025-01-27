@@ -1621,7 +1621,7 @@ static GstBusSyncReply bus_handler_cb(GstBus *bus, GstMessage *msg, gpointer use
         if (gst_structure_has_name(structure, "missing-plugin"))
         {
             pthread_mutex_lock(&parser->mutex);
-            if (!parser->use_mediaconv && !parser->output_compressed)
+            if (!parser->use_mediaconv)
             {
                 GST_WARNING("Autoplugged element failed to initialise, trying again with protonvideoconvert.");
                 parser->error = true;
@@ -1858,7 +1858,7 @@ static NTSTATUS wg_parser_connect(void *args)
 
     if (ret == GST_STATE_CHANGE_FAILURE)
     {
-        if (!parser->use_mediaconv && !parser->output_compressed)
+        if (!parser->use_mediaconv)
         {
             GST_WARNING("Failed to play media, trying again with protonvideoconvert.");
             use_mediaconv = true;
@@ -1874,7 +1874,7 @@ static NTSTATUS wg_parser_connect(void *args)
         pthread_cond_wait(&parser->init_cond, &parser->mutex);
     if (parser->error)
     {
-        if (!parser->use_mediaconv && !parser->output_compressed)
+        if (!parser->use_mediaconv)
             use_mediaconv = true;
         pthread_mutex_unlock(&parser->mutex);
         goto out;
