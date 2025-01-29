@@ -68,6 +68,7 @@ HRESULT WINAPI DllRegisterServer(void)
         {MFMediaType_Video, MEDIASUBTYPE_VC1S},
         {MFMediaType_Video, MFVideoFormat_theora},
         {MFMediaType_Video, MFVideoFormat_AV1},
+        {MFMediaType_Video, MFVideoFormat_VP90},
     };
     MFT_REGISTER_TYPE_INFO wmv_decoder_mft_outputs[] =
     {
@@ -109,6 +110,7 @@ HRESULT WINAPI DllRegisterServer(void)
         {.type = MEDIATYPE_Video, .subtype = MEDIASUBTYPE_VC1S},
         {.type = MEDIATYPE_Video, .subtype = MFVideoFormat_theora},
         {.type = MEDIATYPE_Video, .subtype = MFVideoFormat_AV1},
+        {.type = MEDIATYPE_Video, .subtype = MFVideoFormat_VP90},
     };
     HRESULT hr;
 
