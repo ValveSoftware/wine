@@ -391,6 +391,14 @@ static void init_caps_from_video_av1(GstCaps *caps, const MFVIDEOFORMAT *format,
     gst_structure_set_name(gst_caps_get_structure(caps, 0), "video/x-av1");
 }
 
+static void init_caps_from_video_vp9(GstCaps *caps, const MFVIDEOFORMAT *format, UINT format_size)
+{
+    init_caps_codec_data(caps, format + 1, format_size - sizeof(*format));
+
+    gst_structure_remove_field(gst_caps_get_structure(caps, 0), "format");
+    gst_structure_set_name(gst_caps_get_structure(caps, 0), "video/x-vp9");
+}
+
 static void init_caps_from_video_subtype(GstCaps *caps, const GUID *subtype, const void *format, UINT format_size)
 {
     if (IsEqualGUID(subtype, &MFVideoFormat_CVID))
@@ -415,6 +423,8 @@ static void init_caps_from_video_subtype(GstCaps *caps, const GUID *subtype, con
         return init_caps_from_video_theora(caps, format, format_size);
     if (IsEqualGUID(subtype, &MFVideoFormat_AV1))
         return init_caps_from_video_av1(caps, format, format_size);
+    if (IsEqualGUID(subtype, &MFVideoFormat_VP90))
+        return init_caps_from_video_vp9(caps, format, format_size);
 
     GST_FIXME("Unsupported subtype " WG_GUID_FORMAT, WG_GUID_ARGS(*subtype));
 }

@@ -1804,6 +1804,7 @@ static const GUID *const wmv_decoder_input_types[] =
     &MEDIASUBTYPE_VC1S,
     &MFVideoFormat_theora,
     &MFVideoFormat_AV1,
+    &MFVideoFormat_VP90,
 };
 static const GUID *const wmv_decoder_output_types[] =
 {
