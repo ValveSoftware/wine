@@ -888,10 +888,17 @@ static const IDirectMusicLoader8Vtbl loader_vtbl =
 
 static HRESULT get_default_gm_path(WCHAR *path, DWORD max_len)
 {
-	DWORD ret;
-	HKEY hkey;
+    DWORD ret;
+    HKEY hkey;
+    static const WCHAR PROTON_SOUNDFILES_FILES_W[] = {'P','R','O','T','O','N','_','S','O','U','N','D','F','O','N','T','_','F','I','L','E','S',0};
+    if (GetEnvironmentVariableW(PROTON_SOUNDFILES_FILES_W, path, max_len))
+    {
+        TRACE("Found soundfont files from environment %s\n", debugstr_w(path));
+        if (GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES) return S_OK;
+        WARN("Counldn't find %s\n", debugstr_w(path));
+    }
 
-	if (!(ret = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\DirectMusic" , 0, KEY_READ, &hkey)))
+    if (!(ret = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\DirectMusic" , 0, KEY_READ, &hkey)))
     {
         DWORD type, size = max_len * sizeof(WCHAR);
         ret = RegQueryValueExW(hkey, L"GMFilePath", NULL, &type, (BYTE *)path, &size);
