@@ -2244,7 +2244,7 @@ static BOOL apply_window_pos( HWND hwnd, HWND insert_after, UINT swp_flags, stru
         }
         if (new_surface) req->paint_flags |= SET_WINPOS_PAINT_SURFACE;
         if (is_layered) req->paint_flags |= SET_WINPOS_LAYERED_WINDOW;
-        if (win->clip_clients) req->paint_flags |= SET_WINPOS_PIXEL_FORMAT;
+        else if (win->clip_clients) req->paint_flags |= SET_WINPOS_PIXEL_FORMAT;
 
         if ((ret = !wine_server_call( req )))
         {

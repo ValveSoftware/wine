@@ -326,6 +326,7 @@ W32KAPI void window_surface_flush( struct window_surface *surface );
 W32KAPI void window_surface_set_clip( struct window_surface *surface, HRGN clip_region );
 W32KAPI void window_surface_set_shape( struct window_surface *surface, HRGN shape_region );
 W32KAPI void window_surface_set_layered( struct window_surface *surface, COLORREF color_key, UINT alpha_bits, UINT alpha_mask );
+W32KAPI struct window_surface *window_surface_get( HWND hwnd );
 
 /* display manager interface, used to initialize display device registry data */
 

@@ -245,6 +245,7 @@ static BOOL enable_fullscreen_hack( HWND hwnd )
 BOOL needs_offscreen_rendering( HWND hwnd )
 {
     UINT style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
+    struct window_surface *surface;
     struct x11drv_win_data *data;
     BOOL needs_offscreen;
 
@@ -253,6 +254,13 @@ BOOL needs_offscreen_rendering( HWND hwnd )
     {
         needs_offscreen = (style & WS_VISIBLE) && !(style & WS_MINIMIZE) && !is_window_rect_mapped( &data->rects.visible );
         release_win_data( data );
+    }
+    if (!needs_offscreen && (surface = window_surface_get( hwnd )))
+    {
+        TRACE("hwnd %p, surface %p, surface->alpha_mask %#x.\n", hwnd, surface, surface->alpha_mask);
+        /* 3d drawing to ULW window never gets onscreen directly, only though UpdateLayeredWindow(). */
+        needs_offscreen = !!surface->alpha_mask;
+        window_surface_release( surface );
     }
     if (needs_offscreen) return needs_offscreen;
 
@@ -454,6 +462,7 @@ static void X11DRV_client_surface_present( struct client_surface *client, HDC hd
 {
     struct x11drv_client_surface *surface = impl_from_client_surface( client );
     HWND hwnd = client->hwnd, toplevel = NtUserGetAncestor( hwnd, GA_ROOT );
+    struct window_surface *win_surface;
     struct x11drv_win_data *data;
     RECT rect_dst, rect;
     Drawable window;
@@ -465,6 +474,18 @@ static void X11DRV_client_surface_present( struct client_surface *client, HDC hd
     client_surface_update_offscreen( hwnd, surface );
 
     if (!hdc) return;
+
+    if (hwnd && (win_surface = window_surface_get( hwnd )))
+    {
+        TRACE( "surface %p, alpha_mask %#x.\n", win_surface, win_surface->alpha_mask );
+        if (win_surface->alpha_mask)
+        {
+            /* GL drawing to ULW window never gets onscreen directly, only though UpdateLayeredWindow(). */
+            window_surface_release( win_surface );
+            return;
+        }
+    }
+
     window = X11DRV_get_whole_window( toplevel );
 
     if (NtUserGetPresentRect( toplevel, &rect_dst, -1 /* raw dpi */ ))

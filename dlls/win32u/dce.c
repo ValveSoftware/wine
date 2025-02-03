@@ -573,6 +573,20 @@ W32KAPI void window_surface_release( struct window_surface *surface )
     }
 }
 
+W32KAPI struct window_surface *window_surface_get( HWND hwnd )
+{
+    struct window_surface *surface = NULL;
+    WND *win = get_win_ptr( hwnd );
+
+    if (win && win != WND_DESKTOP && win != WND_OTHER_PROCESS)
+    {
+        if ((surface = win->surface))
+            window_surface_add_ref( surface );
+        release_win_ptr( win );
+    }
+    return surface;
+}
+
 W32KAPI void window_surface_lock( struct window_surface *surface )
 {
     if (surface == &dummy_surface) return;
