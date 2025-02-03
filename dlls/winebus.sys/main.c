@@ -603,6 +603,15 @@ static BOOL is_hidraw_enabled(WORD vid, WORD pid, const USAGE_AND_PAGE *usages, 
     case 0x0eb7:
         if (pid == 0x183b) prefer_hidraw = TRUE; /* Fanatec ClubSport Pedals v3 */
         if (pid == 0x1839) prefer_hidraw = TRUE; /* Fanatec ClubSport Pedals v1/v2 */
+        if (pid == 0x0e03) prefer_hidraw = TRUE; /* Fanatec CSL Elite */
+        if (pid == 0x0005) prefer_hidraw = TRUE; /* Fanatec CSL Elite PS4 */
+        if (pid == 0x0020) prefer_hidraw = TRUE; /* Fanatec CSL DD / DD Pro / ClubSport DD */
+        if (pid == 0x0001) prefer_hidraw = TRUE; /* Fanatec ClubSport V2 */
+        if (pid == 0x0004) prefer_hidraw = TRUE; /* Fanatec ClubSport V2.5 */
+        if (pid == 0x0006) prefer_hidraw = TRUE; /* Fanatec Podium DD1 */
+        if (pid == 0x0007) prefer_hidraw = TRUE; /* Fanatec Podium DD2 */
+        if (pid == 0x0011) prefer_hidraw = TRUE; /* Fanatec CSR Elite / Forza Motorsport */
+        if (pid == 0xe0fe) prefer_hidraw = TRUE; /* CS-WB-DD (FW update mode) */
         break;
     case 0x231d:
         /* comes with 128 buttons in the default configuration */
