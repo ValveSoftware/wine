@@ -219,7 +219,7 @@ static struct hid_report *hid_queue_pop_report( struct hid_queue *queue )
 static void hid_device_queue_input( DEVICE_OBJECT *device, HID_XFER_PACKET *packet )
 {
     BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
-    HIDP_COLLECTION_DESC *desc = ext->u.pdo.device_desc.CollectionDesc;
+    HIDP_COLLECTION_DESC *desc = ext->u.pdo.collection_desc;
     const BOOL polled = ext->u.pdo.information.Polled;
     ULONG size, report_len = polled ? packet->reportBufferLen : desc->InputLength;
     struct hid_report *last_report, *report;
@@ -303,11 +303,13 @@ static void hid_device_queue_input( DEVICE_OBJECT *device, HID_XFER_PACKET *pack
 
 static HIDP_REPORT_IDS *find_report_with_type_and_id( BASE_DEVICE_EXTENSION *ext, BYTE type, BYTE id, BOOL any_id )
 {
-    HIDP_REPORT_IDS *report, *reports = ext->u.pdo.device_desc.ReportIDs;
-    ULONG report_count = ext->u.pdo.device_desc.ReportIDsLength;
+    BASE_DEVICE_EXTENSION *fdo_ext = ext->u.pdo.parent_fdo->DeviceExtension;
+    HIDP_REPORT_IDS *report, *reports = fdo_ext->u.fdo.device_desc.ReportIDs;
+    ULONG report_count = fdo_ext->u.fdo.device_desc.ReportIDsLength;
 
     for (report = reports; report != reports + report_count; report++)
     {
+        if (ext->u.pdo.collection_desc->CollectionNumber != report->CollectionNumber) continue;
         if (!any_id && report->ReportID && report->ReportID != id) continue;
         if (type == HidP_Input && report->InputLength) return report;
         if (type == HidP_Output && report->OutputLength) return report;
@@ -321,7 +323,7 @@ static DWORD CALLBACK hid_device_thread(void *args)
 {
     DEVICE_OBJECT *device = (DEVICE_OBJECT*)args;
     BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
-    HIDP_COLLECTION_DESC *desc = ext->u.pdo.device_desc.CollectionDesc;
+    HIDP_COLLECTION_DESC *desc = ext->u.pdo.collection_desc;
     BOOL polled = ext->u.pdo.information.Polled;
     HIDP_REPORT_IDS *report;
     HID_XFER_PACKET *packet;
@@ -627,7 +629,7 @@ NTSTATUS WINAPI pdo_ioctl(DEVICE_OBJECT *device, IRP *irp)
         }
         case IOCTL_HID_GET_COLLECTION_DESCRIPTOR:
         {
-            HIDP_COLLECTION_DESC *desc = ext->u.pdo.device_desc.CollectionDesc;
+            HIDP_COLLECTION_DESC *desc = ext->u.pdo.collection_desc;
 
             irp->IoStatus.Information = desc->PreparsedDataLength;
             if (irpsp->Parameters.DeviceIoControl.OutputBufferLength < desc->PreparsedDataLength)
@@ -699,7 +701,7 @@ NTSTATUS WINAPI pdo_read(DEVICE_OBJECT *device, IRP *irp)
 {
     struct hid_queue *queue = irp->Tail.Overlay.OriginalFileObject->FsContext;
     BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
-    HIDP_COLLECTION_DESC *desc = ext->u.pdo.device_desc.CollectionDesc;
+    HIDP_COLLECTION_DESC *desc = ext->u.pdo.collection_desc;
     IO_STACK_LOCATION *irpsp = IoGetCurrentIrpStackLocation(irp);
     struct hid_report *report;
     BOOL removed;
