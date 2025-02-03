@@ -484,6 +484,15 @@ static void X11DRV_client_surface_present( struct client_surface *client, HDC hd
             window_surface_release( win_surface );
             return;
         }
+
+        TRACE( "Surface is present.\n" );
+        region = get_dc_monitor_region( hwnd, hdc );
+        if (region) NtGdiExtSelectClipRgn( hdc, region, RGN_COPY );
+        NtGdiStretchBlt( hdc, 0, 0, surface->rect.right - surface->rect.left, surface->rect.bottom - surface->rect.top,
+                         surface->hdc_src, 0, 0, surface->rect.right, surface->rect.bottom, SRCCOPY, 0 );
+        if (region) NtGdiDeleteObjectApp( region );
+        window_surface_release( win_surface );
+        return;
     }
 
     window = X11DRV_get_whole_window( toplevel );
