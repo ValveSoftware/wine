@@ -107,6 +107,21 @@ static BOOL is_fanatec_pedals(WORD vid, WORD pid)
     return FALSE;
 }
 
+static BOOL is_fanatec_wheelbase(WORD vid, WORD pid)
+{
+    if (vid != 0x0EB7) return FALSE;
+    if (pid == 0x0E03) return TRUE; /* Fanatec CSL Elite */
+    if (pid == 0x0005) return TRUE; /* Fanatec CSL Elite PS4 */
+    if (pid == 0x0020) return TRUE; /* Fanatec CSL DD / DD Pro / ClubSport DD */
+    if (pid == 0x0001) return TRUE; /* Fanatec ClubSport V2 */
+    if (pid == 0x0004) return TRUE; /* Fanatec ClubSport V2.5 */
+    if (pid == 0x0006) return TRUE; /* Fanatec Podium DD1 */
+    if (pid == 0x0007) return TRUE; /* Fanatec Podium DD2 */
+    if (pid == 0x0011) return TRUE; /* Fanatec CSR Elite / Forza Motorsport */
+    if (pid == 0xE0FE) return TRUE; /* CS-WB-DD (FW update mode) */
+    return FALSE;
+}
+
 static BOOL is_vkb_controller(WORD vid, WORD pid, INT buttons)
 {
     if (vid != 0x231D) return FALSE;
@@ -157,6 +172,7 @@ BOOL is_hidraw_enabled(WORD vid, WORD pid, INT axes, INT buttons)
     if (is_thrustmaster_hotas(vid, pid)) return TRUE;
     if (is_simucube_wheel(vid, pid)) return TRUE;
     if (is_fanatec_pedals(vid, pid)) return TRUE;
+    if (is_fanatec_wheelbase(vid, pid)) return TRUE;
     if (is_vkb_controller(vid, pid, buttons)) return TRUE;
     if (is_virpil_controller(vid, pid, buttons)) return TRUE;
 
