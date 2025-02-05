@@ -1714,6 +1714,12 @@ static void window_set_wm_state( struct x11drv_win_data *data, UINT new_state, B
 
     /* override redirect windows won't receive WM_STATE property changes */
     if (!data->managed) data->wm_state_serial = 0;
+
+    /* Gamescope has broken ICCCM support, and never sets the WM_STATE property.
+     * Still, it changes it to NormalState on IconifyWindow, or when giving focus to a window so we will
+     * mostly only lack response for transitions to Withdrawn and shouldn't wait for it.
+     */
+    if (X11DRV_HasWindowManager( "steamcompmgr" ) && new_state == WithdrawnState) data->wm_state_serial = 0;
 }
 
 static void window_set_managed( struct x11drv_win_data *data, BOOL new_managed )
