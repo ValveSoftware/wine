@@ -3221,6 +3221,7 @@ void X11DRV_GetDC( HDC hdc, HWND hwnd, HWND top, const RECT *win_rect,
 {
     struct x11drv_escape_set_drawable escape;
     struct x11drv_win_data *data;
+    int emulated_mode_offset;
 
     escape.code = X11DRV_SET_DRAWABLE;
     escape.mode = IncludeInferiors;
@@ -3235,6 +3236,12 @@ void X11DRV_GetDC( HDC hdc, HWND hwnd, HWND top, const RECT *win_rect,
     {
         escape.drawable = data->whole_window;
         escape.visual = data->vis;
+
+        if ((emulated_mode_offset = data->rects.window.left - data->rects.visible.left) > 0)
+            OffsetRect( &escape.dc_rect, emulated_mode_offset, 0 );
+        if ((emulated_mode_offset = data->rects.window.top - data->rects.visible.top) > 0)
+            OffsetRect( &escape.dc_rect, 0, emulated_mode_offset );
+
         /* special case: when repainting the root window, clip out top-level windows */
         if (top == hwnd && data->whole_window == root_window) escape.mode = ClipByChildren;
         release_win_data( data );
@@ -3457,6 +3464,7 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, HWND owner_hint, UIN
     BOOL is_managed, was_fullscreen, activate = !(swp_flags & SWP_NOACTIVATE), fullscreen = !!(swp_flags & WINE_SWP_FULLSCREEN);
 
     if ((is_managed = is_window_managed( hwnd, swp_flags, fullscreen ))) make_owner_managed( hwnd );
+    set_surface_window_rects( surface, new_rects );
 
     if (!(data = get_win_data( hwnd ))) return;
     if (is_managed) window_set_managed( data, TRUE );
