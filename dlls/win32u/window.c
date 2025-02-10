@@ -2055,6 +2055,7 @@ static BOOL get_surface_rect( const RECT *visible_rect, RECT *surface_rect )
     /* crop surfaces which are larger than the virtual screen rect, some applications create huge windows */
     if ((surface_rect->right - surface_rect->left > virtual_rect.right - virtual_rect.left ||
          surface_rect->bottom - surface_rect->top > virtual_rect.bottom - virtual_rect.top) &&
+        !force_present_to_surface( visible_rect ) &&
         !intersect_rect( surface_rect, surface_rect, &virtual_rect ))
         return FALSE;
     OffsetRect( surface_rect, -visible_rect->left, -visible_rect->top );
@@ -2099,11 +2100,16 @@ static BOOL get_default_window_surface( HWND hwnd, const RECT *surface_rect, str
 static BOOL window_clip_client_surfaces( HWND hwnd )
 {
     WND *win = get_win_ptr( hwnd );
+    RECT win_rect;
     BOOL ret;
 
     if (!win || win == WND_DESKTOP || win == WND_OTHER_PROCESS) return FALSE;
     ret = win->clip_clients;
+    win_rect = win->rects.window;
     release_win_ptr( win );
+
+    if (ret) return !force_present_to_surface( &win_rect );
+
     return ret;
 }
 

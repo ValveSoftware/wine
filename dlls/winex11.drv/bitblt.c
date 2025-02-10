@@ -1975,6 +1975,12 @@ static BOOL enable_direct_drawing( struct x11drv_win_data *data, BOOL layered )
     if (layered) return FALSE;
     if (data->embedded) return TRUE; /* draw directly to the window */
     if (data->whole_window == root_window) return TRUE; /* draw directly to the window */
+    if (!is_window_rect_mapped( &data->rects.visible ))
+    {
+        DWORD style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE );
+
+        if (style & WS_VISIBLE && !(style & WS_MINIMIZE)) return FALSE;
+    }
     if (data->client_window) return TRUE; /* draw directly to the window */
     if (!client_side_graphics) return TRUE; /* draw directly to the window */
     return FALSE;

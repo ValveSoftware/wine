@@ -818,6 +818,24 @@ static void dump_rdw_flags(UINT flags)
 #undef RDW_FLAGS
 }
 
+int force_present_to_surface( const RECT *win_rect )
+{
+    static int cached = -1;
+
+    if (cached == -1)
+    {
+        const char *sgi = getenv( "SteamGameId" );
+
+        cached = sgi &&
+                 (
+                    !strcmp(sgi, "803600")
+                 );
+    }
+    if (!cached) return 0;
+
+    return win_rect->right < 0 && win_rect->bottom < 0;
+}
+
 /***********************************************************************
  *           update_visible_region
  *
@@ -878,7 +896,8 @@ static void update_visible_region( struct dce *dce )
 
     /* don't use a surface to paint the client area of OpenGL windows */
     if (!(paint_flags & SET_WINPOS_PIXEL_FORMAT) || (flags & DCX_WINDOW)
-        || (NtUserGetLayeredWindowAttributes( dce->hwnd, NULL, NULL, &layered_flags ) && layered_flags & LWA_COLORKEY))
+        || (NtUserGetLayeredWindowAttributes( dce->hwnd, NULL, NULL, &layered_flags ) && layered_flags & LWA_COLORKEY)
+        || force_present_to_surface( &win_rect ))
     {
         win = get_win_ptr( top_win );
         if (win && win != WND_DESKTOP && win != WND_OTHER_PROCESS)
