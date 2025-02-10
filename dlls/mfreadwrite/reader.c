@@ -2005,6 +2005,15 @@ static HRESULT source_reader_create_transform(struct source_reader *reader, BOOL
         out_type.guidSubtype = MFVideoFormat_RGB32;
     }
 
+    if (IsEqualGUID(&out_type.guidMajorType, &MFMediaType_Video) && IsEqualGUID(&out_type.guidSubtype, &MFVideoFormat_IYUV)
+            && IsEqualGUID(&category, &MFT_CATEGORY_VIDEO_DECODER))
+    {
+        /* The WMV video decoder isn't registered for MFVideoFormat_IYUV, but selecting it as an output format still succeeds,
+         * the host decoders usually support IYUV as well, so fixup the subtype for MFTEnumEx.
+         */
+        WARN("Fixing up MFVideoFormat_IYUV subtype for the video processor\n");
+        out_type.guidSubtype = MFVideoFormat_NV12;
+    }
 
     count = 0;
     if (SUCCEEDED(hr = MFTEnumEx(category, 0, &in_type, allow_processor ? NULL : &out_type, &activates, &count)))
