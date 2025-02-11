@@ -415,6 +415,7 @@ struct x11drv_thread_data
     int      net_supported_count;  /* number of _NET_SUPPORTED atoms */
     UINT     net_wm_state_mask;    /* mask of supported _NET_WM_STATE *bits */
     char    *window_manager;       /* name of the supporting window manager */
+    char    *active_window;        /* name of the currently active window */
 #ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
     XIValuatorClassInfo x_valuator;
     XIValuatorClassInfo y_valuator;

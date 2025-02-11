@@ -2056,6 +2056,8 @@ void window_configure_notify( struct x11drv_win_data *data, unsigned long serial
     window_set_config( data, data->desired_state.rect, FALSE );
 }
 
+static BOOL get_window_name( Display *display, Window window, char **name );
+
 void net_active_window_notify( unsigned long serial, Window value, Time time )
 {
     struct x11drv_thread_data *data = x11drv_thread_data();
@@ -2073,6 +2075,7 @@ void net_active_window_notify( unsigned long serial, Window value, Time time )
                               current, expected, "", received, NULL ))
         return;
 
+    if (value) get_window_name( data->display, value, &data->active_window );
     NtUserPostMessage( NtUserGetForegroundWindow(), WM_WINE_WINDOW_STATE_CHANGED, 0, 0 );
 }
 
@@ -2094,6 +2097,37 @@ Window get_net_active_window( Display *display )
     return window;
 }
 
+static BOOL get_window_net_wm_name( Display *display, Window window, char **name )
+{
+    unsigned long count, remaining;
+    int format, ret;
+    Atom type;
+
+    *name = NULL;
+    X11DRV_expect_error( display, host_window_error, NULL );
+    ret = XGetWindowProperty( display, window, x11drv_atom(_NET_WM_NAME), 0, 65536 / sizeof(CARD32), False, x11drv_atom(UTF8_STRING),
+                              &type, &format, &count, &remaining, (unsigned char **)name );
+    return !X11DRV_check_error() && !ret && *name;
+}
+
+static BOOL get_window_wm_name( Display *display, Window window, char **name )
+{
+    unsigned long count, remaining;
+    int format, ret;
+    Atom type;
+
+    *name = NULL;
+    X11DRV_expect_error( display, host_window_error, NULL );
+    ret = XGetWindowProperty( display, window, x11drv_atom(WM_NAME), 0, 65536 / sizeof(CARD32), False, XA_STRING,
+                              &type, &format, &count, &remaining, (unsigned char **)name );
+    return !X11DRV_check_error() && !ret && *name;
+}
+
+static BOOL get_window_name( Display *display, Window window, char **name )
+{
+    return get_window_net_wm_name( display, window, name ) || get_window_wm_name( display, window, name );
+}
+
 void net_active_window_init( struct x11drv_thread_data *data )
 {
     Window window = get_net_active_window( data->display );
@@ -2101,6 +2135,8 @@ void net_active_window_init( struct x11drv_thread_data *data )
     data->desired_state.net_active_window = window;
     data->pending_state.net_active_window = window;
     data->current_state.net_active_window = window;
+
+    if (window) get_window_name( data->display, window, &data->active_window );
 }
 
 static BOOL window_set_pending_activate( HWND hwnd, BOOL *withdrawn )
@@ -3834,33 +3870,6 @@ static Window get_net_supporting_wm_check( Display *display, Window window )
     }
 
     return support;
-}
-
-
-static BOOL get_window_net_wm_name( Display *display, Window window, char **name )
-{
-    unsigned long count, remaining;
-    int format, ret;
-    Atom type;
-
-    *name = NULL;
-    X11DRV_expect_error( display, host_window_error, NULL );
-    ret = XGetWindowProperty( display, window, x11drv_atom(_NET_WM_NAME), 0, 65536 / sizeof(CARD32), False, x11drv_atom(UTF8_STRING),
-                              &type, &format, &count, &remaining, (unsigned char **)name );
-    return !X11DRV_check_error() && !ret && *name;
-}
-
-static BOOL get_window_wm_name( Display *display, Window window, char **name )
-{
-    unsigned long count, remaining;
-    int format, ret;
-    Atom type;
-
-    *name = NULL;
-    X11DRV_expect_error( display, host_window_error, NULL );
-    ret = XGetWindowProperty( display, window, x11drv_atom(WM_NAME), 0, 65536 / sizeof(CARD32), False, XA_STRING,
-                              &type, &format, &count, &remaining, (unsigned char **)name );
-    return !X11DRV_check_error() && !ret && *name;
 }
 
 void net_supporting_wm_check_init( struct x11drv_thread_data *data )
