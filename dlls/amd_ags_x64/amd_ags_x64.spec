@@ -54,6 +54,7 @@
 @ stdcall agsDriverExtensionsDX12_PushMarker(ptr ptr ptr)
 @ stdcall agsDriverExtensionsDX12_SetMarker(ptr ptr ptr)
 @ stdcall agsGetCrossfireGPUCount(ptr ptr)
+@ stdcall agsGetDriverVersionInfo(ptr ptr)
 @ stdcall agsGetVersionNumber()
 @ stdcall agsInit(ptr ptr ptr)
 @ stdcall agsInitialize(long ptr ptr ptr)

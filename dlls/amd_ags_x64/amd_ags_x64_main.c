@@ -82,7 +82,7 @@ static const struct
 }
 amd_ags_info[AMD_AGS_VERSION_COUNT] =
 {
-    {AGS_MAKE_VERSION(3, 1, 0), AGS_MAKE_VERSION(4, 0, 3), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
+    {AGS_MAKE_VERSION(3, 0, 0), AGS_MAKE_VERSION(4, 0, 3), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
     {AGS_MAKE_VERSION(5, 0, 0), AGS_MAKE_VERSION(5, 0, 6), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
     {AGS_MAKE_VERSION(5, 1, 1), AGS_MAKE_VERSION(5, 1, 1), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
     {AGS_MAKE_VERSION(5, 2, 0), AGS_MAKE_VERSION(5, 2, 1), sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
@@ -379,6 +379,14 @@ static enum amd_ags_version guess_version_from_exports(HMODULE hnative, int *ags
      *  - CoD: Modern Warfare Remastered (2017) ships dll without version info which is version 5.0.1
      *    (not tagged in AGSSDK history), compatible with 5.0.5.
      */
+    if (GetProcAddress(hnative, "agsGetDriverVersionInfo"))
+    {
+        /* agsGetDriverVersionInfo existed somewhere before 3.1.1, there is no SDK history in github before 3.1.1. */
+        TRACE("agsGetDriverVersionInfo found.\n");
+        *ags_version = AGS_MAKE_VERSION(3, 0, 0);
+        return AMD_AGS_VERSION_4_0_3;
+    }
+
     if (GetProcAddress(hnative, "agsDriverExtensions_SetCrossfireMode"))
     {
         /* agsDriverExtensions_SetCrossfireMode was deprecated in 3.2.0 */
@@ -865,7 +873,12 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
         return ret;
     }
 
-    if (object->public_version <= AGS_MAKE_VERSION(3, 1, 1))
+    if (object->public_version <= AGS_MAKE_VERSION(3, 0, 0))
+    {
+        WARN("Detected pre-historic AGS version.\n");
+        goto done;
+    }
+    else if (object->public_version <= AGS_MAKE_VERSION(3, 1, 1))
     {
         /* Unfortunately it doesn't look sanely possible to distinguish 3.1.1 and 3.1.0 versions, while in
          * 3.1.0 radeonSoftwareVersion was present, removed in 3.1.1 and brought back in 3.2.2. */
@@ -1242,6 +1255,26 @@ AGSReturnCode WINAPI agsGetCrossfireGPUCount(AGSContext *context, int *gpu_count
     return AGS_SUCCESS;
 }
 
+struct AGSDriverVersionInfo
+{
+    char strDriverVersion[256];
+    char strCatalystVersion[256];
+    char strCatalystWebLink[256];
+};
+
+AGSReturnCode WINAPI agsGetDriverVersionInfo(AGSContext *context, struct AGSDriverVersionInfo *ver)
+{
+    TRACE("context %p, ver %p.\n", context, ver);
+
+    if (!context || !ver)
+        return AGS_INVALID_ARGS;
+
+    strcpy(ver->strDriverVersion, driver_version);
+    *ver->strCatalystVersion = 0;
+    *ver->strCatalystWebLink = 0;
+    return AGS_SUCCESS;
+}
+
 static void get_dx11_extensions_supported(ID3D11Device *device, AGSDX11ExtensionsSupported_600 *extensions)
 {
     ID3D11VkExtDevice *ext_device;
@@ -1431,7 +1464,12 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_Init( AGSContext *context, ID3D11De
             ID3D11Device_GetImmediateContext(device, &context->d3d11_context);
         }
         get_dx11_extensions_supported(device, &context->extensions);
-        *extensionsSupported = *(unsigned int *)&context->extensions;
+        if (context->public_version <= AGS_MAKE_VERSION(3, 0, 0))
+            *extensionsSupported = context->extensions.quadList | (context->extensions.uavOverlap << 1)
+                    | (context->extensions.depthBoundsTest << 2) | (context->extensions.multiDrawIndirect << 3);
+        else
+            *extensionsSupported = *(unsigned int *)&context->extensions;
+        TRACE("-> %#x.\n", *extensionsSupported);
     }
 
     return AGS_SUCCESS;
