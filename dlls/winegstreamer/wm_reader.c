@@ -1554,8 +1554,13 @@ static HRESULT init_stream(struct wm_reader *reader)
 
                 const char *id = getenv("SteamGameId");
 
-                if (id && !strcmp(id, "1113000"))
+                if (id && (0
+                    || !strcmp(id, "1113000")
+                    || !strcmp(id, "638160")
+                    ))
+                {
                     stream->format.u.video.format = WG_VIDEO_FORMAT_BGRx;
+                }
             }
         }
         wg_parser_stream_enable(stream->wg_stream, &stream->format);
