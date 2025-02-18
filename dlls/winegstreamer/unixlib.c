@@ -278,6 +278,7 @@ NTSTATUS wg_init_gstreamer(void *arg)
     if (params->err_on)
         setenv("GST_DEBUG", "1", FALSE);
     setenv("GST_DEBUG_NO_COLOR", "1", FALSE);
+    setenv("GST_GL_WINDOW", "x11", 1);
 
     /* GStreamer installs a temporary SEGV handler when it loads plugins
      * to initialize its registry calling exit(-1) when any fault is caught.
