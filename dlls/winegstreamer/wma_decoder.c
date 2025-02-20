@@ -983,6 +983,8 @@ static HRESULT WINAPI media_object_ProcessOutput(IMediaObject *iface, DWORD flag
         hr = S_FALSE;
 
 
+    if (hr == MF_E_TRANSFORM_NEED_MORE_INPUT)
+        return S_FALSE;
     return hr;
 }
 
