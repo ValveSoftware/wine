@@ -757,6 +757,21 @@ static HRESULT WINAPI media_object_SetInputType(IMediaObject *iface, DWORD index
         decoder->wg_transform = 0;
     }
 
+{
+    const char *sgi = getenv("SteamGameId");
+    if (sgi && (0
+        || !strcmp(sgi, "802870")
+        || !strcmp(sgi, "1230140")
+        || !strcmp(sgi, "2515070")
+    ))
+    {
+        WAVEFORMATEX *wfx = (WAVEFORMATEX *)decoder->input_type.pbFormat;
+        decoder->input_type.subtype = MFAudioFormat_PCM;
+        wfx->wFormatTag = WAVE_FORMAT_PCM;
+        wfx->wBitsPerSample = 16;
+    }
+}
+
     return S_OK;
 }
 
