@@ -557,6 +557,45 @@ static HRESULT WINAPI stream_props_GetMediaType(IWMMediaProps *iface, WM_MEDIA_T
 
     wg_parser_stream_get_codec_format(config->stream->wg_stream, &codec_format);
     format = (codec_format.major_type != WG_MAJOR_TYPE_UNKNOWN && config->stream->demux_compressed) ? &codec_format : &config->stream->format;
+
+{
+    const char *sgi = getenv("SteamGameId");
+    if (format->major_type == WG_MAJOR_TYPE_VIDEO && sgi && (0
+        || !strcmp(sgi, "802870")
+        || !strcmp(sgi, "1083650")
+        || !strcmp(sgi, "1097880")
+        || !strcmp(sgi, "1230140")
+    ))
+    {
+        codec_format = config->stream->format;
+        codec_format.major_type = WG_MAJOR_TYPE_VIDEO_WMV;
+        codec_format.u.video.format = WG_VIDEO_FORMAT_WMV3;
+        codec_format.u.video.height = abs(codec_format.u.video.height);
+        format = &codec_format;
+    }
+    if (format->major_type == WG_MAJOR_TYPE_VIDEO && sgi && (0
+        || !strcmp(sgi, "2515070")
+    ))
+    {
+        codec_format = config->stream->format;
+        codec_format.major_type = WG_MAJOR_TYPE_VIDEO_WMV;
+        codec_format.u.video.format = WG_VIDEO_FORMAT_WVC1;
+        codec_format.u.video.height = abs(codec_format.u.video.height);
+        format = &codec_format;
+    }
+    if (format->major_type == WG_MAJOR_TYPE_AUDIO && sgi && (0
+        || !strcmp(sgi, "802870")
+        || !strcmp(sgi, "1230140")
+        || !strcmp(sgi, "2515070")
+    ))
+    {
+        codec_format = config->stream->format;
+        codec_format.major_type = WG_MAJOR_TYPE_AUDIO_WMA;
+        codec_format.u.audio.version = 2;
+        format = &codec_format;
+    }
+}
+
     if (!amt_from_wg_format(&stream_mt, format, true))
         return E_OUTOFMEMORY;
 
