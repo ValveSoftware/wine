@@ -2616,7 +2616,15 @@ static HRESULT WINAPI reader_SetReadStreamSamples(IWMSyncReader2 *iface, WORD st
 
     {
         const char *sgi = getenv("SteamGameId");
-        if (sgi && !strcmp(sgi, "638160")) compressed = FALSE;
+        if (sgi && (0
+            || !strcmp(sgi, "638160")
+            || !strcmp(sgi, "802870")
+            || !strcmp(sgi, "1083650")
+            || !strcmp(sgi, "1097880")
+            || !strcmp(sgi, "1230140")
+            || !strcmp(sgi, "2515070")
+            ))
+            compressed = FALSE;
     }
 
     if (stream->demux_compressed != compressed)
