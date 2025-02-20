@@ -1261,6 +1261,22 @@ static HRESULT WINAPI media_object_SetInputType(IMediaObject *iface, DWORD index
         decoder->wg_transform = 0;
     }
 
+{
+    const char *sgi = getenv("SteamGameId");
+    if (sgi && (0
+        || !strcmp(sgi, "802870")
+        || !strcmp(sgi, "1083650")
+        || !strcmp(sgi, "1097880")
+        || !strcmp(sgi, "1230140")
+        || !strcmp(sgi, "2515070")
+    ))
+    {
+        VIDEOINFOHEADER *vih = (VIDEOINFOHEADER *)decoder->dmo_input_type.pbFormat;
+        decoder->dmo_input_type.subtype = MFVideoFormat_RGB24;
+        vih->bmiHeader.biCompression = BI_RGB;
+    }
+}
+
     return S_OK;
 }
 
