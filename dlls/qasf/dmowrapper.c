@@ -331,6 +331,8 @@ static HRESULT process_output(struct dmo_wrapper *filter, IMediaObject *dmo)
         release_output_samples(filter);
     } while (more_data);
 
+    if (hr == S_FALSE)
+        return S_OK;
     return hr;
 }
 
