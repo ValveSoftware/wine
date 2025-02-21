@@ -1111,6 +1111,29 @@ VkResult wine_vkAllocateCommandBuffers(VkDevice client_device, const VkCommandBu
     return res;
 }
 
+static void filter_duplicate_structures(const VkBaseInStructure **in)
+{
+    const VkBaseInStructure *h;
+    VkBaseInStructure **h2;
+
+    for (h = *in; h; h = h->pNext)
+    {
+        if (h->sType == 1000284001 /*VK_STRUCTURE_TYPE_DEVICE_DEVICE_MEMORY_REPORT_CREATE_INFO_EXT*/
+                || h->sType == VK_STRUCTURE_TYPE_DEVICE_PRIVATE_DATA_CREATE_INFO)
+            continue;
+
+        for (h2 = (VkBaseInStructure **)in; *h2 != h; h2 = (VkBaseInStructure **)&(*h2)->pNext)
+        {
+            if ((*h2)->sType == h->sType)
+            {
+                ERR("Duplicate sType %d in the chain, keeping the last.\n", h->sType);
+                *h2 = (VkBaseInStructure *)(*h2)->pNext;
+                break;
+            }
+        }
+    }
+}
+
 VkResult wine_vkCreateDevice(VkPhysicalDevice client_physical_device, const VkDeviceCreateInfo *create_info,
                              const VkAllocationCallbacks *allocator, VkDevice *ret, void *client_ptr)
 {
@@ -1128,6 +1151,8 @@ VkResult wine_vkCreateDevice(VkPhysicalDevice client_physical_device, const VkDe
     PFN_native_vkCreateDevice native_create_device = NULL;
     void *native_create_device_context = NULL;
     VkCreateInfoWineDeviceCallback *callback;
+
+    filter_duplicate_structures((const VkBaseInStructure **)&create_info);
 
     if (allocator)
         FIXME("Support for allocation callbacks not implemented yet\n");
