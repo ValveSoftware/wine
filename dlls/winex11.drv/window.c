@@ -476,7 +476,27 @@ static BOOL is_window_managed( HWND hwnd, UINT swp_flags, BOOL fullscreen )
  */
 static inline BOOL is_window_resizable( struct x11drv_win_data *data, DWORD style )
 {
+
     if (data->is_resizable) return TRUE;
+
+    /* CW bug 24654: Tidy Cauldron (2708320) doesn't specify WS_THICKFRAME for its game window. And
+     * KWin refuses to both maximize and restore from maximization if a window is not resizable.
+     * Please see the isMaximizable() check at kwin-5.27.11/src/x11window.cpp#X11Window::maximize().
+     * Removing the resizable check on KWin introduces other bugs. See a previous MR that tried to
+     * do it at https://invent.kde.org/plasma/kwin/-/merge_requests/3248 */
+    if (X11DRV_HasWindowManager( "KWin" ))
+    {
+        static const WCHAR UnityWndClassW[] = {'U','n','i','t','y','W','n','d','C','l','a','s','s',0};
+        WCHAR class_name[80];
+        UNICODE_STRING name = { .Buffer = class_name, .MaximumLength = sizeof(class_name) };
+        const char *sgi;
+
+        NtUserGetClassName( data->hwnd, FALSE, &name );
+        if ((sgi = getenv( "SteamGameId" )) && !strcmp( sgi, "2708320" )
+            && !wcscmp( class_name, UnityWndClassW ))
+            return TRUE;
+    }
+
     /* Metacity needs the window to be resizable to make it fullscreen */
     return data->is_fullscreen;
 }
