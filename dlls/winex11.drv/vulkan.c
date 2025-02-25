@@ -105,7 +105,7 @@ static BOOL disable_opwr(void)
     return disable;
 }
 
-static VkResult X11DRV_vulkan_surface_create( HWND hwnd, VkInstance instance, VkSurfaceKHR *handle, void **private )
+static VkResult X11DRV_vulkan_surface_create( HWND hwnd, const struct vulkan_instance *instance, VkSurfaceKHR *handle, void **private )
 {
     VkXlibSurfaceCreateInfoKHR info =
     {
@@ -172,7 +172,7 @@ static VkResult X11DRV_vulkan_surface_create( HWND hwnd, VkInstance instance, Vk
     }
 
     info.window = surface->window;
-    if (pvkCreateXlibSurfaceKHR( instance, &info, NULL /* allocator */, handle ))
+    if (pvkCreateXlibSurfaceKHR( instance->host.instance, &info, NULL /* allocator */, handle ))
     {
         ERR("Failed to create Xlib surface\n");
         vulkan_surface_destroy( hwnd, surface );
