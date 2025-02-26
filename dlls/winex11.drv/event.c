@@ -996,6 +996,32 @@ static BOOL X11DRV_FocusOut( HWND hwnd, XEvent *xev )
     return TRUE;
 }
 
+void clear_emulated_fullscreen_padding( struct x11drv_win_data *data )
+{
+    RECT rect, visible;
+
+    visible = data->rects.visible;
+    OffsetRect( &visible, -data->rects.visible.left, -data->rects.visible.top );
+
+    rect = data->rects.window;
+    OffsetRect( &rect, -data->rects.visible.left, -data->rects.visible.top );
+    intersect_rect( &rect, &rect, &visible );
+
+    if (rect.left > 0 || rect.top > 0 || rect.right < visible.right || rect.bottom < visible.bottom)
+    {
+        UINT width = visible.right - rect.right, height = visible.bottom - rect.bottom;
+        GC gc;
+
+        TRACE("clearing for visible %s, rect %s.\n", wine_dbgstr_rect(&visible), wine_dbgstr_rect(&rect));
+        gc = XCreateGC( data->display, data->whole_window, 0, NULL );
+        XSetSubwindowMode( data->display, gc, IncludeInferiors );
+        if (visible.right && rect.top) XFillRectangle( data->display, data->whole_window, gc, 0, 0, visible.right, rect.top );
+        if (rect.left && visible.bottom) XFillRectangle( data->display, data->whole_window, gc, 0, 0, rect.left, visible.bottom );
+        if (width && visible.bottom) XFillRectangle( data->display, data->whole_window, gc, rect.right, 0, width, visible.bottom );
+        if (height && visible.right) XFillRectangle( data->display, data->whole_window, gc, 0, rect.bottom, visible.right, height );
+        XFreeGC( data->display, gc );
+    }
+}
 
 /***********************************************************************
  *           X11DRV_Expose
@@ -1019,6 +1045,8 @@ static BOOL X11DRV_Expose( HWND hwnd, XEvent *xev )
     else pos = root_to_virtual_screen( event->x, event->y );
 
     if (!(data = get_win_data( hwnd ))) return FALSE;
+
+    clear_emulated_fullscreen_padding( data );
 
     rect.left   = pos.x;
     rect.top    = pos.y;

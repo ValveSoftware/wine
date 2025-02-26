@@ -780,6 +780,8 @@ extern void init_icm_profile(void);
 extern const unsigned int *depths;
 extern RECT gamescope_screen_rect;
 
+void clear_emulated_fullscreen_padding( struct x11drv_win_data *data );
+
 /* Use a distinct type for the settings id, to avoid mixups other types of ids */
 typedef struct { ULONG_PTR id; } x11drv_settings_id;
 

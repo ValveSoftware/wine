@@ -1479,6 +1479,7 @@ static void window_set_config( struct x11drv_win_data *data, RECT rect, BOOL abo
     TRACE( "window %p/%lx, requesting config %s mask %#x above %u, serial %lu\n", data->hwnd, data->whole_window,
            wine_dbgstr_rect(new_rect), mask, above, data->configure_serial );
     XReconfigureWMWindow( data->display, data->whole_window, data->vis.screen, mask, &changes );
+    if (mask & (CWWidth | CWHeight)) clear_emulated_fullscreen_padding( data );
 }
 
 /***********************************************************************
