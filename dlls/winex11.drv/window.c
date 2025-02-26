@@ -488,6 +488,8 @@ static unsigned long get_mwm_decorations_for_style( DWORD style, DWORD ex_style 
 {
     unsigned long ret = 0;
 
+    if (X11DRV_HasWindowManager( "Mutter" )) return 0;
+
     if (ex_style & WS_EX_TOOLWINDOW) return 0;
     if (ex_style & WS_EX_LAYERED) return 0;
 
