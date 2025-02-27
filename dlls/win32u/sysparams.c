@@ -4490,6 +4490,8 @@ static LONG apply_display_settings( struct source *target, const DEVMODEW *devmo
 
     /* use the default implementation in virtual desktop mode */
     if (is_virtual_desktop() || emulate_modeset) ret = DISP_CHANGE_SUCCESSFUL;
+    /* HACK: Gamescope doesn't really changes the display mode, no point even trying as it sometimes fails with emulated mode list */
+    else if (user_driver->pHasWindowManager( "steamcompmgr" )) ret = DISP_CHANGE_SUCCESSFUL;
     else ret = user_driver->pChangeDisplaySettings( displays, primary_name, hwnd, flags, lparam );
     if (ret != DISP_CHANGE_SUCCESSFUL) WARN( "Failed to change display settings, ret %d\n", ret );
 
