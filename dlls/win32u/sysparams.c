@@ -3045,14 +3045,17 @@ static struct monitor *get_monitor_from_rect( RECT rect, UINT flags, UINT dpi, M
     LIST_FOR_EACH_ENTRY(monitor, &monitors, struct monitor, entry)
     {
         RECT intersect, monitor_rect;
+        UINT density, raw_dpi, x, y;
 
         if (!is_monitor_active( monitor ) || monitor->is_clone) continue;
+        raw_dpi = monitor_get_dpi( monitor, MDT_RAW_DPI, &x, &y );
+        density = raw_dpi * raw_dpi / 96 / 96;
 
         monitor_rect = monitor_get_rect( monitor, dpi, type );
         if (intersect_rect( &intersect, &monitor_rect, &rect ))
         {
             /* check for larger intersecting area */
-            UINT area = (intersect.right - intersect.left) * (intersect.bottom - intersect.top);
+            UINT area = (intersect.right - intersect.left) * (intersect.bottom - intersect.top) * density;
             if (area > max_area)
             {
                 max_area = area;
