@@ -593,7 +593,7 @@ public class WineActivity extends Activity
         }
 
         /* wrapper for layout() making sure that the view is not empty */
-        public void set_layout( int left, int top, int right, int bottom )
+        public void set_layout( float left, float top, float right, float bottom )
         {
             left   *= win.scale;
             top    *= win.scale;
@@ -601,7 +601,7 @@ public class WineActivity extends Activity
             bottom *= win.scale;
             if (right <= left + 1) right = left + 2;
             if (bottom <= top + 1) bottom = top + 2;
-            layout( left, top, right, bottom );
+            layout( (int)left, (int)top, (int)right, (int)bottom );
         }
 
         @Override
