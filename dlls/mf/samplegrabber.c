@@ -1195,6 +1195,10 @@ static HRESULT sample_grabber_set_state(struct sample_grabber *grabber, enum sin
 
             if (state == SINK_STATE_RUNNING && grabber->state != SINK_STATE_RUNNING)
             {
+                /* Unpause at a position is a seek operation which drops everything pending. */
+                if (grabber->state == SINK_STATE_PAUSED && offset != PRESENTATION_CURRENT_POSITION)
+                    grabber->sample_count = MAX_SAMPLE_QUEUE_LENGTH;
+
                 /* Every transition to running state sends a bunch requests to build up initial queue. */
                 for (i = 0; i < grabber->sample_count; ++i)
                 {
