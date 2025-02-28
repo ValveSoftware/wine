@@ -364,13 +364,11 @@ void x11drv_xinput2_enable( Display *display, Window window )
         {
             XISetMask( mask_bits, XI_RawButtonPress );
             XISetMask( mask_bits, XI_RawButtonRelease );
+
+            XISetMask( mask_bits, XI_RawTouchBegin );
+            XISetMask( mask_bits, XI_RawTouchUpdate );
+            XISetMask( mask_bits, XI_RawTouchEnd );
         }
-    }
-    else
-    {
-        XISetMask( mask_bits, XI_TouchBegin );
-        XISetMask( mask_bits, XI_TouchUpdate );
-        XISetMask( mask_bits, XI_TouchEnd );
     }
 
     pXISelectEvents( display, window, &mask, 1 );
@@ -1815,6 +1813,18 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input, BOOL send_raw
     {
         input->mi.dx = round( x->value );
         input->mi.dy = round( y->value );
+        if (gamescope_screen_rect.bottom)
+        {
+            RECT virtual = NtUserGetVirtualScreenRect( MDT_RAW_DPI );
+
+            input->mi.dx = input->mi.dx * (gamescope_screen_rect.right - gamescope_screen_rect.left)
+                           / (virtual.right - virtual.left);
+            input->mi.dx = min( input->mi.dx, 65535 );
+
+            input->mi.dy = input->mi.dy * (gamescope_screen_rect.bottom - gamescope_screen_rect.top)
+                           / (virtual.bottom - virtual.top);
+            input->mi.dy = min( input->mi.dy, 65535 );
+        }
         TRACE( "event %f,%f value %f,%f absolute input %d,%d\n", x_value, y_value, x->value, y->value,
                (int)input->mi.dx, (int)input->mi.dy );
     }
@@ -1924,32 +1934,33 @@ static BOOL X11DRV_RawButtonEvent( XGenericEventCookie *cookie )
     return TRUE;
 }
 
-static BOOL X11DRV_TouchEvent( HWND hwnd, XGenericEventCookie *xev )
+static BOOL X11DRV_RawTouchEvent( HWND hwnd, XGenericEventCookie *xev )
 {
-    RECT virtual = NtUserGetVirtualScreenRect( MDT_RAW_DPI );
+    struct x11drv_thread_data *thread_data = x11drv_thread_data();
     INPUT input = {.type = INPUT_HARDWARE};
-    XIDeviceEvent *event = xev->data;
+    XIRawEvent *event = xev->data;
     int flags = 0;
     POINT pos;
 
-    input.mi.dx = event->event_x;
-    input.mi.dy = event->event_y;
-    map_event_coords( hwnd, event->event, event->root, event->root_x, event->root_y, &input );
-    pos.x = input.mi.dx * 65535 / (virtual.right - virtual.left);
-    pos.y = input.mi.dy * 65535 / (virtual.bottom - virtual.top);
+    if (!thread_data->xinput2_rawinput) return FALSE;
+
+    if (!map_raw_event_coords( event, &input, FALSE )) return FALSE;
+    if (!(input.mi.dwFlags & MOUSEEVENTF_ABSOLUTE)) return FALSE;
+    pos.x = input.mi.dx;
+    pos.y = input.mi.dy;
 
     switch (event->evtype)
     {
-    case XI_TouchBegin:
+    case XI_RawTouchBegin:
         input.hi.uMsg = WM_POINTERDOWN;
         flags |= POINTER_MESSAGE_FLAG_NEW;
         TRACE("XI_TouchBegin detail %u pos %dx%d, flags %#x\n", event->detail, pos.x, pos.y, flags);
         break;
-    case XI_TouchEnd:
+    case XI_RawTouchEnd:
         input.hi.uMsg = WM_POINTERUP;
         TRACE("XI_TouchEnd detail %u pos %dx%d, flags %#x\n", event->detail, pos.x, pos.y, flags);
         break;
-    case XI_TouchUpdate:
+    case XI_RawTouchUpdate:
         input.hi.uMsg = WM_POINTERUPDATE;
         TRACE("XI_TouchUpdate detail %u pos %dx%d, flags %#x\n", event->detail, pos.x, pos.y, flags);
         break;
@@ -2040,10 +2051,10 @@ BOOL X11DRV_GenericEvent( HWND hwnd, XEvent *xev )
         ret = X11DRV_RawButtonEvent( event );
         break;
 
-    case XI_TouchBegin:
-    case XI_TouchUpdate:
-    case XI_TouchEnd:
-        ret = X11DRV_TouchEvent( hwnd, event );
+    case XI_RawTouchBegin:
+    case XI_RawTouchUpdate:
+    case XI_RawTouchEnd:
+        ret = X11DRV_RawTouchEvent( hwnd, event );
         break;
 
     default:

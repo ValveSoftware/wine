@@ -33,6 +33,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(x11drv);
 
 static struct x11drv_display_device_handler host_handler;
 static struct x11drv_settings_handler settings_handler;
+RECT gamescope_screen_rect;
 
 #define NEXT_DEVMODEW(mode) ((DEVMODEW *)((char *)((mode) + 1) + (mode)->dmDriverExtra))
 
@@ -436,6 +437,13 @@ UINT X11DRV_UpdateDisplayDevices( const struct gdi_device_manager *device_manage
             if (!settings_handler.get_id( devname, is_primary, &settings_id )) break;
 
             settings_handler.get_current_mode( settings_id, &current_mode );
+            if (!gpu && X11DRV_HasWindowManager( "steamcompmgr" ))
+            {
+                gamescope_screen_rect.left = gamescope_screen_rect.top = 0;
+                gamescope_screen_rect.right = current_mode.dmPelsWidth;
+                gamescope_screen_rect.bottom = current_mode.dmPelsHeight;
+            }
+
             if (settings_handler.get_modes( settings_id, EDS_ROTATEDMODE, &modes, &mode_count ))
             {
                 strip_driver_extra( &modes->mode, mode_count );
