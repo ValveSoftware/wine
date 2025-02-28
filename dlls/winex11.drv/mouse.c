@@ -268,7 +268,7 @@ static void update_device_mapping( Display *display, int deviceid )
     struct mouse_button_mapping *tmp;
     XDevice *device;
 
-    if (!(device = pXOpenDevice( display, deviceid )))
+    if (!deviceid || !(device = pXOpenDevice( display, deviceid )))
     {
         WARN( "Unable to open cursor device %d\n", deviceid );
         return;
@@ -1744,6 +1744,8 @@ static BOOL X11DRV_DeviceChanged( XGenericEventCookie *xev )
     struct x11drv_thread_data *data = x11drv_thread_data();
 
     if (event->deviceid != data->xinput2_pointer) return FALSE;
+    if (event->reason != XISlaveSwitch) return FALSE;
+
     update_relative_valuators( event->classes, event->num_classes );
     update_device_mapping( event->display, event->sourceid );
 
