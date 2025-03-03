@@ -731,27 +731,33 @@ BOOL WINAPI NtUserSetCursorPos( INT x, INT y )
     return ret;
 }
 
-/***********************************************************************
- *	     NtUserGetCursorPos (win32u.@)
- */
-BOOL WINAPI NtUserGetCursorPos( POINT *pt )
+static BOOL get_shared_cursor_pos( POINT *pt, DWORD *last_change )
 {
     struct object_lock lock = OBJECT_LOCK_INIT;
     const desktop_shm_t *desktop_shm;
-    BOOL ret = TRUE;
-    DWORD last_change = 0;
     NTSTATUS status;
-    RECT rect;
-
-    if (!pt) return FALSE;
 
     while ((status = get_shared_desktop( &lock, &desktop_shm )) == STATUS_PENDING)
     {
         pt->x = desktop_shm->cursor.x;
         pt->y = desktop_shm->cursor.y;
-        last_change = desktop_shm->cursor.last_change;
+        *last_change = desktop_shm->cursor.last_change;
     }
-    if (status) return FALSE;
+    return !status;
+}
+
+/***********************************************************************
+ *	     NtUserGetCursorPos (win32u.@)
+ */
+BOOL WINAPI NtUserGetCursorPos( POINT *pt )
+{
+    BOOL ret = TRUE;
+    DWORD last_change = 0;
+    RECT rect;
+
+    if (!pt) return FALSE;
+
+    if (!get_shared_cursor_pos( pt, &last_change )) return FALSE;
 
     /* query new position from graphics driver if we haven't updated recently */
     if (NtGetTickCount() - last_change > 100) ret = user_driver->pGetCursorPos( pt );
@@ -2643,14 +2649,22 @@ BOOL WINAPI NtUserIsMouseInPointerEnabled(void)
 
 void update_mouse_state_from_pointer( HWND hwnd, UINT msg, unsigned int pointer_id )
 {
+    BOOL update_cursor_pos = FALSE;
+    DWORD last_change;
+    POINT pt = { 0 };
+
     SERVER_START_REQ( track_mouse_from_pointer )
     {
         req->win = wine_server_user_handle( hwnd );
         req->msg = msg;
         req->pointer_id = pointer_id;
-        wine_server_call( req );
+        if (!wine_server_call( req )) update_cursor_pos = reply->cursor_pos_updated;
     }
     SERVER_END_REQ;
+
+    if (!update_cursor_pos) return;
+    if (get_shared_cursor_pos( &pt, &last_change ))
+        user_driver->pSetCursorPos( pt.x, pt.y );
 }
 
 static BOOL is_captured_by_system(void)

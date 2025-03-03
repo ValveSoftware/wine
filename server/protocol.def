@@ -2392,6 +2392,8 @@ enum message_type
     user_handle_t   win;        /* window handle */
     unsigned int    msg;        /* message code */
     unsigned int    pointer_id; /* pointer id */
+@REPLY
+    int             cursor_pos_updated; /* cursor position updated */
 @END
 
 

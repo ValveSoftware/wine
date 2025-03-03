@@ -112,6 +112,7 @@ struct pointer_state
     int button_msg_sent;        /* mouse button message was already sent */
     int x;                      /* last seen pointer x coordinate */
     int y;                      /* last seen pointer y coordinate */
+    int cursor_pos_updated;     /* updated mouse cursor position since last client tracking request */
 };
 
 struct thread_input
@@ -2603,7 +2604,7 @@ static void queue_mouse_message_from_pointer( struct desktop *desktop, unsigned 
         queue_hardware_message( desktop, msg, 1 );
 }
 
-static void track_mouse_message_from_pointer( struct thread_input *input, unsigned int pointer_id,
+static int track_mouse_message_from_pointer( struct thread_input *input, unsigned int pointer_id,
                                               unsigned int input_message )
 {
     struct pointer_state *state = &input->pointer_state;
@@ -2613,44 +2614,47 @@ static void track_mouse_message_from_pointer( struct thread_input *input, unsign
     struct pointer *pointer;
     int pointer_moved;
 
-    if (!input) return;
+    if (!input) return 0;
     if (input_message == WM_POINTERUP)
     {
         /* hardware pointer might be destroyed at this moment so don't rely on its presence */
-        if (pointer_id != state->pointer_id) return;
+        if (pointer_id != state->pointer_id) return 0;
         if (!state->button_msg_sent)
         {
             queue_mouse_message_from_pointer( desktop, WM_MOUSEMOVE, state->x, state->y, state->pointer_win, time );
             queue_mouse_message_from_pointer( desktop, WM_LBUTTONDOWN, state->x, state->y, state->pointer_win, time );
+            state->cursor_pos_updated = 1;
         }
         else if (state->x != desktop_shm->cursor.x || state->y != desktop_shm->cursor.y)
         {
             queue_mouse_message_from_pointer( desktop, WM_MOUSEMOVE, state->x, state->y, state->pointer_win, time );
+            state->cursor_pos_updated = 1;
         }
         queue_mouse_message_from_pointer( desktop, WM_LBUTTONUP, state->x, state->y, state->pointer_win, time );
         state->pointer_id = ~0u;
-        return;
+        return 1;
     }
 
-    if (input_message != WM_POINTERDOWN && state->pointer_id != pointer_id) return;
+    if (input_message != WM_POINTERDOWN && state->pointer_id != pointer_id) return 0;
 
-    if (!(pointer = find_pointer_from_id( desktop, pointer_id, 0 ))) return;
+    if (!(pointer = find_pointer_from_id( desktop, pointer_id, 0 ))) return 0;
     if (input_message == WM_POINTERDOWN)
     {
         if (state->pointer_id != pointer_id && list_count( &desktop->pointers ) > 1)
         {
             if (!state->button_msg_sent) state->pointer_id = ~0u;
-            return;
+            return 0;
         }
         state->pointer_id = pointer_id;
         state->pointer_win = pointer->win;
         state->x = pointer->x;
         state->y = pointer->y;
         state->button_msg_sent = 0;
-        return;
+        state->cursor_pos_updated = 0;
+        return 1;
     }
 
-    if (input_message != WM_POINTERUPDATE) return;
+    if (input_message != WM_POINTERUPDATE) return 0;
     state->pointer_win = pointer->win;
 
     pointer_moved = state->x != pointer->x || state->y != pointer->y;
@@ -2663,14 +2667,18 @@ static void track_mouse_message_from_pointer( struct thread_input *input, unsign
             /* TODO: emulate right button and double clicks. */
             queue_mouse_message_from_pointer( desktop, WM_LBUTTONDOWN, state->x, state->y, state->pointer_win, time );
             state->button_msg_sent = 1;
+            state->cursor_pos_updated = 1;
         }
         state->x = pointer->x;
         state->y = pointer->y;
     }
     if (pointer_moved || (state->button_msg_sent
                           && (state->x != desktop_shm->cursor.x || state->y != desktop_shm->cursor.y)))
+    {
         queue_mouse_message_from_pointer( desktop, WM_MOUSEMOVE, state->x, state->y, state->pointer_win, time );
-    return;
+        state->cursor_pos_updated = 1;
+    }
+    return 1;
 }
 
 static void queue_pointer_message( struct pointer *pointer, int repeated );
@@ -4349,6 +4357,10 @@ DECL_HANDLER(track_mouse_from_pointer)
 {
     struct msg_queue *queue = get_current_queue();
 
-    if (queue && check_queue_input_window( queue, req->win ))
-        track_mouse_message_from_pointer( queue->input, req->pointer_id, req->msg );
+    if (queue && check_queue_input_window( queue, req->win )
+        && track_mouse_message_from_pointer( queue->input, req->pointer_id, req->msg ))
+    {
+        reply->cursor_pos_updated = queue->input->pointer_state.cursor_pos_updated;
+        queue->input->pointer_state.cursor_pos_updated = 0;
+    }
 }
