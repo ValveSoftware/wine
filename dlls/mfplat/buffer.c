@@ -1353,7 +1353,6 @@ static HRESULT memory_buffer_init(struct buffer *buffer, DWORD max_length, DWORD
 
     if (!(buffer->data = _aligned_malloc(max_length, alignment)))
         return E_OUTOFMEMORY;
-    memset(buffer->data, 0, max_length);
 
     buffer->IMFMediaBuffer_iface.lpVtbl = vtbl;
     buffer->refcount = 1;
