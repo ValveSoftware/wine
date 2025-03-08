@@ -2537,6 +2537,25 @@ static struct pointer *find_pointer_from_id( struct desktop *desktop, unsigned i
     return pointer;
 }
 
+static void queue_mouse_message_from_pointer( struct desktop *desktop, unsigned int message, int x, int y,
+                                              user_handle_t pointer_win, unsigned int time )
+{
+    const struct hw_msg_source source = { IMDT_TOUCH, IMO_HARDWARE };
+    struct message *msg;
+
+    if (!(msg = alloc_hardware_message( 0xff515700, source, time, 0 ))) return;
+
+    msg->win       = get_user_full_handle( pointer_win );
+    msg->msg       = message;
+    msg->wparam    = 0;
+    msg->lparam    = 0;
+    msg->x         = x;
+    msg->y         = y;
+
+    if (!send_hook_ll_message( desktop, msg, WH_MOUSE_LL, 0, NULL ))
+        queue_hardware_message( desktop, msg, 0 );
+}
+
 static void queue_pointer_message( struct pointer *pointer, int repeated );
 
 static void pointer_message_timeout( void *private )
@@ -2584,21 +2603,13 @@ static void queue_pointer_message( struct pointer *pointer, int repeated )
         queue_hardware_message( desktop, msg, 1 );
     }
 
-    if (!repeated && pointer->primary && (msg = alloc_hardware_message( 0xff515700, source, time, 0 )))
+    if (!repeated && pointer->primary)
     {
         unsigned int message = WM_MOUSEMOVE;
         if (input->hw.msg == WM_POINTERDOWN) message = WM_LBUTTONDOWN;
         else if (input->hw.msg == WM_POINTERUP) message = WM_LBUTTONUP;
 
-        msg->win       = get_user_full_handle( win );
-        msg->msg       = message;
-        msg->wparam    = 0;
-        msg->lparam    = 0;
-        msg->x         = x;
-        msg->y         = y;
-
-        if (!send_hook_ll_message( desktop, msg, WH_MOUSE_LL, 0, NULL ))
-            queue_hardware_message( desktop, msg, 0 );
+        queue_mouse_message_from_pointer( desktop, message, x, y, win, time );
     }
 
     if (input->hw.msg != WM_POINTERUP)
