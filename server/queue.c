@@ -922,6 +922,35 @@ static int merge_unique_message( struct thread_input *input, unsigned int messag
     return 1;
 }
 
+/* try to merge pointer update message with the last in the list; return 1 if successful */
+static int merge_pointerupdate( struct thread_input *input, const struct message *msg )
+{
+    struct message *prev;
+
+    LIST_FOR_EACH_ENTRY_REV( prev, &input->msg_list, struct message, entry )
+    {
+        if (prev->msg == msg->msg) break;
+        if (prev->msg >= WM_POINTERUPDATE && prev->msg <= WM_POINTERLEAVE) return 0;
+    }
+
+    if (&prev->entry == &input->msg_list) return 0;
+
+    if (prev->result) return 0;
+    if (prev->win != msg->win) return 0;
+    if (prev->type != msg->type) return 0;
+    if (prev->wparam != msg->wparam) return 0;
+    if (prev->lparam != msg->lparam) return 0;
+
+    /* now we can merge it */
+    prev->x       = msg->x;
+    prev->y       = msg->y;
+    prev->time    = msg->time;
+    list_remove( &prev->entry );
+    list_add_tail( &input->msg_list, &prev->entry );
+
+    return 1;
+}
+
 /* try to merge a message with the messages in the list; return 1 if successful */
 static int merge_message( struct thread_input *input, const struct message *msg )
 {
@@ -929,6 +958,7 @@ static int merge_message( struct thread_input *input, const struct message *msg 
     if (msg->msg == WM_MOUSEMOVE) return merge_mousemove( input, msg );
     if (msg->msg == WM_WINE_CLIPCURSOR) return merge_unique_message( input, WM_WINE_CLIPCURSOR, msg );
     if (msg->msg == WM_WINE_SETCURSOR) return merge_unique_message( input, WM_WINE_SETCURSOR, msg );
+    if (msg->msg == WM_POINTERUPDATE) return merge_pointerupdate( input, msg );
     return 0;
 }
 
