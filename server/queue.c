@@ -2521,6 +2521,22 @@ struct pointer
     union hw_input input;
 };
 
+static struct pointer *find_pointer_from_id( struct desktop *desktop, unsigned int id )
+{
+    struct pointer *pointer;
+
+    LIST_FOR_EACH_ENTRY( pointer, &desktop->pointers, struct pointer, entry )
+        if (LOWORD(pointer->input.hw.wparam) == id) return pointer;
+
+    pointer = mem_alloc( sizeof(struct pointer) );
+    pointer->timeout = NULL;
+    pointer->desktop = desktop;
+    pointer->primary = list_empty( &desktop->pointers );
+    list_add_tail( &desktop->pointers, &pointer->entry );
+
+    return pointer;
+}
+
 static void queue_pointer_message( struct pointer *pointer, int repeated );
 
 static void pointer_message_timeout( void *private )
@@ -2596,22 +2612,6 @@ static void queue_pointer_message( struct pointer *pointer, int repeated )
         list_remove( &pointer->entry );
         free( pointer );
     }
-}
-
-static struct pointer *find_pointer_from_id( struct desktop *desktop, unsigned int id )
-{
-    struct pointer *pointer;
-
-    LIST_FOR_EACH_ENTRY( pointer, &desktop->pointers, struct pointer, entry )
-        if (LOWORD(pointer->input.hw.wparam) == id) return pointer;
-
-    pointer = mem_alloc( sizeof(struct pointer) );
-    pointer->timeout = NULL;
-    pointer->desktop = desktop;
-    pointer->primary = list_empty( &desktop->pointers );
-    list_add_tail( &desktop->pointers, &pointer->entry );
-
-    return pointer;
 }
 
 /* queue a hardware message for a custom type of event */
