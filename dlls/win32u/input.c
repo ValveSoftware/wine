@@ -2641,6 +2641,18 @@ BOOL WINAPI NtUserIsMouseInPointerEnabled(void)
     return FALSE;
 }
 
+void update_mouse_state_from_pointer( HWND hwnd, UINT msg, unsigned int pointer_id )
+{
+    SERVER_START_REQ( track_mouse_from_pointer )
+    {
+        req->win = wine_server_user_handle( hwnd );
+        req->msg = msg;
+        req->pointer_id = pointer_id;
+        wine_server_call( req );
+    }
+    SERVER_END_REQ;
+}
+
 static BOOL is_captured_by_system(void)
 {
     GUITHREADINFO info;

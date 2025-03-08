@@ -3004,6 +3004,8 @@ LRESULT default_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam, 
         struct touchinput_thread_data *thread_data;
         UINT i;
 
+        update_mouse_state_from_pointer( hwnd, msg, GET_POINTERID_WPARAM( wparam ) );
+
         if (!NtUserIsTouchWindow( hwnd, NULL )) return 0;
         if (!(thread_data = touch_input_thread_data())) return 0;
 

@@ -2387,6 +2387,14 @@ enum message_type
 @END
 
 
+/* Control generating of mouse events from pointer events. */
+@REQ(track_mouse_from_pointer)
+    user_handle_t   win;        /* window handle */
+    unsigned int    msg;        /* message code */
+    unsigned int    pointer_id; /* pointer id */
+@END
+
+
 /* Get a message from the current queue */
 @REQ(get_message)
     unsigned int    flags;     /* PM_* flags */

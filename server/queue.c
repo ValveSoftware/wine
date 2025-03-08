@@ -105,6 +105,15 @@ struct timer
     lparam_t        lparam;    /* lparam for message */
 };
 
+struct pointer_state
+{
+    unsigned int pointer_id;    /* id of pointer currently tracked, ~0u if none */
+    user_handle_t pointer_win;  /* pointer window */
+    int button_msg_sent;        /* mouse button message was already sent */
+    int x;                      /* last seen pointer x coordinate */
+    int y;                      /* last seen pointer y coordinate */
+};
+
 struct thread_input
 {
     struct object          obj;           /* object header */
@@ -114,6 +123,7 @@ struct thread_input
     struct list            msg_list;      /* list of hardware messages */
     timeout_t              user_time;     /* time of last user input */
     unsigned char          desktop_keystate[256]; /* desktop keystate when keystate was synced */
+    struct pointer_state   pointer_state;
     input_shm_t           *shared;        /* thread input in session shared memory */
 };
 
@@ -256,6 +266,7 @@ static struct thread_input *create_thread_input( struct thread *thread )
         list_init( &input->msg_list );
         input->user_time = 0;
         input->shared = NULL;
+        input->pointer_state.pointer_id = ~0u;
 
         if (!(input->desktop = get_thread_desktop( thread, 0 /* FIXME: access rights */ )))
         {
@@ -2549,19 +2560,25 @@ struct pointer
     user_handle_t win;
     int primary;
     union hw_input input;
+    int x;
+    int y;
 };
 
-static struct pointer *find_pointer_from_id( struct desktop *desktop, unsigned int id )
+static struct pointer *find_pointer_from_id( struct desktop *desktop, unsigned int id, int create )
 {
     struct pointer *pointer;
 
     LIST_FOR_EACH_ENTRY( pointer, &desktop->pointers, struct pointer, entry )
         if (LOWORD(pointer->input.hw.wparam) == id) return pointer;
 
+    if (!create) return NULL;
+
     pointer = mem_alloc( sizeof(struct pointer) );
     pointer->timeout = NULL;
     pointer->desktop = desktop;
     pointer->primary = list_empty( &desktop->pointers );
+    pointer->x = 0;
+    pointer->y = 0;
     list_add_tail( &desktop->pointers, &pointer->entry );
 
     return pointer;
@@ -2583,7 +2600,77 @@ static void queue_mouse_message_from_pointer( struct desktop *desktop, unsigned 
     msg->y         = y;
 
     if (!send_hook_ll_message( desktop, msg, WH_MOUSE_LL, 0, NULL ))
-        queue_hardware_message( desktop, msg, 0 );
+        queue_hardware_message( desktop, msg, 1 );
+}
+
+static void track_mouse_message_from_pointer( struct thread_input *input, unsigned int pointer_id,
+                                              unsigned int input_message )
+{
+    struct pointer_state *state = &input->pointer_state;
+    struct desktop *desktop = input->desktop;
+    unsigned int time = get_tick_count();
+    const desktop_shm_t *desktop_shm = desktop->shared;
+    struct pointer *pointer;
+    int pointer_moved;
+
+    if (!input) return;
+    if (input_message == WM_POINTERUP)
+    {
+        /* hardware pointer might be destroyed at this moment so don't rely on its presence */
+        if (pointer_id != state->pointer_id) return;
+        if (!state->button_msg_sent)
+        {
+            queue_mouse_message_from_pointer( desktop, WM_MOUSEMOVE, state->x, state->y, state->pointer_win, time );
+            queue_mouse_message_from_pointer( desktop, WM_LBUTTONDOWN, state->x, state->y, state->pointer_win, time );
+        }
+        else if (state->x != desktop_shm->cursor.x || state->y != desktop_shm->cursor.y)
+        {
+            queue_mouse_message_from_pointer( desktop, WM_MOUSEMOVE, state->x, state->y, state->pointer_win, time );
+        }
+        queue_mouse_message_from_pointer( desktop, WM_LBUTTONUP, state->x, state->y, state->pointer_win, time );
+        state->pointer_id = ~0u;
+        return;
+    }
+
+    if (input_message != WM_POINTERDOWN && state->pointer_id != pointer_id) return;
+
+    if (!(pointer = find_pointer_from_id( desktop, pointer_id, 0 ))) return;
+    if (input_message == WM_POINTERDOWN)
+    {
+        if (state->pointer_id != pointer_id && list_count( &desktop->pointers ) > 1)
+        {
+            if (!state->button_msg_sent) state->pointer_id = ~0u;
+            return;
+        }
+        state->pointer_id = pointer_id;
+        state->pointer_win = pointer->win;
+        state->x = pointer->x;
+        state->y = pointer->y;
+        state->button_msg_sent = 0;
+        return;
+    }
+
+    if (input_message != WM_POINTERUPDATE) return;
+    state->pointer_win = pointer->win;
+
+    pointer_moved = state->x != pointer->x || state->y != pointer->y;
+
+    if (pointer_moved)
+    {
+        if (!state->button_msg_sent)
+        {
+            queue_mouse_message_from_pointer( desktop, WM_MOUSEMOVE, state->x, state->y, state->pointer_win, time );
+            /* TODO: emulate right button and double clicks. */
+            queue_mouse_message_from_pointer( desktop, WM_LBUTTONDOWN, state->x, state->y, state->pointer_win, time );
+            state->button_msg_sent = 1;
+        }
+        state->x = pointer->x;
+        state->y = pointer->y;
+    }
+    if (pointer_moved || (state->button_msg_sent
+                          && (state->x != desktop_shm->cursor.x || state->y != desktop_shm->cursor.y)))
+        queue_mouse_message_from_pointer( desktop, WM_MOUSEMOVE, state->x, state->y, state->pointer_win, time );
+    return;
 }
 
 static void queue_pointer_message( struct pointer *pointer, int repeated );
@@ -2607,40 +2694,33 @@ static void queue_pointer_message( struct pointer *pointer, int repeated )
     desktop_shm_t *desktop_shm = desktop->shared;
     const union hw_input *input = &pointer->input;
     unsigned int i, wparam = input->hw.wparam;
-    timeout_t time = get_tick_count();
-    user_handle_t win = pointer->win;
     struct rectangle top_rect;
     struct message *msg;
-    int x, y;
 
     get_virtual_screen_rect( desktop, &top_rect, 0 );
-    x = LOWORD(input->hw.lparam) * (top_rect.right - top_rect.left) / 65535;
-    y = HIWORD(input->hw.lparam) * (top_rect.bottom - top_rect.top) / 65535;
+    pointer->x = LOWORD(input->hw.lparam) * (top_rect.right - top_rect.left) / 65535;
+    pointer->y = HIWORD(input->hw.lparam) * (top_rect.bottom - top_rect.top) / 65535;
 
     if (pointer->primary) wparam |= POINTER_MESSAGE_FLAG_PRIMARY << 16;
 
     for (i = 0; i < 2 && messages[input->hw.msg - WM_POINTERUPDATE][i]; i++)
     {
-        if (!(msg = alloc_hardware_message( 0, source, time, 0 ))) return;
+        if (!(msg = alloc_hardware_message( 0, source, get_tick_count(), 0 ))) return;
 
-        msg->win       = get_user_full_handle( win );
+        msg->win       = get_user_full_handle( pointer->win );
         msg->msg       = messages[input->hw.msg - WM_POINTERUPDATE][i];
         msg->wparam    = wparam;
-        msg->lparam    = MAKELONG(x, y);
+        msg->lparam    = MAKELONG(pointer->x, pointer->y);
         msg->x         = desktop_shm->cursor.x;
         msg->y         = desktop_shm->cursor.y;
 
         queue_hardware_message( desktop, msg, 1 );
     }
 
-    if (!repeated && pointer->primary)
-    {
-        unsigned int message = WM_MOUSEMOVE;
-        if (input->hw.msg == WM_POINTERDOWN) message = WM_LBUTTONDOWN;
-        else if (input->hw.msg == WM_POINTERUP) message = WM_LBUTTONUP;
-
-        queue_mouse_message_from_pointer( desktop, message, x, y, win, time );
-    }
+    if (desktop->foreground_input
+        && desktop->foreground_input->pointer_state.pointer_id == LOWORD(pointer->input.hw.wparam)
+        && desktop->foreground_input->pointer_state.button_msg_sent)
+        track_mouse_message_from_pointer( desktop->foreground_input, LOWORD(pointer->input.hw.wparam), input->hw.msg );
 
     if (input->hw.msg != WM_POINTERUP)
     {
@@ -2689,7 +2769,7 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
 
     if (input->hw.msg == WM_POINTERDOWN || input->hw.msg == WM_POINTERUP || input->hw.msg == WM_POINTERUPDATE)
     {
-        pointer = find_pointer_from_id( desktop, LOWORD(input->hw.wparam) );
+        pointer = find_pointer_from_id( desktop, LOWORD(input->hw.wparam), 1 );
         if (pointer->timeout) remove_timeout_user( pointer->timeout );
         pointer->input = *input;
         pointer->win = win;
@@ -4263,4 +4343,12 @@ DECL_HANDLER(set_keyboard_repeat)
     if (!desktop->key_repeat.enable) stop_key_repeat( desktop );
 
     release_object( desktop );
+}
+
+DECL_HANDLER(track_mouse_from_pointer)
+{
+    struct msg_queue *queue = get_current_queue();
+
+    if (queue && check_queue_input_window( queue, req->win ))
+        track_mouse_message_from_pointer( queue->input, req->pointer_id, req->msg );
 }
