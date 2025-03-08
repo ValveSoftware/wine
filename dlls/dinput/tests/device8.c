@@ -50,6 +50,17 @@ struct enum_data
     };
 };
 
+static void pump_messages(void)
+{
+    MSG msg;
+
+    while (PeekMessageA( &msg, 0, 0, 0, PM_REMOVE ))
+    {
+        TranslateMessage( &msg );
+        DispatchMessageA( &msg );
+    }
+}
+
 static void flush_events(void)
 {
     int min_timeout = 100, diff = 200;
@@ -1769,13 +1780,121 @@ done:
 
 static UINT pointer_enter_count;
 static UINT pointer_up_count;
-static HANDLE touchdown_event, touchleave_event;
+static HANDLE touchdown_event, touchmoved_event, touchleave_event;
 static WPARAM pointer_wparam[16];
 static WPARAM pointer_lparam[16];
 static UINT pointer_count;
+static int touch_test_line;
+static POINT last_cursor_pos;
+static const BOOL *skip_defwnd_for_pointer_message;
+BOOL skip_touch_mouse_tests, touch_missing_leave_todo;
+
+#define start_touch_test(a) start_touch_test_( __LINE__, a )
+static void start_touch_test_( int line, const BOOL *skip_defwnd )
+{
+    pointer_enter_count = pointer_up_count = pointer_count = 0;
+    memset( pointer_wparam, 0, sizeof(pointer_wparam) );
+    memset( pointer_lparam, 0, sizeof(pointer_lparam) );
+
+    skip_defwnd_for_pointer_message = skip_defwnd;
+    SetCursorPos( 0, 0 );
+    GetCursorPos( &last_cursor_pos );
+    touch_test_line = line;
+}
+
+static BOOL get_touch_mouse_message( HWND hwnd, MSG *msg )
+{
+    while (PeekMessageW( msg, NULL, WM_MOUSEFIRST, WM_MOUSELAST, PM_REMOVE ))
+    {
+        if (msg->message != WM_MOUSEMOVE || (GetMessageExtraInfo() & ~(ULONG_PTR)0xff) == 0xff515700) return TRUE;
+    }
+    return FALSE;
+}
+
+static BOOL touch_mouse_message_matches( UINT msg, UINT expect_msg )
+{
+    /* Pointer quick up / downs, holds are used to simulate right mouse button and double clicks on Windows. That
+     * is randomly triggered with the tests. Since currently that is neither avoided nor consciously emulated
+     * in tests just accept that all. */
+    if (expect_msg == WM_LBUTTONDOWN)
+        return msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN || msg == WM_LBUTTONDBLCLK;
+    if (expect_msg == WM_LBUTTONUP)
+        return msg == WM_LBUTTONUP || msg == WM_RBUTTONUP;
+    return msg == expect_msg;
+}
+
+#define expect_touch_mouse_message(a, b, c) expect_touch_mouse_message_( __LINE__, a, b, c )
+static BOOL expect_touch_mouse_message_( int line, HWND hwnd, UINT expect_msg, BOOL optional )
+{
+    INPUT_MESSAGE_SOURCE source;
+    LPARAM extra;
+    DWORD pos;
+    BOOL bret;
+    POINT cp;
+    MSG msg;
+
+    if (skip_touch_mouse_tests) return TRUE;
+
+    if (!(bret = get_touch_mouse_message( hwnd, &msg )) && !optional)
+    {
+        MsgWaitForMultipleObjects( 0, NULL, FALSE, 100, QS_MOUSE );
+        bret = get_touch_mouse_message( hwnd, &msg );
+    }
+
+    if (!optional)
+        ok_(__FILE__, line)( bret, "did not receive mouse message, expected %#x.\n", expect_msg );
+    if (!bret) return FALSE;
+
+    if (optional && !touch_mouse_message_matches( msg.message, expect_msg ))
+    {
+        trace_(__FILE__, line)( "got message %#x instead of optional %#x.\n", msg.message, expect_msg );
+        return FALSE;
+    }
+
+    ok_(__FILE__, line)( touch_mouse_message_matches( msg.message, expect_msg ),
+                         "got message %#x, expected %#x.\n", msg.message, expect_msg );
+
+    bret = GetCurrentInputMessageSource( &source );
+    ok_(__FILE__, line)( bret, "got error %ld.\n", GetLastError() );
+    ok_(__FILE__, line)( source.deviceType == IMDT_TOUCH, "got deviceType %#x, expected %#x.\n",
+                         source.deviceType, IMDT_TOUCH );
+    ok_(__FILE__, line)( source.originId == IMO_HARDWARE, "got originId %#x, expected %#x.\n",
+                         source.originId, IMO_HARDWARE );
+
+    cp = last_cursor_pos;
+    pos = msg.lParam;
+    ok_(__FILE__, line)( pos == MAKELPARAM(cp.x, cp.y), "got coords (%d, %d), expected (%ld, %ld).\n",
+                         LOWORD(pos), HIWORD(pos), cp.x, cp.y );
+    pos = GetMessagePos();
+    ok_(__FILE__, line)( pos == MAKELPARAM(cp.x, cp.y), "got coords (%d, %d), expected (%ld, %ld).\n",
+                         LOWORD(pos), HIWORD(pos), cp.x, cp.y );
+
+    extra = GetMessageExtraInfo();
+    ok_(__FILE__, line)( (extra & ~(ULONG_PTR)0xff) == 0xff515700, "got message extra info %#Ix, expected %#x.\n",
+                         extra, 0xff515700 );
+    return TRUE;
+}
 
 static LRESULT CALLBACK touch_screen_wndproc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
 {
+    static struct
+    {
+        UINT pointerid;
+        BOOL tracking_started;
+        POINT curr_pos;
+    }
+    state[64];
+    static unsigned int active_touch_count, total_touch_count;
+
+    BOOL pointer_moved, curpos_changed;
+    UINT expect_message_after;
+    unsigned int i;
+    UINT pointerid;
+    LRESULT ret;
+    MSG message;
+    BOOL bret;
+    POINT pt;
+
     if (msg == WM_POINTERENTER)
     {
         pointer_wparam[pointer_count] = wparam;
@@ -1783,8 +1902,6 @@ static LRESULT CALLBACK touch_screen_wndproc( HWND hwnd, UINT msg, WPARAM wparam
         pointer_count++;
         pointer_enter_count++;
     }
-    if (msg == WM_POINTERDOWN) ReleaseSemaphore( touchdown_event, 1, NULL );
-
     if (msg == WM_POINTERUP)
     {
         pointer_wparam[pointer_count] = wparam;
@@ -1792,9 +1909,182 @@ static LRESULT CALLBACK touch_screen_wndproc( HWND hwnd, UINT msg, WPARAM wparam
         pointer_count++;
         pointer_up_count++;
     }
-    if (msg == WM_POINTERLEAVE) ReleaseSemaphore( touchleave_event, 1, NULL );
 
-    return DefWindowProcW( hwnd, msg, wparam, lparam );
+    if (!skip_touch_mouse_tests && msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST)
+    {
+        INPUT_MESSAGE_SOURCE source;
+        GetCurrentInputMessageSource( &source );
+        ok( source.deviceType != IMDT_TOUCH, "got touch mouse message %#x outside of state tracking.\n", msg );
+    }
+
+    if (!(msg >= WM_POINTERUPDATE && msg <= WM_POINTERLEAVE))
+        return DefWindowProcW( hwnd, msg, wparam, lparam );
+
+    pointerid = GET_POINTERID_WPARAM( wparam );
+    winetest_push_context( "line %d, pointer msg %#x, wp %#Ix, lp %#Ix, pointerid %#x",
+                           touch_test_line, msg, wparam, lparam, pointerid );
+    for (i = 0; i < ARRAY_SIZE(state); ++i)
+    {
+        if (state[i].pointerid == pointerid) break;
+    }
+    if (msg == WM_POINTERENTER)
+    {
+        todo_wine_if(touch_missing_leave_todo) ok( i == ARRAY_SIZE(state), "Duplicate WM_POINTERDOWN for id %#x.\n", pointerid );
+        touch_missing_leave_todo = FALSE;
+        if (i == ARRAY_SIZE(state))
+        {
+            for (i = 0; i < ARRAY_SIZE(state); ++i)
+            {
+                if (!state[i].pointerid) break;
+            }
+        }
+        else
+        {
+            ok( active_touch_count == 1, "got %u.\n", active_touch_count );
+            ok( total_touch_count == 1, "got %u.\n", total_touch_count );
+            if (!--active_touch_count) total_touch_count = 0;
+        }
+        ok( i < ARRAY_SIZE(state), "No free space in state table.\n" );
+        state[i].pointerid = pointerid;
+        state[i].tracking_started = FALSE;
+        state[i].curr_pos.x = LOWORD(lparam);
+        state[i].curr_pos.y = HIWORD(lparam);
+        ++active_touch_count;
+        ++total_touch_count;
+    }
+    else if (msg != WM_POINTERLEAVE)
+    {
+        ok( i < ARRAY_SIZE(state), "Missed WM_POINTERDOWN for id %#x.\n", pointerid );
+    }
+
+    pointer_moved = LOWORD(lparam) != state[i].curr_pos.x || HIWORD(lparam) != state[i].curr_pos.y;
+    curpos_changed = LOWORD(lparam) != last_cursor_pos.x || HIWORD(lparam) != last_cursor_pos.y;
+    expect_message_after = 0;
+
+        if (winetest_debug > 1)
+            trace( "msg %#x, msgpos (%d, %d), tracking %d, t %ld, pointer_moved %d, curpos_changed %d.\n",
+                    msg, LOWORD(lparam), HIWORD(lparam), state[i].tracking_started, GetTickCount(),
+                    pointer_moved, curpos_changed);
+
+    if (state[i].tracking_started)
+    {
+        if (msg == WM_POINTERUPDATE && (pointer_moved || curpos_changed)
+            && active_touch_count && total_touch_count == 1)
+        {
+            state[i].curr_pos.x = LOWORD(lparam);
+            state[i].curr_pos.y = HIWORD(lparam);
+            last_cursor_pos = state[i].curr_pos;
+            expect_touch_mouse_message( hwnd, WM_MOUSEMOVE, FALSE );
+        }
+        else if (msg == WM_POINTERUP)
+        {
+            if (pointer_moved || curpos_changed)
+            {
+                state[i].curr_pos.x = LOWORD(lparam);
+                state[i].curr_pos.y = HIWORD(lparam);
+                last_cursor_pos = state[i].curr_pos;
+                expect_touch_mouse_message( hwnd, WM_MOUSEMOVE, FALSE );
+            }
+            if (!expect_touch_mouse_message( hwnd, WM_LBUTTONUP, TRUE ))
+            {
+                /* This message arrives here most of the time, but sometimes it is delayed until after DefWindowProc
+                 * call, maybe based on timing between WM_POINTERUPDATE which changed the position first time
+                 * and WM_POINTERUP. */
+                expect_message_after = WM_LBUTTONUP;
+            }
+        }
+    }
+    else
+    {
+        if (!skip_touch_mouse_tests) do
+        {
+            bret = get_touch_mouse_message( hwnd, &message );
+
+            ok( !bret, "got mouse message before DefWindowProc, msg  %#x, wp %#Ix, lp %#Ix.\n",
+                       message.message, message.wParam, message.lParam );
+        } while (bret);
+    }
+
+    if (skip_defwnd_for_pointer_message && skip_defwnd_for_pointer_message[msg - WM_POINTERUPDATE])
+    {
+        ret = 0;
+    }
+    else
+    {
+        /* The handling in DefWindowProc() doesn't depend on pointer flags in wparam and position in lparam */
+        ret = DefWindowProcW( hwnd, msg, LOWORD(wparam), 0 );
+        ok( !ret, "got %Id from DefWindowProcW.\n", ret );
+
+        if (skip_defwnd_for_pointer_message && skip_defwnd_for_pointer_message[WM_POINTERDOWN - WM_POINTERUPDATE])
+        {
+            /* No mouse messages al all if DefWindowProcW() wasn't called for WM_POINTERDOWN. */
+        }
+        else if (msg == WM_POINTERUPDATE && pointer_moved && !state[i].tracking_started && active_touch_count && total_touch_count == 1)
+        {
+            last_cursor_pos = state[i].curr_pos;
+            expect_touch_mouse_message( hwnd, WM_MOUSEMOVE, FALSE );
+            state[i].curr_pos.x = LOWORD(lparam);
+            state[i].curr_pos.y = HIWORD(lparam);
+            if (!state[i].tracking_started)
+            {
+                state[i].tracking_started = TRUE;
+                expect_touch_mouse_message( hwnd, WM_LBUTTONDOWN, FALSE );
+                last_cursor_pos = state[i].curr_pos;
+                expect_touch_mouse_message( hwnd, WM_MOUSEMOVE, FALSE );
+            }
+        }
+        else if (msg == WM_POINTERUP && active_touch_count == 1 && total_touch_count == 1)
+        {
+            if (!state[i].tracking_started)
+            {
+                last_cursor_pos = state[i].curr_pos;
+                if (!expect_touch_mouse_message( hwnd, WM_MOUSEMOVE, TRUE ))
+                {
+                    /* A lot of details go different before Win10, so don't perform the rest of mouse message tests. */
+                    win_skip( "Old behaviour detected, skipping remaining mouse tracking tests.\n" );
+                    skip_touch_mouse_tests = TRUE;
+                }
+                expect_touch_mouse_message( hwnd, WM_LBUTTONDOWN, FALSE );
+                expect_touch_mouse_message( hwnd, WM_LBUTTONUP, FALSE );
+            }
+        }
+
+        if (!skip_touch_mouse_tests)
+        {
+            GetCursorPos( &pt );
+            /* This is flaky because GetCursorPos() currently periodically updated from mouse position from
+             * display driver. While we try to update that on mouse position update from pointer that may
+             * still fail. */
+            flaky_wine ok( pt.x == last_cursor_pos.x && pt.y == last_cursor_pos.y, "got (%ld, %ld), expected (%ld, %ld).\n",
+                           pt.x, pt.y, last_cursor_pos.x, last_cursor_pos.y );
+        }
+    }
+
+    if (expect_message_after) expect_touch_mouse_message( hwnd, expect_message_after, FALSE );
+    if (msg == WM_POINTERDOWN && total_touch_count > 1)
+    {
+        /* With double touch, depending on WM_POINTERDOWN / WM_POINTERUPDATE timing, we may get mouse down message
+         * here (both on Windows and Wine). Then we are going to get mouse up before DefWindowProc which will be
+         * handled by our test state tracker with 'tracking_started' set. */
+        if (expect_touch_mouse_message( hwnd, WM_LBUTTONDOWN, TRUE ))
+        {
+            trace( "Got WM_LBUTTONDOWN on WM_POINTERDOWN.\n" );
+            state[i].tracking_started = TRUE;
+        }
+    }
+
+    if (msg == WM_POINTERUP)
+    {
+        state[i].pointerid = 0;
+        ok( active_touch_count, "got 0.\n" );
+        if (!--active_touch_count) total_touch_count = 0;
+    }
+
+    winetest_pop_context();
+    if (msg == WM_POINTERUPDATE && pointer_moved) SetEvent( touchmoved_event );
+    if (msg == WM_POINTERDOWN) ReleaseSemaphore( touchdown_event, 1, NULL );
+    if (msg == WM_POINTERLEAVE) ReleaseSemaphore( touchleave_event, 1, NULL );
+    return ret;
 }
 
 static void test_hid_touch_screen(void)
@@ -1910,6 +2200,16 @@ static void test_hid_touch_screen(void)
         .code = IOCTL_HID_READ_REPORT,
         .report_buf = {1, 1, 0x01,0x02,0x08,0x10},
     };
+    struct hid_expect touch_single2 =
+    {
+        .code = IOCTL_HID_READ_REPORT,
+        .report_buf = {1, 1, 0x01,0x02,0x18,0x20},
+    };
+    struct hid_expect touch_single3 =
+    {
+        .code = IOCTL_HID_READ_REPORT,
+        .report_buf = {1, 1, 0x01,0x02,0x40,0x50},
+    };
     struct hid_expect touch_multiple =
     {
         .code = IOCTL_HID_READ_REPORT,
@@ -1928,11 +2228,26 @@ static void test_hid_touch_screen(void)
         .report_buf = {1,0x02},
     };
 
+    static struct
+    {
+        BOOL skip_message[5];
+    }
+    mouse_tests[] =
+    {
+        /* WM_POINTERUPDATE, WM_POINTERDOWN, WM_POINTERUP, WM_POINTERENTER, WM_POINTERLEAVE */
+        {{ FALSE }},
+        {{ FALSE, TRUE }},
+        {{ TRUE }},
+        {{ FALSE, FALSE, TRUE }},
+        {{ TRUE, FALSE, TRUE }},
+    };
+
     RAWINPUTDEVICE rawdevice = {.usUsagePage = HID_USAGE_PAGE_DIGITIZER, .usUsage = HID_USAGE_DIGITIZER_TOUCH_SCREEN};
     UINT rawbuffer_count, rawbuffer_size, expect_flags, id, width, height;
     WCHAR device_path[MAX_PATH];
     char rawbuffer[1024];
     RAWINPUT *rawinput;
+    unsigned int i, j;
     HANDLE file;
     DWORD res;
     HWND hwnd;
@@ -1943,6 +2258,8 @@ static void test_hid_touch_screen(void)
 
     touchdown_event = CreateSemaphoreW( NULL, 0, LONG_MAX, NULL );
     ok( !!touchdown_event, "CreateSemaphoreW failed, error %lu\n", GetLastError() );
+    touchmoved_event = CreateEventW( NULL, FALSE, FALSE, NULL );
+    ok( !!touchmoved_event, "CreateEventW failed, error %lu\n", GetLastError() );
     touchleave_event = CreateSemaphoreW( NULL, 0, LONG_MAX, NULL );
     ok( !!touchleave_event, "CreateSemaphoreW failed, error %lu\n", GetLastError() );
 
@@ -1986,17 +2303,13 @@ static void test_hid_touch_screen(void)
 
     /* check basic touch_screen input injection to window message */
 
-    SetCursorPos( 0, 0 );
-
     hwnd = create_foreground_window( TRUE );
     SetWindowLongPtrW( hwnd, GWLP_WNDPROC, (LONG_PTR)touch_screen_wndproc );
 
 
     /* a single touch is automatically released if we don't send continuous updates */
 
-    pointer_enter_count = pointer_up_count = pointer_count = 0;
-    memset( pointer_wparam, 0, sizeof(pointer_wparam) );
-    memset( pointer_lparam, 0, sizeof(pointer_lparam) );
+    start_touch_test( NULL );
     bus_send_hid_input( file, &desc, &touch_single, sizeof(touch_single) );
 
     res = MsgWaitForMultipleObjects( 0, NULL, FALSE, 500, QS_POINTER );
@@ -2033,6 +2346,8 @@ static void test_hid_touch_screen(void)
     todo_wine
     ok( HIWORD( pointer_lparam[1] ) * 128 / height == 0x10, "got lparam %#Ix\n", pointer_lparam[1] );
 
+    /* Wine is currently missing WM_POINTERUP generation in this case. */
+    touch_missing_leave_todo = TRUE;
 
     /* test that we receive HID rawinput type with the touchscreen */
 
@@ -2143,9 +2458,7 @@ static void test_hid_touch_screen(void)
 
     /* now the touch is continuously updated */
 
-    pointer_enter_count = pointer_up_count = pointer_count = 0;
-    memset( pointer_wparam, 0, sizeof(pointer_wparam) );
-    memset( pointer_lparam, 0, sizeof(pointer_lparam) );
+    start_touch_test( NULL );
     bus_send_hid_input( file, &desc, &touch_single, sizeof(touch_single) );
 
     res = msg_wait_for_events( 1, &touchdown_event, 1000 );
@@ -2194,12 +2507,14 @@ static void test_hid_touch_screen(void)
     pointer_enter_count = pointer_up_count = pointer_count = 0;
     memset( pointer_wparam, 0, sizeof(pointer_wparam) );
     memset( pointer_lparam, 0, sizeof(pointer_lparam) );
+
     bus_send_hid_input( file, &desc, &touch_multiple, sizeof(touch_multiple) );
 
     res = msg_wait_for_events( 1, &touchdown_event, 1000 );
     ok( res == 0, "WaitForSingleObject returned %#lx\n", res );
     res = msg_wait_for_events( 1, &touchdown_event, 1000 );
     ok( res == 0, "WaitForSingleObject returned %#lx\n", res );
+
     res = msg_wait_for_events( 1, &touchleave_event, 10 );
     ok( res == WAIT_TIMEOUT, "WaitForSingleObject returned %#lx\n", res );
     ok( pointer_enter_count == 2, "got pointer_enter_count %u\n", pointer_enter_count );
@@ -2256,7 +2571,57 @@ static void test_hid_touch_screen(void)
     ok( LOWORD( pointer_lparam[1] ) * 128 / width == 0x18, "got lparam %#Ix\n", pointer_lparam[1] );
     ok( HIWORD( pointer_lparam[1] ) * 128 / height == 0x20, "got lparam %#Ix\n", pointer_lparam[1] );
 
+    /* Test mouse messages generation. */
+    SetCapture( hwnd );
+    pump_messages();
+    for (i = 0; i < ARRAY_SIZE(mouse_tests); ++i)
+    {
+        for (j = 0; j < 2; ++j)
+        {
+            winetest_push_context( "test %u, %u", i, j );
 
+            res = WaitForSingleObject( touchdown_event, 0 );
+            ok( res == WAIT_TIMEOUT, "WaitForSingleObject returned %#lx\n", res );
+            res = WaitForSingleObject( touchleave_event, 0 );
+            ok( res == WAIT_TIMEOUT, "WaitForSingleObject returned %#lx\n", res );
+
+            start_touch_test( mouse_tests[i].skip_message );
+            bus_send_hid_input( file, &desc, &touch_single, sizeof(touch_single) );
+            ResetEvent( touchmoved_event );
+            res = msg_wait_for_events( 1, &touchdown_event, 1000 );
+            ok( res == 0, "WaitForSingleObject returned %#lx\n", res );
+
+            if (j)
+            {
+                /* Current cursor positon affects WM_MOUSEMOVE messages. */
+                start_touch_test( mouse_tests[i].skip_message );
+            }
+            ResetEvent( touchmoved_event );
+            bus_send_hid_input( file, &desc, &touch_single2, sizeof(touch_single2) );
+
+            res = msg_wait_for_events( 1, &touchmoved_event, 1000 );
+            ok( res == 0, "WaitForSingleObject returned %#lx\n", res );
+
+            if (j) start_touch_test( mouse_tests[i].skip_message );
+            ResetEvent( touchmoved_event );
+            bus_send_hid_input( file, &desc, &touch_single3, sizeof(touch_single3) );
+            res = msg_wait_for_events( 1, &touchmoved_event, 1000 );
+            ok( res == 0, "WaitForSingleObject returned %#lx\n", res );
+
+            if (j) start_touch_test( mouse_tests[i].skip_message );
+            bus_send_hid_input( file, & desc, &touch_release, sizeof(touch_release) );
+            res = msg_wait_for_events( 1, &touchleave_event, 1000 );
+            ok( res == 0, "WaitForSingleObject returned %#lx\n", res );
+
+            start_touch_test( NULL );
+            pump_messages();
+
+            winetest_pop_context();
+        }
+    }
+
+    ret = ReleaseCapture();
+    ok( ret, "ReleaseCapture() failed.\n" );
     DestroyWindow( hwnd );
 
     CloseHandle( file );
@@ -2265,6 +2630,7 @@ done:
     hid_device_stop( &desc, 1 );
 
     CloseHandle( touchdown_event );
+    CloseHandle( touchmoved_event );
     CloseHandle( touchleave_event );
 }
 
