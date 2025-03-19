@@ -30,6 +30,8 @@ struct inputpane
     IInputPane IInputPane_iface;
     IInputPane2 IInputPane2_iface;
     LONG ref;
+
+    HWND tabtip_hwnd;
 };
 
 static inline struct inputpane *impl_from_IInputPane( IInputPane *iface )
@@ -155,16 +157,28 @@ static const struct IInputPaneVtbl inputpane_vtbl =
 
 DEFINE_IINSPECTABLE( inputpane2, IInputPane2, struct inputpane, IInputPane_iface );
 
+#define WM_TABTIP_OSK_TOGGLE (WM_USER + 1)
 static HRESULT WINAPI inputpane2_TryShow( IInputPane2 *iface, boolean *result )
 {
+    struct inputpane *impl = impl_from_IInputPane2( iface );
+
     FIXME( "iface %p, result %p stub!\n", iface, result );
+
     *result = FALSE;
+
+    PostMessageW(impl->tabtip_hwnd, WM_TABTIP_OSK_TOGGLE, TRUE, 0);
+
     return S_OK;
 }
 
 static HRESULT WINAPI inputpane2_TryHide( IInputPane2 *iface, boolean *result )
 {
+    struct inputpane *impl = impl_from_IInputPane2( iface );
+
     FIXME( "iface %p, result %p stub!\n", iface, result );
+
+    PostMessageW(impl->tabtip_hwnd, WM_TABTIP_OSK_TOGGLE, FALSE, 0);
+
     return S_OK;
 }
 
@@ -284,6 +298,8 @@ static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInsp
     impl->IInputPane_iface.lpVtbl = &inputpane_vtbl;
     impl->IInputPane2_iface.lpVtbl = &inputpane2_vtbl;
     impl->ref = 1;
+
+    impl->tabtip_hwnd = FindWindowW(L"IPTip_Main_Window", L"Input");
 
     *instance = (IInspectable *)&impl->IInputPane_iface;
     return S_OK;
