@@ -34,6 +34,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(tabtip);
 
+#define WM_TABTIP_OSK_TOGGLE (WM_USER + 1)
 static BOOL keyboard_up;
 static BOOL use_steam_osk;
 static unsigned int steam_app_id;
@@ -107,9 +108,16 @@ static const char *get_str_from_id_pair(int id, const struct str_id_pair *id_pai
     return "";
 }
 
+static void tabtip_toggle_steam_osk(BOOL raise, const RECT *rect);
 static const WCHAR tabtip_window_class_name[]  = L"IPTip_Main_Window";
 static LRESULT CALLBACK tabtip_win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
+    /* Try to invoke the OSK. */
+    if (msg == WM_TABTIP_OSK_TOGGLE)
+    {
+        tabtip_toggle_steam_osk((BOOL)wparam, NULL);
+    }
+
     return DefWindowProcW(hwnd, msg, wparam, lparam);
 }
 
@@ -181,11 +189,48 @@ static ULONG WINAPI FocusChangedHandler_Release(IUIAutomationFocusChangedEventHa
     return 1;
 }
 
+static void tabtip_toggle_steam_osk(BOOL raise, const RECT *rect)
+{
+    struct osk_link_data link_data = { 0 };
+
+    if (!use_steam_osk)
+        return;
+
+    if (raise)
+    {
+        osk_link_init(&link_data, L"steam://open/keyboard");
+        /* Requested in CW-Bug-Id: #21613. */
+        if (steam_app_id) osk_link_add_int_arg(&link_data, L"AppID", steam_app_id);
+        if (rect && (rect->left || rect->top || rect->right || rect->bottom))
+        {
+            osk_link_add_int_arg(&link_data, L"XPosition", rect->left);
+            osk_link_add_int_arg(&link_data, L"YPosition", rect->top);
+            osk_link_add_int_arg(&link_data, L"Width", (rect->right - rect->left));
+            osk_link_add_int_arg(&link_data, L"Height", (rect->bottom - rect->top));
+            osk_link_add_int_arg(&link_data, L"Mode", 0);
+        }
+
+        WINE_TRACE("Keyboard up!\n");
+        keyboard_up = TRUE;
+    }
+    else if (!raise && keyboard_up)
+    {
+        osk_link_init(&link_data, L"steam://close/keyboard");
+        /* Requested in CW-Bug-Id: #21613. */
+        if (steam_app_id) osk_link_add_int_arg(&link_data, L"AppID", steam_app_id);
+
+        WINE_TRACE("Keyboard down!\n");
+        keyboard_up = FALSE;
+    }
+
+    if (link_data.link_buf_pos && (link_data.link_buf_pos != link_data.link_buf))
+        ShellExecuteW(NULL, NULL, link_data.link_buf, NULL, NULL, SW_SHOWNOACTIVATE);
+}
+
 static HRESULT WINAPI FocusChangedHandler_HandleFocusChangedEvent(IUIAutomationFocusChangedEventHandler *iface,
         IUIAutomationElement *sender)
 {
     BOOL is_readonly, has_kbd_focus;
-    struct osk_link_data link_data = { 0 };
     RECT rect = { 0 };
     BSTR name = NULL;
     int control_type;
@@ -216,35 +261,7 @@ static HRESULT WINAPI FocusChangedHandler_HandleFocusChangedEvent(IUIAutomationF
     is_readonly = ((V_VT(&v) == VT_BOOL) && (V_BOOL(&v) == VARIANT_TRUE));
     VariantClear(&v);
 
-    if (use_steam_osk && (control_type == UIA_EditControlTypeId) && has_kbd_focus && !is_readonly)
-    {
-        osk_link_init(&link_data, L"steam://open/keyboard");
-        /* Requested in CW-Bug-Id: #21613. */
-        if (steam_app_id) osk_link_add_int_arg(&link_data, L"AppID", steam_app_id);
-        if (rect.left || rect.top || rect.right || rect.bottom)
-        {
-            osk_link_add_int_arg(&link_data, L"XPosition", rect.left);
-            osk_link_add_int_arg(&link_data, L"YPosition", rect.top);
-            osk_link_add_int_arg(&link_data, L"Width", (rect.right - rect.left));
-            osk_link_add_int_arg(&link_data, L"Height", (rect.bottom - rect.top));
-            osk_link_add_int_arg(&link_data, L"Mode", 0);
-        }
-
-        WINE_TRACE("Keyboard up!\n");
-        keyboard_up = TRUE;
-    }
-    else if (keyboard_up)
-    {
-        osk_link_init(&link_data, L"steam://close/keyboard");
-        /* Requested in CW-Bug-Id: #21613. */
-        if (steam_app_id) osk_link_add_int_arg(&link_data, L"AppID", steam_app_id);
-
-        WINE_TRACE("Keyboard down!\n");
-        keyboard_up = FALSE;
-    }
-
-    if (use_steam_osk && link_data.link_buf_pos && (link_data.link_buf_pos != link_data.link_buf))
-        ShellExecuteW(NULL, NULL, link_data.link_buf, NULL, NULL, SW_SHOWNOACTIVATE);
+    tabtip_toggle_steam_osk(((control_type == UIA_EditControlTypeId) && has_kbd_focus && !is_readonly), &rect);
 
     WINE_TRACE("name %s, control_type %d (%s), rect %s, has_kbd_focus %d, is_readonly %d\n", wine_dbgstr_w(name),
             control_type, get_str_for_id(control_type, uia_control_type_id_strs), wine_dbgstr_rect(&rect),
