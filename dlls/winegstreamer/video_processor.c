@@ -95,6 +95,8 @@ struct video_processor
 
     IUnknown *device_manager;
     IMFVideoSampleAllocatorEx *allocator;
+
+    IMFVideoProcessorControl IMFVideoProcessorControl_iface;
 };
 
 static void update_video_aperture(MFVideoInfo *input_info, MFVideoInfo *output_info)
@@ -476,6 +478,8 @@ static HRESULT WINAPI video_processor_QueryInterface(IMFTransform *iface, REFIID
 
     if (IsEqualGUID(iid, &IID_IMFTransform))
         *out = &impl->IMFTransform_iface;
+    else if (IsEqualGUID(iid, &IID_IMFVideoProcessorControl))
+        *out = &impl->IMFVideoProcessorControl_iface;
     else
     {
         *out = NULL;
@@ -1042,6 +1046,81 @@ static const IMFTransformVtbl video_processor_vtbl =
     video_processor_ProcessOutput,
 };
 
+static struct video_processor *impl_from_IMFVideoProcessorControl(IMFVideoProcessorControl *iface)
+{
+    return CONTAINING_RECORD(iface, struct video_processor, IMFVideoProcessorControl_iface);
+}
+
+static HRESULT WINAPI video_processor_control_QueryInterface(IMFVideoProcessorControl *iface, REFIID iid, void **out)
+{
+    return video_processor_QueryInterface(&impl_from_IMFVideoProcessorControl(iface)->IMFTransform_iface, iid, out);
+}
+
+static ULONG WINAPI video_processor_control_AddRef(IMFVideoProcessorControl *iface)
+{
+    return video_processor_AddRef(&impl_from_IMFVideoProcessorControl(iface)->IMFTransform_iface);
+}
+
+static ULONG WINAPI video_processor_control_Release(IMFVideoProcessorControl *iface)
+{
+    return video_processor_Release(&impl_from_IMFVideoProcessorControl(iface)->IMFTransform_iface);
+}
+
+static HRESULT WINAPI video_processor_control_SetBorderColor(IMFVideoProcessorControl *iface, MFARGB *color)
+{
+    FIXME("iface %p, color %p: stub.\n", iface, color);
+    //return E_NOTIMPL;
+    return S_OK;
+}
+
+static HRESULT WINAPI video_processor_control_SetSourceRectangle(IMFVideoProcessorControl *iface, RECT *rect)
+{
+    FIXME("iface %p, rect %p: stub.\n", iface, rect);
+    //return E_NOTIMPL;
+    return S_OK;
+}
+
+static HRESULT WINAPI video_processor_control_SetDestinationRectangle(IMFVideoProcessorControl *iface, RECT *rect)
+{
+    FIXME("iface %p, rect %p: stub.\n", iface, rect);
+    //return E_NOTIMPL;
+    return S_OK;
+}
+
+static HRESULT WINAPI video_processor_control_SetMirror(IMFVideoProcessorControl *iface, MF_VIDEO_PROCESSOR_MIRROR mirror)
+{
+    FIXME("iface %p, mirror %d: stub.\n", iface, mirror);
+    //return E_NOTIMPL;
+    return S_OK;
+}
+
+static HRESULT WINAPI video_processor_control_SetRotation(IMFVideoProcessorControl *iface, MF_VIDEO_PROCESSOR_ROTATION rotation)
+{
+    FIXME("iface %p, rotation %d: stub.\n", iface, rotation);
+    //return E_NOTIMPL;
+    return S_OK;
+}
+
+static HRESULT WINAPI video_processor_control_SetConstrictionSize(IMFVideoProcessorControl *iface, SIZE *size)
+{
+    FIXME("iface %p, size %p: stub.\n", iface, size);
+    //return E_NOTIMPL;
+    return S_OK;
+}
+
+static const IMFVideoProcessorControlVtbl video_processor_control_vtbl =
+{
+    video_processor_control_QueryInterface,
+    video_processor_control_AddRef,
+    video_processor_control_Release,
+    video_processor_control_SetBorderColor,
+    video_processor_control_SetSourceRectangle,
+    video_processor_control_SetDestinationRectangle,
+    video_processor_control_SetMirror,
+    video_processor_control_SetRotation,
+    video_processor_control_SetConstrictionSize,
+};
+
 HRESULT video_processor_create(REFIID riid, void **ret)
 {
     const MFVIDEOFORMAT input_format =
@@ -1083,6 +1162,7 @@ HRESULT video_processor_create(REFIID riid, void **ret)
         goto failed;
 
     impl->IMFTransform_iface.lpVtbl = &video_processor_vtbl;
+    impl->IMFVideoProcessorControl_iface.lpVtbl = &video_processor_control_vtbl;
     impl->refcount = 1;
 
     *ret = &impl->IMFTransform_iface;
