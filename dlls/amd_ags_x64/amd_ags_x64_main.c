@@ -53,8 +53,8 @@ static BOOL init_unix_lib(void)
     return unix_lib_initialized;
 }
 
-static const char driver_version[] = "23.19.02-230831a-396538C-AMD-Software-Adrenalin-Edition";
-static const char radeon_version[] = "23.10.2";
+static const char driver_version[] = "99.19.02-230831a-396538C-AMD-Software-Adrenalin-Edition";
+static const char radeon_version[] = "99.10.2";
 
 enum amd_ags_version
 {
