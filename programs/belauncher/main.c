@@ -86,8 +86,15 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
     *game_exeW = 0;
     game_exe_len = 0;
 
+    WINE_TRACE("cmdline %s.\n", wine_dbgstr_w(cmdline));
     if ((argvW = CommandLineToArgvW(cmdline, &argc)))
     {
+        if (argc && iswdigit(argvW[0][0]) && _wtoi(argvW[0]) == 4)
+        {
+            WINE_TRACE("uninstall cmd, exiting.\n");
+            return 0;
+        }
+
         for (i = 0; i < argc; ++i)
         {
             if (!wcscmp(argvW[i], L"-exe") && i < argc - 1)
@@ -157,7 +164,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
     if (!MultiByteToWideChar(CP_ACP, 0, be_arg, -1, launch_cmd + path_len + game_exe_len + 1 + wcslen(cmdline) + 1, arg_len + 1))
         launch_cmd[path_len + game_exe_len + 1 + wcslen(cmdline)] = 0;
 
-    WINE_TRACE("game_exe %s, cmdline %s.\n", wine_dbgstr_w(game_exeW), wine_dbgstr_w(cmdline));
+    WINE_TRACE("game_exe %s.\n", wine_dbgstr_w(game_exeW));
     WINE_TRACE("path %s, be_arg %s.\n", wine_dbgstr_w(path), wine_dbgstr_a(be_arg));
     WINE_TRACE("launch_cmd %s.\n", wine_dbgstr_w(launch_cmd));
 
