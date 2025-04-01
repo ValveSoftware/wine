@@ -1985,3 +1985,9 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_SetDiskShaderCacheEnabled(AGSContex
     FIXME("context %p, enable %d stub.\n", context, enable);
     return AGS_SUCCESS;
 }
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_SetMaxAsyncCompileThreadCount(AGSContext *context, unsigned int thread_count)
+{
+    FIXME("context %p, thread_count %u.\n", context, thread_count);
+    return AGS_SUCCESS;
+}

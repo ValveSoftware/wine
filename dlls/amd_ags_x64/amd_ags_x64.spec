@@ -41,7 +41,7 @@
 @ stdcall -norelay -arch=x86_64,arm64ec agsDriverExtensions_SetDepthBounds() DX11_SetDepthBounds_impl
 @ stdcall -norelay -arch=x86_64,arm64ec agsDriverExtensionsDX11_SetDepthBounds() DX11_SetDepthBounds_impl
 @ stdcall agsDriverExtensionsDX11_SetDiskShaderCacheEnabled(ptr long)
-@ stub agsDriverExtensionsDX11_SetMaxAsyncCompileThreadCount
+@ stdcall agsDriverExtensionsDX11_SetMaxAsyncCompileThreadCount(ptr long)
 @ stub agsDriverExtensionsDX11_SetViewBroadcastMasks
 @ stub agsDriverExtensionsDX11_WriteBreadcrumb
 @ stdcall agsDriverExtensionsDX12_CreateDevice(ptr ptr ptr ptr)
