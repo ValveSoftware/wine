@@ -288,7 +288,8 @@ static void X11DRV_vulkan_surface_update( HWND hwnd, void *private )
     TRACE( "%p %p\n", hwnd, private );
 
     vulkan_surface_update_size( hwnd, surface );
-    vulkan_surface_update_offscreen( hwnd, surface );
+    if (surface->offscreen || !X11DRV_HasWindowManager( "steamcompmgr" ))
+        vulkan_surface_update_offscreen( hwnd, surface );
 }
 
 static int force_present_to_surface(void)
@@ -310,6 +311,7 @@ static int force_present_to_surface(void)
 static void X11DRV_vulkan_surface_presented( HWND hwnd, void *private, VkResult result )
 {
     struct x11drv_vulkan_surface *surface = private;
+    BOOL was_offscreen = surface->offscreen;
     struct window_surface *win_surface;
     struct x11drv_win_data *data;
     RECT rect_dst, rect;
@@ -332,6 +334,12 @@ static void X11DRV_vulkan_surface_presented( HWND hwnd, void *private, VkResult 
                          surface->hdc_src, 0, 0, surface->rect.right, surface->rect.bottom, SRCCOPY, 0 );
         NtUserReleaseDC( hwnd, hdc );
         window_surface_release( win_surface );
+        return;
+    }
+
+    if (!was_offscreen && X11DRV_HasWindowManager( "steamcompmgr" ))
+    {
+        NtUserPostMessage( hwnd, WM_WINE_UPDATEWINDOWSTATE, 0, 0 );
         return;
     }
 
