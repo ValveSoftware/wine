@@ -1741,6 +1741,14 @@ static void window_set_wm_state( struct x11drv_win_data *data, UINT new_state, B
         break;
     }
 
+    /* CW Bug 25142: Project CARS 3 (958400) fails to enter triple screen mode Mutter doesn't load
+     * _NET_WM_FULLSCREEN_MONITORS property when its value was set before a window gets mapped. Work
+     * around the Mutter issue for now by updating the property after the window gets mapped. Remove
+     * this hack after https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/4389 gets merged and
+     * widely deployed */
+    if (X11DRV_HasWindowManager( "Mutter" ) && new_state == NormalState && !data->embedded)
+        update_net_wm_fullscreen_monitors( data );
+
     /* override redirect windows won't receive WM_STATE property changes */
     if (!data->managed) data->wm_state_serial = 0;
 
