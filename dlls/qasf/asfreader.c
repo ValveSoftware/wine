@@ -865,7 +865,7 @@ static HRESULT WINAPI reader_callback_OnStatus(IWMReaderCallback *iface, WMT_STA
                     /* King of Fighters XIII requests the WMV decoder filter pins by name
                      * to connect them to a Sample Grabber filter.
                      */
-                    if (sgi && !strcmp(sgi, "222940"))
+                    if (sgi && (!strcmp(sgi, "222940") || !strcmp(sgi, "3050220")))
                         swprintf(name, ARRAY_SIZE(name), L"out0");
                     else
                         swprintf(name, ARRAY_SIZE(name), L"Raw Video %u", stream->index);
