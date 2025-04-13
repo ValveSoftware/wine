@@ -286,6 +286,7 @@
 @ stdcall -import CreateFileA(str long long ptr long long long)
 @ stdcall CreateFileTransactedA(str long long ptr long long long ptr ptr ptr)
 @ stdcall CreateFileMappingA(long ptr long long long str)
+@ stub CreateFileMapping2
 # @ stub CreateFileMappingNumaA
 @ stdcall CreateFileMappingFromApp(long ptr long int64 wstr) kernelbase.CreateFileMappingFromApp
 @ stdcall -import CreateFileMappingNumaW(long ptr long long long wstr long)
