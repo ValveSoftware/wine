@@ -3302,12 +3302,12 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    __ASM_CFI(".cfi_same_value %rsi\n\t")
                    "movq 0x70(%rcx),%rcx\n\t"      /* frame->rip */
                    __ASM_CFI(".cfi_register rip, rcx\n\t")
-                   "pushq %rcx\n\t"
-                   __ASM_CFI(".cfi_adjust_cfa_offset 8\n\t")
                    "pushq %r11\n\t"
                    __ASM_CFI(".cfi_adjust_cfa_offset 8\n\t")
                    "popfq\n\t"
                    __ASM_CFI(".cfi_adjust_cfa_offset -8\n\t")
+                   "pushq %rcx\n\t"
+                   __ASM_CFI(".cfi_adjust_cfa_offset 8\n\t")
                    "ret\n\t"
                    /* pop rcx-based kernel stack cfi */
                    __ASM_CFI(".cfi_restore_state\n")
