@@ -686,18 +686,6 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
     {
         WCHAR *cmdline_new = NULL;
 
-        {
-            char sgi[64];
-
-            if (cmd_line && !wcsncmp( cmd_line, L"powershell", 10 )
-                && GetEnvironmentVariableA( "SteamGameId", sgi, sizeof(sgi) ) < sizeof(sgi) && !strcmp( sgi, "2767030" ))
-            {
-                FIXME("HACK: not starting powershell.exe.\n");
-                SetLastError( ERROR_FILE_NOT_FOUND );
-                return FALSE;
-            }
-        }
-
         if ((append = hack_append_command_line( cmd_line )))
         {
             cmdline_new = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(WCHAR)
