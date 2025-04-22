@@ -1166,6 +1166,12 @@ DWORD service_start(struct service_entry *service, DWORD service_argc, LPCWSTR *
     BOOL shared_process;
     DWORD err;
 
+    if (service->name && (!wcscmp(service->name, L"edgeupdate") || !wcscmp(service->name, L"edgeupdatem")))
+    {
+        ERR( "HACK: not starting %s.\n", wine_dbgstr_w(service->name));
+        return ERROR_SUCCESS;
+    }
+
     err = service_start_process(service, &process, &shared_process);
     if (err == ERROR_SUCCESS)
     {
