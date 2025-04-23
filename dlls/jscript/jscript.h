@@ -665,5 +665,3 @@ static inline void unlock_module(void)
 {
     InterlockedDecrement(&module_ref);
 }
-
-void hack_pump_messages(void);
