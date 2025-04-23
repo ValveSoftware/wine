@@ -971,8 +971,6 @@ static HRESULT InterpretedFunction_call(script_ctx_t *ctx, FunctionInstance *fun
 
     TRACE("%p\n", function);
 
-    hack_pump_messages();
-
     if(flags & DISPATCH_CONSTRUCT) {
         hres = create_object(ctx, &function->function.dispex, &new_obj);
         if(FAILED(hres))
