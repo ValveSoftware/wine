@@ -26,6 +26,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(opencl);
 
+#ifdef HAVE_OPENCL
 NTSTATUS wrap_clBuildProgram( void *args )
 {
     struct clBuildProgram_params *params = args;
@@ -54,6 +55,22 @@ NTSTATUS wrap_clCreateContextFromType( void *args )
                                                  NULL, NULL, params->errcode_ret );
     return STATUS_SUCCESS;
 }
+#else
+NTSTATUS wrap_clBuildProgram( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+NTSTATUS wrap_clCreateContext( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+NTSTATUS wrap_clCreateContextFromType( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+#endif
 
 NTSTATUS wrap_clEnqueueNativeKernel( void *args )
 {

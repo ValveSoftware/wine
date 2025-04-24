@@ -1453,15 +1453,6 @@ else
                      [enable_winex11_drv])
 fi
 
-dnl **** Check for OpenCL ****
-if test "$ac_cv_header_CL_cl_h" = "yes"
-then
-    AC_CHECK_LIB(OpenCL,clGetPlatformInfo,[AC_SUBST(OPENCL_LIBS,["-lOpenCL"])])
-fi
-WINE_NOTICE_WITH(opencl,[test "x$ac_cv_lib_OpenCL_clGetPlatformInfo" != xyes],
-                 [OpenCL ${notice_platform}development files not found, OpenCL won't be supported.],
-                 [enable_opencl])
-
 dnl **** Check for libpcap ****
 if test "$ac_cv_header_pcap_pcap_h" = "yes"
 then
