@@ -1328,9 +1328,9 @@ void update_net_wm_states( struct x11drv_win_data *data )
         {
             if (!wm_is_steamcompmgr( data->display ) || !fs_hack_enabled( monitor ))
             {
+                net_wm_bypass_compositor = 1;
+
                 /* when fs hack is enabled, we don't want steamcompmgr to resize the window to be fullscreened */
-                if (is_window_rect_full_virtual_screen( &data->whole_rect ))
-                    net_wm_bypass_compositor = 1;
                 new_state |= (1 << NET_WM_STATE_FULLSCREEN);
             }
         }
