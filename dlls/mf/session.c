@@ -223,6 +223,7 @@ enum presentation_flags
     SESSION_FLAG_END_OF_PRESENTATION = 0x10,
     SESSION_FLAG_PENDING_RATE_CHANGE = 0x20,
     SESSION_FLAG_PENDING_COMMAND = 0x40,
+    SESSION_FLAG_RESTARTING = 0x80,
 };
 
 struct media_session
@@ -1013,6 +1014,42 @@ static HRESULT session_subscribe_sources(struct media_session *session)
     return hr;
 }
 
+static void session_flush_transforms(struct media_session *session)
+{
+    struct topo_node *node;
+    UINT i;
+
+    LIST_FOR_EACH_ENTRY(node, &session->presentation.nodes, struct topo_node, entry)
+    {
+        if (node->type == MF_TOPOLOGY_TRANSFORM_NODE)
+        {
+            IMFTransform_ProcessMessage(node->object.transform, MFT_MESSAGE_COMMAND_FLUSH, 0);
+            for (i = 0; i < node->u.transform.output_count; i++)
+                node->u.transform.outputs[i].requests = 0; /* these requests might have been flushed */
+        }
+    }
+}
+
+static void session_request_sample(struct media_session *session, IMFStreamSink *sink_stream);
+
+static void session_flush_sinks(struct media_session *session)
+{
+    struct topo_node *node;
+
+    LIST_FOR_EACH_ENTRY(node, &session->presentation.nodes, struct topo_node, entry)
+    {
+        if (node->type == MF_TOPOLOGY_OUTPUT_NODE)
+        {
+            if (node->u.sink.requests)
+            {
+                node->u.sink.requests--;
+                session_request_sample(session, node->object.sink_stream);
+            }
+            IMFStreamSink_Flush(node->object.sink_stream);
+        }
+    }
+}
+
 static void session_flush_nodes(struct media_session *session)
 {
     struct topo_node *node;
@@ -1101,24 +1138,55 @@ static void session_reset_transforms(struct media_session *session, BOOL drop)
 static void session_start(struct media_session *session, const GUID *time_format, const PROPVARIANT *start_position)
 {
     struct media_source *source;
-    BOOL unpause_seek;
     MFTIME duration;
     HRESULT hr;
 
     switch (session->state)
     {
-        case SESSION_STATE_STOPPED:
+        case SESSION_STATE_PAUSED:
+        case SESSION_STATE_STARTED:
+            if (!IsEqualGUID(time_format, &GUID_NULL) || start_position->vt != VT_EMPTY)
+            {
+                /* We are seeking to a new position, check for invalid positions */
+                LIST_FOR_EACH_ENTRY(source, &session->presentation.sources, struct media_source, entry)
+                {
+                    hr = IMFPresentationDescriptor_GetUINT64(source->pd, &MF_PD_DURATION, (UINT64 *)&duration);
+                    if (SUCCEEDED(hr) && IsEqualGUID(time_format, &GUID_NULL)
+                            && start_position->vt == VT_I8 && start_position->hVal.QuadPart > duration)
+                    {
+                        WARN("Start position %s out of range, hr %#lx.\n", wine_dbgstr_longlong(start_position->hVal.QuadPart), hr);
+                        session_command_complete_with_event(session, MESessionStarted, MF_E_INVALID_POSITION, NULL);
+                        return;
+                    }
+                }
 
+                /* Stop sources */
+                LIST_FOR_EACH_ENTRY(source, &session->presentation.sources, struct media_source, entry)
+                {
+                    if (FAILED(hr = IMFMediaSource_Stop(source->source)))
+                    {
+                        WARN("Failed to stop media source %p, hr %#lx.\n", source->source, hr);
+                        session_command_complete_with_event(session, MESessionStarted, hr, NULL);
+                        return;
+                    }
+                }
+
+                session->presentation.time_format = *time_format;
+                session->presentation.start_position.vt = VT_EMPTY;
+                PropVariantCopy(&session->presentation.start_position, start_position);
+
+                /* SESSION_STATE_STARTED -> SESSION_STATE_RESTARTING_SOURCES -> SESSION_STATE_STARTED */
+                session->state = SESSION_STATE_RESTARTING_SOURCES;
+                break;
+            }
+            /* fallthrough; we're resuming from the current position */
+        case SESSION_STATE_STOPPED:
             /* Start request with no current topology. */
             if (session->presentation.topo_status == MF_TOPOSTATUS_INVALID)
             {
                 session_command_complete_with_event(session, MESessionStarted, MF_E_INVALIDREQUEST, NULL);
                 break;
             }
-
-            /* fallthrough */
-        case SESSION_STATE_PAUSED:
-
             session->presentation.time_format = *time_format;
             session->presentation.start_position.vt = VT_EMPTY;
             PropVariantCopy(&session->presentation.start_position, start_position);
@@ -1129,10 +1197,7 @@ static void session_start(struct media_session *session, const GUID *time_format
                 return;
             }
 
-            unpause_seek = start_position->vt == VT_I8;
-            if (unpause_seek)
-                session_flush_nodes(session);
-            session_reset_transforms(session, unpause_seek);
+            session_reset_transforms(session, FALSE);
 
             LIST_FOR_EACH_ENTRY(source, &session->presentation.sources, struct media_source, entry)
             {
@@ -1146,40 +1211,7 @@ static void session_start(struct media_session *session, const GUID *time_format
 
             session->state = SESSION_STATE_STARTING_SOURCES;
             break;
-        case SESSION_STATE_STARTED:
-            /* Check for invalid positions */
-            LIST_FOR_EACH_ENTRY(source, &session->presentation.sources, struct media_source, entry)
-            {
-                hr = IMFPresentationDescriptor_GetUINT64(source->pd, &MF_PD_DURATION, (UINT64 *)&duration);
-                if (SUCCEEDED(hr) && IsEqualGUID(time_format, &GUID_NULL)
-                        && start_position->vt == VT_I8 && start_position->hVal.QuadPart > duration)
-                {
-                    WARN("Start position %s out of range, hr %#lx.\n", wine_dbgstr_longlong(start_position->hVal.QuadPart), hr);
-                    session_command_complete_with_event(session, MESessionStarted, MF_E_INVALID_POSITION, NULL);
-                    return;
-                }
-            }
 
-            /* Stop sources */
-            LIST_FOR_EACH_ENTRY(source, &session->presentation.sources, struct media_source, entry)
-            {
-                if (FAILED(hr = IMFMediaSource_Stop(source->source)))
-                {
-                    WARN("Failed to stop media source %p, hr %#lx.\n", source->source, hr);
-                    session_command_complete_with_event(session, MESessionStarted, hr, NULL);
-                    return;
-                }
-            }
-
-            session_reset_transforms(session, TRUE);
-
-            session->presentation.time_format = *time_format;
-            session->presentation.start_position.vt = VT_EMPTY;
-            PropVariantCopy(&session->presentation.start_position, start_position);
-
-            /* SESSION_STATE_STARTED -> SESSION_STATE_RESTARTING_SOURCES -> SESSION_STATE_STARTED */
-            session->state = SESSION_STATE_RESTARTING_SOURCES;
-            break;
         default:
             session_command_complete_with_event(session, MESessionStarted, MF_E_INVALIDREQUEST, NULL);
             break;
@@ -3290,15 +3322,6 @@ static void session_set_source_object_state(struct media_session *session, IUnkn
 
             session_set_presentation_clock(session);
 
-            /* If sinks are already started, start session immediately. This can happen when doing a
-             * seek from SESSION_STATE_STARTED */
-            if (session_is_output_nodes_state(session, OBJ_STATE_STARTED)
-                    && SUCCEEDED(session_start_clock(session)))
-            {
-                session_set_started(session);
-                return;
-            }
-
             if ((session->presentation.flags & SESSION_FLAG_NEEDS_PREROLL) && session_is_output_nodes_state(session, OBJ_STATE_STOPPED))
             {
                 MFTIME preroll_time = 0;
@@ -3333,15 +3356,38 @@ static void session_set_source_object_state(struct media_session *session, IUnkn
                 }
                 session->state = SESSION_STATE_PREROLLING_SINKS;
             }
-            else if (SUCCEEDED(session_start_clock(session)))
-                session->state = SESSION_STATE_STARTING_SINKS;
+            else
+            {
+                if (session->presentation.flags & SESSION_FLAG_RESTARTING)
+                {
+                    session->presentation.flags &= ~SESSION_FLAG_RESTARTING;
+                    session_flush_sinks(session);
+                }
+
+                if (SUCCEEDED(hr = session_start_clock(session)))
+                {
+                    /* If sinks are already started, start session immediately. This can happen when doing a
+                     * seek from SESSION_STATE_STARTED (i.e. a seek without pause/stop) */
+                    if (session_is_output_nodes_state(session, OBJ_STATE_STARTED))
+                        session_set_started(session);
+                    else
+                        session->state = SESSION_STATE_STARTING_SINKS;
+                }
+                else
+                {
+                    WARN("Failed to start session clock %p, hr %#lx.\n", session, hr);
+                    session_command_complete_with_event(session, MESessionStarted, hr, NULL);
+                }
+            }
 
             break;
         case SESSION_STATE_RESTARTING_SOURCES:
             if (!session_is_source_nodes_state(session, OBJ_STATE_STOPPED))
                 break;
 
-            session_flush_nodes(session);
+            session->presentation.flags |= SESSION_FLAG_RESTARTING;
+            session_reset_transforms(session, TRUE);
+            session_flush_transforms(session);
 
             /* Start sources */
             LIST_FOR_EACH_ENTRY(source, &session->presentation.sources, struct media_source, entry)

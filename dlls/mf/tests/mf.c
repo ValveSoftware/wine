@@ -6407,7 +6407,6 @@ static void test_media_session_Start(void)
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
         hr = wait_media_event(session, callback, MESessionStarted, 5000, &propvar);
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-        todo_wine_if(initial_state == SOURCE_PAUSED)
         compare_object_states(&actual_object_state_record, &expected_object_state_records[initial_state]);
 
         hr = IMFMediaSession_Stop(session);
