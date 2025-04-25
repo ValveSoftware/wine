@@ -1,6 +1,7 @@
 MODULE    = d3d9.dll
 IMPORTLIB = d3d9
 IMPORTS   = dxguid uuid wined3d
+EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
 	buffer.c \

@@ -2,6 +2,7 @@ MODULE    = d3d10.dll
 IMPORTLIB = d3d10
 IMPORTS   = uuid d3d10core d3dcompiler dxgi wined3d
 EXTRADEFS = -DD3D_COMPILER_VERSION=0
+EXTRADLLFLAGS = -Wb,--prefer-native
 PARENTSRC = ../d3dcompiler_43
 EXTRAINCL = $(VKD3D_PE_CFLAGS)
 

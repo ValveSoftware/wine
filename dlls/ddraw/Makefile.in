@@ -1,6 +1,7 @@
 MODULE    = ddraw.dll
 IMPORTLIB = ddraw
 IMPORTS   = dxguid uuid wined3d user32 gdi32 advapi32
+EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
 	clipper.c \
