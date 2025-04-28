@@ -271,6 +271,8 @@ int create_placeholder_file(const char *file_name)
     char path[1024];
     int ret;
 
+    GST_INFO("Creating tag file %s.", file_name);
+
     if ((shader_path = getenv("STEAM_COMPAT_TRANSCODED_MEDIA_PATH")))
     {
         path_concat(path, shader_path, file_name);
