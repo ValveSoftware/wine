@@ -199,6 +199,8 @@ int mediaconv_demuxer_open( AVFormatContext **ctx, struct stream_context *contex
         for (i = 0; i < (*ctx)->nb_streams; i++)
         {
             par = (*ctx)->streams[i]->codecpar;
+            if (par->codec_id && !strcmp("h264", avcodec_get_name(par->codec_id)))
+                    create_placeholder_file("h264-used");
             if (!par->codec_id) FIXME( "Ignoring unknown codec on stream %u\n", i );
             else if (!avcodec_find_decoder( par->codec_id )) break;
         }
@@ -263,6 +265,8 @@ int mediaconv_demuxer_open( AVFormatContext **ctx, struct stream_context *contex
     {
         const char *blank_path;
         int ret;
+
+        create_placeholder_file("placeholder-video-used");
 
         if (!(blank_path = getenv( "MEDIACONV_BLANK_VIDEO_FILE" ))) return AVERROR(ENOENT);
         if (!(*ctx = avformat_alloc_context())) return AVERROR(ENOMEM);
