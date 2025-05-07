@@ -1516,12 +1516,6 @@ static void session_set_presentation_clock(struct media_session *session)
     struct topo_node *node;
     HRESULT hr;
 
-    LIST_FOR_EACH_ENTRY(node, &session->presentation.nodes, struct topo_node, entry)
-    {
-        if (node->type == MF_TOPOLOGY_TRANSFORM_NODE)
-            IMFTransform_ProcessMessage(node->object.transform, MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
-    }
-
     if (!(session->presentation.flags & SESSION_FLAG_PRESENTATION_CLOCK_SET))
     {
         /* Attempt to get time source from the sinks. */
@@ -3275,6 +3269,7 @@ static void session_set_source_object_state(struct media_session *session, IUnkn
     struct media_source *src;
     struct media_sink *sink;
     enum object_state state;
+    struct topo_node *node;
     BOOL changed = FALSE;
     DWORD i, count;
     HRESULT hr;
@@ -3319,6 +3314,15 @@ static void session_set_source_object_state(struct media_session *session, IUnkn
                 break;
 
             session_set_topo_status(session, S_OK, MF_TOPOSTATUS_STARTED_SOURCE);
+
+            if (event_type == MESourceStarted || event_type == MEStreamStarted)
+            {
+                LIST_FOR_EACH_ENTRY(node, &session->presentation.nodes, struct topo_node, entry)
+                {
+                    if (node->type == MF_TOPOLOGY_TRANSFORM_NODE)
+                        IMFTransform_ProcessMessage(node->object.transform, MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
+                }
+            }
 
             session_set_presentation_clock(session);
 
