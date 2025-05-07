@@ -1508,7 +1508,7 @@ static void session_set_consumed_clock(IUnknown *object, IMFPresentationClock *c
     }
 }
 
-static void session_set_presentation_clock(struct media_session *session)
+static void session_set_presentation_clock(struct media_session *session, BOOL seeking)
 {
     IMFPresentationTimeSource *time_source = NULL;
     struct media_source *source;
@@ -1516,10 +1516,13 @@ static void session_set_presentation_clock(struct media_session *session)
     struct topo_node *node;
     HRESULT hr;
 
-    LIST_FOR_EACH_ENTRY(node, &session->presentation.nodes, struct topo_node, entry)
+    if (!seeking)
     {
-        if (node->type == MF_TOPOLOGY_TRANSFORM_NODE)
-            IMFTransform_ProcessMessage(node->object.transform, MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
+        LIST_FOR_EACH_ENTRY(node, &session->presentation.nodes, struct topo_node, entry)
+        {
+            if (node->type == MF_TOPOLOGY_TRANSFORM_NODE)
+                IMFTransform_ProcessMessage(node->object.transform, MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
+        }
     }
 
     if (!(session->presentation.flags & SESSION_FLAG_PRESENTATION_CLOCK_SET))
@@ -1633,7 +1636,7 @@ static void session_complete_rate_change(struct media_session *session)
         return;
 
     session->presentation.flags &= ~SESSION_FLAG_PENDING_RATE_CHANGE;
-    session_set_presentation_clock(session);
+    session_set_presentation_clock(session, FALSE);
 
     hr = IMFRateControl_SetRate(session->clock_rate_control, session->presentation.thin,
             session->presentation.rate);
@@ -3278,9 +3281,12 @@ static void session_set_source_object_state(struct media_session *session, IUnkn
     BOOL changed = FALSE;
     DWORD i, count;
     HRESULT hr;
+    BOOL seeking;
 
     if ((state = session_get_object_state_for_event(event_type)) == OBJ_STATE_INVALID)
         return;
+
+    seeking = (event_type == MESourceSeeked || event_type == MEStreamSeeked);
 
     switch (event_type)
     {
@@ -3320,7 +3326,7 @@ static void session_set_source_object_state(struct media_session *session, IUnkn
 
             session_set_topo_status(session, S_OK, MF_TOPOSTATUS_STARTED_SOURCE);
 
-            session_set_presentation_clock(session);
+            session_set_presentation_clock(session, seeking);
 
             if ((session->presentation.flags & SESSION_FLAG_NEEDS_PREROLL) && session_is_output_nodes_state(session, OBJ_STATE_STOPPED))
             {
