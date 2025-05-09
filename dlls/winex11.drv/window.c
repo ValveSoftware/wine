@@ -317,12 +317,11 @@ static HWND hwnd_from_window( Display *display, Window window )
 {
     unsigned long count, remaining;
     unsigned long *xhwnd;
-    HWND hwnd = (HWND)-1;
+    HWND hwnd = 0;
     int format;
     Atom type;
 
-    if (!window) return 0;
-    if (!XFindContext( display, window, winContext, (char **)&hwnd )) return hwnd;
+    if (!window || !XFindContext( display, window, winContext, (char **)&hwnd )) return hwnd;
 
     X11DRV_expect_error( display, host_window_error, NULL );
     if (!XGetWindowProperty( display, window, x11drv_atom(_WINE_HWND), 0, 65536, False, XA_CARDINAL,
@@ -331,7 +330,7 @@ static HWND hwnd_from_window( Display *display, Window window )
         if (type == XA_CARDINAL && format == 32) hwnd = ULongToHandle(*xhwnd);
         XFree( xhwnd );
     }
-    if (X11DRV_check_error()) return (HWND)-1;
+    if (X11DRV_check_error()) return 0;
     return hwnd;
 }
 
@@ -1854,7 +1853,7 @@ BOOL X11DRV_GetWindowStateUpdates( HWND hwnd, UINT *state_cmd, UINT *config_cmd,
         !thread_data->net_active_window_serial && (window = thread_data->current_net_active_window))
     {
         *foreground = hwnd_from_window( thread_data->display, window );
-        if (*foreground == (HWND)-1) *foreground = NtUserGetDesktopWindow();
+        if (*foreground == 0) *foreground = NtUserGetDesktopWindow();
         if (*foreground == old_foreground) *foreground = 0;
     }
 
@@ -1990,7 +1989,7 @@ void net_active_window_notify( unsigned long serial, Window value, Time time )
     received = wine_dbg_sprintf( "_NET_ACTIVE_WINDOW %p/%lx serial %lu time %lu", hwnd, value, serial, time );
     expected = *expect_serial ? wine_dbg_sprintf( ", expected %p/%lx serial %lu", expect_hwnd, *pending, *expect_serial ) : "";
 
-    if (hwnd == (HWND)-1) value = root_window;
+    if (hwnd == 0) value = root_window;
     handle_state_change( serial, expect_serial, sizeof(value), &value, desired, pending,
                          current, expected, "", received, NULL );
 }
@@ -1999,7 +1998,7 @@ void net_active_window_init( struct x11drv_thread_data *data )
 {
     Window window = get_net_active_window( data->display, &data->active_window );
 
-    if (hwnd_from_window( data->display, window ) == (HWND)-1) window = root_window;
+    if (hwnd_from_window( data->display, window ) == 0) window = root_window;
     data->desired_net_active_window = window;
     data->pending_net_active_window = window;
     data->current_net_active_window = window;
