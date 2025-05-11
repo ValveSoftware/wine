@@ -584,6 +584,7 @@ HKLM,%Control%\Session Manager\KnownDLLs,"gdi32full",,"gdi32full.dll"
 HKLM,%Control%\Session Manager\KnownDLLs,"WINTRUST",,"WINTRUST.dll"
 HKLM,%Control%\Session Manager\KnownDLLs,"CRYPT32",,"CRYPT32.dll"
 HKLM,%Control%\Session Manager\KnownDLLs,"WLDAP32",,"WLDAP32.dll"
+HKLM,%Control%\Session Manager\Memory Management\PrefetchParameters,BootId,0x10003,1
 
 [Fonts]
 HKLM,%FontSubStr%,"Arial Baltic,186",,"Arial,186"
