@@ -11014,7 +11014,7 @@ static void test_update_region(void)
     SetWindowPos(parent, NULL, 0, 0, 350, 200, SWP_NOMOVE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOACTIVATE);
     GetUpdateRect(parent, &r, FALSE);
     GetClientRect(parent, &expect_rect);
-    todo_wine ok(EqualRect(&r, &expect_rect), "got %s, expected %s.\n", wine_dbgstr_rect(&r), wine_dbgstr_rect(&expect_rect));
+    ok(EqualRect(&r, &expect_rect), "got %s, expected %s.\n", wine_dbgstr_rect(&r), wine_dbgstr_rect(&expect_rect));
     ValidateRect(parent, NULL);
 
     SetWindowPos(parent, NULL, 0, 0, 300, 150, SWP_NOMOVE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOACTIVATE);
@@ -11029,7 +11029,7 @@ static void test_update_region(void)
     SetWindowPos(parent, NULL, 0, 0, 350, 200, SWP_NOMOVE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOACTIVATE);
     GetUpdateRect(parent, &r, FALSE);
     GetClientRect(parent, &expect_rect);
-    todo_wine ok(EqualRect(&r, &expect_rect), "got %s, expected %s.\n", wine_dbgstr_rect(&r), wine_dbgstr_rect(&expect_rect));
+    ok(EqualRect(&r, &expect_rect), "got %s, expected %s.\n", wine_dbgstr_rect(&r), wine_dbgstr_rect(&expect_rect));
     pump_messages();
     RedrawWindow(parent, NULL, 0, RDW_VALIDATE | RDW_FRAME | RDW_ALLCHILDREN);
 
@@ -11044,7 +11044,7 @@ static void test_update_region(void)
     SetWindowPos(hwnd, NULL, 0, 0, 210, 110, SWP_NOMOVE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOACTIVATE);
     GetUpdateRect(hwnd, &r, FALSE);
     GetClientRect(hwnd, &expect_rect);
-    todo_wine ok(EqualRect(&r, &expect_rect), "got %s, expected %s.\n", wine_dbgstr_rect(&r), wine_dbgstr_rect(&expect_rect));
+    ok(EqualRect(&r, &expect_rect), "got %s, expected %s.\n", wine_dbgstr_rect(&r), wine_dbgstr_rect(&expect_rect));
     ValidateRect(hwnd, NULL);
     ValidateRect(parent, NULL);
     SetWindowPos(hwnd, NULL, 0, 0, 200, 100, SWP_NOMOVE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOACTIVATE);
@@ -11059,7 +11059,7 @@ static void test_update_region(void)
     SetWindowPos(hwnd, NULL, 0, 0, 210, 110, SWP_NOMOVE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOACTIVATE);
     GetUpdateRect(hwnd, &r, FALSE);
     GetClientRect(hwnd, &expect_rect);
-    todo_wine ok(EqualRect(&r, &expect_rect), "got %s, expected %s.\n", wine_dbgstr_rect(&r), wine_dbgstr_rect(&expect_rect));
+    ok(EqualRect(&r, &expect_rect), "got %s, expected %s.\n", wine_dbgstr_rect(&r), wine_dbgstr_rect(&expect_rect));
     ValidateRect(hwnd, NULL);
     ValidateRect(parent, NULL);
     SetWindowPos(hwnd, NULL, 0, 0, 200, 100, SWP_NOMOVE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOACTIVATE);
@@ -11078,7 +11078,7 @@ static void test_update_region(void)
     GetClientRect(parent, &r);
     expect_rect.bottom = r.bottom - 150;
     GetUpdateRect(hwnd, &r, FALSE);
-    todo_wine ok(EqualRect(&r, &expect_rect), "got %s, expected %s.\n", wine_dbgstr_rect(&r), wine_dbgstr_rect(&expect_rect));
+    ok(EqualRect(&r, &expect_rect), "got %s, expected %s.\n", wine_dbgstr_rect(&r), wine_dbgstr_rect(&expect_rect));
     ValidateRect(hwnd, NULL);
     ValidateRect(parent, NULL);
     SetWindowPos(hwnd, NULL, 0, 0, 200, 100, SWP_NOZORDER | SWP_NOREDRAW | SWP_NOACTIVATE);
