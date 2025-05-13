@@ -22,6 +22,7 @@
 #define WIN32_NO_STATUS
 #include "user_private.h"
 #include "controls.h"
+#include "shlwapi.h"
 #include "wine/asm.h"
 #include "wine/debug.h"
 
@@ -161,7 +162,9 @@ void release_display_dc( HDC hdc )
  */
 void SYSPARAMS_Init(void)
 {
+    const WCHAR *name;
     WCHAR buffer[256];
+    const char *sgi;
     DWORD option;
 
     system_dpi = NtUserGetSystemDpiForProcess( NULL );
@@ -209,6 +212,23 @@ void SYSPARAMS_Init(void)
             SetProcessDpiAwarenessContext( DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE );
         else
             SetProcessDpiAwarenessContext( DPI_AWARENESS_CONTEXT_UNAWARE );
+    }
+
+    /* The Elder Scrolls V: Skyrim Special Edition. Windows 10 tests show the dpi-aware setting is
+     * not normally inherited from the parent process. The launcher sets it late, after creating
+     * windows, but changing the scale factor in Windows 10 has no effect on the launcher window,
+     * suggesting Windows sets the launcher to dpi-aware on startup. Tests show that Windows 11
+     * sets dpi-aware by default. When dpi-unaware, Skyrim creates its window to fit the monitor,
+     * then resizes it later, but never calls ResizeBuffers() on the swapchain, which may explain
+     * why some elements are rendered shrunk. Setting dpi-aware fixes shrunken rendering. Proton 9
+     * didn't have this issue because a bug caused thread per-monitor-dpi-aware to be always set.
+     * Five processes are created for 489830, but we only set dpi-aware for launcher and game. */
+    if ((sgi = getenv( "SteamGameId" )) && !strcmp( sgi, "489830" )
+        && GetModuleFileNameW( NULL, buffer, ARRAY_SIZE(buffer) )
+        && (!wcscmp( name = PathFindFileNameW( buffer ), L"SkyrimSE.exe") || !wcscmp( name, L"SkyrimSELauncher.exe" )))
+    {
+        WARN("Setting DPI awareness to system-aware.\n");
+        SetProcessDpiAwarenessContext( DPI_AWARENESS_CONTEXT_SYSTEM_AWARE );
     }
 }
 
