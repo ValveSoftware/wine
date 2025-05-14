@@ -12,9 +12,9 @@ Goliath/Wine is free software, released under the GNU LGPL; see the file
 LICENSE for the details.
 
 
-## QUICK START
+## QUICK START (Wine)
 
-From the top-level directory of the Wine source (which contains this file),
+From the top-level directory of the Goliath/Wine source (which contains this file),
 run:
 
 ```
@@ -39,7 +39,7 @@ resolution, read the rest of this file, the Wine man page, and
 especially the wealth of information found at https://www.winehq.org.
 
 
-## REQUIREMENTS
+## REQUIREMENTS (Wine)
 
 To compile and run Wine, you must have one of the following:
 
@@ -94,7 +94,7 @@ support kernel threads may be supported in the future.
 
 ## COMPILATION
 
-To build Wine, do:
+To build Wine/Goliath, do:
 
 ```
 ./configure
@@ -143,12 +143,12 @@ wine ~/.wine/drive_c/windows/notepad.exe  (using Unix filename syntax)
 wine notepad.exe readme.txt          (calling program with parameters)
 ```
 
-Wine is not perfect, so some programs may crash. If that happens you
+Goliath is not perfect, so some programs may crash. If that happens you
 will get a crash log that you should attach to your report when filing
 a bug.
 
 
-## GETTING MORE INFORMATION
+## GETTING MORE INFORMATION (Wine)
 
 - **WWW**: A great deal of information about Wine is available from WineHQ at
 	https://www.winehq.org/ : various Wine Guides, application database,
