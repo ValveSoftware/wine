@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/com/gitlab/android-translation-layer/android-translation-layer">
+    <file alias="default-stylesheet.css">src/main-executable/css/default-stylesheet.css</file>
+  </gresource>
+</gresources>

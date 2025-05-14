@@ -1,0 +1,30 @@
+/* Border Styling */
+.ATL-no-border {
+	border: unset;
+}
+
+/* Font styling */
+.ATL-font-bold > * {
+	font-weight: bold;
+}
+
+.ATL-font-italic > * {
+	font-style: italic;
+}
+
+/* Text styling */
+.ATL-text-uppercase > * {
+	text-transform: uppercase;
+}
+
+.ATL-text-align-left > * {
+	text-align: left;
+}
+
+.ATL-text-align-center > * {
+	text-align: center;
+}
+
+.ATL-text-align-right > * {
+	text-align: right;
+}
