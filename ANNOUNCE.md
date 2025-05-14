@@ -375,3 +375,15 @@ See the file [AUTHORS][3] for the complete list.
 
 - Libunwind is no longer used on ARM platforms since they are built as
   PE. It's only used on x86-64.
+
+# Goliath Integration Notes
+#
+# This project pseudo-merges Wine, Darling, and ATL into a single compatibility layer.
+#
+# - The launcher script (`goliath-launch.sh`) auto-detects the application type and dispatches to the correct subsystem.
+# - Build configuration options for Darling and ATL are available in `configure.ac`.
+# - See `README-goliath.md` for usage and extension notes.
+#
+# Next Steps:
+# - Add Darling and ATL as submodules or document their installation.
+# - Optionally, add build/test hooks for deeper integration.

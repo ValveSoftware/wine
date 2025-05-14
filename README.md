@@ -170,3 +170,11 @@ a bug.
 	problem is already known or fixed before posting a bug report.
 
 - **IRC**: Online help is available at channel `#WineHQ` on irc.libera.chat.
+
+
+## Goliath Compatibility Layer
+
+Goliath unifies Wine (Windows), Darling (macOS), and ATL (Android) to run applications from all major operating systems on Linux.
+
+- Use `goliath-launch.sh` to run any supported application.
+- See `documentation/README-goliath.md` for details.
