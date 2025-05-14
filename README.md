@@ -1,13 +1,14 @@
 ## INTRODUCTION
 
-Wine is a program which allows running Microsoft Windows programs
+Goliath is a compatibility Layer for running Apps from every Major OS, and is based off of Wine.
+*Wine itself is a program which allows running Microsoft Windows programs
 (including DOS, Windows 3.x, Win32, and Win64 executables) on Unix.
 It consists of a program loader which loads and executes a Microsoft
 Windows binary, and a library (called Winelib) that implements Windows
 API calls using their Unix, X11 or Mac equivalents.  The library may also
-be used for porting Windows code into native Unix executables.
+be used for porting Windows code into native Unix executables.*
 
-Wine is free software, released under the GNU LGPL; see the file
+Goliath/Wine is free software, released under the GNU LGPL; see the file
 LICENSE for the details.
 
 
