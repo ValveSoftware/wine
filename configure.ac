@@ -3644,6 +3644,7 @@ WINE_CONFIG_MAKEFILE(tools/winegcc,,[test "x$enable_tools" = xno])
 WINE_CONFIG_MAKEFILE(tools/winemaker,,[test "x$enable_tools" = xno])
 WINE_CONFIG_MAKEFILE(tools/wmc,,[test "x$enable_tools" = xno])
 WINE_CONFIG_MAKEFILE(tools/wrc,,[test "x$enable_tools" = xno])
+WINE_CONFIG_MAKEFILE(libs/atl_android)
 dnl End of auto-generated output commands
 
 dnl Main ignore file
