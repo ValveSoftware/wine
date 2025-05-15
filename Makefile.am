@@ -8,7 +8,8 @@ SUBDIRS = \
 	fonts \
 	include \
 	documentation \
-	libs/atl_android
+	libs/atl_android \
+	libs/darling
 
 EXTRA_DIST = goliath-launch.sh
 
