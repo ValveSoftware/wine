@@ -1,6 +1,7 @@
 SUBDIRS = \
 	tools \
 	dlls \
+	dlls/darling_coreaudio \
 	programs \
 	libs \
 	loader \

@@ -1,5 +1,5 @@
 # atl_android Makefile.am
-lib_LTLIBRARIES = libatl_android.la
+noinst_LTLIBRARIES = libatl_android.la
 libatl_android_la_SOURCES = \
 	asset_manager.c \
 	bitmap.c \
