@@ -1,0 +1,3 @@
+AC_DEFUN([WINE_CONFIG_MAKEFILE], [
+  AC_CONFIG_FILES([$1/Makefile])
+])

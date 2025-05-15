@@ -1,0 +1,1 @@
+AC_DEFUN([WINE_IGNORE_FILE], [dnl])

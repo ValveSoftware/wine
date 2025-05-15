@@ -13,3 +13,5 @@
 
 m4_ifndef([AC_CONFIG_MACRO_DIRS], [m4_defun([_AM_CONFIG_MACRO_DIRS], [])m4_defun([AC_CONFIG_MACRO_DIRS], [_AM_CONFIG_MACRO_DIRS($@)])])
 m4_include([m4/wine_check_define.m4])
+m4_include([m4/wine_config_makefile.m4])
+m4_include([m4/wine_config_symlink.m4])
