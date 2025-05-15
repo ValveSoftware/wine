@@ -1,3 +1,5 @@
+AC_DEFUN([WINE_IGNORE_FILE], [dnl])
+
 # Comments for autoconf: use dnl for comments, not as a macro
 AC_CONFIG_MACRO_DIR([m4])
 m4_define([WINE_VERSION], regexp(m4_include([VERSION]), [version \([-.0-9A-Za-z]+\)], [\1]))
@@ -1497,8 +1499,6 @@ WINE_IGNORE_FILE(config.status)
 WINE_IGNORE_FILE(include/config.h)
 WINE_IGNORE_FILE(include/stamp-h)
 test "$wine_binary" = wine || WINE_IGNORE_FILE(loader/wine)
-
-AC_DEFUN([WINE_IGNORE_FILE], [dnl])
 
 if test "x$enable_tools" != xno
 then
