@@ -2087,3 +2087,1474 @@ configure: failed program was:
 |   return 0;
 | }
 configure:3501: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:32:28: error: storage size of 'ac_aggr' isn't known
+   32 | static struct sockaddr_in6 ac_aggr;
+      |                            ^~~~~~~
+configure:3501: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct sockaddr_in6 ac_aggr;
+| if (sizeof ac_aggr.sin6_scope_id)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3501: result: no
+configure:3516: checking for struct __res_state._u._ext.nscount6
+configure:3516: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:31:27: error: storage size of 'ac_aggr' isn't known
+   31 | static struct __res_state ac_aggr;
+      |                           ^~~~~~~
+configure:3516: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #ifdef HAVE_RESOLV_H
+| #include <resolv.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct __res_state ac_aggr;
+| if (ac_aggr._u._ext.nscount6)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3516: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:31:27: error: storage size of 'ac_aggr' isn't known
+   31 | static struct __res_state ac_aggr;
+      |                           ^~~~~~~
+configure:3516: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #ifdef HAVE_RESOLV_H
+| #include <resolv.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct __res_state ac_aggr;
+| if (sizeof ac_aggr._u._ext.nscount6)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3516: result: no
+configure:3530: checking for struct in6_pktinfo.ipi6_addr
+configure:3530: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:31:27: error: storage size of 'ac_aggr' isn't known
+   31 | static struct in6_pktinfo ac_aggr;
+      |                           ^~~~~~~
+configure:3530: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct in6_pktinfo ac_aggr;
+| if (ac_aggr.ipi6_addr)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3530: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:31:27: error: storage size of 'ac_aggr' isn't known
+   31 | static struct in6_pktinfo ac_aggr;
+      |                           ^~~~~~~
+configure:3530: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct in6_pktinfo ac_aggr;
+| if (sizeof ac_aggr.ipi6_addr)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3530: result: no
+configure:3544: checking for struct ipstat.ips_total
+configure:3544: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:38:22: error: storage size of 'ac_aggr' isn't known
+   38 | static struct ipstat ac_aggr;
+      |                      ^~~~~~~
+configure:3544: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_SYS_SOCKETVAR_H
+| #include <sys/socketvar.h>
+| #endif
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| #ifdef HAVE_NETINET_IP_VAR_H
+| #include <netinet/ip_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct ipstat ac_aggr;
+| if (ac_aggr.ips_total)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3544: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:38:22: error: storage size of 'ac_aggr' isn't known
+   38 | static struct ipstat ac_aggr;
+      |                      ^~~~~~~
+configure:3544: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_SYS_SOCKETVAR_H
+| #include <sys/socketvar.h>
+| #endif
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| #ifdef HAVE_NETINET_IP_VAR_H
+| #include <netinet/ip_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct ipstat ac_aggr;
+| if (sizeof ac_aggr.ips_total)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3544: result: no
+configure:3565: checking for struct ip_stats.ips_total
+configure:3565: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:31:24: error: storage size of 'ac_aggr' isn't known
+   31 | static struct ip_stats ac_aggr;
+      |                        ^~~~~~~
+configure:3565: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #ifdef HAVE_NETINET_IP_VAR_H
+| #include <netinet/ip_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct ip_stats ac_aggr;
+| if (ac_aggr.ips_total)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3565: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:31:24: error: storage size of 'ac_aggr' isn't known
+   31 | static struct ip_stats ac_aggr;
+      |                        ^~~~~~~
+configure:3565: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #ifdef HAVE_NETINET_IP_VAR_H
+| #include <netinet/ip_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct ip_stats ac_aggr;
+| if (sizeof ac_aggr.ips_total)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3565: result: no
+configure:3579: checking for struct ip6stat.ip6s_total
+configure:3579: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:38:23: error: storage size of 'ac_aggr' isn't known
+   38 | static struct ip6stat ac_aggr;
+      |                       ^~~~~~~
+configure:3579: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_SYS_SOCKETVAR_H
+| #include <sys/socketvar.h>
+| #endif
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| #ifdef HAVE_NETINET6_IP6_VAR_H
+| #include <netinet6/ip6_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct ip6stat ac_aggr;
+| if (ac_aggr.ip6s_total)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3579: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:38:23: error: storage size of 'ac_aggr' isn't known
+   38 | static struct ip6stat ac_aggr;
+      |                       ^~~~~~~
+configure:3579: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_SYS_SOCKETVAR_H
+| #include <sys/socketvar.h>
+| #endif
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| #ifdef HAVE_NETINET6_IP6_VAR_H
+| #include <netinet6/ip6_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct ip6stat ac_aggr;
+| if (sizeof ac_aggr.ip6s_total)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3579: result: no
+configure:3600: checking for struct icmpstat.icps_error
+configure:3600: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:44:24: error: storage size of 'ac_aggr' isn't known
+   44 | static struct icmpstat ac_aggr;
+      |                        ^~~~~~~
+configure:3600: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_SYS_SOCKETVAR_H
+| #include <sys/socketvar.h>
+| #endif
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| #ifdef HAVE_NETINET_IP_H
+| #include <netinet/ip.h>
+| #endif
+| #ifdef HAVE_NETINET_IP_ICMP_H
+| #include <netinet/ip_icmp.h>
+| #endif
+| #ifdef HAVE_NETINET_ICMP_VAR_H
+| #include <netinet/icmp_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct icmpstat ac_aggr;
+| if (ac_aggr.icps_error)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3600: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:44:24: error: storage size of 'ac_aggr' isn't known
+   44 | static struct icmpstat ac_aggr;
+      |                        ^~~~~~~
+configure:3600: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_SYS_SOCKETVAR_H
+| #include <sys/socketvar.h>
+| #endif
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| #ifdef HAVE_NETINET_IP_H
+| #include <netinet/ip.h>
+| #endif
+| #ifdef HAVE_NETINET_IP_ICMP_H
+| #include <netinet/ip_icmp.h>
+| #endif
+| #ifdef HAVE_NETINET_ICMP_VAR_H
+| #include <netinet/icmp_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct icmpstat ac_aggr;
+| if (sizeof ac_aggr.icps_error)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3600: result: no
+configure:3627: checking for struct icmp6stat.icp6s_error
+configure:3627: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:38:25: error: storage size of 'ac_aggr' isn't known
+   38 | static struct icmp6stat ac_aggr;
+      |                         ^~~~~~~
+configure:3627: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_SYS_SOCKETVAR_H
+| #include <sys/socketvar.h>
+| #endif
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| #ifdef HAVE_NETINET_ICMP6_H
+| #include <netinet/icmp6.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct icmp6stat ac_aggr;
+| if (ac_aggr.icp6s_error)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3627: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:38:25: error: storage size of 'ac_aggr' isn't known
+   38 | static struct icmp6stat ac_aggr;
+      |                         ^~~~~~~
+configure:3627: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_SYS_SOCKETVAR_H
+| #include <sys/socketvar.h>
+| #endif
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| #ifdef HAVE_NETINET_ICMP6_H
+| #include <netinet/icmp6.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct icmp6stat ac_aggr;
+| if (sizeof ac_aggr.icp6s_error)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3627: result: no
+configure:3648: checking for struct tcpstat.tcps_connattempt
+configure:3648: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:41:23: error: storage size of 'ac_aggr' isn't known
+   41 | static struct tcpstat ac_aggr;
+      |                       ^~~~~~~
+configure:3648: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_SYS_SOCKETVAR_H
+| #include <sys/socketvar.h>
+| #endif
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| #ifdef HAVE_NETINET_TCP_H
+| #include <netinet/tcp.h>
+| #endif
+| #ifdef HAVE_NETINET_TCP_VAR_H
+| #include <netinet/tcp_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct tcpstat ac_aggr;
+| if (ac_aggr.tcps_connattempt)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3648: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:41:23: error: storage size of 'ac_aggr' isn't known
+   41 | static struct tcpstat ac_aggr;
+      |                       ^~~~~~~
+configure:3648: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_SYS_SOCKETVAR_H
+| #include <sys/socketvar.h>
+| #endif
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| #ifdef HAVE_NETINET_TCP_H
+| #include <netinet/tcp.h>
+| #endif
+| #ifdef HAVE_NETINET_TCP_VAR_H
+| #include <netinet/tcp_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct tcpstat ac_aggr;
+| if (sizeof ac_aggr.tcps_connattempt)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3648: result: no
+configure:3672: checking for struct tcp_stats.tcps_connattempt
+configure:3672: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:31:25: error: storage size of 'ac_aggr' isn't known
+   31 | static struct tcp_stats ac_aggr;
+      |                         ^~~~~~~
+configure:3672: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #ifdef HAVE_NETINET_TCP_VAR_H
+| #include <netinet/tcp_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct tcp_stats ac_aggr;
+| if (ac_aggr.tcps_connattempt)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3672: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:31:25: error: storage size of 'ac_aggr' isn't known
+   31 | static struct tcp_stats ac_aggr;
+      |                         ^~~~~~~
+configure:3672: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #ifdef HAVE_NETINET_TCP_VAR_H
+| #include <netinet/tcp_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct tcp_stats ac_aggr;
+| if (sizeof ac_aggr.tcps_connattempt)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3672: result: no
+configure:3686: checking for struct udpstat.udps_ipackets
+configure:3686: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:41:23: error: storage size of 'ac_aggr' isn't known
+   41 | static struct udpstat ac_aggr;
+      |                       ^~~~~~~
+configure:3686: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| #ifdef HAVE_NETINET_IP_VAR_H
+| #include <netinet/ip_var.h>
+| #endif
+| #ifdef HAVE_NETINET_UDP_H
+| #include <netinet/udp.h>
+| #endif
+| #ifdef HAVE_NETINET_UDP_VAR_H
+| #include <netinet/udp_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct udpstat ac_aggr;
+| if (ac_aggr.udps_ipackets)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3686: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:41:23: error: storage size of 'ac_aggr' isn't known
+   41 | static struct udpstat ac_aggr;
+      |                       ^~~~~~~
+configure:3686: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_NETINET_IN_H
+| #include <netinet/in.h>
+| #endif
+| #ifdef HAVE_NETINET_IP_VAR_H
+| #include <netinet/ip_var.h>
+| #endif
+| #ifdef HAVE_NETINET_UDP_H
+| #include <netinet/udp.h>
+| #endif
+| #ifdef HAVE_NETINET_UDP_VAR_H
+| #include <netinet/udp_var.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct udpstat ac_aggr;
+| if (sizeof ac_aggr.udps_ipackets)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3686: result: no
+configure:3710: checking for struct ifreq.ifr_hwaddr
+configure:3710: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:32:21: error: storage size of 'ac_aggr' isn't known
+   32 | static struct ifreq ac_aggr;
+      |                     ^~~~~~~
+configure:3710: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_NET_IF_H
+| # include <net/if.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct ifreq ac_aggr;
+| if (ac_aggr.ifr_hwaddr)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3710: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:32:21: error: storage size of 'ac_aggr' isn't known
+   32 | static struct ifreq ac_aggr;
+      |                     ^~~~~~~
+configure:3710: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #include <sys/types.h>
+| #ifdef HAVE_NET_IF_H
+| # include <net/if.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct ifreq ac_aggr;
+| if (sizeof ac_aggr.ifr_hwaddr)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3710: result: no
+configure:3725: checking for struct sysinfo.totalram
+configure:3725: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:31:23: error: storage size of 'ac_aggr' isn't known
+   31 | static struct sysinfo ac_aggr;
+      |                       ^~~~~~~
+configure:3725: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #ifdef HAVE_SYS_SYSINFO_H
+| # include <sys/sysinfo.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct sysinfo ac_aggr;
+| if (ac_aggr.totalram)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3725: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:31:23: error: storage size of 'ac_aggr' isn't known
+   31 | static struct sysinfo ac_aggr;
+      |                       ^~~~~~~
+configure:3725: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #ifdef HAVE_SYS_SYSINFO_H
+| # include <sys/sysinfo.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct sysinfo ac_aggr;
+| if (sizeof ac_aggr.totalram)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3725: result: no
+configure:3737: checking for struct sysinfo.mem_unit
+configure:3737: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:31:23: error: storage size of 'ac_aggr' isn't known
+   31 | static struct sysinfo ac_aggr;
+      |                       ^~~~~~~
+configure:3737: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #ifdef HAVE_SYS_SYSINFO_H
+| # include <sys/sysinfo.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct sysinfo ac_aggr;
+| if (ac_aggr.mem_unit)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3737: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:31:23: error: storage size of 'ac_aggr' isn't known
+   31 | static struct sysinfo ac_aggr;
+      |                       ^~~~~~~
+configure:3737: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_STRUCT_STAT_ST_MTIM 1
+| #define HAVE_STRUCT_STAT_ST_CTIM 1
+| #define HAVE_STRUCT_STAT_ST_ATIM 1
+| /* end confdefs.h.  */
+| #ifdef HAVE_SYS_SYSINFO_H
+| # include <sys/sysinfo.h>
+| #endif
+| 
+| int
+| main ()
+| {
+| static struct sysinfo ac_aggr;
+| if (sizeof ac_aggr.mem_unit)
+| return 0;
+|   ;
+|   return 0;
+| }
+configure:3737: result: no
+configure:3753: checking for __builtin_popcount
+configure:3769: gcc -o conftest -g -O2   conftest.c  >&5
+configure:3769: $? = 0
+configure:3777: result: yes
+configure:3786: checking for __clear_cache
+configure:3802: gcc -o conftest -g -O2   conftest.c  >&5
+configure:3802: $? = 0
+configure:3810: result: yes
+
+## ---------------- ##
+## Cache variables. ##
+## ---------------- ##
+
+ac_cv_c_compiler_gnu=yes
+ac_cv_env_CC_set=
+ac_cv_env_CC_value=
+ac_cv_env_CFLAGS_set=
+ac_cv_env_CFLAGS_value=
+ac_cv_env_CPPFLAGS_set=
+ac_cv_env_CPPFLAGS_value=
+ac_cv_env_CPP_set=
+ac_cv_env_CPP_value=
+ac_cv_env_LDFLAGS_set=
+ac_cv_env_LDFLAGS_value=
+ac_cv_env_LIBS_set=
+ac_cv_env_LIBS_value=
+ac_cv_env_build_alias_set=
+ac_cv_env_build_alias_value=
+ac_cv_env_host_alias_set=
+ac_cv_env_host_alias_value=
+ac_cv_env_target_alias_set=
+ac_cv_env_target_alias_value=
+ac_cv_have___builtin_popcount=yes
+ac_cv_have___clear_cache=yes
+ac_cv_header_inttypes_h=yes
+ac_cv_header_memory_h=yes
+ac_cv_header_stdc=yes
+ac_cv_header_stdint_h=yes
+ac_cv_header_stdlib_h=yes
+ac_cv_header_string_h=yes
+ac_cv_header_strings_h=yes
+ac_cv_header_sys_stat_h=yes
+ac_cv_header_sys_types_h=yes
+ac_cv_header_unistd_h=yes
+ac_cv_member_scsireq_t_cmd=no
+ac_cv_member_sg_io_hdr_t_interface_id=no
+ac_cv_member_siginfo_t_si_fd=yes
+ac_cv_member_struct___res_state__u__ext_nscount6=no
+ac_cv_member_struct_icmp6stat_icp6s_error=no
+ac_cv_member_struct_icmpstat_icps_error=no
+ac_cv_member_struct_ifreq_ifr_hwaddr=no
+ac_cv_member_struct_in6_pktinfo_ipi6_addr=no
+ac_cv_member_struct_ip6stat_ip6s_total=no
+ac_cv_member_struct_ip_stats_ips_total=no
+ac_cv_member_struct_ipstat_ips_total=no
+ac_cv_member_struct_mtget_mt_blkno=no
+ac_cv_member_struct_mtget_mt_blksiz=no
+ac_cv_member_struct_mtget_mt_gstat=no
+ac_cv_member_struct_sockaddr_in6_sin6_scope_id=no
+ac_cv_member_struct_sockaddr_un_sun_len=no
+ac_cv_member_struct_stat___st_birthtim=no
+ac_cv_member_struct_stat___st_birthtime=no
+ac_cv_member_struct_stat_st_atim=yes
+ac_cv_member_struct_stat_st_atimespec=no
+ac_cv_member_struct_stat_st_birthtim=no
+ac_cv_member_struct_stat_st_birthtime=no
+ac_cv_member_struct_stat_st_birthtimespec=no
+ac_cv_member_struct_stat_st_ctim=yes
+ac_cv_member_struct_stat_st_ctimespec=no
+ac_cv_member_struct_stat_st_mtim=yes
+ac_cv_member_struct_stat_st_mtimespec=no
+ac_cv_member_struct_sysinfo_mem_unit=no
+ac_cv_member_struct_sysinfo_totalram=no
+ac_cv_member_struct_tcp_stats_tcps_connattempt=no
+ac_cv_member_struct_tcpstat_tcps_connattempt=no
+ac_cv_member_struct_udpstat_udps_ipackets=no
+ac_cv_objext=o
+ac_cv_path_EGREP='/usr/bin/grep -E'
+ac_cv_path_GREP=/usr/bin/grep
+ac_cv_prog_CPP='gcc -E'
+ac_cv_prog_ac_ct_CC=gcc
+ac_cv_prog_cc_c89=
+ac_cv_prog_cc_g=yes
+ac_cv_type_request_sense=no
+wine_cv_linux_gethostbyname_r_6=yes
+
+## ----------------- ##
+## Output variables. ##
+## ----------------- ##
+
+CC='gcc'
+CFLAGS='-g -O2'
+CPP='gcc -E'
+CPPFLAGS=''
+DEFS=''
+ECHO_C=''
+ECHO_N='-n'
+ECHO_T=''
+EGREP='/usr/bin/grep -E'
+EXEEXT=''
+GREP='/usr/bin/grep'
+LDFLAGS=''
+LIBOBJS=''
+LIBS=''
+LTLIBOBJS=''
+OBJEXT='o'
+PACKAGE_BUGREPORT='wine-devel@winehq.org'
+PACKAGE_NAME='Wine'
+PACKAGE_STRING='Wine 10.0'
+PACKAGE_TARNAME='wine'
+PACKAGE_URL='https://www.winehq.org'
+PACKAGE_VERSION='10.0'
+PATH_SEPARATOR=':'
+SHELL='/bin/bash'
+TAGSFLAGS=''
+ac_ct_CC='gcc'
+bindir='${exec_prefix}/bin'
+build_alias=''
+datadir='${datarootdir}'
+datarootdir='${prefix}/share'
+docdir='${datarootdir}/doc/${PACKAGE_TARNAME}'
+dvidir='${docdir}'
+exec_prefix='NONE'
+host_alias=''
+htmldir='${docdir}'
+includedir='${prefix}/include'
+infodir='${datarootdir}/info'
+libdir='${exec_prefix}/lib'
+libexecdir='${exec_prefix}/libexec'
+localedir='${datarootdir}/locale'
+localstatedir='${prefix}/var'
+mandir='${datarootdir}/man'
+oldincludedir='/usr/include'
+pdfdir='${docdir}'
+prefix='NONE'
+program_transform_name='s,x,x,'
+psdir='${docdir}'
+runstatedir='${localstatedir}/run'
+sbindir='${exec_prefix}/sbin'
+sharedstatedir='${prefix}/com'
+sysconfdir='${prefix}/etc'
+target_alias=''
+
+## ----------- ##
+## confdefs.h. ##
+## ----------- ##
+
+/* confdefs.h */
+#define PACKAGE_NAME "Wine"
+#define PACKAGE_TARNAME "wine"
+#define PACKAGE_VERSION "10.0"
+#define PACKAGE_STRING "Wine 10.0"
+#define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+#define PACKAGE_URL "https://www.winehq.org"
+#define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+#define HAVE_SIGINFO_T_SI_FD 1
+#define STDC_HEADERS 1
+#define HAVE_SYS_TYPES_H 1
+#define HAVE_SYS_STAT_H 1
+#define HAVE_STDLIB_H 1
+#define HAVE_STRING_H 1
+#define HAVE_MEMORY_H 1
+#define HAVE_STRINGS_H 1
+#define HAVE_INTTYPES_H 1
+#define HAVE_STDINT_H 1
+#define HAVE_UNISTD_H 1
+#define HAVE_STRUCT_STAT_ST_MTIM 1
+#define HAVE_STRUCT_STAT_ST_CTIM 1
+#define HAVE_STRUCT_STAT_ST_ATIM 1
+#define HAVE___BUILTIN_POPCOUNT 1
+#define HAVE___CLEAR_CACHE 1
+
+configure: exit 2
