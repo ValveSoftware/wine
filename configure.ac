@@ -14,6 +14,10 @@ AC_CONFIG_AUX_DIR([tools])
 
 libwine_version="1.0"
 
+AM_INIT_AUTOMAKE([foreign subdir-objects])
+LT_INIT
+AC_PROG_CC
+
 AC_CHECK_TYPES([request_sense],,,[#include <linux/cdrom.h>])
 
 AC_CACHE_CHECK([whether we can use re-entrant gethostbyname_r Linux style],
