@@ -2,6 +2,7 @@ dnl Process this file with autoconf to produce a configure script.
 dnl Original author: Michael Patra
 dnl For detailed change history, see the git commit logs.
 
+AC_CONFIG_MACRO_DIR([m4])
 m4_define(WINE_VERSION,regexp(m4_include(VERSION),[version \([-.0-9A-Za-z]+\)],[\1]))
 
 dnl autoconf versions before 2.63b don't have AS_VAR_APPEND or AS_VAR_IF
