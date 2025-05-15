@@ -16,18 +16,18 @@
                         'configure.ac'
                       ],
                       {
-                        '_m4_warn' => 1,
-                        '_AM_CONFIG_MACRO_DIRS' => 1,
-                        'include' => 1,
-                        '_AM_AUTOCONF_VERSION' => 1,
-                        'm4_pattern_forbid' => 1,
-                        'm4_pattern_allow' => 1,
-                        'AC_DEFUN_ONCE' => 1,
-                        'AC_CONFIG_MACRO_DIR' => 1,
-                        'AC_DEFUN' => 1,
-                        'AU_DEFUN' => 1,
                         'm4_include' => 1,
-                        'AC_CONFIG_MACRO_DIR_TRACE' => 1
+                        '_AM_AUTOCONF_VERSION' => 1,
+                        'AC_CONFIG_MACRO_DIR' => 1,
+                        'AU_DEFUN' => 1,
+                        'AC_CONFIG_MACRO_DIR_TRACE' => 1,
+                        'AC_DEFUN' => 1,
+                        'm4_pattern_allow' => 1,
+                        'include' => 1,
+                        'm4_pattern_forbid' => 1,
+                        'AC_DEFUN_ONCE' => 1,
+                        '_m4_warn' => 1,
+                        '_AM_CONFIG_MACRO_DIRS' => 1
                       }
                     ], 'Autom4te::Request' )
            );
