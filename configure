@@ -18273,26 +18273,11 @@ SHELL=/bin/sh
 
 
 
-WINE_APPEND_RULE(
-all: wine
-	@echo \"Wine build complete.\"
-Makefile: config.status
-	@./config.status Makefile
-config.status: ${wine_srcdir}configure
-	@./config.status --recheck
-include/config.h: include/stamp-h
-include/stamp-h: ${wine_srcdir}include/config.h.in config.status
-	@./config.status include/config.h include/stamp-h)
+
 
 if test "x$enable_maintainer_mode" = xyes
 then
-    WINE_APPEND_RULE(
-configure: configure.ac aclocal.m4
-	autoconf --warnings=all
-include/config.h.in: include/stamp-h.in
-include/stamp-h.in: configure.ac aclocal.m4
-	autoheader --warnings=all
-	@echo timestamp > \$[@])
+
 fi
 
 
@@ -18303,16 +18288,7 @@ then
       *)  reldir="../" ;;
     esac
         rm -f fonts server 2>/dev/null
-    WINE_APPEND_RULE(
-all: loader/wine64 loader/wine64-preloader $with_wine64/loader/wine $with_wine64/loader/wine-preloader
-loader/wine64 loader/wine64-preloader:
-	rm -f \$[@] && \$(LN_S) $reldir$with_wine64/\$[@] \$[@]
-$with_wine64/loader/wine:
-	rm -f \$[@] && \$(LN_S) $ac_pwd/loader/wine \$[@]
-$with_wine64/loader/wine-preloader:
-	rm -f \$[@] && \$(LN_S) $ac_pwd/loader/wine-preloader \$[@]
-clean::
-	rm -f loader/wine64 loader/wine64-preloader $with_wine64/loader/wine $with_wine64/loader/wine-preloader)
+
 else
     TOP_INSTALL_DEV="$TOP_INSTALL_DEV include"
     TOP_INSTALL_LIB="$TOP_INSTALL_LIB \
@@ -18340,36 +18316,15 @@ server/wineserver"
 fi
 
 
-WINE_APPEND_RULE(
-distclean:: clean
-	rm -rf autom4te.cache
-maintainer-clean::
-	rm -f configure include/config.h.in)
 
 
-WINE_APPEND_RULE(
-dlls/ntdll/unix/version.c: dummy
-	@version=\`(GIT_DIR=${wine_srcdir}.git git describe HEAD 2>/dev/null || echo \"wine-\$(PACKAGE_VERSION)\") | sed -n -e '\$\$s/\(.*\)/const char wine_build[[]] = \"\\1\";/p'\` && (echo \$\$version | cmp -s - \$[@]) || echo \$\$version >\$[@] || (rm -f \$[@] && exit 1)
-programs/winetest/build.rc: dummy
-	@build=\"STRINGTABLE { 1 \\\"\`GIT_DIR=${wine_srcdir}.git git rev-parse HEAD 2>/dev/null\`\\\" }\" && (echo \$\$build | cmp -s - \$[@]) || echo \$\$build >\$[@] || (rm -f \$[@] && exit 1)
-programs/winetest/build.nfo:
-	@-\$(CC) -v 2>\$[@]
-dlls/wineandroid.drv/wine-debug.apk: dlls/wineandroid.drv/build.gradle ${wine_srcdir}dlls/wineandroid.drv/AndroidManifest.xml ${wine_srcdir}dlls/wineandroid.drv/WineActivity.java ${wine_srcdir}dlls/wineandroid.drv/wine.svg
-	cd dlls/wineandroid.drv && gradle -q -Psrcdir=$srcdir assembleDebug
-	mv dlls/wineandroid.drv/build/outputs/apk/wine-debug.apk \$[@])
+
+
 
 
 TAGSFLAGS="--langmap='c:+.idl.l.rh,make:(Make*.in)'"
 
-WINE_APPEND_RULE(
-TAGS etags:
-	rm -f TAGS
-	(test -d .git && git ls-files || find -L $srcdir -name '*.[[ch]]' -print) | xargs etags -a \$(TAGSFLAGS)
-tags ctags:
-	rm -f tags
-	(test -d .git && git ls-files || find -L $srcdir -name '*.[[ch]]' -print) | xargs ctags -a \$(TAGSFLAGS)
-dummy:
-.PHONY: dummy)
+
 
 $as_echo " done" >&6
 cat >confcache <<\_ACEOF
