@@ -160,4 +160,19 @@
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
+/* Define if __aarch64__ is available */
+#undef __aarch64__
+
+/* Define if __arm__ is available */
+#undef __arm__
+
+/* Define if __i386__ is available */
+#undef __i386__
+
+/* Define if __powerpc64__ is available */
+#undef __powerpc64__
+
+/* Define if __x86_64__ is available */
+#undef __x86_64__
+
 #endif /* __WINE_CONFIG_H */

@@ -3849,11 +3849,131 @@ fi
 
 
 case $host_cpu in
-  *i[3456789]86*) WINE_CHECK_DEFINE(__i386__) ;;
-  *x86_64*)         WINE_CHECK_DEFINE(__x86_64__) ;;
-  *powerpc64*)      WINE_CHECK_DEFINE(__powerpc64__) ;;
-  *aarch64*)        WINE_CHECK_DEFINE(__aarch64__) ;;
-  *arm*)            WINE_CHECK_DEFINE(__arm__) ;;
+  *i[3456789]86*)
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+    #ifndef __i386__
+    #error "__i386__ not defined"
+    #endif
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+
+cat >>confdefs.h <<_ACEOF
+#define __i386__ 1
+_ACEOF
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+ ;;
+  *x86_64*)
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+    #ifndef __x86_64__
+    #error "__x86_64__ not defined"
+    #endif
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+
+cat >>confdefs.h <<_ACEOF
+#define __x86_64__ 1
+_ACEOF
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+ ;;
+  *powerpc64*)
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+    #ifndef __powerpc64__
+    #error "__powerpc64__ not defined"
+    #endif
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+
+cat >>confdefs.h <<_ACEOF
+#define __powerpc64__ 1
+_ACEOF
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+ ;;
+  *aarch64*)
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+    #ifndef __aarch64__
+    #error "__aarch64__ not defined"
+    #endif
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+
+cat >>confdefs.h <<_ACEOF
+#define __aarch64__ 1
+_ACEOF
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+ ;;
+  *arm*)
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+    #ifndef __arm__
+    #error "__arm__ not defined"
+    #endif
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+
+cat >>confdefs.h <<_ACEOF
+#define __arm__ 1
+_ACEOF
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+ ;;
 esac
 
 

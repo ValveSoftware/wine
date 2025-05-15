@@ -1,3 +1,4 @@
+m4trace:aclocal.m4:15: -1- m4_include([m4/wine_check_define.m4])
 m4trace:configure.ac:3: -3- m4_include([VERSION])
 m4trace:configure.ac:10: -1- AC_INIT([Wine], [WINE_VERSION], [wine-devel@winehq.org], [wine], [https://www.winehq.org])
 m4trace:configure.ac:10: -1- m4_pattern_forbid([^_?A[CHUM]_])
@@ -370,6 +371,26 @@ m4trace:configure.ac:231: -1- m4_pattern_allow([^HAVE___CLEAR_CACHE$])
 m4trace:configure.ac:231: -1- AH_OUTPUT([HAVE___CLEAR_CACHE], [/* Define to 1 if you have the \'__clear_cache\' (potentially built-in)
    function. */
 @%:@undef HAVE___CLEAR_CACHE])
+m4trace:configure.ac:237: -1- AC_DEFINE_TRACE_LITERAL([__i386__])
+m4trace:configure.ac:237: -1- m4_pattern_allow([^__i386__$])
+m4trace:configure.ac:237: -1- AH_OUTPUT([__i386__], [/* Define if __i386__ is available */
+@%:@undef __i386__])
+m4trace:configure.ac:238: -1- AC_DEFINE_TRACE_LITERAL([__x86_64__])
+m4trace:configure.ac:238: -1- m4_pattern_allow([^__x86_64__$])
+m4trace:configure.ac:238: -1- AH_OUTPUT([__x86_64__], [/* Define if __x86_64__ is available */
+@%:@undef __x86_64__])
+m4trace:configure.ac:239: -1- AC_DEFINE_TRACE_LITERAL([__powerpc64__])
+m4trace:configure.ac:239: -1- m4_pattern_allow([^__powerpc64__$])
+m4trace:configure.ac:239: -1- AH_OUTPUT([__powerpc64__], [/* Define if __powerpc64__ is available */
+@%:@undef __powerpc64__])
+m4trace:configure.ac:240: -1- AC_DEFINE_TRACE_LITERAL([__aarch64__])
+m4trace:configure.ac:240: -1- m4_pattern_allow([^__aarch64__$])
+m4trace:configure.ac:240: -1- AH_OUTPUT([__aarch64__], [/* Define if __aarch64__ is available */
+@%:@undef __aarch64__])
+m4trace:configure.ac:241: -1- AC_DEFINE_TRACE_LITERAL([__arm__])
+m4trace:configure.ac:241: -1- m4_pattern_allow([^__arm__$])
+m4trace:configure.ac:241: -1- AH_OUTPUT([__arm__], [/* Define if __arm__ is available */
+@%:@undef __arm__])
 m4trace:configure.ac:277: -1- AH_OUTPUT([00001], [#ifndef __WINE_CONFIG_H
 #define __WINE_CONFIG_H])
 m4trace:configure.ac:279: -1- AH_OUTPUT([zzzz2], [#endif /* __WINE_CONFIG_H */])
