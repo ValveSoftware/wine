@@ -75,18 +75,42 @@ PATH: /home/codespace/.vscode-remote/data/User/globalStorage/github.copilot-chat
 ## Core tests. ##
 ## ----------- ##
 
-configure:2086: checking for gcc
-configure:2102: found /usr/bin/gcc
-configure:2113: result: gcc
-configure:2342: checking for C compiler version
-configure:2351: gcc --version >&5
+configure:2294: checking for a BSD-compatible install
+configure:2362: result: /usr/bin/install -c
+configure:2373: checking whether build environment is sane
+configure:2428: result: yes
+configure:2577: checking for a thread-safe mkdir -p
+configure:2616: result: /usr/bin/mkdir -p
+configure:2623: checking for gawk
+configure:2639: found /usr/bin/gawk
+configure:2650: result: gawk
+configure:2661: checking whether make sets $(MAKE)
+configure:2683: result: yes
+configure:2712: checking whether make supports nested variables
+configure:2729: result: yes
+configure:2884: checking build system type
+configure:2898: result: x86_64-pc-linux-gnu
+configure:2918: checking host system type
+configure:2931: result: x86_64-pc-linux-gnu
+configure:2972: checking how to print strings
+configure:2999: result: printf
+configure:3024: checking whether make supports the include directive
+configure:3039: make -f confmf.GNU && cat confinc.out
+this is the am__doit target
+configure:3042: $? = 0
+configure:3061: result: yes (GNU style)
+configure:3131: checking for gcc
+configure:3147: found /usr/bin/gcc
+configure:3158: result: gcc
+configure:3387: checking for C compiler version
+configure:3396: gcc --version >&5
 gcc (Ubuntu 9.4.0-1ubuntu1~20.04.2) 9.4.0
 Copyright (C) 2019 Free Software Foundation, Inc.
 This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-configure:2362: $? = 0
-configure:2351: gcc -v >&5
+configure:3407: $? = 0
+configure:3396: gcc -v >&5
 Using built-in specs.
 COLLECT_GCC=gcc
 COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/9/lto-wrapper
@@ -96,57 +120,143 @@ Target: x86_64-linux-gnu
 Configured with: ../src/configure -v --with-pkgversion='Ubuntu 9.4.0-1ubuntu1~20.04.2' --with-bugurl=file:///usr/share/doc/gcc-9/README.Bugs --enable-languages=c,ada,c++,go,brig,d,fortran,objc,obj-c++,gm2 --prefix=/usr --with-gcc-major-version-only --program-suffix=-9 --program-prefix=x86_64-linux-gnu- --enable-shared --enable-linker-build-id --libexecdir=/usr/lib --without-included-gettext --enable-threads=posix --libdir=/usr/lib --enable-nls --enable-clocale=gnu --enable-libstdcxx-debug --enable-libstdcxx-time=yes --with-default-libstdcxx-abi=new --enable-gnu-unique-object --disable-vtable-verify --enable-plugin --enable-default-pie --with-system-zlib --with-target-system-zlib=auto --enable-objc-gc=auto --enable-multiarch --disable-werror --with-arch-32=i686 --with-abi=m64 --with-multilib-list=m32,m64,mx32 --enable-multilib --with-tune=generic --enable-offload-targets=nvptx-none=/build/gcc-9-9QDOt0/gcc-9-9.4.0/debian/tmp-nvptx/usr,hsa --without-cuda-driver --enable-checking=release --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=x86_64-linux-gnu
 Thread model: posix
 gcc version 9.4.0 (Ubuntu 9.4.0-1ubuntu1~20.04.2) 
-configure:2362: $? = 0
-configure:2351: gcc -V >&5
+configure:3407: $? = 0
+configure:3396: gcc -V >&5
 gcc: error: unrecognized command line option '-V'
 gcc: fatal error: no input files
 compilation terminated.
-configure:2362: $? = 1
-configure:2351: gcc -qversion >&5
+configure:3407: $? = 1
+configure:3396: gcc -qversion >&5
 gcc: error: unrecognized command line option '-qversion'; did you mean '--version'?
 gcc: fatal error: no input files
 compilation terminated.
-configure:2362: $? = 1
-configure:2382: checking whether the C compiler works
-configure:2404: gcc    conftest.c  >&5
-configure:2408: $? = 0
-configure:2456: result: yes
-configure:2459: checking for C compiler default output file name
-configure:2461: result: a.out
-configure:2467: checking for suffix of executables
-configure:2474: gcc -o conftest    conftest.c  >&5
-configure:2478: $? = 0
-configure:2500: result: 
-configure:2522: checking whether we are cross compiling
-configure:2530: gcc -o conftest    conftest.c  >&5
-configure:2534: $? = 0
-configure:2541: ./conftest
-configure:2545: $? = 0
-configure:2533: result: no
-configure:2538: checking for suffix of object files
-configure:2560: gcc -c   conftest.c >&5
-configure:2564: $? = 0
-configure:2585: result: o
-configure:2589: checking whether we are using the GNU C compiler
-configure:2608: gcc -c   conftest.c >&5
-configure:2608: $? = 0
-configure:2617: result: yes
-configure:2626: checking whether gcc accepts -g
-configure:2646: gcc -c -g  conftest.c >&5
-configure:2646: $? = 0
-configure:2687: result: yes
-configure:2704: checking for gcc option to accept ISO C89
-configure:2767: gcc  -c -g -O2  conftest.c >&5
-configure:2767: $? = 0
-configure:2780: result: none needed
-configure:2801: checking for request_sense
-configure:2801: gcc -c -g -O2  conftest.c >&5
-conftest.c: In function 'main':
-conftest.c:14:13: error: 'request_sense' undeclared (first use in this function)
-   14 | if (sizeof (request_sense))
-      |             ^~~~~~~~~~~~~
-conftest.c:14:13: note: each undeclared identifier is reported only once for each function it appears in
-configure:2801: $? = 1
+configure:3407: $? = 1
+configure:3427: checking whether the C compiler works
+configure:3449: gcc    conftest.c  >&5
+configure:3453: $? = 0
+configure:3501: result: yes
+configure:3504: checking for C compiler default output file name
+configure:3506: result: a.out
+configure:3512: checking for suffix of executables
+configure:3519: gcc -o conftest    conftest.c  >&5
+configure:3523: $? = 0
+configure:3545: result: 
+configure:3567: checking whether we are cross compiling
+configure:3575: gcc -o conftest    conftest.c  >&5
+configure:3579: $? = 0
+configure:3586: ./conftest
+configure:3590: $? = 0
+configure:3578: result: no
+configure:3583: checking for suffix of object files
+configure:3605: gcc -c   conftest.c >&5
+configure:3609: $? = 0
+configure:3630: result: o
+configure:3634: checking whether we are using the GNU C compiler
+configure:3653: gcc -c   conftest.c >&5
+configure:3653: $? = 0
+configure:3662: result: yes
+configure:3671: checking whether gcc accepts -g
+configure:3691: gcc -c -g  conftest.c >&5
+configure:3691: $? = 0
+configure:3732: result: yes
+configure:3749: checking for gcc option to accept ISO C89
+configure:3812: gcc  -c -g -O2  conftest.c >&5
+configure:3812: $? = 0
+configure:3825: result: none needed
+configure:3850: checking whether gcc understands -c and -o together
+configure:3872: gcc -c conftest.c -o conftest2.o
+configure:3875: $? = 0
+configure:3872: gcc -c conftest.c -o conftest2.o
+configure:3875: $? = 0
+configure:3887: result: yes
+configure:3906: checking dependency style of gcc
+configure:4017: result: gcc3
+configure:4032: checking for a sed that does not truncate output
+configure:4096: result: /usr/bin/sed
+configure:4114: checking for grep that handles long lines and -e
+configure:4172: result: /usr/bin/grep
+configure:4177: checking for egrep
+configure:4239: result: /usr/bin/grep -E
+configure:4244: checking for fgrep
+configure:4306: result: /usr/bin/grep -F
+configure:4341: checking for ld used by gcc
+configure:4408: result: /usr/bin/ld
+configure:4415: checking if the linker (/usr/bin/ld) is GNU ld
+configure:4430: result: yes
+configure:4442: checking for BSD- or MS-compatible name lister (nm)
+configure:4496: result: /usr/bin/nm -B
+configure:4626: checking the name lister (/usr/bin/nm -B) interface
+configure:4633: gcc -c -g -O2  conftest.c >&5
+configure:4636: /usr/bin/nm -B "conftest.o"
+configure:4639: output
+0000000000000000 B some_variable
+configure:4640: result: BSD nm
+configure:4643: checking whether ln -s works
+configure:4647: result: yes
+configure:4655: checking the maximum length of command line arguments
+configure:4786: result: 1572864
+configure:4834: checking how to convert x86_64-pc-linux-gnu file names to x86_64-pc-linux-gnu format
+configure:4874: result: func_convert_file_noop
+configure:4881: checking how to convert x86_64-pc-linux-gnu file names to toolchain format
+configure:4901: result: func_convert_file_noop
+configure:4908: checking for /usr/bin/ld option to reload object files
+configure:4915: result: -r
+configure:4989: checking for objdump
+configure:5005: found /usr/bin/objdump
+configure:5016: result: objdump
+configure:5048: checking how to recognize dependent libraries
+configure:5248: result: pass_all
+configure:5333: checking for dlltool
+configure:5363: result: no
+configure:5393: checking how to associate runtime and link libraries
+configure:5420: result: printf %s\n
+configure:5481: checking for ar
+configure:5497: found /usr/bin/ar
+configure:5508: result: ar
+configure:5545: checking for archiver @FILE support
+configure:5562: gcc -c -g -O2  conftest.c >&5
+configure:5562: $? = 0
+configure:5565: ar cr libconftest.a @conftest.lst >&5
+configure:5568: $? = 0
+configure:5573: ar cr libconftest.a @conftest.lst >&5
+ar: conftest.o: No such file or directory
+configure:5576: $? = 1
+configure:5575: result: @
+configure:5633: checking for strip
+configure:5649: found /usr/bin/strip
+configure:5660: result: strip
+configure:5732: checking for ranlib
+configure:5748: found /usr/bin/ranlib
+configure:5759: result: ranlib
+configure:5861: checking command to parse /usr/bin/nm -B output from gcc object
+configure:6014: gcc -c -g -O2  conftest.c >&5
+configure:6017: $? = 0
+configure:6021: /usr/bin/nm -B conftest.o | sed -n -e 's/^.*[	 ]\([ABCDGIRSTW][ABCDGIRSTW]*\)[	 ][	 ]*\([_A-Za-z][_A-Za-z0-9]*\)$/\1 \2 \2/p' | sed '/ __gnu_lto/d' > conftest.nm
+configure:6087: gcc -o conftest -g -O2   conftest.c conftstm.o >&5
+configure:6090: $? = 0
+configure:6128: result: ok
+configure:6175: checking for sysroot
+configure:6205: result: no
+configure:6212: checking for a working dd
+configure:6250: result: /usr/bin/dd
+configure:6254: checking how to truncate binary pipes
+configure:6269: result: /usr/bin/dd bs=4096 count=1
+configure:6405: gcc -c -g -O2  conftest.c >&5
+configure:6408: $? = 0
+configure:6598: checking for mt
+configure:6628: result: no
+configure:6648: checking if : is a manifest tool
+configure:6654: : '-?'
+configure:6662: result: no
+configure:7339: checking how to run the C preprocessor
+configure:7370: gcc -E  conftest.c
+configure:7370: $? = 0
+configure:7384: gcc -E  conftest.c
+conftest.c:11:10: fatal error: ac_nonexistent.h: No such file or directory
+   11 | #include <ac_nonexistent.h>
+      |          ^~~~~~~~~~~~~~~~~~
+compilation terminated.
+configure:7384: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -155,6 +265,193 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| /* end confdefs.h.  */
+| #include <ac_nonexistent.h>
+configure:7409: result: gcc -E
+configure:7429: gcc -E  conftest.c
+configure:7429: $? = 0
+configure:7443: gcc -E  conftest.c
+conftest.c:11:10: fatal error: ac_nonexistent.h: No such file or directory
+   11 | #include <ac_nonexistent.h>
+      |          ^~~~~~~~~~~~~~~~~~
+compilation terminated.
+configure:7443: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| /* end confdefs.h.  */
+| #include <ac_nonexistent.h>
+configure:7472: checking for ANSI C header files
+configure:7492: gcc -c -g -O2  conftest.c >&5
+configure:7492: $? = 0
+configure:7565: gcc -o conftest -g -O2   conftest.c  >&5
+configure:7565: $? = 0
+configure:7565: ./conftest
+configure:7565: $? = 0
+configure:7576: result: yes
+configure:7589: checking for sys/types.h
+configure:7589: gcc -c -g -O2  conftest.c >&5
+configure:7589: $? = 0
+configure:7589: result: yes
+configure:7589: checking for sys/stat.h
+configure:7589: gcc -c -g -O2  conftest.c >&5
+configure:7589: $? = 0
+configure:7589: result: yes
+configure:7589: checking for stdlib.h
+configure:7589: gcc -c -g -O2  conftest.c >&5
+configure:7589: $? = 0
+configure:7589: result: yes
+configure:7589: checking for string.h
+configure:7589: gcc -c -g -O2  conftest.c >&5
+configure:7589: $? = 0
+configure:7589: result: yes
+configure:7589: checking for memory.h
+configure:7589: gcc -c -g -O2  conftest.c >&5
+configure:7589: $? = 0
+configure:7589: result: yes
+configure:7589: checking for strings.h
+configure:7589: gcc -c -g -O2  conftest.c >&5
+configure:7589: $? = 0
+configure:7589: result: yes
+configure:7589: checking for inttypes.h
+configure:7589: gcc -c -g -O2  conftest.c >&5
+configure:7589: $? = 0
+configure:7589: result: yes
+configure:7589: checking for stdint.h
+configure:7589: gcc -c -g -O2  conftest.c >&5
+configure:7589: $? = 0
+configure:7589: result: yes
+configure:7589: checking for unistd.h
+configure:7589: gcc -c -g -O2  conftest.c >&5
+configure:7589: $? = 0
+configure:7589: result: yes
+configure:7603: checking for dlfcn.h
+configure:7603: gcc -c -g -O2  conftest.c >&5
+configure:7603: $? = 0
+configure:7603: result: yes
+configure:7859: checking for objdir
+configure:7874: result: .libs
+configure:8138: checking if gcc supports -fno-rtti -fno-exceptions
+configure:8156: gcc -c -g -O2  -fno-rtti -fno-exceptions conftest.c >&5
+cc1: warning: command line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C
+configure:8160: $? = 0
+configure:8173: result: no
+configure:8537: checking for gcc option to produce PIC
+configure:8544: result: -fPIC -DPIC
+configure:8552: checking if gcc PIC flag -fPIC -DPIC works
+configure:8570: gcc -c -g -O2  -fPIC -DPIC -DPIC conftest.c >&5
+configure:8574: $? = 0
+configure:8587: result: yes
+configure:8616: checking if gcc static flag -static works
+configure:8644: result: yes
+configure:8659: checking if gcc supports -c -o file.o
+configure:8680: gcc -c -g -O2  -o out/conftest2.o conftest.c >&5
+configure:8684: $? = 0
+configure:8706: result: yes
+configure:8714: checking if gcc supports -c -o file.o
+configure:8761: result: yes
+configure:8794: checking whether the gcc linker (/usr/bin/ld -m elf_x86_64) supports shared libraries
+configure:10057: result: yes
+configure:10094: checking whether -lc should be explicitly linked in
+configure:10102: gcc -c -g -O2  conftest.c >&5
+configure:10105: $? = 0
+configure:10120: gcc -shared  -fPIC -DPIC conftest.o  -v -Wl,-soname -Wl,conftest -o conftest 2\>\&1 \| /usr/bin/grep  -lc  \>/dev/null 2\>\&1
+configure:10123: $? = 0
+configure:10137: result: no
+configure:10297: checking dynamic linker characteristics
+configure:10878: gcc -o conftest -g -O2   -Wl,-rpath -Wl,/foo conftest.c  >&5
+configure:10878: $? = 0
+configure:11127: result: GNU/Linux ld.so
+configure:11249: checking how to hardcode library paths into programs
+configure:11274: result: immediate
+configure:11822: checking whether stripping libraries is possible
+configure:11827: result: yes
+configure:11862: checking if libtool supports shared libraries
+configure:11864: result: yes
+configure:11867: checking whether to build shared libraries
+configure:11892: result: yes
+configure:11895: checking whether to build static libraries
+configure:11899: result: yes
+configure:8760: checking for gcc
+configure:8787: result: gcc
+configure:9016: checking for C compiler version
+configure:9025: gcc --version >&5
+gcc (Ubuntu 9.4.0-1ubuntu1~20.04.2) 9.4.0
+Copyright (C) 2019 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+configure:9036: $? = 0
+configure:9025: gcc -v >&5
+Using built-in specs.
+COLLECT_GCC=gcc
+COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/9/lto-wrapper
+OFFLOAD_TARGET_NAMES=nvptx-none:hsa
+OFFLOAD_TARGET_DEFAULT=1
+Target: x86_64-linux-gnu
+Configured with: ../src/configure -v --with-pkgversion='Ubuntu 9.4.0-1ubuntu1~20.04.2' --with-bugurl=file:///usr/share/doc/gcc-9/README.Bugs --enable-languages=c,ada,c++,go,brig,d,fortran,objc,obj-c++,gm2 --prefix=/usr --with-gcc-major-version-only --program-suffix=-9 --program-prefix=x86_64-linux-gnu- --enable-shared --enable-linker-build-id --libexecdir=/usr/lib --without-included-gettext --enable-threads=posix --libdir=/usr/lib --enable-nls --enable-clocale=gnu --enable-libstdcxx-debug --enable-libstdcxx-time=yes --with-default-libstdcxx-abi=new --enable-gnu-unique-object --disable-vtable-verify --enable-plugin --enable-default-pie --with-system-zlib --with-target-system-zlib=auto --enable-objc-gc=auto --enable-multiarch --disable-werror --with-arch-32=i686 --with-abi=m64 --with-multilib-list=m32,m64,mx32 --enable-multilib --with-tune=generic --enable-offload-targets=nvptx-none=/build/gcc-9-9QDOt0/gcc-9-9.4.0/debian/tmp-nvptx/usr,hsa --without-cuda-driver --enable-checking=release --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=x86_64-linux-gnu
+Thread model: posix
+gcc version 9.4.0 (Ubuntu 9.4.0-1ubuntu1~20.04.2) 
+configure:9036: $? = 0
+configure:9025: gcc -V >&5
+gcc: error: unrecognized command line option '-V'
+gcc: fatal error: no input files
+compilation terminated.
+configure:9036: $? = 1
+configure:9025: gcc -qversion >&5
+gcc: error: unrecognized command line option '-qversion'; did you mean '--version'?
+gcc: fatal error: no input files
+compilation terminated.
+configure:9036: $? = 1
+configure:9040: checking whether we are using the GNU C compiler
+configure:9068: result: yes
+configure:9077: checking whether gcc accepts -g
+configure:9138: result: yes
+configure:9155: checking for gcc option to accept ISO C89
+configure:9231: result: none needed
+configure:9256: checking whether gcc understands -c and -o together
+configure:9293: result: yes
+configure:9312: checking dependency style of gcc
+configure:9423: result: gcc3
+configure:9439: checking for request_sense
+configure:9439: gcc -c -g -O2  conftest.c >&5
+conftest.c: In function 'main':
+conftest.c:28:13: error: 'request_sense' undeclared (first use in this function)
+   28 | if (sizeof (request_sense))
+      |             ^~~~~~~~~~~~~
+conftest.c:28:13: note: each undeclared identifier is reported only once for each function it appears in
+configure:9439: $? = 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Wine"
+| #define PACKAGE_TARNAME "wine"
+| #define PACKAGE_VERSION "10.0"
+| #define PACKAGE_STRING "Wine 10.0"
+| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
+| #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | /* end confdefs.h.  */
 | #include <linux/cdrom.h>
 | 
@@ -166,18 +463,18 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2801: result: no
-configure:2813: checking whether we can use re-entrant gethostbyname_r Linux style
-configure:2887: gcc -o conftest -g -O2   conftest.c  >&5
-configure:2887: $? = 0
-configure:2897: result: yes
-configure:2906: checking for struct sockaddr_un.sun_len
-configure:2906: gcc -c -g -O2  conftest.c >&5
+configure:9439: result: no
+configure:9451: checking whether we can use re-entrant gethostbyname_r Linux style
+configure:9479: gcc -o conftest -g -O2   conftest.c  >&5
+configure:9479: $? = 0
+configure:9489: result: yes
+configure:9498: checking for struct sockaddr_un.sun_len
+configure:9498: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:19:27: error: storage size of 'ac_aggr' isn't known
-   19 | static struct sockaddr_un ac_aggr;
+conftest.c:33:27: error: storage size of 'ac_aggr' isn't known
+   33 | static struct sockaddr_un ac_aggr;
       |                           ^~~~~~~
-configure:2906: $? = 1
+configure:9498: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -186,6 +483,20 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
 | /* end confdefs.h.  */
 | #include <sys/types.h>
@@ -203,12 +514,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2906: gcc -c -g -O2  conftest.c >&5
+configure:9498: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:19:27: error: storage size of 'ac_aggr' isn't known
-   19 | static struct sockaddr_un ac_aggr;
+conftest.c:33:27: error: storage size of 'ac_aggr' isn't known
+   33 | static struct sockaddr_un ac_aggr;
       |                           ^~~~~~~
-configure:2906: $? = 1
+configure:9498: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -217,6 +528,20 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
 | /* end confdefs.h.  */
 | #include <sys/types.h>
@@ -234,17 +559,17 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2906: result: no
-configure:2922: checking for scsireq_t.cmd
-configure:2922: gcc -c -g -O2  conftest.c >&5
+configure:9498: result: no
+configure:9514: checking for scsireq_t.cmd
+configure:9514: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:18:8: error: unknown type name 'scsireq_t'
-   18 | static scsireq_t ac_aggr;
+conftest.c:32:8: error: unknown type name 'scsireq_t'
+   32 | static scsireq_t ac_aggr;
       |        ^~~~~~~~~
-conftest.c:19:12: error: request for member 'cmd' in something not a structure or union
-   19 | if (ac_aggr.cmd)
+conftest.c:33:12: error: request for member 'cmd' in something not a structure or union
+   33 | if (ac_aggr.cmd)
       |            ^
-configure:2922: $? = 1
+configure:9514: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -253,6 +578,20 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
 | /* end confdefs.h.  */
 | #include <sys/types.h>
@@ -269,15 +608,15 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2922: gcc -c -g -O2  conftest.c >&5
+configure:9514: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:18:8: error: unknown type name 'scsireq_t'
-   18 | static scsireq_t ac_aggr;
+conftest.c:32:8: error: unknown type name 'scsireq_t'
+   32 | static scsireq_t ac_aggr;
       |        ^~~~~~~~~
-conftest.c:19:19: error: request for member 'cmd' in something not a structure or union
-   19 | if (sizeof ac_aggr.cmd)
+conftest.c:33:19: error: request for member 'cmd' in something not a structure or union
+   33 | if (sizeof ac_aggr.cmd)
       |                   ^
-configure:2922: $? = 1
+configure:9514: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -286,6 +625,20 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
 | /* end confdefs.h.  */
 | #include <sys/types.h>
@@ -302,17 +655,17 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2922: result: no
-configure:2935: checking for sg_io_hdr_t.interface_id
-configure:2935: gcc -c -g -O2  conftest.c >&5
+configure:9514: result: no
+configure:9527: checking for sg_io_hdr_t.interface_id
+configure:9527: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:18:8: error: unknown type name 'sg_io_hdr_t'
-   18 | static sg_io_hdr_t ac_aggr;
+conftest.c:32:8: error: unknown type name 'sg_io_hdr_t'
+   32 | static sg_io_hdr_t ac_aggr;
       |        ^~~~~~~~~~~
-conftest.c:19:12: error: request for member 'interface_id' in something not a structure or union
-   19 | if (ac_aggr.interface_id)
+conftest.c:33:12: error: request for member 'interface_id' in something not a structure or union
+   33 | if (ac_aggr.interface_id)
       |            ^
-configure:2935: $? = 1
+configure:9527: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -321,6 +674,20 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
 | /* end confdefs.h.  */
 | #include <sys/types.h>
@@ -337,15 +704,15 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2935: gcc -c -g -O2  conftest.c >&5
+configure:9527: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:18:8: error: unknown type name 'sg_io_hdr_t'
-   18 | static sg_io_hdr_t ac_aggr;
+conftest.c:32:8: error: unknown type name 'sg_io_hdr_t'
+   32 | static sg_io_hdr_t ac_aggr;
       |        ^~~~~~~~~~~
-conftest.c:19:19: error: request for member 'interface_id' in something not a structure or union
-   19 | if (sizeof ac_aggr.interface_id)
+conftest.c:33:19: error: request for member 'interface_id' in something not a structure or union
+   33 | if (sizeof ac_aggr.interface_id)
       |                   ^
-configure:2935: $? = 1
+configure:9527: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -354,6 +721,20 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
 | /* end confdefs.h.  */
 | #include <sys/types.h>
@@ -370,18 +751,18 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2935: result: no
-configure:2950: checking for siginfo_t.si_fd
-configure:2950: gcc -c -g -O2  conftest.c >&5
-configure:2950: $? = 0
-configure:2950: result: yes
-configure:2962: checking for struct mtget.mt_blksiz
-configure:2962: gcc -c -g -O2  conftest.c >&5
+configure:9527: result: no
+configure:9542: checking for siginfo_t.si_fd
+configure:9542: gcc -c -g -O2  conftest.c >&5
+configure:9542: $? = 0
+configure:9542: result: yes
+configure:9554: checking for struct mtget.mt_blksiz
+configure:9554: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:19:21: error: storage size of 'ac_aggr' isn't known
-   19 | static struct mtget ac_aggr;
+conftest.c:33:21: error: storage size of 'ac_aggr' isn't known
+   33 | static struct mtget ac_aggr;
       |                     ^~~~~~~
-configure:2962: $? = 1
+configure:9554: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -390,6 +771,20 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
 | #define HAVE_SIGINFO_T_SI_FD 1
 | /* end confdefs.h.  */
@@ -407,12 +802,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2962: gcc -c -g -O2  conftest.c >&5
+configure:9554: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:19:21: error: storage size of 'ac_aggr' isn't known
-   19 | static struct mtget ac_aggr;
+conftest.c:33:21: error: storage size of 'ac_aggr' isn't known
+   33 | static struct mtget ac_aggr;
       |                     ^~~~~~~
-configure:2962: $? = 1
+configure:9554: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -421,6 +816,20 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
 | #define HAVE_SIGINFO_T_SI_FD 1
 | /* end confdefs.h.  */
@@ -438,14 +847,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2962: result: no
-configure:2975: checking for struct mtget.mt_gstat
-configure:2975: gcc -c -g -O2  conftest.c >&5
+configure:9554: result: no
+configure:9567: checking for struct mtget.mt_gstat
+configure:9567: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:19:21: error: storage size of 'ac_aggr' isn't known
-   19 | static struct mtget ac_aggr;
+conftest.c:33:21: error: storage size of 'ac_aggr' isn't known
+   33 | static struct mtget ac_aggr;
       |                     ^~~~~~~
-configure:2975: $? = 1
+configure:9567: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -454,6 +863,20 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
 | #define HAVE_SIGINFO_T_SI_FD 1
 | /* end confdefs.h.  */
@@ -471,12 +894,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2975: gcc -c -g -O2  conftest.c >&5
+configure:9567: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:19:21: error: storage size of 'ac_aggr' isn't known
-   19 | static struct mtget ac_aggr;
+conftest.c:33:21: error: storage size of 'ac_aggr' isn't known
+   33 | static struct mtget ac_aggr;
       |                     ^~~~~~~
-configure:2975: $? = 1
+configure:9567: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -485,6 +908,20 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
 | #define HAVE_SIGINFO_T_SI_FD 1
 | /* end confdefs.h.  */
@@ -502,14 +939,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2975: result: no
-configure:2988: checking for struct mtget.mt_blkno
-configure:2988: gcc -c -g -O2  conftest.c >&5
+configure:9567: result: no
+configure:9580: checking for struct mtget.mt_blkno
+configure:9580: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:19:21: error: storage size of 'ac_aggr' isn't known
-   19 | static struct mtget ac_aggr;
+conftest.c:33:21: error: storage size of 'ac_aggr' isn't known
+   33 | static struct mtget ac_aggr;
       |                     ^~~~~~~
-configure:2988: $? = 1
+configure:9580: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -518,6 +955,20 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
 | #define HAVE_SIGINFO_T_SI_FD 1
 | /* end confdefs.h.  */
@@ -535,12 +986,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2988: gcc -c -g -O2  conftest.c >&5
+configure:9580: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:19:21: error: storage size of 'ac_aggr' isn't known
-   19 | static struct mtget ac_aggr;
+conftest.c:33:21: error: storage size of 'ac_aggr' isn't known
+   33 | static struct mtget ac_aggr;
       |                     ^~~~~~~
-configure:2988: $? = 1
+configure:9580: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -549,6 +1000,20 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
 | #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
 | #define HAVE_SIGINFO_T_SI_FD 1
 | /* end confdefs.h.  */
@@ -566,104 +1031,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:2988: result: no
-configure:3008: checking how to run the C preprocessor
-configure:3039: gcc -E  conftest.c
-configure:3039: $? = 0
-configure:3053: gcc -E  conftest.c
-conftest.c:11:10: fatal error: ac_nonexistent.h: No such file or directory
-   11 | #include <ac_nonexistent.h>
-      |          ^~~~~~~~~~~~~~~~~~
-compilation terminated.
-configure:3053: $? = 1
-configure: failed program was:
-| /* confdefs.h */
-| #define PACKAGE_NAME "Wine"
-| #define PACKAGE_TARNAME "wine"
-| #define PACKAGE_VERSION "10.0"
-| #define PACKAGE_STRING "Wine 10.0"
-| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
-| #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
-| /* end confdefs.h.  */
-| #include <ac_nonexistent.h>
-configure:3078: result: gcc -E
-configure:3098: gcc -E  conftest.c
-configure:3098: $? = 0
-configure:3112: gcc -E  conftest.c
-conftest.c:11:10: fatal error: ac_nonexistent.h: No such file or directory
-   11 | #include <ac_nonexistent.h>
-      |          ^~~~~~~~~~~~~~~~~~
-compilation terminated.
-configure:3112: $? = 1
-configure: failed program was:
-| /* confdefs.h */
-| #define PACKAGE_NAME "Wine"
-| #define PACKAGE_TARNAME "wine"
-| #define PACKAGE_VERSION "10.0"
-| #define PACKAGE_STRING "Wine 10.0"
-| #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
-| #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
-| /* end confdefs.h.  */
-| #include <ac_nonexistent.h>
-configure:3141: checking for grep that handles long lines and -e
-configure:3199: result: /usr/bin/grep
-configure:3204: checking for egrep
-configure:3266: result: /usr/bin/grep -E
-configure:3271: checking for ANSI C header files
-configure:3291: gcc -c -g -O2  conftest.c >&5
-configure:3291: $? = 0
-configure:3364: gcc -o conftest -g -O2   conftest.c  >&5
-configure:3364: $? = 0
-configure:3364: ./conftest
-configure:3364: $? = 0
-configure:3375: result: yes
-configure:3388: checking for sys/types.h
-configure:3388: gcc -c -g -O2  conftest.c >&5
-configure:3388: $? = 0
-configure:3388: result: yes
-configure:3388: checking for sys/stat.h
-configure:3388: gcc -c -g -O2  conftest.c >&5
-configure:3388: $? = 0
-configure:3388: result: yes
-configure:3388: checking for stdlib.h
-configure:3388: gcc -c -g -O2  conftest.c >&5
-configure:3388: $? = 0
-configure:3388: result: yes
-configure:3388: checking for string.h
-configure:3388: gcc -c -g -O2  conftest.c >&5
-configure:3388: $? = 0
-configure:3388: result: yes
-configure:3388: checking for memory.h
-configure:3388: gcc -c -g -O2  conftest.c >&5
-configure:3388: $? = 0
-configure:3388: result: yes
-configure:3388: checking for strings.h
-configure:3388: gcc -c -g -O2  conftest.c >&5
-configure:3388: $? = 0
-configure:3388: result: yes
-configure:3388: checking for inttypes.h
-configure:3388: gcc -c -g -O2  conftest.c >&5
-configure:3388: $? = 0
-configure:3388: result: yes
-configure:3388: checking for stdint.h
-configure:3388: gcc -c -g -O2  conftest.c >&5
-configure:3388: $? = 0
-configure:3388: result: yes
-configure:3388: checking for unistd.h
-configure:3388: gcc -c -g -O2  conftest.c >&5
-configure:3388: $? = 0
-configure:3388: result: yes
-configure:3400: checking for struct stat.st_mtim
-configure:3400: gcc -c -g -O2  conftest.c >&5
+configure:9580: result: no
+configure:9595: checking for struct stat.st_mtim
+configure:9595: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:58:5: error: used struct type value where scalar is required
-   58 | if (ac_aggr.st_mtim)
+conftest.c:62:5: error: used struct type value where scalar is required
+   62 | if (ac_aggr.st_mtim)
       |     ^~~~~~~
-configure:3400: $? = 1
+configure:9595: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -672,8 +1047,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -684,6 +1059,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | /* end confdefs.h.  */
 | #include <stdio.h>
 | #ifdef HAVE_SYS_TYPES_H
@@ -727,16 +1106,16 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3400: gcc -c -g -O2  conftest.c >&5
-configure:3400: $? = 0
-configure:3400: result: yes
-configure:3409: checking for struct stat.st_mtimespec
-configure:3409: gcc -c -g -O2  conftest.c >&5
+configure:9595: gcc -c -g -O2  conftest.c >&5
+configure:9595: $? = 0
+configure:9595: result: yes
+configure:9604: checking for struct stat.st_mtimespec
+configure:9604: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:59:12: error: 'struct stat' has no member named 'st_mtimespec'
-   59 | if (ac_aggr.st_mtimespec)
+conftest.c:63:12: error: 'struct stat' has no member named 'st_mtimespec'
+   63 | if (ac_aggr.st_mtimespec)
       |            ^
-configure:3409: $? = 1
+configure:9604: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -745,8 +1124,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -757,6 +1136,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | /* end confdefs.h.  */
 | #include <stdio.h>
@@ -801,12 +1184,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3409: gcc -c -g -O2  conftest.c >&5
+configure:9604: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:59:19: error: 'struct stat' has no member named 'st_mtimespec'
-   59 | if (sizeof ac_aggr.st_mtimespec)
+conftest.c:63:19: error: 'struct stat' has no member named 'st_mtimespec'
+   63 | if (sizeof ac_aggr.st_mtimespec)
       |                   ^
-configure:3409: $? = 1
+configure:9604: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -815,8 +1198,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -827,6 +1210,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | /* end confdefs.h.  */
 | #include <stdio.h>
@@ -871,14 +1258,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3409: result: no
-configure:3418: checking for struct stat.st_ctim
-configure:3418: gcc -c -g -O2  conftest.c >&5
+configure:9604: result: no
+configure:9613: checking for struct stat.st_ctim
+configure:9613: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:59:5: error: used struct type value where scalar is required
-   59 | if (ac_aggr.st_ctim)
+conftest.c:63:5: error: used struct type value where scalar is required
+   63 | if (ac_aggr.st_ctim)
       |     ^~~~~~~
-configure:3418: $? = 1
+configure:9613: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -887,8 +1274,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -899,6 +1286,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | /* end confdefs.h.  */
 | #include <stdio.h>
@@ -943,16 +1334,16 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3418: gcc -c -g -O2  conftest.c >&5
-configure:3418: $? = 0
-configure:3418: result: yes
-configure:3427: checking for struct stat.st_ctimespec
-configure:3427: gcc -c -g -O2  conftest.c >&5
+configure:9613: gcc -c -g -O2  conftest.c >&5
+configure:9613: $? = 0
+configure:9613: result: yes
+configure:9622: checking for struct stat.st_ctimespec
+configure:9622: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:60:12: error: 'struct stat' has no member named 'st_ctimespec'
-   60 | if (ac_aggr.st_ctimespec)
+conftest.c:64:12: error: 'struct stat' has no member named 'st_ctimespec'
+   64 | if (ac_aggr.st_ctimespec)
       |            ^
-configure:3427: $? = 1
+configure:9622: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -961,8 +1352,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -973,6 +1364,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | /* end confdefs.h.  */
@@ -1018,12 +1413,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3427: gcc -c -g -O2  conftest.c >&5
+configure:9622: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:60:19: error: 'struct stat' has no member named 'st_ctimespec'
-   60 | if (sizeof ac_aggr.st_ctimespec)
+conftest.c:64:19: error: 'struct stat' has no member named 'st_ctimespec'
+   64 | if (sizeof ac_aggr.st_ctimespec)
       |                   ^
-configure:3427: $? = 1
+configure:9622: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1032,8 +1427,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1044,6 +1439,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | /* end confdefs.h.  */
@@ -1089,14 +1488,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3427: result: no
-configure:3436: checking for struct stat.st_atim
-configure:3436: gcc -c -g -O2  conftest.c >&5
+configure:9622: result: no
+configure:9631: checking for struct stat.st_atim
+configure:9631: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:60:5: error: used struct type value where scalar is required
-   60 | if (ac_aggr.st_atim)
+conftest.c:64:5: error: used struct type value where scalar is required
+   64 | if (ac_aggr.st_atim)
       |     ^~~~~~~
-configure:3436: $? = 1
+configure:9631: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1105,8 +1504,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1117,6 +1516,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | /* end confdefs.h.  */
@@ -1162,16 +1565,16 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3436: gcc -c -g -O2  conftest.c >&5
-configure:3436: $? = 0
-configure:3436: result: yes
-configure:3445: checking for struct stat.st_atimespec
-configure:3445: gcc -c -g -O2  conftest.c >&5
+configure:9631: gcc -c -g -O2  conftest.c >&5
+configure:9631: $? = 0
+configure:9631: result: yes
+configure:9640: checking for struct stat.st_atimespec
+configure:9640: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:61:12: error: 'struct stat' has no member named 'st_atimespec'
-   61 | if (ac_aggr.st_atimespec)
+conftest.c:65:12: error: 'struct stat' has no member named 'st_atimespec'
+   65 | if (ac_aggr.st_atimespec)
       |            ^
-configure:3445: $? = 1
+configure:9640: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1180,8 +1583,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1192,6 +1595,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -1238,12 +1645,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3445: gcc -c -g -O2  conftest.c >&5
+configure:9640: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:61:19: error: 'struct stat' has no member named 'st_atimespec'
-   61 | if (sizeof ac_aggr.st_atimespec)
+conftest.c:65:19: error: 'struct stat' has no member named 'st_atimespec'
+   65 | if (sizeof ac_aggr.st_atimespec)
       |                   ^
-configure:3445: $? = 1
+configure:9640: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1252,8 +1659,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1264,6 +1671,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -1310,14 +1721,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3445: result: no
-configure:3454: checking for struct stat.st_birthtime
-configure:3454: gcc -c -g -O2  conftest.c >&5
+configure:9640: result: no
+configure:9649: checking for struct stat.st_birthtime
+configure:9649: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:61:12: error: 'struct stat' has no member named 'st_birthtime'
-   61 | if (ac_aggr.st_birthtime)
+conftest.c:65:12: error: 'struct stat' has no member named 'st_birthtime'
+   65 | if (ac_aggr.st_birthtime)
       |            ^
-configure:3454: $? = 1
+configure:9649: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1326,8 +1737,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1338,6 +1749,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -1384,12 +1799,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3454: gcc -c -g -O2  conftest.c >&5
+configure:9649: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:61:19: error: 'struct stat' has no member named 'st_birthtime'
-   61 | if (sizeof ac_aggr.st_birthtime)
+conftest.c:65:19: error: 'struct stat' has no member named 'st_birthtime'
+   65 | if (sizeof ac_aggr.st_birthtime)
       |                   ^
-configure:3454: $? = 1
+configure:9649: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1398,8 +1813,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1410,6 +1825,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -1456,14 +1875,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3454: result: no
-configure:3463: checking for struct stat.st_birthtim
-configure:3463: gcc -c -g -O2  conftest.c >&5
+configure:9649: result: no
+configure:9658: checking for struct stat.st_birthtim
+configure:9658: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:61:12: error: 'struct stat' has no member named 'st_birthtim'
-   61 | if (ac_aggr.st_birthtim)
+conftest.c:65:12: error: 'struct stat' has no member named 'st_birthtim'
+   65 | if (ac_aggr.st_birthtim)
       |            ^
-configure:3463: $? = 1
+configure:9658: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1472,8 +1891,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1484,6 +1903,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -1530,12 +1953,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3463: gcc -c -g -O2  conftest.c >&5
+configure:9658: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:61:19: error: 'struct stat' has no member named 'st_birthtim'
-   61 | if (sizeof ac_aggr.st_birthtim)
+conftest.c:65:19: error: 'struct stat' has no member named 'st_birthtim'
+   65 | if (sizeof ac_aggr.st_birthtim)
       |                   ^
-configure:3463: $? = 1
+configure:9658: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1544,8 +1967,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1556,6 +1979,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -1602,14 +2029,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3463: result: no
-configure:3472: checking for struct stat.st_birthtimespec
-configure:3472: gcc -c -g -O2  conftest.c >&5
+configure:9658: result: no
+configure:9667: checking for struct stat.st_birthtimespec
+configure:9667: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:61:12: error: 'struct stat' has no member named 'st_birthtimespec'
-   61 | if (ac_aggr.st_birthtimespec)
+conftest.c:65:12: error: 'struct stat' has no member named 'st_birthtimespec'
+   65 | if (ac_aggr.st_birthtimespec)
       |            ^
-configure:3472: $? = 1
+configure:9667: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1618,8 +2045,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1630,6 +2057,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -1676,12 +2107,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3472: gcc -c -g -O2  conftest.c >&5
+configure:9667: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:61:19: error: 'struct stat' has no member named 'st_birthtimespec'
-   61 | if (sizeof ac_aggr.st_birthtimespec)
+conftest.c:65:19: error: 'struct stat' has no member named 'st_birthtimespec'
+   65 | if (sizeof ac_aggr.st_birthtimespec)
       |                   ^
-configure:3472: $? = 1
+configure:9667: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1690,8 +2121,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1702,6 +2133,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -1748,14 +2183,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3472: result: no
-configure:3481: checking for struct stat.__st_birthtime
-configure:3481: gcc -c -g -O2  conftest.c >&5
+configure:9667: result: no
+configure:9676: checking for struct stat.__st_birthtime
+configure:9676: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:61:12: error: 'struct stat' has no member named '__st_birthtime'
-   61 | if (ac_aggr.__st_birthtime)
+conftest.c:65:12: error: 'struct stat' has no member named '__st_birthtime'
+   65 | if (ac_aggr.__st_birthtime)
       |            ^
-configure:3481: $? = 1
+configure:9676: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1764,8 +2199,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1776,6 +2211,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -1822,12 +2261,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3481: gcc -c -g -O2  conftest.c >&5
+configure:9676: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:61:19: error: 'struct stat' has no member named '__st_birthtime'
-   61 | if (sizeof ac_aggr.__st_birthtime)
+conftest.c:65:19: error: 'struct stat' has no member named '__st_birthtime'
+   65 | if (sizeof ac_aggr.__st_birthtime)
       |                   ^
-configure:3481: $? = 1
+configure:9676: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1836,8 +2275,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1848,6 +2287,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -1894,14 +2337,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3481: result: no
-configure:3490: checking for struct stat.__st_birthtim
-configure:3490: gcc -c -g -O2  conftest.c >&5
+configure:9676: result: no
+configure:9685: checking for struct stat.__st_birthtim
+configure:9685: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:61:12: error: 'struct stat' has no member named '__st_birthtim'
-   61 | if (ac_aggr.__st_birthtim)
+conftest.c:65:12: error: 'struct stat' has no member named '__st_birthtim'
+   65 | if (ac_aggr.__st_birthtim)
       |            ^
-configure:3490: $? = 1
+configure:9685: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1910,8 +2353,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1922,6 +2365,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -1968,12 +2415,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3490: gcc -c -g -O2  conftest.c >&5
+configure:9685: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:61:19: error: 'struct stat' has no member named '__st_birthtim'
-   61 | if (sizeof ac_aggr.__st_birthtim)
+conftest.c:65:19: error: 'struct stat' has no member named '__st_birthtim'
+   65 | if (sizeof ac_aggr.__st_birthtim)
       |                   ^
-configure:3490: $? = 1
+configure:9685: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -1982,8 +2429,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -1994,6 +2441,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2040,14 +2491,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3490: result: no
-configure:3501: checking for struct sockaddr_in6.sin6_scope_id
-configure:3501: gcc -c -g -O2  conftest.c >&5
+configure:9685: result: no
+configure:9696: checking for struct sockaddr_in6.sin6_scope_id
+configure:9696: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:32:28: error: storage size of 'ac_aggr' isn't known
-   32 | static struct sockaddr_in6 ac_aggr;
+conftest.c:36:28: error: storage size of 'ac_aggr' isn't known
+   36 | static struct sockaddr_in6 ac_aggr;
       |                            ^~~~~~~
-configure:3501: $? = 1
+configure:9696: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2056,8 +2507,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2068,6 +2519,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2086,12 +2541,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3501: gcc -c -g -O2  conftest.c >&5
+configure:9696: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:32:28: error: storage size of 'ac_aggr' isn't known
-   32 | static struct sockaddr_in6 ac_aggr;
+conftest.c:36:28: error: storage size of 'ac_aggr' isn't known
+   36 | static struct sockaddr_in6 ac_aggr;
       |                            ^~~~~~~
-configure:3501: $? = 1
+configure:9696: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2100,8 +2555,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2112,6 +2567,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2130,14 +2589,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3501: result: no
-configure:3516: checking for struct __res_state._u._ext.nscount6
-configure:3516: gcc -c -g -O2  conftest.c >&5
+configure:9696: result: no
+configure:9711: checking for struct __res_state._u._ext.nscount6
+configure:9711: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:31:27: error: storage size of 'ac_aggr' isn't known
-   31 | static struct __res_state ac_aggr;
+conftest.c:35:27: error: storage size of 'ac_aggr' isn't known
+   35 | static struct __res_state ac_aggr;
       |                           ^~~~~~~
-configure:3516: $? = 1
+configure:9711: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2146,8 +2605,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2158,6 +2617,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2175,12 +2638,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3516: gcc -c -g -O2  conftest.c >&5
+configure:9711: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:31:27: error: storage size of 'ac_aggr' isn't known
-   31 | static struct __res_state ac_aggr;
+conftest.c:35:27: error: storage size of 'ac_aggr' isn't known
+   35 | static struct __res_state ac_aggr;
       |                           ^~~~~~~
-configure:3516: $? = 1
+configure:9711: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2189,8 +2652,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2201,6 +2664,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2218,14 +2685,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3516: result: no
-configure:3530: checking for struct in6_pktinfo.ipi6_addr
-configure:3530: gcc -c -g -O2  conftest.c >&5
+configure:9711: result: no
+configure:9725: checking for struct in6_pktinfo.ipi6_addr
+configure:9725: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:31:27: error: storage size of 'ac_aggr' isn't known
-   31 | static struct in6_pktinfo ac_aggr;
+conftest.c:35:27: error: storage size of 'ac_aggr' isn't known
+   35 | static struct in6_pktinfo ac_aggr;
       |                           ^~~~~~~
-configure:3530: $? = 1
+configure:9725: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2234,8 +2701,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2246,6 +2713,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2263,12 +2734,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3530: gcc -c -g -O2  conftest.c >&5
+configure:9725: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:31:27: error: storage size of 'ac_aggr' isn't known
-   31 | static struct in6_pktinfo ac_aggr;
+conftest.c:35:27: error: storage size of 'ac_aggr' isn't known
+   35 | static struct in6_pktinfo ac_aggr;
       |                           ^~~~~~~
-configure:3530: $? = 1
+configure:9725: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2277,8 +2748,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2289,6 +2760,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2306,14 +2781,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3530: result: no
-configure:3544: checking for struct ipstat.ips_total
-configure:3544: gcc -c -g -O2  conftest.c >&5
+configure:9725: result: no
+configure:9739: checking for struct ipstat.ips_total
+configure:9739: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:38:22: error: storage size of 'ac_aggr' isn't known
-   38 | static struct ipstat ac_aggr;
+conftest.c:42:22: error: storage size of 'ac_aggr' isn't known
+   42 | static struct ipstat ac_aggr;
       |                      ^~~~~~~
-configure:3544: $? = 1
+configure:9739: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2322,8 +2797,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2334,6 +2809,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2358,12 +2837,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3544: gcc -c -g -O2  conftest.c >&5
+configure:9739: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:38:22: error: storage size of 'ac_aggr' isn't known
-   38 | static struct ipstat ac_aggr;
+conftest.c:42:22: error: storage size of 'ac_aggr' isn't known
+   42 | static struct ipstat ac_aggr;
       |                      ^~~~~~~
-configure:3544: $? = 1
+configure:9739: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2372,8 +2851,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2384,6 +2863,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2408,14 +2891,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3544: result: no
-configure:3565: checking for struct ip_stats.ips_total
-configure:3565: gcc -c -g -O2  conftest.c >&5
+configure:9739: result: no
+configure:9760: checking for struct ip_stats.ips_total
+configure:9760: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:31:24: error: storage size of 'ac_aggr' isn't known
-   31 | static struct ip_stats ac_aggr;
+conftest.c:35:24: error: storage size of 'ac_aggr' isn't known
+   35 | static struct ip_stats ac_aggr;
       |                        ^~~~~~~
-configure:3565: $? = 1
+configure:9760: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2424,8 +2907,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2436,6 +2919,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2453,12 +2940,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3565: gcc -c -g -O2  conftest.c >&5
+configure:9760: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:31:24: error: storage size of 'ac_aggr' isn't known
-   31 | static struct ip_stats ac_aggr;
+conftest.c:35:24: error: storage size of 'ac_aggr' isn't known
+   35 | static struct ip_stats ac_aggr;
       |                        ^~~~~~~
-configure:3565: $? = 1
+configure:9760: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2467,8 +2954,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2479,6 +2966,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2496,14 +2987,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3565: result: no
-configure:3579: checking for struct ip6stat.ip6s_total
-configure:3579: gcc -c -g -O2  conftest.c >&5
+configure:9760: result: no
+configure:9774: checking for struct ip6stat.ip6s_total
+configure:9774: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:38:23: error: storage size of 'ac_aggr' isn't known
-   38 | static struct ip6stat ac_aggr;
+conftest.c:42:23: error: storage size of 'ac_aggr' isn't known
+   42 | static struct ip6stat ac_aggr;
       |                       ^~~~~~~
-configure:3579: $? = 1
+configure:9774: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2512,8 +3003,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2524,6 +3015,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2548,12 +3043,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3579: gcc -c -g -O2  conftest.c >&5
+configure:9774: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:38:23: error: storage size of 'ac_aggr' isn't known
-   38 | static struct ip6stat ac_aggr;
+conftest.c:42:23: error: storage size of 'ac_aggr' isn't known
+   42 | static struct ip6stat ac_aggr;
       |                       ^~~~~~~
-configure:3579: $? = 1
+configure:9774: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2562,8 +3057,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2574,6 +3069,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2598,14 +3097,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3579: result: no
-configure:3600: checking for struct icmpstat.icps_error
-configure:3600: gcc -c -g -O2  conftest.c >&5
+configure:9774: result: no
+configure:9795: checking for struct icmpstat.icps_error
+configure:9795: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:44:24: error: storage size of 'ac_aggr' isn't known
-   44 | static struct icmpstat ac_aggr;
+conftest.c:48:24: error: storage size of 'ac_aggr' isn't known
+   48 | static struct icmpstat ac_aggr;
       |                        ^~~~~~~
-configure:3600: $? = 1
+configure:9795: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2614,8 +3113,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2626,6 +3125,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2656,12 +3159,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3600: gcc -c -g -O2  conftest.c >&5
+configure:9795: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:44:24: error: storage size of 'ac_aggr' isn't known
-   44 | static struct icmpstat ac_aggr;
+conftest.c:48:24: error: storage size of 'ac_aggr' isn't known
+   48 | static struct icmpstat ac_aggr;
       |                        ^~~~~~~
-configure:3600: $? = 1
+configure:9795: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2670,8 +3173,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2682,6 +3185,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2712,14 +3219,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3600: result: no
-configure:3627: checking for struct icmp6stat.icp6s_error
-configure:3627: gcc -c -g -O2  conftest.c >&5
+configure:9795: result: no
+configure:9822: checking for struct icmp6stat.icp6s_error
+configure:9822: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:38:25: error: storage size of 'ac_aggr' isn't known
-   38 | static struct icmp6stat ac_aggr;
+conftest.c:42:25: error: storage size of 'ac_aggr' isn't known
+   42 | static struct icmp6stat ac_aggr;
       |                         ^~~~~~~
-configure:3627: $? = 1
+configure:9822: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2728,8 +3235,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2740,6 +3247,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2764,12 +3275,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3627: gcc -c -g -O2  conftest.c >&5
+configure:9822: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:38:25: error: storage size of 'ac_aggr' isn't known
-   38 | static struct icmp6stat ac_aggr;
+conftest.c:42:25: error: storage size of 'ac_aggr' isn't known
+   42 | static struct icmp6stat ac_aggr;
       |                         ^~~~~~~
-configure:3627: $? = 1
+configure:9822: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2778,8 +3289,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2790,6 +3301,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2814,14 +3329,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3627: result: no
-configure:3648: checking for struct tcpstat.tcps_connattempt
-configure:3648: gcc -c -g -O2  conftest.c >&5
+configure:9822: result: no
+configure:9843: checking for struct tcpstat.tcps_connattempt
+configure:9843: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:41:23: error: storage size of 'ac_aggr' isn't known
-   41 | static struct tcpstat ac_aggr;
+conftest.c:45:23: error: storage size of 'ac_aggr' isn't known
+   45 | static struct tcpstat ac_aggr;
       |                       ^~~~~~~
-configure:3648: $? = 1
+configure:9843: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2830,8 +3345,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2842,6 +3357,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2869,12 +3388,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3648: gcc -c -g -O2  conftest.c >&5
+configure:9843: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:41:23: error: storage size of 'ac_aggr' isn't known
-   41 | static struct tcpstat ac_aggr;
+conftest.c:45:23: error: storage size of 'ac_aggr' isn't known
+   45 | static struct tcpstat ac_aggr;
       |                       ^~~~~~~
-configure:3648: $? = 1
+configure:9843: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2883,8 +3402,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2895,6 +3414,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2922,14 +3445,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3648: result: no
-configure:3672: checking for struct tcp_stats.tcps_connattempt
-configure:3672: gcc -c -g -O2  conftest.c >&5
+configure:9843: result: no
+configure:9867: checking for struct tcp_stats.tcps_connattempt
+configure:9867: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:31:25: error: storage size of 'ac_aggr' isn't known
-   31 | static struct tcp_stats ac_aggr;
+conftest.c:35:25: error: storage size of 'ac_aggr' isn't known
+   35 | static struct tcp_stats ac_aggr;
       |                         ^~~~~~~
-configure:3672: $? = 1
+configure:9867: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2938,8 +3461,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2950,6 +3473,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -2967,12 +3494,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3672: gcc -c -g -O2  conftest.c >&5
+configure:9867: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:31:25: error: storage size of 'ac_aggr' isn't known
-   31 | static struct tcp_stats ac_aggr;
+conftest.c:35:25: error: storage size of 'ac_aggr' isn't known
+   35 | static struct tcp_stats ac_aggr;
       |                         ^~~~~~~
-configure:3672: $? = 1
+configure:9867: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -2981,8 +3508,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -2993,6 +3520,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -3010,14 +3541,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3672: result: no
-configure:3686: checking for struct udpstat.udps_ipackets
-configure:3686: gcc -c -g -O2  conftest.c >&5
+configure:9867: result: no
+configure:9881: checking for struct udpstat.udps_ipackets
+configure:9881: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:41:23: error: storage size of 'ac_aggr' isn't known
-   41 | static struct udpstat ac_aggr;
+conftest.c:45:23: error: storage size of 'ac_aggr' isn't known
+   45 | static struct udpstat ac_aggr;
       |                       ^~~~~~~
-configure:3686: $? = 1
+configure:9881: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -3026,8 +3557,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -3038,6 +3569,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -3065,12 +3600,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3686: gcc -c -g -O2  conftest.c >&5
+configure:9881: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:41:23: error: storage size of 'ac_aggr' isn't known
-   41 | static struct udpstat ac_aggr;
+conftest.c:45:23: error: storage size of 'ac_aggr' isn't known
+   45 | static struct udpstat ac_aggr;
       |                       ^~~~~~~
-configure:3686: $? = 1
+configure:9881: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -3079,8 +3614,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -3091,6 +3626,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -3118,14 +3657,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3686: result: no
-configure:3710: checking for struct ifreq.ifr_hwaddr
-configure:3710: gcc -c -g -O2  conftest.c >&5
+configure:9881: result: no
+configure:9905: checking for struct ifreq.ifr_hwaddr
+configure:9905: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:32:21: error: storage size of 'ac_aggr' isn't known
-   32 | static struct ifreq ac_aggr;
+conftest.c:36:21: error: storage size of 'ac_aggr' isn't known
+   36 | static struct ifreq ac_aggr;
       |                     ^~~~~~~
-configure:3710: $? = 1
+configure:9905: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -3134,8 +3673,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -3146,6 +3685,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -3164,12 +3707,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3710: gcc -c -g -O2  conftest.c >&5
+configure:9905: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:32:21: error: storage size of 'ac_aggr' isn't known
-   32 | static struct ifreq ac_aggr;
+conftest.c:36:21: error: storage size of 'ac_aggr' isn't known
+   36 | static struct ifreq ac_aggr;
       |                     ^~~~~~~
-configure:3710: $? = 1
+configure:9905: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -3178,8 +3721,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -3190,6 +3733,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -3208,14 +3755,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3710: result: no
-configure:3725: checking for struct sysinfo.totalram
-configure:3725: gcc -c -g -O2  conftest.c >&5
+configure:9905: result: no
+configure:9920: checking for struct sysinfo.totalram
+configure:9920: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:31:23: error: storage size of 'ac_aggr' isn't known
-   31 | static struct sysinfo ac_aggr;
+conftest.c:35:23: error: storage size of 'ac_aggr' isn't known
+   35 | static struct sysinfo ac_aggr;
       |                       ^~~~~~~
-configure:3725: $? = 1
+configure:9920: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -3224,8 +3771,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -3236,6 +3783,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -3253,12 +3804,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3725: gcc -c -g -O2  conftest.c >&5
+configure:9920: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:31:23: error: storage size of 'ac_aggr' isn't known
-   31 | static struct sysinfo ac_aggr;
+conftest.c:35:23: error: storage size of 'ac_aggr' isn't known
+   35 | static struct sysinfo ac_aggr;
       |                       ^~~~~~~
-configure:3725: $? = 1
+configure:9920: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -3267,8 +3818,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -3279,6 +3830,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -3296,14 +3851,14 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3725: result: no
-configure:3737: checking for struct sysinfo.mem_unit
-configure:3737: gcc -c -g -O2  conftest.c >&5
+configure:9920: result: no
+configure:9932: checking for struct sysinfo.mem_unit
+configure:9932: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:31:23: error: storage size of 'ac_aggr' isn't known
-   31 | static struct sysinfo ac_aggr;
+conftest.c:35:23: error: storage size of 'ac_aggr' isn't known
+   35 | static struct sysinfo ac_aggr;
       |                       ^~~~~~~
-configure:3737: $? = 1
+configure:9932: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -3312,8 +3867,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -3324,6 +3879,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -3341,12 +3900,12 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3737: gcc -c -g -O2  conftest.c >&5
+configure:9932: gcc -c -g -O2  conftest.c >&5
 conftest.c: In function 'main':
-conftest.c:31:23: error: storage size of 'ac_aggr' isn't known
-   31 | static struct sysinfo ac_aggr;
+conftest.c:35:23: error: storage size of 'ac_aggr' isn't known
+   35 | static struct sysinfo ac_aggr;
       |                       ^~~~~~~
-configure:3737: $? = 1
+configure:9932: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME "Wine"
@@ -3355,8 +3914,8 @@ configure: failed program was:
 | #define PACKAGE_STRING "Wine 10.0"
 | #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 | #define PACKAGE_URL "https://www.winehq.org"
-| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-| #define HAVE_SIGINFO_T_SI_FD 1
+| #define PACKAGE "wine"
+| #define VERSION "10.0"
 | #define STDC_HEADERS 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
@@ -3367,6 +3926,10 @@ configure: failed program was:
 | #define HAVE_INTTYPES_H 1
 | #define HAVE_STDINT_H 1
 | #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+| #define HAVE_SIGINFO_T_SI_FD 1
 | #define HAVE_STRUCT_STAT_ST_MTIM 1
 | #define HAVE_STRUCT_STAT_ST_CTIM 1
 | #define HAVE_STRUCT_STAT_ST_ATIM 1
@@ -3384,20 +3947,23 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3737: result: no
-configure:3753: checking for __builtin_popcount
-configure:3769: gcc -o conftest -g -O2   conftest.c  >&5
-configure:3769: $? = 0
-configure:3777: result: yes
-configure:3786: checking for __clear_cache
-configure:3802: gcc -o conftest -g -O2   conftest.c  >&5
-configure:3802: $? = 0
-configure:3810: result: yes
+configure:9932: result: no
+configure:9948: checking for __builtin_popcount
+configure:9964: gcc -o conftest -g -O2   conftest.c  >&5
+configure:9964: $? = 0
+configure:9972: result: yes
+configure:9981: checking for __clear_cache
+configure:9997: gcc -o conftest -g -O2   conftest.c  >&5
+configure:9997: $? = 0
+configure:10005: result: yes
+configure:10057: gcc -c -g -O2  conftest.c >&5
+configure:10057: $? = 0
 
 ## ---------------- ##
 ## Cache variables. ##
 ## ---------------- ##
 
+ac_cv_build=x86_64-pc-linux-gnu
 ac_cv_c_compiler_gnu=yes
 ac_cv_env_CC_set=
 ac_cv_env_CC_value=
@@ -3411,6 +3977,8 @@ ac_cv_env_LDFLAGS_set=
 ac_cv_env_LDFLAGS_value=
 ac_cv_env_LIBS_set=
 ac_cv_env_LIBS_value=
+ac_cv_env_LT_SYS_LIBRARY_PATH_set=
+ac_cv_env_LT_SYS_LIBRARY_PATH_value=
 ac_cv_env_build_alias_set=
 ac_cv_env_build_alias_value=
 ac_cv_env_host_alias_set=
@@ -3419,6 +3987,7 @@ ac_cv_env_target_alias_set=
 ac_cv_env_target_alias_value=
 ac_cv_have___builtin_popcount=yes
 ac_cv_have___clear_cache=yes
+ac_cv_header_dlfcn_h=yes
 ac_cv_header_inttypes_h=yes
 ac_cv_header_memory_h=yes
 ac_cv_header_stdc=yes
@@ -3429,6 +3998,7 @@ ac_cv_header_strings_h=yes
 ac_cv_header_sys_stat_h=yes
 ac_cv_header_sys_types_h=yes
 ac_cv_header_unistd_h=yes
+ac_cv_host=x86_64-pc-linux-gnu
 ac_cv_member_scsireq_t_cmd=no
 ac_cv_member_sg_io_hdr_t_interface_id=no
 ac_cv_member_siginfo_t_si_fd=yes
@@ -3463,34 +4033,115 @@ ac_cv_member_struct_tcpstat_tcps_connattempt=no
 ac_cv_member_struct_udpstat_udps_ipackets=no
 ac_cv_objext=o
 ac_cv_path_EGREP='/usr/bin/grep -E'
+ac_cv_path_FGREP='/usr/bin/grep -F'
 ac_cv_path_GREP=/usr/bin/grep
+ac_cv_path_SED=/usr/bin/sed
+ac_cv_path_install='/usr/bin/install -c'
+ac_cv_path_lt_DD=/usr/bin/dd
+ac_cv_path_mkdir=/usr/bin/mkdir
+ac_cv_prog_AWK=gawk
 ac_cv_prog_CPP='gcc -E'
+ac_cv_prog_ac_ct_AR=ar
 ac_cv_prog_ac_ct_CC=gcc
+ac_cv_prog_ac_ct_OBJDUMP=objdump
+ac_cv_prog_ac_ct_RANLIB=ranlib
+ac_cv_prog_ac_ct_STRIP=strip
 ac_cv_prog_cc_c89=
 ac_cv_prog_cc_g=yes
+ac_cv_prog_make_make_set=yes
 ac_cv_type_request_sense=no
+am_cv_CC_dependencies_compiler_type=gcc3
+am_cv_make_support_nested_variables=yes
+am_cv_prog_cc_c_o=yes
+lt_cv_ar_at_file=@
+lt_cv_archive_cmds_need_lc=no
+lt_cv_deplibs_check_method=pass_all
+lt_cv_file_magic_cmd='$MAGIC_CMD'
+lt_cv_file_magic_test_file=
+lt_cv_ld_reload_flag=-r
+lt_cv_nm_interface='BSD nm'
+lt_cv_objdir=.libs
+lt_cv_path_LD=/usr/bin/ld
+lt_cv_path_NM='/usr/bin/nm -B'
+lt_cv_path_mainfest_tool=no
+lt_cv_prog_compiler_c_o=yes
+lt_cv_prog_compiler_pic='-fPIC -DPIC'
+lt_cv_prog_compiler_pic_works=yes
+lt_cv_prog_compiler_rtti_exceptions=no
+lt_cv_prog_compiler_static_works=yes
+lt_cv_prog_gnu_ld=yes
+lt_cv_sharedlib_from_linklib_cmd='printf %s\n'
+lt_cv_shlibpath_overrides_runpath=yes
+lt_cv_sys_global_symbol_pipe='sed -n -e '\''s/^.*[	 ]\([ABCDGIRSTW][ABCDGIRSTW]*\)[	 ][	 ]*\([_A-Za-z][_A-Za-z0-9]*\)$/\1 \2 \2/p'\'' | sed '\''/ __gnu_lto/d'\'''
+lt_cv_sys_global_symbol_to_c_name_address='sed -n -e '\''s/^: \(.*\) .*$/  {"\1", (void *) 0},/p'\'' -e '\''s/^[ABCDGIRSTW][ABCDGIRSTW]* .* \(.*\)$/  {"\1", (void *) \&\1},/p'\'''
+lt_cv_sys_global_symbol_to_c_name_address_lib_prefix='sed -n -e '\''s/^: \(.*\) .*$/  {"\1", (void *) 0},/p'\'' -e '\''s/^[ABCDGIRSTW][ABCDGIRSTW]* .* \(lib.*\)$/  {"\1", (void *) \&\1},/p'\'' -e '\''s/^[ABCDGIRSTW][ABCDGIRSTW]* .* \(.*\)$/  {"lib\1", (void *) \&\1},/p'\'''
+lt_cv_sys_global_symbol_to_cdecl='sed -n -e '\''s/^T .* \(.*\)$/extern int \1();/p'\'' -e '\''s/^[ABCDGIRSTW][ABCDGIRSTW]* .* \(.*\)$/extern char \1;/p'\'''
+lt_cv_sys_global_symbol_to_import=
+lt_cv_sys_max_cmd_len=1572864
+lt_cv_to_host_file_cmd=func_convert_file_noop
+lt_cv_to_tool_file_cmd=func_convert_file_noop
+lt_cv_truncate_bin='/usr/bin/dd bs=4096 count=1'
 wine_cv_linux_gethostbyname_r_6=yes
 
 ## ----------------- ##
 ## Output variables. ##
 ## ----------------- ##
 
+ACLOCAL='${SHELL} /workspaces/Goliath/tools/missing aclocal-1.16'
+AMDEPBACKSLASH='\'
+AMDEP_FALSE='#'
+AMDEP_TRUE=''
+AMTAR='$${TAR-tar}'
+AM_BACKSLASH='\'
+AM_DEFAULT_V='$(AM_DEFAULT_VERBOSITY)'
+AM_DEFAULT_VERBOSITY='1'
+AM_V='$(V)'
+AR='ar'
+AUTOCONF='${SHELL} /workspaces/Goliath/tools/missing autoconf'
+AUTOHEADER='${SHELL} /workspaces/Goliath/tools/missing autoheader'
+AUTOMAKE='${SHELL} /workspaces/Goliath/tools/missing automake-1.16'
+AWK='gawk'
 CC='gcc'
+CCDEPMODE='depmode=gcc3'
 CFLAGS='-g -O2'
 CPP='gcc -E'
 CPPFLAGS=''
+CYGPATH_W='echo'
 DEFS=''
+DEPDIR='.deps'
+DLLTOOL='false'
+DSYMUTIL=''
+DUMPBIN=''
 ECHO_C=''
 ECHO_N='-n'
 ECHO_T=''
 EGREP='/usr/bin/grep -E'
 EXEEXT=''
+FGREP='/usr/bin/grep -F'
 GREP='/usr/bin/grep'
+INSTALL_DATA='${INSTALL} -m 644'
+INSTALL_PROGRAM='${INSTALL}'
+INSTALL_SCRIPT='${INSTALL}'
+INSTALL_STRIP_PROGRAM='$(install_sh) -c -s'
+LD='/usr/bin/ld -m elf_x86_64'
 LDFLAGS=''
 LIBOBJS=''
 LIBS=''
+LIBTOOL='$(SHELL) $(top_builddir)/libtool'
+LIPO=''
+LN_S='ln -s'
 LTLIBOBJS=''
+LT_SYS_LIBRARY_PATH=''
+MAKEINFO='${SHELL} /workspaces/Goliath/tools/missing makeinfo'
+MANIFEST_TOOL=':'
+MKDIR_P='/usr/bin/mkdir -p'
+NM='/usr/bin/nm -B'
+NMEDIT=''
+OBJDUMP='objdump'
 OBJEXT='o'
+OTOOL64=''
+OTOOL=''
+PACKAGE='wine'
 PACKAGE_BUGREPORT='wine-devel@winehq.org'
 PACKAGE_NAME='Wine'
 PACKAGE_STRING='Wine 10.0'
@@ -3498,25 +4149,53 @@ PACKAGE_TARNAME='wine'
 PACKAGE_URL='https://www.winehq.org'
 PACKAGE_VERSION='10.0'
 PATH_SEPARATOR=':'
-SHELL='/bin/bash'
+RANLIB='ranlib'
+SED='/usr/bin/sed'
+SET_MAKE=''
+SHELL='/bin/sh'
+STRIP='strip'
 TAGSFLAGS=''
+VERSION='10.0'
+ac_ct_AR='ar'
 ac_ct_CC='gcc'
+ac_ct_DUMPBIN=''
+am__EXEEXT_FALSE=''
+am__EXEEXT_TRUE=''
+am__fastdepCC_FALSE='#'
+am__fastdepCC_TRUE=''
+am__include='include'
+am__isrc=''
+am__leading_dot='.'
+am__nodep='_no'
+am__quote=''
+am__tar='$${TAR-tar} chof - "$$tardir"'
+am__untar='$${TAR-tar} xf -'
 bindir='${exec_prefix}/bin'
+build='x86_64-pc-linux-gnu'
 build_alias=''
+build_cpu='x86_64'
+build_os='linux-gnu'
+build_vendor='pc'
 datadir='${datarootdir}'
 datarootdir='${prefix}/share'
 docdir='${datarootdir}/doc/${PACKAGE_TARNAME}'
 dvidir='${docdir}'
 exec_prefix='NONE'
+host='x86_64-pc-linux-gnu'
 host_alias=''
+host_cpu='x86_64'
+host_os='linux-gnu'
+host_vendor='pc'
 htmldir='${docdir}'
 includedir='${prefix}/include'
 infodir='${datarootdir}/info'
+install_sh='${SHELL} /workspaces/Goliath/tools/install-sh'
 libdir='${exec_prefix}/lib'
 libexecdir='${exec_prefix}/libexec'
 localedir='${datarootdir}/locale'
 localstatedir='${prefix}/var'
 mandir='${datarootdir}/man'
+mkdir_p='$(MKDIR_P)'
 oldincludedir='/usr/include'
 pdfdir='${docdir}'
 prefix='NONE'
@@ -3539,8 +4218,8 @@ target_alias=''
 #define PACKAGE_STRING "Wine 10.0"
 #define PACKAGE_BUGREPORT "wine-devel@winehq.org"
 #define PACKAGE_URL "https://www.winehq.org"
-#define HAVE_LINUX_GETHOSTBYNAME_R_6 1
-#define HAVE_SIGINFO_T_SI_FD 1
+#define PACKAGE "wine"
+#define VERSION "10.0"
 #define STDC_HEADERS 1
 #define HAVE_SYS_TYPES_H 1
 #define HAVE_SYS_STAT_H 1
@@ -3551,10 +4230,15 @@ target_alias=''
 #define HAVE_INTTYPES_H 1
 #define HAVE_STDINT_H 1
 #define HAVE_UNISTD_H 1
+#define HAVE_DLFCN_H 1
+#define LT_OBJDIR ".libs/"
+#define HAVE_LINUX_GETHOSTBYNAME_R_6 1
+#define HAVE_SIGINFO_T_SI_FD 1
 #define HAVE_STRUCT_STAT_ST_MTIM 1
 #define HAVE_STRUCT_STAT_ST_CTIM 1
 #define HAVE_STRUCT_STAT_ST_ATIM 1
 #define HAVE___BUILTIN_POPCOUNT 1
 #define HAVE___CLEAR_CACHE 1
+#define __x86_64__ 1
 
 configure: exit 2
