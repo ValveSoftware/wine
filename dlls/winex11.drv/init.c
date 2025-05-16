@@ -248,6 +248,7 @@ BOOL needs_offscreen_rendering( HWND hwnd )
     struct window_surface *surface;
     struct x11drv_win_data *data;
     BOOL needs_offscreen;
+    DWORD layered_flags;
 
     if (!(data = get_win_data( hwnd ))) needs_offscreen = TRUE; /* window is in a different process */
     else
@@ -255,6 +256,11 @@ BOOL needs_offscreen_rendering( HWND hwnd )
         needs_offscreen = (style & WS_VISIBLE) && !(style & WS_MINIMIZE) && !is_window_rect_mapped( &data->rects.visible );
         release_win_data( data );
     }
+
+    if (!needs_offscreen && style & WS_EX_LAYERED && NtUserGetLayeredWindowAttributes( hwnd, NULL, NULL, &layered_flags )
+        && layered_flags & LWA_COLORKEY)
+        needs_offscreen = TRUE;
+
     if (!needs_offscreen && (surface = window_surface_get( hwnd )))
     {
         TRACE("hwnd %p, surface %p, surface->alpha_mask %#x.\n", hwnd, surface, surface->alpha_mask);
