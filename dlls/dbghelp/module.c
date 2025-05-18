@@ -902,6 +902,7 @@ BOOL image_check_alternate(struct image_file_map* fmap, const struct module* mod
     return FALSE;
 }
 
+#ifndef _WIN64
 /***********************************************************************
  *			SymLoadModule (DBGHELP.@)
  */
@@ -911,6 +912,7 @@ DWORD WINAPI SymLoadModule(HANDLE hProcess, HANDLE hFile, PCSTR ImageName,
     return SymLoadModuleEx(hProcess, hFile, ImageName, ModuleName, BaseOfDll,
                            SizeOfDll, NULL, 0);
 }
+#endif
 
 /***********************************************************************
  *			SymLoadModuleEx (DBGHELP.@)
@@ -1127,6 +1129,7 @@ BOOL module_remove(struct process* pcs, struct module* module)
     return FALSE;
 }
 
+#ifndef _WIN64
 /******************************************************************
  *		SymUnloadModule (DBGHELP.@)
  *
@@ -1135,6 +1138,7 @@ BOOL WINAPI SymUnloadModule(HANDLE hProcess, DWORD BaseOfDll)
 {
     return SymUnloadModule64(hProcess, BaseOfDll);
 }
+#endif
 
 /******************************************************************
  *		SymUnloadModule64 (DBGHELP.@)
@@ -1153,6 +1157,7 @@ BOOL WINAPI SymUnloadModule64(HANDLE hProcess, DWORD64 BaseOfDll)
     return TRUE;
 }
 
+#ifndef _WIN64
 /******************************************************************
  *		SymEnumerateModules (DBGHELP.@)
  *
@@ -1183,6 +1188,7 @@ BOOL  WINAPI SymEnumerateModules(HANDLE hProcess,
 
     return SymEnumerateModulesW64(hProcess, enum_modW64_32, &x);
 }
+#endif
 
 /******************************************************************
  *		SymEnumerateModules64 (DBGHELP.@)
@@ -1272,6 +1278,7 @@ BOOL  WINAPI EnumerateLoadedModules64(HANDLE hProcess,
     return EnumerateLoadedModulesW64(hProcess, enum_load_modW64_64, &x);
 }
 
+#ifndef _WIN64
 /******************************************************************
  *		EnumerateLoadedModules (DBGHELP.@)
  *
@@ -1302,6 +1309,7 @@ BOOL  WINAPI EnumerateLoadedModules(HANDLE hProcess,
 
     return EnumerateLoadedModulesW64(hProcess, enum_load_modW64_32, &x);
 }
+#endif
 
 static unsigned int load_and_grow_modules(HANDLE process, HMODULE** hmods, unsigned start, unsigned* alloc, DWORD filter)
 {
@@ -1427,6 +1435,7 @@ static void dbghelp_str_WtoA(const WCHAR *src, char *dst, int dst_len)
     dst[dst_len - 1] = 0;
 }
 
+#ifndef _WIN64
 /******************************************************************
  *		SymGetModuleInfo (DBGHELP.@)
  *
@@ -1487,6 +1496,7 @@ BOOL  WINAPI SymGetModuleInfoW(HANDLE hProcess, DWORD dwAddr,
 
     return TRUE;
 }
+#endif
 
 /******************************************************************
  *		SymGetModuleInfo64 (DBGHELP.@)
@@ -1582,6 +1592,7 @@ BOOL  WINAPI SymGetModuleInfoW64(HANDLE hProcess, DWORD64 dwAddr,
     return TRUE;
 }
 
+#ifndef _WIN64
 /***********************************************************************
  *		SymGetModuleBase (DBGHELP.@)
  */
@@ -1589,6 +1600,7 @@ DWORD WINAPI SymGetModuleBase(HANDLE hProcess, DWORD dwAddr)
 {
     return (DWORD)SymGetModuleBase64(hProcess, dwAddr);
 }
+#endif
 
 /***********************************************************************
  *		SymGetModuleBase64 (DBGHELP.@)
@@ -1662,6 +1674,7 @@ BOOL WINAPI SymRefreshModuleList(HANDLE hProcess)
     return module_refresh_list(pcs);
 }
 
+#ifndef _WIN64
 /***********************************************************************
  *		SymFunctionTableAccess (DBGHELP.@)
  */
@@ -1669,6 +1682,7 @@ PVOID WINAPI SymFunctionTableAccess(HANDLE hProcess, DWORD AddrBase)
 {
     return SymFunctionTableAccess64(hProcess, AddrBase);
 }
+#endif
 
 /***********************************************************************
  *		SymFunctionTableAccess64 (DBGHELP.@)
