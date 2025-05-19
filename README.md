@@ -1,6 +1,6 @@
 ## INTRODUCTION
 
-Goliath is a compatibility Layer for running Apps from every Major OS, and is based off of Wine.
+Goliath is a compatibility Layer for running Apps from every Major OS, and is based off of Proton's version of Wine.
 *Wine itself is a program which allows running Microsoft Windows programs
 (including DOS, Windows 3.x, Win32, and Win64 executables) on Unix.
 It consists of a program loader which loads and executes a Microsoft
