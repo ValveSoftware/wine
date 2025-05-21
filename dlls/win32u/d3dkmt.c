@@ -1036,6 +1036,9 @@ BOOL get_vulkan_gpus( struct list *gpus )
     {
         struct gpu_info *gpu;
 
+        /* Ignore Khronos vendor IDs */
+        if (devinfo[i].properties2.properties.vendorID >= 0x10000) continue;
+
         if (!(gpu = calloc( 1, sizeof(*gpu) ))) break;
         memcpy( &gpu->uuid, devinfo[i].id.deviceUUID, sizeof(gpu->uuid) );
         gpu->name = strdup( devinfo[i].properties2.properties.deviceName );
