@@ -2,6 +2,7 @@ SUBDIRS = \
 	tools \
 	dlls \
 	dlls/darling_coreaudio \
+	dlls/darling_sandbox \
 	dlls/wsl \
 	programs \
 	libs \
