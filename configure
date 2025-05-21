@@ -13459,11 +13459,7 @@ wine_srcdir=
 test "$srcdir" = . || wine_srcdir="$srcdir/"
 
 
-  ac_config_commands="$ac_config_commands wine"
 
-
-
-  ac_config_commands="$ac_config_commands wine64"
 
 
 
@@ -19487,8 +19483,6 @@ do
     "depfiles") CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "include/stamp-h") CONFIG_COMMANDS="$CONFIG_COMMANDS include/stamp-h" ;;
-    "wine") CONFIG_COMMANDS="$CONFIG_COMMANDS wine" ;;
-    "wine64") CONFIG_COMMANDS="$CONFIG_COMMANDS wine64" ;;
     "dlls/acledit/Makefile") CONFIG_FILES="$CONFIG_FILES dlls/acledit/Makefile" ;;
     "dlls/aclui/Makefile") CONFIG_FILES="$CONFIG_FILES dlls/aclui/Makefile" ;;
     "dlls/activeds.tlb/Makefile") CONFIG_FILES="$CONFIG_FILES dlls/activeds.tlb/Makefile" ;;
@@ -21917,12 +21911,6 @@ ltmain=$ac_aux_dir/ltmain.sh
 
  ;;
     "include/stamp-h":C) echo timestamp > include/stamp-h ;;
-    "wine":C)
-    rm -f wine && ln -s tools/winewrapper wine
-   ;;
-    "wine64":C)
-    rm -f wine64 && ln -s tools/winewrapper wine64
-   ;;
     "tools/makedep":C) wine_fn_output_makedep || as_fn_exit $? ;;
     "Makefile":C) wine_fn_output_makefile Makefile ;;
 

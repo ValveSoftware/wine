@@ -2433,9 +2433,7 @@ m4trace:m4/wine_config_makefile.m4:1: -1- AC_DEFUN([WINE_CONFIG_MAKEFILE], [
   AC_CONFIG_FILES([$1/Makefile])
 ])
 m4trace:m4/wine_config_symlink.m4:1: -1- AC_DEFUN([WINE_CONFIG_SYMLINK], [
-  AC_CONFIG_COMMANDS([$1], [
-    rm -f $1 && ln -s $2 $1
-  ])
+  dnl No-op stub for WINE_CONFIG_SYMLINK. Accepts up to 3 arguments for compatibility.
 ])
 m4trace:m4/wine_ignore_file.m4:1: -1- AC_DEFUN([WINE_IGNORE_FILE], [])
 m4trace:configure.ac:2: -1- AC_CONFIG_MACRO_DIR([m4])
