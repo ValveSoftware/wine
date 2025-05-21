@@ -30,7 +30,7 @@ uname -v = #32~22.04.1-Ubuntu SMP Thu Apr  3 20:26:27 UTC 2025
 PATH: /usr/local/rvm/gems/ruby-3.3.4/bin
 PATH: /usr/local/rvm/gems/ruby-3.3.4@global/bin
 PATH: /usr/local/rvm/rubies/ruby-3.3.4/bin
-PATH: /vscode/bin/linux-x64/91fa95bccb027ece6a968589bb1d662fa9c8e170/bin/remote-cli
+PATH: /vscode/bin/linux-x64/848b80aeb52026648a8ff9f7c45a9b0a80641e2e/bin/remote-cli
 PATH: /home/codespace/.local/bin
 PATH: /home/codespace/.dotnet
 PATH: /home/codespace/nvm/current/bin
