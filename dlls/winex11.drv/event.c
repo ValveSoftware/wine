@@ -695,7 +695,7 @@ static void set_focus( Display *display, HWND focus, Time time )
 
     TRACE( "setting foreground window to %p\n", focus );
 
-    if (!is_netwm_supported( x11drv_atom(_NET_ACTIVE_WINDOW) ))
+    if (!is_net_supported( x11drv_atom(_NET_ACTIVE_WINDOW) ))
     {
         NtUserSetForegroundWindow( focus );
 
@@ -964,7 +964,7 @@ static void focus_out( Display *display , HWND hwnd )
     /* don't reset the foreground window, if the window which is
        getting the focus is a Wine window */
 
-    if (!is_netwm_supported( x11drv_atom(_NET_ACTIVE_WINDOW) ) && !is_current_process_focused())
+    if (!is_net_supported( x11drv_atom(_NET_ACTIVE_WINDOW) ) && !is_current_process_focused())
     {
         /* Abey : 6-Oct-99. Check again if the focus out window is the
            Foreground window, because in most cases the messages sent
@@ -1307,24 +1307,6 @@ static void get_window_mwm_hints( Display *display, Window window, MwmHints *hin
     }
 }
 
-Window get_net_active_window( Display *display, char **name )
-{
-    unsigned long count, remaining;
-    Window window = None, *value;
-    int format;
-    Atom type;
-
-    if (!XGetWindowProperty( display, DefaultRootWindow( display ), x11drv_atom(_NET_ACTIVE_WINDOW), 0,
-                             65536 / sizeof(Window), False, XA_WINDOW, &type, &format, &count,
-                             &remaining, (unsigned char **)&value ))
-    {
-        if (type == XA_WINDOW && format == 32) window = *value;
-        XFree( value );
-    }
-
-    if (window) get_window_name( display, window, name );
-    return window;
-}
 
 /***********************************************************************
  *           handle_wm_state_notify
@@ -1410,25 +1392,11 @@ static void handle_net_supporting_wm_check_notify( XPropertyEvent *event )
     if (event->state == PropertyNewValue) net_supporting_wm_check_init( data );
 }
 
-static void handle_net_active_window( HWND hwnd, XPropertyEvent *event )
+static void handle_net_active_window( XPropertyEvent *event )
 {
-    struct x11drv_thread_data *data = x11drv_thread_data();
-    Window window = None;
-    HWND foreground;
-
-    if (data->active_window)
-    {
-        XFree( data->active_window );
-        data->active_window = NULL;
-    }
-
-    if (event->state == PropertyNewValue) window = get_net_active_window( event->display, &data->active_window );
+    Window window = 0;
+    if (event->state == PropertyNewValue) window = get_net_active_window( event->display );
     net_active_window_notify( event->serial, window, event->time );
-
-    if (data->active_window) TRACE( "_NET_ACTIVE_WINDOW changed to %s\n", debugstr_a(data->active_window) );
-
-    if (!(foreground = NtUserGetForegroundWindow())) foreground = NtUserGetDesktopWindow();
-    NtUserPostMessage( foreground, WM_WINE_WINDOW_STATE_CHANGED, 0, 0 );
 }
 
 /***********************************************************************
@@ -1445,7 +1413,7 @@ static BOOL X11DRV_PropertyNotify( HWND hwnd, XEvent *xev )
     if (event->atom == x11drv_atom(_MOTIF_WM_HINTS)) handle_mwm_hints_notify( hwnd, event );
     if (event->atom == x11drv_atom(_NET_SUPPORTED)) handle_net_supported_notify( event );
     if (event->atom == x11drv_atom(_NET_SUPPORTING_WM_CHECK)) handle_net_supporting_wm_check_notify( event );
-    if (event->atom == x11drv_atom(_NET_ACTIVE_WINDOW)) handle_net_active_window( hwnd, event );
+    if (event->atom == x11drv_atom(_NET_ACTIVE_WINDOW)) handle_net_active_window( event );
 
     return TRUE;
 }
@@ -1460,7 +1428,7 @@ void X11DRV_ActivateWindow( HWND hwnd, HWND previous )
 {
     struct x11drv_win_data *data;
 
-    set_net_active_window( hwnd, previous );
+    if (!is_virtual_desktop()) set_net_active_window( hwnd, previous );
 
     if (!(data = get_win_data( hwnd ))) return;
     if (!data->managed || data->embedder) set_input_focus( data );

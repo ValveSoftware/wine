@@ -385,6 +385,11 @@ extern RECT host_window_configure_child( struct host_window *win, Window window,
 extern POINT host_window_map_point( struct host_window *win, int x, int y );
 extern struct host_window *get_host_window( Window window, BOOL create );
 
+struct display_state
+{
+    Window net_active_window;
+};
+
 struct x11drv_thread_data
 {
     Display *display;
@@ -411,10 +416,10 @@ struct x11drv_thread_data
     int      xinput2_rawinput;     /* XInput2 rawinput-only thread */
 #endif /* HAVE_X11_EXTENSIONS_XINPUT2_H */
 
-    Window        desired_net_active_window;    /* active window tracking the desired / win32 state */
-    Window        pending_net_active_window;    /* active window tracking the pending / requested state */
-    Window        current_net_active_window;    /* active window tracking the current X11 state */
-    unsigned long net_active_window_serial;     /* serial of last pending _NET_ACTIVE_WINDOW request */
+    struct display_state desired_state;       /* display state tracking the desired / win32 state */
+    struct display_state pending_state;       /* display state tracking the pending / requested state */
+    struct display_state current_state;       /* display state tracking the current X11 state */
+    unsigned long net_active_window_serial;   /* serial of last pending _NET_ACTIVE_WINDOW request */
 };
 
 extern struct x11drv_thread_data *x11drv_init_thread_data(void);
@@ -704,12 +709,12 @@ extern void window_configure_notify( struct x11drv_win_data *data, unsigned long
 
 extern BOOL get_window_name( Display *display, Window window, char **name );
 extern void set_net_active_window( HWND hwnd, HWND previous );
+extern Window get_net_active_window( Display *display );
 extern void net_active_window_notify( unsigned long serial, Window window, Time time );
-extern Window get_net_active_window( Display *display, char **name );
 extern void net_active_window_init( struct x11drv_thread_data *data );
 extern void net_supported_init( struct x11drv_thread_data *data );
 extern void net_supporting_wm_check_init( struct x11drv_thread_data *data );
-extern BOOL is_netwm_supported( Atom atom );
+extern BOOL is_net_supported( Atom atom );
 
 extern Window init_clip_window(void);
 extern void update_user_time( struct x11drv_win_data *data, Time time, BOOL force );
