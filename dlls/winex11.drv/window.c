@@ -2022,6 +2022,8 @@ void net_active_window_init( struct x11drv_thread_data *data )
     data->desired_state.net_active_window = window;
     data->pending_state.net_active_window = window;
     data->current_state.net_active_window = window;
+
+    if (window) get_window_name( data->display, window, &data->active_window );
 }
 
 static BOOL window_set_pending_activate( HWND hwnd )
