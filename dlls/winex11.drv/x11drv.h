@@ -640,8 +640,8 @@ enum x11drv_net_wm_state
 
 struct window_state
 {
-    UINT swp_flags;
     UINT wm_state;
+    BOOL activate;
     UINT net_wm_state;
     MwmHints mwm_hints;
     RECT rect;
@@ -717,7 +717,7 @@ extern void net_supporting_wm_check_init( struct x11drv_thread_data *data );
 extern BOOL is_net_supported( Atom atom );
 
 extern Window init_clip_window(void);
-extern void update_user_time( struct x11drv_win_data *data, Time time, BOOL force );
+extern void window_set_user_time( struct x11drv_win_data *data, Time time, BOOL init );
 extern UINT get_window_net_wm_state( Display *display, Window window );
 extern void make_window_embedded( struct x11drv_win_data *data );
 extern Window create_client_window( HWND hwnd, RECT client_rect, const XVisualInfo *visual, Colormap colormap );

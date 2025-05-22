@@ -1343,7 +1343,7 @@ BOOL X11DRV_KeyEvent( HWND hwnd, XEvent *xev )
 
     if (event->type == KeyPress && (data = get_win_data( hwnd )))
     {
-        update_user_time( data, event->time, FALSE );
+        window_set_user_time( data, event->time, FALSE );
         release_win_data( data );
     }
 
