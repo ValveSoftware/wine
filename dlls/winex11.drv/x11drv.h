@@ -534,7 +534,6 @@ enum x11drv_atoms
     XATOM__NET_WM_WINDOW_TYPE_UTILITY,
     XATOM__NET_WORKAREA,
     XATOM__GTK_WORKAREAS_D0,
-    XATOM__WINE_HWND,
     XATOM__XEMBED,
     XATOM__XEMBED_INFO,
     XATOM__WINE_ALLOW_FLIP,
@@ -749,7 +748,6 @@ extern void move_resize_window( HWND hwnd, int dir, POINT pos );
 extern void X11DRV_InitKeyboard( Display *display );
 extern void X11DRV_InitMouse( Display *display );
 extern BOOL X11DRV_ProcessEvents( DWORD mask );
-extern HWND *build_hwnd_list(void);
 
 typedef int (*x11drv_error_callback)( Display *display, XErrorEvent *event, void *arg );
 

@@ -164,7 +164,6 @@ static const char * const atom_names[NB_XATOMS - FIRST_XATOM] =
     "_NET_WM_WINDOW_TYPE_UTILITY",
     "_NET_WORKAREA",
     "_GTK_WORKAREAS_D0",
-    "_WINE_HWND",
     "_XEMBED",
     "_XEMBED_INFO",
     "_WINE_ALLOW_FLIP",
