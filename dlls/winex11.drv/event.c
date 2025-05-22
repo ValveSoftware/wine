@@ -1322,7 +1322,7 @@ static void handle_wm_state_notify( HWND hwnd, XPropertyEvent *event )
     if (!(data = get_win_data( hwnd ))) return;
     if (event->state == PropertyNewValue) value = get_window_wm_state( event->display, event->window );
     window_wm_state_notify( data, event->serial, value, event->time );
-    activate = value == NormalState && !data->wm_state_serial && !(data->current_state.swp_flags & SWP_NOACTIVATE);
+    activate = value == NormalState && !data->wm_state_serial && data->current_state.activate;
     release_win_data( data );
 
     if (hwnd == NtUserGetForegroundWindow() && activate) set_net_active_window( hwnd, 0 );
