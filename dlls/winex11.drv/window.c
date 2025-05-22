@@ -313,27 +313,6 @@ static void remove_startup_notification( struct x11drv_win_data *data )
     }
 }
 
-static HWND hwnd_from_window( Display *display, Window window )
-{
-    unsigned long count, remaining;
-    unsigned long *xhwnd;
-    HWND hwnd = 0;
-    int format;
-    Atom type;
-
-    if (!window || !XFindContext( display, window, winContext, (char **)&hwnd )) return hwnd;
-
-    X11DRV_expect_error( display, host_window_error, NULL );
-    if (!XGetWindowProperty( display, window, x11drv_atom(_WINE_HWND), 0, 65536, False, XA_CARDINAL,
-                             &type, &format, &count, &remaining, (unsigned char **)&xhwnd ))
-    {
-        if (type == XA_CARDINAL && format == 32) hwnd = ULongToHandle(*xhwnd);
-        XFree( xhwnd );
-    }
-    if (X11DRV_check_error()) return 0;
-    return hwnd;
-}
-
 static BOOL is_managed( HWND hwnd )
 {
     struct x11drv_win_data *data = get_win_data( hwnd );
@@ -342,7 +321,7 @@ static BOOL is_managed( HWND hwnd )
     return ret;
 }
 
-HWND *build_hwnd_list(void)
+static HWND *build_hwnd_list(void)
 {
     NTSTATUS status;
     HWND *list;
@@ -377,6 +356,27 @@ static BOOL has_owned_popups( HWND hwnd )
     return ret;
 }
 
+/* returns the HWND for the X11 window, or the desktop window if it isn't a Wine window */
+static HWND hwnd_from_window( Display *display, Window window )
+{
+    HWND hwnd, desktop = NtUserGetDesktopWindow();
+    HWND *list;
+    UINT i;
+
+    if (!window || window == root_window) return desktop;
+    if (!XFindContext( display, window, winContext, (char **)&hwnd )) return hwnd;
+
+    if (!(list = build_hwnd_list())) return desktop;
+
+    for (i = 0; list[i] != HWND_BOTTOM; i++)
+        if (window == X11DRV_get_whole_window( list[i] ))
+            break;
+    hwnd = list[i] == HWND_BOTTOM ? desktop : list[i];
+
+    free( list );
+
+    return hwnd;
+}
 
 /***********************************************************************
  *              alloc_win_data
@@ -2424,7 +2424,6 @@ void set_gamescope_overlay_prop( Display *display, Window window, HWND hwnd )
  */
 static void create_whole_window( struct x11drv_win_data *data )
 {
-    unsigned long xhwnd = (UINT_PTR)data->hwnd;
     int cx, cy, mask;
     XSetWindowAttributes attr;
     WCHAR text[1024];
@@ -2459,8 +2458,6 @@ static void create_whole_window( struct x11drv_win_data *data )
                                         cx, cy, 0, data->vis.depth, InputOutput,
                                         data->vis.visual, mask, &attr );
     if (!data->whole_window) goto done;
-    XChangeProperty( data->display, data->whole_window, x11drv_atom(_WINE_HWND), XA_CARDINAL, 32,
-                     PropModeReplace, (unsigned char *)&xhwnd, 1 );
     set_wine_allow_flip( data->whole_window, 0 );
 
     SetRect( &data->current_state.rect, pos.x, pos.y, pos.x + cx, pos.y + cy );
