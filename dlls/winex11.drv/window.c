@@ -1843,17 +1843,16 @@ BOOL X11DRV_GetWindowStateUpdates( HWND hwnd, UINT *state_cmd, UINT *config_cmd,
     struct x11drv_thread_data *thread_data = x11drv_thread_data();
     struct x11drv_win_data *data;
     HWND old_foreground;
-    Window window;
 
     *state_cmd = *config_cmd = 0;
     *foreground = 0;
 
     if (!(old_foreground = NtUserGetForegroundWindow())) old_foreground = NtUserGetDesktopWindow();
-    if (NtUserGetWindowThread( old_foreground, NULL ) == GetCurrentThreadId() && !window_has_pending_wm_state( old_foreground, NormalState ) &&
-        !thread_data->net_active_window_serial && (window = thread_data->current_net_active_window))
+    if (!is_virtual_desktop() && NtUserGetWindowThread( old_foreground, NULL ) == GetCurrentThreadId() &&
+        !window_has_pending_wm_state( old_foreground, NormalState ) &&
+        !thread_data->net_active_window_serial)
     {
-        *foreground = hwnd_from_window( thread_data->display, window );
-        if (*foreground == 0) *foreground = NtUserGetDesktopWindow();
+        *foreground = hwnd_from_window( thread_data->display, thread_data->current_state.net_active_window );
         if (*foreground == old_foreground) *foreground = 0;
     }
 
@@ -1981,27 +1980,48 @@ void window_configure_notify( struct x11drv_win_data *data, unsigned long serial
 void net_active_window_notify( unsigned long serial, Window value, Time time )
 {
     struct x11drv_thread_data *data = x11drv_thread_data();
-    Window *desired = &data->desired_net_active_window, *pending = &data->pending_net_active_window, *current = &data->current_net_active_window;
-    HWND hwnd = hwnd_from_window( data->display, value ), expect_hwnd = hwnd_from_window( data->display, *pending );
+    Window *desired = &data->desired_state.net_active_window, *pending = &data->pending_state.net_active_window, *current = &data->current_state.net_active_window;
     unsigned long *expect_serial = &data->net_active_window_serial;
     const char *expected, *received;
+    HWND current_hwnd, pending_hwnd;
 
-    received = wine_dbg_sprintf( "_NET_ACTIVE_WINDOW %p/%lx serial %lu time %lu", hwnd, value, serial, time );
-    expected = *expect_serial ? wine_dbg_sprintf( ", expected %p/%lx serial %lu", expect_hwnd, *pending, *expect_serial ) : "";
+    current_hwnd = hwnd_from_window( data->display, value );
+    pending_hwnd = hwnd_from_window( data->display, *pending );
 
-    if (hwnd == 0) value = root_window;
-    handle_state_change( serial, expect_serial, sizeof(value), &value, desired, pending,
-                         current, expected, "", received, NULL );
+    received = wine_dbg_sprintf( "_NET_ACTIVE_WINDOW %p/%lx serial %lu time %lu", current_hwnd, value, serial, time );
+    expected = *expect_serial ? wine_dbg_sprintf( ", expected %p/%lx serial %lu", pending_hwnd, *pending, *expect_serial ) : "";
+    if (!handle_state_change( serial, expect_serial, sizeof(value), &value, desired, pending,
+                              current, expected, "", received, NULL ))
+        return;
+
+    NtUserPostMessage( NtUserGetForegroundWindow(), WM_WINE_WINDOW_STATE_CHANGED, 0, 0 );
+}
+
+Window get_net_active_window( Display *display )
+{
+    unsigned long count, remaining;
+    Window window = None, *value;
+    int format;
+    Atom type;
+
+    if (!XGetWindowProperty( display, DefaultRootWindow( display ), x11drv_atom(_NET_ACTIVE_WINDOW), 0,
+                             65536 / sizeof(Window), False, XA_WINDOW, &type, &format, &count,
+                             &remaining, (unsigned char **)&value ))
+    {
+        if (type == XA_WINDOW && format == 32) window = *value;
+        XFree( value );
+    }
+
+    return window;
 }
 
 void net_active_window_init( struct x11drv_thread_data *data )
 {
-    Window window = get_net_active_window( data->display, &data->active_window );
+    Window window = get_net_active_window( data->display );
 
-    if (hwnd_from_window( data->display, window ) == 0) window = root_window;
-    data->desired_net_active_window = window;
-    data->pending_net_active_window = window;
-    data->current_net_active_window = window;
+    data->desired_state.net_active_window = window;
+    data->pending_state.net_active_window = window;
+    data->current_state.net_active_window = window;
 }
 
 static BOOL window_set_pending_activate( HWND hwnd )
@@ -2022,9 +2042,9 @@ void set_net_active_window( HWND hwnd, HWND previous )
     Window window;
     XEvent xev;
 
-    if (!is_netwm_supported( x11drv_atom(_NET_ACTIVE_WINDOW) )) return;
+    if (!is_net_supported( x11drv_atom(_NET_ACTIVE_WINDOW) )) return;
     if (!(window = X11DRV_get_whole_window( hwnd ))) return;
-    if (data->pending_net_active_window == window) return;
+    if (data->pending_state.net_active_window == window) return;
     if (window_set_pending_activate( hwnd )) return;
 
     xev.xclient.type = ClientMessage;
@@ -2040,7 +2060,7 @@ void set_net_active_window( HWND hwnd, HWND previous )
     xev.xclient.data.l[3] = 0;
     xev.xclient.data.l[4] = 0;
 
-    data->pending_net_active_window = window;
+    data->pending_state.net_active_window = window;
     data->net_active_window_serial = NextRequest( data->display );
     TRACE( "requesting _NET_ACTIVE_WINDOW %p/%lx serial %lu\n", hwnd, window, data->net_active_window_serial );
     XSendEvent( data->display, DefaultRootWindow( data->display ), False,
@@ -3641,9 +3661,9 @@ LRESULT X11DRV_WindowMessage( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
 
 
 /***********************************************************************
- *              is_netwm_supported
+ *              is_net_supported
  */
-BOOL is_netwm_supported( Atom atom )
+BOOL is_net_supported( Atom atom )
 {
     struct x11drv_thread_data *data = x11drv_thread_data();
     BOOL supported;
@@ -3735,7 +3755,7 @@ LRESULT X11DRV_SysCommand( HWND hwnd, WPARAM wparam, LPARAM lparam, const POINT 
 
     if (NtUserGetWindowLongW( hwnd, GWL_STYLE ) & WS_MAXIMIZE) goto failed;
 
-    if (!is_netwm_supported( x11drv_atom(_NET_WM_MOVERESIZE) ))
+    if (!is_net_supported( x11drv_atom(_NET_WM_MOVERESIZE) ))
     {
         TRACE( "_NET_WM_MOVERESIZE not supported\n" );
         goto failed;
@@ -3792,7 +3812,7 @@ void net_supported_init( struct x11drv_thread_data *data )
     for (i = 0; i < NB_NET_WM_STATES; i++)
     {
         Atom atom = X11DRV_Atoms[net_wm_state_atoms[i] - FIRST_XATOM];
-        if (is_netwm_supported( atom )) data->net_wm_state_mask |= (1 << i);
+        if (is_net_supported( atom )) data->net_wm_state_mask |= (1 << i);
     }
 }
 
