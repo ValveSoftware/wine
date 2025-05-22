@@ -1394,7 +1394,15 @@ static void handle_net_supporting_wm_check_notify( XPropertyEvent *event )
 
 static void handle_net_active_window( XPropertyEvent *event )
 {
+    struct x11drv_thread_data *data = x11drv_thread_data();
     Window window = 0;
+
+    if (data->active_window)
+    {
+        XFree( data->active_window );
+        data->active_window = NULL;
+    }
+
     if (event->state == PropertyNewValue) window = get_net_active_window( event->display );
     net_active_window_notify( event->serial, window, event->time );
 }
