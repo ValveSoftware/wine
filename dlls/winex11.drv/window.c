@@ -935,6 +935,13 @@ static void set_size_hints( struct x11drv_win_data *data, DWORD style )
     XFree( size_hints );
 }
 
+static BOOL window_needs_config_change_delay( struct x11drv_win_data *data )
+{
+    static const UINT fullscreen_mask = (1 << NET_WM_STATE_MAXIMIZED) | (1 << NET_WM_STATE_FULLSCREEN);
+    if (data->pending_state.wm_state != NormalState) return FALSE;
+    if (data->configure_serial) return TRUE; /* another config update is pending, wait for it to complete */
+    return data->net_wm_state_serial && !(data->pending_state.net_wm_state & fullscreen_mask) && (data->current_state.net_wm_state & fullscreen_mask);
+}
 
 static void window_set_wm_state( struct x11drv_win_data *data, UINT new_state, BOOL activate );
 
@@ -1373,6 +1380,15 @@ static void window_set_config( struct x11drv_win_data *data, RECT rect, BOOL abo
     data->desired_state.above = above;
     if (!data->whole_window) return; /* no window, nothing to update */
     if (EqualRect( old_rect, new_rect ) && (old_above || !above)) return; /* rects are the same, no need to be raised, nothing to update */
+    if (data->managed && window_needs_config_change_delay( data ))
+    {
+        /* Some window managers are sending a ConfigureNotify event with the fullscreen size when
+         * exiting a fullscreen window, with a serial that we cannot predict. Handling that event
+         * will override the Win32 window size and make the window fullscreen again.
+         */
+        WARN( "window %p/%lx is exiting maximize/fullscreen, delaying request\n", data->hwnd, data->whole_window );
+        return;
+    }
 
     /* Kwin internal maximized state tracking gets bogus if a window configure request is sent to a maximized
      * window, and it loses track of whether the window was maximized state.
@@ -2000,10 +2016,23 @@ void window_configure_notify( struct x11drv_win_data *data, unsigned long serial
     received = wine_dbg_sprintf( "config %s/%lu", wine_dbgstr_rect(value), serial );
     expected = *expect_serial ? wine_dbg_sprintf( ", expected %s/%lu", wine_dbgstr_rect(pending), *expect_serial ) : "";
 
+    /* if we've delayed some config we want to continue with it, make sure handle_state_change doesn't overwrite it */
+    if ((*expect_serial || window_needs_config_change_delay( data )) &&
+        serial >= *expect_serial && !EqualRect( desired, pending ))
+    {
+        WARN( "%spreserving delayed config %s\n", prefix, wine_dbgstr_rect(desired) );
+        desired = pending;
+    }
+
     if (!handle_state_change( serial, expect_serial, sizeof(*value), value, desired, pending,
                               current, expected, prefix, received, NULL ))
         return;
     data->pending_state.above = FALSE; /* allow requesting it again */
+
+    /* send any pending changes from the desired state */
+    window_set_wm_state( data, data->desired_state.wm_state, data->desired_state.activate );
+    window_set_net_wm_state( data, data->desired_state.net_wm_state );
+    window_set_config( data, data->desired_state.rect, FALSE );
 }
 
 void net_active_window_notify( unsigned long serial, Window value, Time time )
