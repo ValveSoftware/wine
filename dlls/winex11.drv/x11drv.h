@@ -645,6 +645,7 @@ struct window_state
     UINT net_wm_state;
     MwmHints mwm_hints;
     RECT rect;
+    BOOL above;
 };
 
 /* x11drv private window data */
