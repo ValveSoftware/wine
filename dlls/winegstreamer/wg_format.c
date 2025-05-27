@@ -151,6 +151,8 @@ static enum wg_video_format wg_video_format_from_gst(GstVideoFormat format)
             return WG_VIDEO_FORMAT_AYUV;
         case GST_VIDEO_FORMAT_I420:
             return WG_VIDEO_FORMAT_I420;
+        case GST_VIDEO_FORMAT_I420_10LE:
+            return WG_VIDEO_FORMAT_P010_10LE;
         case GST_VIDEO_FORMAT_NV12:
             return WG_VIDEO_FORMAT_NV12;
         case GST_VIDEO_FORMAT_P010_10LE:
