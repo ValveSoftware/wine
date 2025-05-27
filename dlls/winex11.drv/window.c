@@ -1511,6 +1511,9 @@ static void window_set_config( struct x11drv_win_data *data, RECT rect, BOOL abo
     if (mask & (CWWidth | CWHeight)) clear_emulated_fullscreen_padding( data );
 
     if (net_wm_state != -1) window_set_net_wm_state( data, net_wm_state );
+
+    /* don't expect a ConfigureNotify while window is unmapped */
+    if (data->pending_state.wm_state == WithdrawnState) data->configure_serial = 0;
 }
 
 /***********************************************************************
