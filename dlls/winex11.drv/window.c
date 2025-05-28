@@ -1511,9 +1511,6 @@ static void window_set_config( struct x11drv_win_data *data, RECT rect, BOOL abo
     if (mask & (CWWidth | CWHeight)) clear_emulated_fullscreen_padding( data );
 
     if (net_wm_state != -1) window_set_net_wm_state( data, net_wm_state );
-
-    /* don't expect a ConfigureNotify while window is unmapped */
-    if (data->pending_state.wm_state == WithdrawnState) data->configure_serial = 0;
 }
 
 /***********************************************************************
@@ -1870,6 +1867,7 @@ static UINT window_update_client_config( struct x11drv_win_data *data )
     RECT rect, old_rect = data->rects.window, new_rect;
 
     if (!data->managed) return 0; /* unmanaged windows are managed by the Win32 side */
+    if (is_virtual_desktop()) return 0; /* ignore window manager config changes in virtual desktop mode */
     if (data->desired_state.wm_state != NormalState) return 0; /* ignore config changes on invisible/minimized windows */
 
     if (data->wm_state_serial) return 0; /* another WM_STATE update is pending, wait for it to complete */
