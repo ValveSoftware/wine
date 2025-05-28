@@ -1807,6 +1807,7 @@ static void test_source_reader_transforms(BOOL enable_processing, BOOL enable_ad
         ATTR_UINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, 1),
         ATTR_UINT32(MF_MT_COMPRESSED, 0, .todo = TRUE),
         ATTR_UINT32(MF_MT_INTERLACE_MODE, 2, .todo_value = TRUE),
+        {0},
     };
     IMFStreamDescriptor *video_stream;
     IMFSourceReaderEx *reader_ex;
