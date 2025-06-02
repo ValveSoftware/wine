@@ -77,6 +77,7 @@ struct wg_parser
     guint64 file_size, start_offset, next_offset, stop_offset;
     guint64 next_pull_offset;
     gchar *uri;
+    gboolean is_web_scheme;
 
     pthread_t push_thread;
 
@@ -1623,9 +1624,12 @@ static GstBusSyncReply bus_handler_cb(GstBus *bus, GstMessage *msg, gpointer use
             pthread_mutex_lock(&parser->mutex);
             if (!parser->use_mediaconv)
             {
-                GST_WARNING("Autoplugged element failed to initialise, trying again with protonvideoconvert.");
                 parser->error = true;
                 pthread_cond_signal(&parser->init_cond);
+                if (parser->is_web_scheme)
+                    GST_WARNING("Autoplugged element failed to initialise. Giving up as we're using a web scheme.");
+                else
+                    GST_WARNING("Autoplugged element failed to initialise, trying again with protonvideoconvert.");
             }
             pthread_mutex_unlock(&parser->mutex);
         }
@@ -1858,7 +1862,7 @@ static NTSTATUS wg_parser_connect(void *args)
 
     if (ret == GST_STATE_CHANGE_FAILURE)
     {
-        if (!parser->use_mediaconv)
+        if (!parser->use_mediaconv && !parser->is_web_scheme)
         {
             GST_WARNING("Failed to play media, trying again with protonvideoconvert.");
             use_mediaconv = true;
@@ -1874,7 +1878,7 @@ static NTSTATUS wg_parser_connect(void *args)
         pthread_cond_wait(&parser->init_cond, &parser->mutex);
     if (parser->error)
     {
-        if (!parser->use_mediaconv)
+        if (!parser->use_mediaconv && !parser->is_web_scheme)
             use_mediaconv = true;
         pthread_mutex_unlock(&parser->mutex);
         goto out;
@@ -2058,8 +2062,9 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
     GstElement *element;
     const char *type;
 
-    type = parser->uri && (!strncmp(parser->uri, "http://", 7) || !strncmp(parser->uri, "https://", 8) ||
-                            !strncmp(parser->uri, "rtsp://", 7)) ? "uridecodebin" : "decodebin";
+    parser->is_web_scheme = parser->uri && (!strncmp(parser->uri, "http://", 7) || !strncmp(parser->uri, "https://", 8) ||
+                            !strncmp(parser->uri, "rtsp://", 7));
+    type = parser->is_web_scheme ? "uridecodebin" : "decodebin";
     if (!(element = create_element(type, "base")))
         return FALSE;
     GST_INFO("creating %s element for uri \"%s\"", type, parser->uri ? parser->uri : "(null)");
