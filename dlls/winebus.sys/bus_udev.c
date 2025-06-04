@@ -1210,22 +1210,17 @@ static NTSTATUS lnxev_device_physical_effect_run(struct lnxev_device *impl, BYTE
     return STATUS_SUCCESS;
 }
 
-static NTSTATUS lnxev_device_physical_device_set_autocenter(struct unix_device *iface, BYTE percent)
+static void lnxev_device_set_autocenter(struct lnxev_device *impl, BOOL enabled)
 {
-    struct lnxev_device *impl = lnxev_impl_from_unix_device(iface);
     struct input_event ie =
     {
         .type = EV_FF,
         .code = FF_AUTOCENTER,
-        .value = 0xffff * percent / 100,
+        .value = enabled ? get_devnode_autocenter(impl->base.devnode) : 0,
     };
-
-    TRACE("iface %p, percent %#x.\n", iface, percent);
 
     if (write(impl->base.device_fd, &ie, sizeof(ie)) == -1)
         WARN("write failed %d %s\n", errno, strerror(errno));
-
-    return STATUS_SUCCESS;
 }
 
 static NTSTATUS lnxev_device_physical_device_control(struct unix_device *iface, USAGE control)
@@ -1271,7 +1266,7 @@ static NTSTATUS lnxev_device_physical_device_control(struct unix_device *iface, 
             if (impl->effect_ids[i] < 0) continue;
             lnxev_device_physical_effect_run(impl, i, 0);
         }
-        lnxev_device_physical_device_set_autocenter(iface, 0);
+        lnxev_device_set_autocenter(impl, FALSE);
         return STATUS_SUCCESS;
     case PID_USAGE_DC_DEVICE_RESET:
         for (i = 0; i < ARRAY_SIZE(impl->effect_ids); ++i)
@@ -1281,7 +1276,7 @@ static NTSTATUS lnxev_device_physical_device_control(struct unix_device *iface, 
                 WARN("couldn't free effect, EVIOCRMFF ioctl failed: %d %s\n", errno, strerror(errno));
             impl->effect_ids[i] = -1;
         }
-        lnxev_device_physical_device_set_autocenter(iface, 100);
+        lnxev_device_set_autocenter(impl, TRUE);
         return STATUS_SUCCESS;
     case PID_USAGE_DC_DEVICE_PAUSE:
         WARN("device pause not supported\n");
