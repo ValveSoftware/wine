@@ -1353,6 +1353,8 @@ static NTSTATUS wow64_unseal_message( void *args )
     struct
     {
         UINT64 context;
+        PTR32 stream;
+        ULONG stream_length;
         PTR32 data;
         ULONG data_length;
         PTR32 token;
@@ -1362,6 +1364,8 @@ static NTSTATUS wow64_unseal_message( void *args )
     struct unseal_message_params params =
     {
         params32->context,
+        ULongToPtr(params32->stream),
+        params32->stream_length,
         ULongToPtr(params32->data),
         params32->data_length,
         ULongToPtr(params32->token),
