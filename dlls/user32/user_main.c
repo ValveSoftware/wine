@@ -190,13 +190,14 @@ static NTSTATUS WINAPI User32DragDropPost( void *args, ULONG size )
     return STATUS_SUCCESS;
 }
 
-static KERNEL_CALLBACK_PROC kernel_callback_table[NtUserCallCount] =
+C_ASSERT( NtUserCallCount <= 256 );
+
+static KERNEL_CALLBACK_PROC kernel_callback_table[256] =
 {
 #define USER32_CALLBACK_ENTRY(name) User32##name,
     ALL_USER32_CALLBACKS
 #undef USER32_CALLBACK_ENTRY
 };
-
 
 /***********************************************************************
  *           USER initialisation routine
