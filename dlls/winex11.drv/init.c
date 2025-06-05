@@ -139,6 +139,7 @@ static BOOL X11DRV_DeleteDC( PHYSDEV dev )
     X11DRV_PDEVICE *physDev = get_x11drv_dev( dev );
 
     XFreeGC( gdi_display, physDev->gc );
+    if (physDev->region) NtGdiDeleteObjectApp( physDev->region );
     free( physDev );
     return TRUE;
 }

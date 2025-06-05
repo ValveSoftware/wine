@@ -957,6 +957,17 @@ static inline UINT get_palette_entries( HPALETTE palette, UINT start, UINT count
     return NtGdiDoPalette( palette, start, count, entries, NtGdiGetPaletteEntries, TRUE );
 }
 
+static inline HRGN clone_gdi_region( HRGN rgn )
+{
+    HRGN copy;
+
+    if (!rgn) return NULL;
+
+    copy = NtGdiCreateRectRgn( 0, 0, 0, 0 );
+    NtGdiCombineRgn( copy, rgn, NULL, RGN_COPY );
+    return copy;
+}
+
 /* user helpers */
 
 static inline LRESULT send_message( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
