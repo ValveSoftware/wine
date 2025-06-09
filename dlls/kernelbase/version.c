@@ -793,7 +793,9 @@ DWORD WINAPI GetFileVersionInfoSizeExW( DWORD flags, LPCWSTR filename, LPDWORD r
                 && (!memcmp( exe_name + exe_name_len - 16, L"vcredist_x64.exe", 16 * sizeof(*exe_name) )
                 || !memcmp( exe_name + exe_name_len - 16, L"vcredist_x86.exe", 16 * sizeof(*exe_name) )))
                 || (exe_name_len >= 17
-                && (!memcmp( exe_name + exe_name_len - 17, L"VC_redist.x64.exe", 17 * sizeof(*exe_name) )
+                && (!memcmp( exe_name + exe_name_len - 17, L"vc_redist.x64.exe", 17 * sizeof(*exe_name) )
+                || !memcmp( exe_name + exe_name_len - 17, L"vc_redist.x86.exe", 17 * sizeof(*exe_name) )
+                || !memcmp( exe_name + exe_name_len - 17, L"VC_redist.x64.exe", 17 * sizeof(*exe_name) )
                 || !memcmp( exe_name + exe_name_len - 17, L"VC_redist.x86.exe", 17 * sizeof(*exe_name) ))))
             && (nt = RtlImageNtHeader( mod )) && (char *)nt - signature >= sizeof(builtin_signature)
             && !memcmp( signature, builtin_signature, sizeof(builtin_signature) ))
