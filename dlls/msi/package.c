@@ -620,6 +620,24 @@ done:
     free(version);
 }
 
+static void fixup_winver(DWORD *verval)
+{
+    static int cached = -1;
+
+    if (cached == -1)
+    {
+        const char *s;
+
+        cached = (s = getenv("STEAM_COMPAT_APP_ID"))
+            && !strcmp(s, "976730")
+            ;
+        if (cached)
+            ERR("HACK: setting winver 502.\n");
+    }
+    if (!cached) return;
+    if (*verval > 502) *verval = 502;
+}
+
 static VOID set_installer_properties(MSIPACKAGE *package)
 {
     WCHAR *ptr;
@@ -747,6 +765,7 @@ static VOID set_installer_properties(MSIPACKAGE *package)
         verval = 603;
         OSVersion.dwBuildNumber = 9600;
     }
+    fixup_winver(&verval);
     len = swprintf( verstr, ARRAY_SIZE(verstr), L"%u", verval );
     switch (OSVersion.dwPlatformId)
     {
