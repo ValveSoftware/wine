@@ -436,8 +436,8 @@ static DWORD check_bus_option(const WCHAR *option, DWORD default_value)
     UNICODE_STRING str;
     DWORD size;
 
+    /* @@ Wine registry key: HKLM\System\CurrentControlSet\Services\WineBus */
     RtlInitUnicodeString(&str, option);
-
     if (NtQueryValueKey(driver_key, &str, KeyValuePartialInformation, info, sizeof(buffer), &size) == STATUS_SUCCESS)
     {
         if (info->Type == REG_DWORD) return *(DWORD *)info->Data;
@@ -1118,6 +1118,7 @@ static void load_device_options(void)
     HANDLE key, subkey;
     NTSTATUS status;
 
+    /* @@ Wine registry key: HKLM\System\CurrentControlSet\Services\WineBus\Devices */
     InitializeObjectAttributes(&attr, &path, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, driver_key, NULL);
     status = NtOpenKey(&key, KEY_ALL_ACCESS, &attr);
     if (status) return;
@@ -1145,6 +1146,7 @@ static void load_device_options(void)
         if (status == STATUS_NO_MORE_ENTRIES) break;
         idx++;
 
+        /* @@ Wine registry key: HKLM\System\CurrentControlSet\Services\WineBus\Devices\<VID[/PID]> */
         name_str.Buffer = name->Name;
         name_str.Length = name->NameLength;
         InitializeObjectAttributes(&attr, &name_str, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, 0, NULL);
