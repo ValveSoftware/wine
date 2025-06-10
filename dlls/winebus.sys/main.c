@@ -529,13 +529,10 @@ static BOOL is_hidraw_enabled(WORD vid, WORD pid, const USAGE_AND_PAGE *usages, 
         if (pid == 0x0127) prefer_hidraw = TRUE; /* VKB-Sim Space Gunfighter L */
         break;
     case 0x3344:
-        /* comes with 31 buttons in the default configuration, or 128 max */
-        if ((buttons == 31) || (buttons == 128)) prefer_hidraw = TRUE;
-        /* users may have configured button limits, usually 32/50/64 */
-        if ((buttons == 32) || (buttons == 50) || (buttons == 64)) prefer_hidraw = TRUE;
-        /* if customized, arbitrary amount of buttons may be shown, decide by PID */
-        if (pid == 0x412f) prefer_hidraw = TRUE; /* Virpil Constellation ALPHA-R */
-        if (pid == 0x812c) prefer_hidraw = TRUE; /* Virpil Constellation ALPHA-L */
+        prefer_hidraw = TRUE; /* All Virpil devices */
+        /* Virpil devices have configurable VID, PID, button count, and axis count. There is no good reason to change VID, so the only valid point to grab is VID
+        currently (2025/jun/10), virpil only sells generic input devices that prefer to be HIDRAW. if they ever sold an xinput device, explicit support should be set for that alone using an if else statement to exclude it from the catchall.
+        PID is different for different generations, but must be manually changed by end users for certain games as no difference exists for L/R on some generations of devices, making arbitrary PID a commonplace. */
         break;
     case 0x03eb:
         /* users may have configured button limits, usually 32/50/64 */
