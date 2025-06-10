@@ -19,6 +19,7 @@
  */
 
 #include <stdarg.h>
+#include <stdlib.h>
 #include <assert.h>
 
 #include "ntstatus.h"
@@ -51,7 +52,7 @@ static DEVICE_OBJECT *keyboard_obj;
 static DEVICE_OBJECT *bus_pdo;
 static DEVICE_OBJECT *bus_fdo;
 
-static struct bus_options options;
+static struct bus_options options = {.devices = LIST_INIT(options.devices)};
 static HANDLE driver_key;
 
 struct hid_report
@@ -455,6 +456,7 @@ static BOOL is_hidraw_enabled(WORD vid, WORD pid, const USAGE_AND_PAGE *usages, 
 {
     char buffer[FIELD_OFFSET(KEY_VALUE_PARTIAL_INFORMATION, Data[1024])];
     KEY_VALUE_PARTIAL_INFORMATION *info = (KEY_VALUE_PARTIAL_INFORMATION *)buffer;
+    struct device_options *device;
     WCHAR vidpid[MAX_PATH], *tmp, value[1024];
     BOOL prefer_hidraw = FALSE;
     UNICODE_STRING str;
@@ -462,6 +464,14 @@ static BOOL is_hidraw_enabled(WORD vid, WORD pid, const USAGE_AND_PAGE *usages, 
     DWORD size;
 
     if (options.disable_hidraw) return FALSE;
+
+    LIST_FOR_EACH_ENTRY(device, &options.devices, struct device_options, entry)
+    {
+        if (device->vid != vid) continue;
+        if (device->pid != -1 && device->pid != pid) continue;
+        if (device->hidraw == -1) continue;
+        return !!device->hidraw;
+    }
 
     if (usages->UsagePage == HID_USAGE_PAGE_DIGITIZER)
     {
@@ -1053,8 +1063,93 @@ done:
     NtClose(key);
 }
 
+static struct device_options *add_device_options(UINT vid, UINT pid)
+{
+    struct device_options *device, *next;
+
+    LIST_FOR_EACH_ENTRY(device, &options.devices, struct device_options, entry)
+        if (device->vid == vid && device->pid == pid) return device;
+
+    if (!(device = calloc(1, sizeof(*device)))) return NULL;
+    device->vid = vid;
+    device->pid = pid;
+    device->hidraw = -1;
+
+    LIST_FOR_EACH_ENTRY(next, &options.devices, struct device_options, entry)
+        if (next->vid > vid || (next->vid == vid && next->pid > pid)) break;
+    list_add_before(&next->entry, &device->entry);
+
+    return device;
+}
+
+static void load_device_options(void)
+{
+    char buffer[FIELD_OFFSET(KEY_VALUE_PARTIAL_INFORMATION, Data[1024])];
+    KEY_VALUE_PARTIAL_INFORMATION *info = (KEY_VALUE_PARTIAL_INFORMATION *)buffer;
+    UNICODE_STRING path = RTL_CONSTANT_STRING(L"Devices");
+    ULONG idx = 0, size, name_max_size;
+    OBJECT_ATTRIBUTES attr = {0};
+    KEY_NAME_INFORMATION *name;
+    WCHAR name_buffer[32];
+    HANDLE key, subkey;
+    NTSTATUS status;
+
+    InitializeObjectAttributes(&attr, &path, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, driver_key, NULL);
+    status = NtOpenKey(&key, KEY_ALL_ACCESS, &attr);
+    if (status) return;
+
+    name_max_size = offsetof(KEY_NAME_INFORMATION, Name) + 512;
+    name = RtlAllocateHeap(GetProcessHeap(), 0, name_max_size);
+
+    while (!status && name)
+    {
+        static const UNICODE_STRING hidraw = RTL_CONSTANT_STRING(L"Hidraw");
+        static const UNICODE_STRING backslash = RTL_CONSTANT_STRING(L"\\");
+        struct device_options *device;
+        UNICODE_STRING name_str;
+        UINT vid, pid;
+        USHORT pos;
+        int ret;
+
+        status = NtEnumerateKey(key, idx, KeyNameInformation, name, name_max_size, &size);
+        while (status == STATUS_BUFFER_OVERFLOW)
+        {
+            name_max_size = size;
+            if (!(name = RtlReAllocateHeap(GetProcessHeap(), 0, name, name_max_size))) break;
+            status = NtEnumerateKey(key, idx, KeyNameInformation, name, name_max_size, &size);
+        }
+        if (status == STATUS_NO_MORE_ENTRIES) break;
+        idx++;
+
+        name_str.Buffer = name->Name;
+        name_str.Length = name->NameLength;
+        InitializeObjectAttributes(&attr, &name_str, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, 0, NULL);
+        if (NtOpenKey(&subkey, KEY_ALL_ACCESS, &attr)) continue;
+
+        if (!RtlFindCharInUnicodeString(1, &name_str, &backslash, &pos)) pos += sizeof(WCHAR);
+        if (name->NameLength - pos >= sizeof(name_buffer)) continue;
+
+        memcpy(name_buffer, name->Name + pos / sizeof(WCHAR), name->NameLength - pos);
+        name_buffer[(name->NameLength - pos) / sizeof(WCHAR)] = 0;
+
+        if ((ret = swscanf(name_buffer, L"%04x/%04x", &vid, &pid)) < 1) continue;
+        if (!(device = add_device_options(vid, ret == 1 ? -1 : pid))) continue;
+
+        if (!NtQueryValueKey(subkey, &hidraw, KeyValuePartialInformation, info, sizeof(buffer), &size) && info->Type == REG_DWORD)
+            device->hidraw = *(DWORD *)info->Data;
+        if (device->hidraw != -1) TRACE("- %04x/%04x: %sabling hidraw\n", device->vid, device->pid, device->hidraw ? "en" : "dis");
+
+        NtClose(subkey);
+    }
+
+    RtlFreeHeap(GetProcessHeap(), 0, name);
+    NtClose(key);
+}
+
 static void bus_options_init(void)
 {
+    char *env;
+
     options.disable_sdl = !check_bus_option(L"Enable SDL", 1);
     if (options.disable_sdl) TRACE("SDL devices disabled in registry\n");
     options.disable_hidraw = check_bus_option(L"DisableHidraw", 0);
@@ -1072,12 +1167,51 @@ static void bus_options_init(void)
         if (!options.map_controllers) TRACE("SDL controller to XInput HID gamepad mapping disabled\n");
         sdl_bus_load_mappings(&options);
     }
+
+    load_device_options();
+
+    if ((env = getenv("WINEBUSCONFIG")) && (env = strdup(env)))
+    {
+        struct device_options *device;
+        UINT vid, pid;
+        int ret;
+
+        TRACE("Parsing WINEBUSCONFIG %s\n", debugstr_a(env));
+
+        for (const char *next, *opt = strtok(env, ","); opt; opt = strtok(NULL, ","))
+        {
+            if ((ret = sscanf(opt, "%04x/%04x=", &vid, &pid)) < 1) continue;
+            if (!(device = add_device_options(vid, ret == 1 ? -1 : pid))) break;
+
+            for (opt = strchr(opt + 1, '='); opt; opt = next)
+            {
+                if (!strncmp(opt + 1, "hidraw", 6)) device->hidraw = 1;
+                else if (!strncmp(opt + 1, "nohidraw", 8)) device->hidraw = 0;
+
+                if (!(next = strchr(opt + 1, '/'))) break;
+            }
+
+            if (device->hidraw != -1) TRACE("- %04x/%04x: %sabling hidraw\n", device->vid, device->pid, device->hidraw ? "en" : "dis");
+        }
+
+        free(env);
+    }
 }
 
 static void bus_options_cleanup(void)
 {
+    struct device_options *device, *next;
+
     if (!options.disable_sdl) sdl_bus_free_mappings(&options);
+
+    LIST_FOR_EACH_ENTRY_SAFE(device, next, &options.devices, struct device_options, entry)
+    {
+        list_remove(&device->entry);
+        free(device);
+    }
+
     memset(&options, 0, sizeof(options));
+    list_init(&options.devices);
 }
 
 static NTSTATUS sdl_driver_init(void)
