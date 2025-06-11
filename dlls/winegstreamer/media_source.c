@@ -819,6 +819,9 @@ static HRESULT wait_on_sample(struct media_stream *stream, IUnknown *token)
             return hr;
     }
 
+    if (source->state == SOURCE_SHUTDOWN)
+        return S_OK;
+
     return media_stream_send_eos(source, stream);
 }
 
