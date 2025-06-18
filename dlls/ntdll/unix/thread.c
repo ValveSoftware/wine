@@ -374,12 +374,13 @@ static NTSTATUS context_to_server( struct context_data *to, USHORT to_machine, c
         if (flags & CONTEXT_I386_CONTROL)
         {
             to->flags |= SERVER_CTX_CONTROL;
-            to->ctl.x86_64_regs.rbp    = from->Ebp;
             to->ctl.x86_64_regs.rsp    = from->Esp;
             to->ctl.x86_64_regs.rip    = from->Eip;
             to->ctl.x86_64_regs.cs     = from->SegCs;
             to->ctl.x86_64_regs.ss     = from->SegSs;
             to->ctl.x86_64_regs.flags  = from->EFlags;
+
+            to->integer.x86_64_regs.rbp = from->Ebp;
         }
         if (flags & CONTEXT_I386_INTEGER)
         {
@@ -433,7 +434,6 @@ static NTSTATUS context_to_server( struct context_data *to, USHORT to_machine, c
         if (flags & CONTEXT_AMD64_CONTROL)
         {
             to->flags |= SERVER_CTX_CONTROL;
-            to->ctl.x86_64_regs.rbp   = from->Rbp;
             to->ctl.x86_64_regs.rip   = from->Rip;
             to->ctl.x86_64_regs.rsp   = from->Rsp;
             to->ctl.x86_64_regs.cs    = from->SegCs;
@@ -447,6 +447,7 @@ static NTSTATUS context_to_server( struct context_data *to, USHORT to_machine, c
             to->integer.x86_64_regs.rcx = from->Rcx;
             to->integer.x86_64_regs.rdx = from->Rdx;
             to->integer.x86_64_regs.rbx = from->Rbx;
+            to->integer.x86_64_regs.rbp = from->Rbp;
             to->integer.x86_64_regs.rsi = from->Rsi;
             to->integer.x86_64_regs.rdi = from->Rdi;
             to->integer.x86_64_regs.r8  = from->R8;
@@ -495,7 +496,6 @@ static NTSTATUS context_to_server( struct context_data *to, USHORT to_machine, c
         if (flags & CONTEXT_AMD64_CONTROL)
         {
             to->flags |= SERVER_CTX_CONTROL;
-            to->ctl.i386_regs.ebp    = from->Rbp;
             to->ctl.i386_regs.eip    = from->Rip;
             to->ctl.i386_regs.esp    = from->Rsp;
             to->ctl.i386_regs.cs     = from->SegCs;
@@ -511,6 +511,8 @@ static NTSTATUS context_to_server( struct context_data *to, USHORT to_machine, c
             to->integer.i386_regs.ebx = from->Rbx;
             to->integer.i386_regs.esi = from->Rsi;
             to->integer.i386_regs.edi = from->Rdi;
+
+            to->ctl.i386_regs.ebp = from->Rbp;
         }
         if (flags & CONTEXT_AMD64_SEGMENTS)
         {
@@ -781,7 +783,6 @@ static NTSTATUS context_from_server( void *dst, const struct context_data *from,
         if ((from->flags & SERVER_CTX_CONTROL) && (to_flags & CONTEXT_I386_CONTROL))
         {
             to->ContextFlags |= CONTEXT_I386_CONTROL;
-            to->Ebp    = from->ctl.x86_64_regs.rbp;
             to->Esp    = from->ctl.x86_64_regs.rsp;
             to->Eip    = from->ctl.x86_64_regs.rip;
             to->SegCs  = from->ctl.x86_64_regs.cs;
@@ -797,6 +798,10 @@ static NTSTATUS context_from_server( void *dst, const struct context_data *from,
             to->Edx = from->integer.x86_64_regs.rdx;
             to->Esi = from->integer.x86_64_regs.rsi;
             to->Edi = from->integer.x86_64_regs.rdi;
+        }
+        if ((from->flags & SERVER_CTX_INTEGER) && (to_flags & CONTEXT_I386_CONTROL))
+        {
+            to->Ebp = from->integer.x86_64_regs.rbp;
         }
         if ((from->flags & SERVER_CTX_SEGMENTS) && (to_flags & CONTEXT_I386_SEGMENTS))
         {
@@ -843,7 +848,6 @@ static NTSTATUS context_from_server( void *dst, const struct context_data *from,
         if ((from->flags & SERVER_CTX_CONTROL) && (to_flags & CONTEXT_AMD64_CONTROL))
         {
             to->ContextFlags |= CONTEXT_AMD64_CONTROL;
-            to->Rbp    = from->ctl.x86_64_regs.rbp;
             to->Rip    = from->ctl.x86_64_regs.rip;
             to->Rsp    = from->ctl.x86_64_regs.rsp;
             to->SegCs  = from->ctl.x86_64_regs.cs;
@@ -857,6 +861,7 @@ static NTSTATUS context_from_server( void *dst, const struct context_data *from,
             to->Rcx = from->integer.x86_64_regs.rcx;
             to->Rdx = from->integer.x86_64_regs.rdx;
             to->Rbx = from->integer.x86_64_regs.rbx;
+            to->Rbp = from->integer.x86_64_regs.rbp;
             to->Rsi = from->integer.x86_64_regs.rsi;
             to->Rdi = from->integer.x86_64_regs.rdi;
             to->R8  = from->integer.x86_64_regs.r8;
@@ -906,7 +911,6 @@ static NTSTATUS context_from_server( void *dst, const struct context_data *from,
         if ((from->flags & SERVER_CTX_CONTROL) && (to_flags & CONTEXT_AMD64_CONTROL))
         {
             to->ContextFlags |= CONTEXT_AMD64_CONTROL;
-            to->Rbp    = from->ctl.i386_regs.ebp;
             to->Rip    = from->ctl.i386_regs.eip;
             to->Rsp    = from->ctl.i386_regs.esp;
             to->SegCs  = from->ctl.i386_regs.cs;
@@ -922,6 +926,10 @@ static NTSTATUS context_from_server( void *dst, const struct context_data *from,
             to->Rbx = from->integer.i386_regs.ebx;
             to->Rsi = from->integer.i386_regs.esi;
             to->Rdi = from->integer.i386_regs.edi;
+        }
+        if ((from->flags & SERVER_CTX_CONTROL) && (to_flags & CONTEXT_AMD64_INTEGER))
+        {
+            to->Rbp = from->ctl.i386_regs.ebp;
         }
         if ((from->flags & SERVER_CTX_SEGMENTS) && (to_flags & CONTEXT_AMD64_SEGMENTS))
         {
