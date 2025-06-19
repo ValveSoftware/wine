@@ -188,7 +188,6 @@ static void test_audioclient(void)
         ref = IUnknown_Release(unk);
         ok(ref == 1, "Released count is %lu\n", ref);
     }
-
     hr = IAudioClient_QueryInterface(ac, &IID_IAudioClient, (void**)&unk);
     ok(hr == S_OK, "QueryInterface(IID_IAudioClient) returned %08lx\n", hr);
     if (unk)
