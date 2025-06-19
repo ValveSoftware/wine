@@ -1222,7 +1222,7 @@ static void lnxev_device_set_autocenter(struct lnxev_device *impl, BOOL enabled)
 
     if (impl->base.options.autocenter_on == AUTOCENTER_DISABLE) return;
 
-    if (impl->base.options.autocenter_on < 0) ie.value = enabled ? 0xffff : 0;
+    if (impl->base.options.autocenter_on < 0) ie.value = enabled ? get_devnode_autocenter(impl->base.devnode) : 0;
     else if (enabled) ie.value = impl->base.options.autocenter_on;
     else ie.value = impl->base.options.autocenter_off;
 

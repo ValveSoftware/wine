@@ -79,6 +79,7 @@ MAKE_FUNCPTR(SDL_JoystickInstanceID);
 MAKE_FUNCPTR(SDL_JoystickName);
 MAKE_FUNCPTR(SDL_JoystickNumAxes);
 MAKE_FUNCPTR(SDL_JoystickOpen);
+MAKE_FUNCPTR(SDL_JoystickPath);
 MAKE_FUNCPTR(SDL_WaitEventTimeout);
 MAKE_FUNCPTR(SDL_JoystickNumButtons);
 MAKE_FUNCPTR(SDL_JoystickNumBalls);
@@ -554,13 +555,14 @@ static NTSTATUS sdl_device_haptics_stop(struct unix_device *iface)
 
 static void sdl_device_set_autocenter(struct sdl_device *impl, BOOL enabled)
 {
+    const char *devnode = pSDL_JoystickPath(impl->sdl_joystick);
     BYTE percent;
 
     TRACE("impl %p, enabled %u.\n", impl, enabled);
 
     if (impl->options.autocenter_on == AUTOCENTER_DISABLE) return;
 
-    if (impl->options.autocenter_on < 0) percent = enabled ? 100 : 0;
+    if (impl->options.autocenter_on < 0) percent = enabled ? get_devnode_autocenter(devnode) * 100 / 65535 : 0;
     else if (enabled) percent = impl->options.autocenter_on * 100 / 65535;
     else percent = impl->options.autocenter_off * 100 / 65535;
 
@@ -1178,6 +1180,7 @@ NTSTATUS sdl_bus_init(void *args)
     LOAD_FUNCPTR(SDL_JoystickName);
     LOAD_FUNCPTR(SDL_JoystickNumAxes);
     LOAD_FUNCPTR(SDL_JoystickOpen);
+    LOAD_FUNCPTR(SDL_JoystickPath);
     LOAD_FUNCPTR(SDL_WaitEventTimeout);
     LOAD_FUNCPTR(SDL_JoystickNumButtons);
     LOAD_FUNCPTR(SDL_JoystickNumBalls);
