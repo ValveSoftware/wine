@@ -1030,15 +1030,23 @@ found:
 
     if (!environment && OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &token))
     {
-        WCHAR val[16];
-        CreateEnvironmentBlock(&environment, token, FALSE);
-        if (GetEnvironmentVariableW( L"WINEBOOTSTRAPMODE", val, ARRAY_SIZE(val) ))
+        static const WCHAR *preserve[] =
         {
-            UNICODE_STRING name = RTL_CONSTANT_STRING(L"WINEBOOTSTRAPMODE");
-            UNICODE_STRING value;
+            L"WINEBOOTSTRAPMODE",
+            L"WINEBUSCONFIG",
+        };
+        WCHAR buffer[1024];
 
-            RtlInitUnicodeString( &value, val );
-            RtlSetEnvironmentVariable( (WCHAR **)&environment, &name, &value );
+        CreateEnvironmentBlock(&environment, token, FALSE);
+        for (size_t i = 0; i < ARRAY_SIZE(preserve); i++)
+        {
+            if (GetEnvironmentVariableW( preserve[i], buffer, ARRAY_SIZE(buffer) ))
+            {
+                UNICODE_STRING value, name;
+                RtlInitUnicodeString( &name, preserve[i] );
+                RtlInitUnicodeString( &value, buffer );
+                RtlSetEnvironmentVariable( (WCHAR **)&environment, &name, &value );
+            }
         }
         CloseHandle(token);
     }
