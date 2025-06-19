@@ -1034,6 +1034,8 @@ found:
         {
             L"WINEBOOTSTRAPMODE",
             L"WINEBUSCONFIG",
+            L"PROTON_DISABLE_HIDRAW",
+            L"PROTON_ENABLE_HIDRAW",
         };
         WCHAR buffer[1024];
 
