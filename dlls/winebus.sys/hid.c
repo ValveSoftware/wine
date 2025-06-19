@@ -41,6 +41,20 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(hid);
 
+void get_device_options(const struct bus_options *options, UINT vid, UINT pid, struct device_options *opts)
+{
+    struct device_options *device;
+
+    LIST_FOR_EACH_ENTRY(device, &options->devices, struct device_options, entry)
+    {
+        if (device->vid != vid) continue;
+        if (device->pid != -1 && device->pid != pid) continue;
+        if (device->hidraw == -1) continue;
+        *opts = *device;
+        break;
+    }
+}
+
 static BOOL hid_report_descriptor_append(struct hid_report_descriptor *desc, const BYTE *buffer, SIZE_T size)
 {
     BYTE *tmp = desc->data;

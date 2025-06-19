@@ -47,12 +47,17 @@ struct device_desc
     WCHAR serialnumber[MAX_PATH];
 };
 
+#define AUTOCENTER_DISABLE -3
+#define AUTOCENTER_ENABLE  -2
+
 struct device_options
 {
     struct list entry;
     UINT vid;
     UINT pid;
     INT hidraw;
+    INT autocenter_on;
+    INT autocenter_off;
 };
 
 struct bus_options

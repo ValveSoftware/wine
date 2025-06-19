@@ -1074,6 +1074,8 @@ static struct device_options *add_device_options(UINT vid, UINT pid)
     device->vid = vid;
     device->pid = pid;
     device->hidraw = -1;
+    device->autocenter_on = -1;
+    device->autocenter_off = -1;
 
     LIST_FOR_EACH_ENTRY(next, &options.devices, struct device_options, entry)
         if (next->vid > vid || (next->vid == vid && next->pid > pid)) break;
@@ -1103,13 +1105,14 @@ static void load_device_options(void)
 
     while (!status && name)
     {
+        static const UNICODE_STRING autocenter = RTL_CONSTANT_STRING(L"Autocenter");
         static const UNICODE_STRING hidraw = RTL_CONSTANT_STRING(L"Hidraw");
         static const UNICODE_STRING backslash = RTL_CONSTANT_STRING(L"\\");
         struct device_options *device;
         UNICODE_STRING name_str;
+        int ret, on, off;
         UINT vid, pid;
         USHORT pos;
-        int ret;
 
         status = NtEnumerateKey(key, idx, KeyNameInformation, name, name_max_size, &size);
         while (status == STATUS_BUFFER_OVERFLOW)
@@ -1138,6 +1141,22 @@ static void load_device_options(void)
         if (!NtQueryValueKey(subkey, &hidraw, KeyValuePartialInformation, info, sizeof(buffer), &size) && info->Type == REG_DWORD)
             device->hidraw = *(DWORD *)info->Data;
         if (device->hidraw != -1) TRACE("- %04x/%04x: %sabling hidraw\n", device->vid, device->pid, device->hidraw ? "en" : "dis");
+
+        if (!NtQueryValueKey(subkey, &autocenter, KeyValuePartialInformation, info, sizeof(buffer), &size) && info->Type == REG_SZ)
+        {
+            if (!wcsnicmp((WCHAR *)info->Data, L"enable", 4)) device->autocenter_off = device->autocenter_on = AUTOCENTER_ENABLE;
+            else if (!wcsnicmp((WCHAR *)info->Data, L"disable", 6)) device->autocenter_off = device->autocenter_on = AUTOCENTER_DISABLE;
+            else if ((ret = swscanf((WCHAR *)info->Data, L"%d/%d", &on, &off)))
+            {
+                device->autocenter_on = on;
+                if (ret == 1) device->autocenter_off = on;
+                else device->autocenter_off = off;
+            }
+        }
+
+        if (device->autocenter_on == AUTOCENTER_ENABLE) TRACE("- %04x/%04x: enabling autocenter\n", device->vid, device->pid);
+        else if (device->autocenter_on == AUTOCENTER_DISABLE) TRACE("- %04x/%04x: disabling autocenter\n", device->vid, device->pid);
+        else if (device->autocenter_on != -1) TRACE("- %04x/%04x: forcing autocenter %d-%d\n", device->vid, device->pid, device->autocenter_on, device->autocenter_off);
 
         NtClose(subkey);
     }
@@ -1173,8 +1192,8 @@ static void bus_options_init(void)
     if ((env = getenv("WINEBUSCONFIG")) && (env = strdup(env)))
     {
         struct device_options *device;
+        int ret, on, off;
         UINT vid, pid;
-        int ret;
 
         TRACE("Parsing WINEBUSCONFIG %s\n", debugstr_a(env));
 
@@ -1188,10 +1207,23 @@ static void bus_options_init(void)
                 if (!strncmp(opt + 1, "hidraw", 6)) device->hidraw = 1;
                 else if (!strncmp(opt + 1, "nohidraw", 8)) device->hidraw = 0;
 
+                if ((ret = sscanf(opt + 1, "autocenter:%d-%d", &on, &off)))
+                {
+                    device->autocenter_on = on;
+                    if (ret == 1) device->autocenter_off = on;
+                    else device->autocenter_off = off;
+                }
+                else if (!strncmp(opt + 1, "autocenter", 8)) device->autocenter_off = device->autocenter_on = AUTOCENTER_ENABLE;
+                else if (!strncmp(opt + 1, "noautocenter", 12)) device->autocenter_off = device->autocenter_on = AUTOCENTER_DISABLE;
+
                 if (!(next = strchr(opt + 1, '/'))) break;
             }
 
             if (device->hidraw != -1) TRACE("- %04x/%04x: %sabling hidraw\n", device->vid, device->pid, device->hidraw ? "en" : "dis");
+
+            if (device->autocenter_on == AUTOCENTER_ENABLE) TRACE("- %04x/%04x: enabling autocenter\n", device->vid, device->pid);
+            else if (device->autocenter_on == AUTOCENTER_DISABLE) TRACE("- %04x/%04x: disabling autocenter\n", device->vid, device->pid);
+            else if (device->autocenter_on != -1) TRACE("- %04x/%04x: forcing autocenter %d-%d\n", device->vid, device->pid, device->autocenter_on, device->autocenter_off);
         }
 
         free(env);

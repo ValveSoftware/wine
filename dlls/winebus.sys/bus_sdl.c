@@ -137,6 +137,7 @@ static const char *(*pSDL_JoystickGetSerial)(SDL_Joystick * joystick);
 struct sdl_device
 {
     struct unix_device unix_device;
+    struct device_options options;
 
     SDL_Joystick *sdl_joystick;
     SDL_GameController *sdl_controller;
@@ -551,6 +552,21 @@ static NTSTATUS sdl_device_haptics_stop(struct unix_device *iface)
     return STATUS_SUCCESS;
 }
 
+static void sdl_device_set_autocenter(struct sdl_device *impl, BOOL enabled)
+{
+    BYTE percent;
+
+    TRACE("impl %p, enabled %u.\n", impl, enabled);
+
+    if (impl->options.autocenter_on == AUTOCENTER_DISABLE) return;
+
+    if (impl->options.autocenter_on < 0) percent = enabled ? 100 : 0;
+    else if (enabled) percent = impl->options.autocenter_on * 100 / 65535;
+    else percent = impl->options.autocenter_off * 100 / 65535;
+
+    pSDL_HapticSetAutocenter(impl->sdl_haptic, percent);
+}
+
 static NTSTATUS sdl_device_physical_device_control(struct unix_device *iface, USAGE control)
 {
     struct sdl_device *impl = impl_from_unix_device(iface);
@@ -570,7 +586,7 @@ static NTSTATUS sdl_device_physical_device_control(struct unix_device *iface, US
         return STATUS_SUCCESS;
     case PID_USAGE_DC_STOP_ALL_EFFECTS:
         pSDL_HapticStopAll(impl->sdl_haptic);
-        pSDL_HapticSetAutocenter(impl->sdl_haptic, 0);
+        sdl_device_set_autocenter(impl, FALSE);
         return STATUS_SUCCESS;
     case PID_USAGE_DC_DEVICE_RESET:
         pSDL_HapticStopAll(impl->sdl_haptic);
@@ -580,7 +596,7 @@ static NTSTATUS sdl_device_physical_device_control(struct unix_device *iface, US
             pSDL_HapticDestroyEffect(impl->sdl_haptic, impl->effect_ids[i]);
             impl->effect_ids[i] = -1;
         }
-        pSDL_HapticSetAutocenter(impl->sdl_haptic, 100);
+        sdl_device_set_autocenter(impl, TRUE);
         return STATUS_SUCCESS;
     case PID_USAGE_DC_DEVICE_PAUSE:
         pSDL_HapticPause(impl->sdl_haptic);
@@ -1060,6 +1076,8 @@ static void sdl_add_device(unsigned int index)
 
         if (!(impl = hid_device_create(&sdl_device_vtbl, sizeof(struct sdl_device)))) return;
         list_add_tail(&device_list, &impl->unix_device.entry);
+
+        get_device_options(options, desc.vid, desc.pid, &impl->options);
         impl->sdl_joystick = joystick;
         impl->sdl_controller = controller;
         impl->id = id;
