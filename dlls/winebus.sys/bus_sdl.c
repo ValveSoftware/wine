@@ -555,15 +555,12 @@ static NTSTATUS sdl_device_haptics_stop(struct unix_device *iface)
 
 static void sdl_device_set_autocenter(struct sdl_device *impl, BOOL enabled)
 {
-    const char *devnode = pSDL_JoystickPath(impl->sdl_joystick);
     BYTE percent;
 
     TRACE("impl %p, enabled %u.\n", impl, enabled);
 
     if (impl->options.autocenter_on == AUTOCENTER_DISABLE) return;
-
-    if (impl->options.autocenter_on < 0) percent = enabled ? get_devnode_autocenter(devnode) * 100 / 65535 : 0;
-    else if (enabled) percent = impl->options.autocenter_on * 100 / 65535;
+    if (enabled) percent = impl->options.autocenter_on * 100 / 65535;
     else percent = impl->options.autocenter_off * 100 / 65535;
 
     pSDL_HapticSetAutocenter(impl->sdl_haptic, percent);
@@ -1080,6 +1077,11 @@ static void sdl_add_device(unsigned int index)
         list_add_tail(&device_list, &impl->unix_device.entry);
 
         get_device_options(options, desc.vid, desc.pid, &impl->options);
+        if (impl->options.autocenter_on != AUTOCENTER_DISABLE && impl->options.autocenter_on < 0)
+        {
+            impl->options.autocenter_on = get_devnode_autocenter(pSDL_JoystickPath(joystick));
+            impl->options.autocenter_off = 0;
+        }
         impl->sdl_joystick = joystick;
         impl->sdl_controller = controller;
         impl->id = id;

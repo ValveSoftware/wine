@@ -1221,9 +1221,7 @@ static void lnxev_device_set_autocenter(struct lnxev_device *impl, BOOL enabled)
     };
 
     if (impl->base.options.autocenter_on == AUTOCENTER_DISABLE) return;
-
-    if (impl->base.options.autocenter_on < 0) ie.value = enabled ? get_devnode_autocenter(impl->base.devnode) : 0;
-    else if (enabled) ie.value = impl->base.options.autocenter_on;
+    if (enabled) ie.value = impl->base.options.autocenter_on;
     else ie.value = impl->base.options.autocenter_off;
 
     if (write(impl->base.device_fd, &ie, sizeof(ie)) == -1)
@@ -1686,6 +1684,11 @@ static void udev_add_device(struct udev_device *dev, int fd)
         list_add_tail(&device_list, &impl->unix_device.entry);
 
         get_device_options(options, desc.vid, desc.pid, &impl->options);
+        if (impl->options.autocenter_on != AUTOCENTER_DISABLE && impl->options.autocenter_on < 0)
+        {
+            impl->options.autocenter_on = get_devnode_autocenter(devnode);
+            impl->options.autocenter_off = 0;
+        }
         impl->read_report = hidraw_device_read_report;
         impl->udev_device = udev_device_ref(dev);
         strcpy(impl->devnode, devnode);
@@ -1700,6 +1703,11 @@ static void udev_add_device(struct udev_device *dev, int fd)
         list_add_tail(&device_list, &impl->unix_device.entry);
 
         get_device_options(options, desc.vid, desc.pid, &impl->options);
+        if (impl->options.autocenter_on != AUTOCENTER_DISABLE && impl->options.autocenter_on < 0)
+        {
+            impl->options.autocenter_on = get_devnode_autocenter(devnode);
+            impl->options.autocenter_off = 0;
+        }
         impl->read_report = lnxev_device_read_report;
         impl->udev_device = udev_device_ref(dev);
         strcpy(impl->devnode, devnode);
