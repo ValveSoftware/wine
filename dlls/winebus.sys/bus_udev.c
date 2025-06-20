@@ -2072,11 +2072,12 @@ static void process_monitor_event(struct udev_monitor *monitor)
 NTSTATUS udev_bus_init(void *args)
 {
     int monitor_fd = -1;
-    BOOL disable_udevd = options->disable_udevd;
+    BOOL disable_udevd;
 
     TRACE("args %p\n", args);
 
     options = (struct bus_options *)args;
+    disable_udevd = options->disable_udevd;
 
     if (pipe(deviceloop_control) != 0)
     {
