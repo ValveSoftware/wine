@@ -24,6 +24,7 @@
 #endif
 
 #include "config.h"
+#undef _TIME_BITS /* libpulse uses default time bitness convention. */
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -59,16 +60,33 @@ DEFINE_GUID(GUID_NULL,0,0,0,0,0,0,0,0,0,0,0);
 
 WINE_DEFAULT_DEBUG_CHANNEL(pulse);
 
+C_ASSERT((sizeof(void *) == 8 && sizeof(struct timeval) == 16) || (sizeof(void *) == 4 && sizeof(struct timeval) == 8));
+
 enum phys_device_bus_type {
     phys_device_bus_invalid = -1,
     phys_device_bus_pci,
     phys_device_bus_usb
 };
 
+struct pulse_period
+{
+    struct list entry;
+    char *device;
+    pa_usec_t period;
+    pa_usec_t timer_last_time, stream_time;
+    pa_usec_t adjust;
+    struct list streams;
+    pa_time_event *time_event;
+    struct pulse_stream *timer_stream;
+};
+
+static struct list active_periods = LIST_INIT(active_periods);
+
 struct pulse_stream
 {
     EDataFlow dataflow;
 
+    char *device;
     pa_stream *stream;
     pa_sample_spec ss;
     pa_channel_map map;
@@ -86,16 +104,19 @@ struct pulse_stream
     BOOL started;
     SIZE_T bufsize_frames, real_bufsize_bytes, period_bytes;
     SIZE_T peek_ofs, read_offs_bytes, lcl_offs_bytes, pa_offs_bytes;
-    SIZE_T tmp_buffer_bytes, held_bytes, peek_len, peek_buffer_len, pa_held_bytes;
+    SIZE_T tmp_buffer_bytes, held_bytes, peek_len, peek_buffer_len, pa_held_bytes, max_pa_held_bytes;
     BYTE *local_buffer, *tmp_buffer, *peek_buffer;
     void *locked_ptr;
-    BOOL please_quit, just_started, just_underran;
+    BOOL just_underran, pa_started, update_timing_info_pending;
     pa_usec_t mmdev_period_usec;
+    pa_usec_t timeline_start_stream_time, timeline_start_period_time;
 
     INT64 clock_lastpos, clock_written;
 
     struct list packet_free_head;
     struct list packet_filled_head;
+    struct list period_entry;
+    struct pulse_period *period;
 };
 
 typedef struct _ACPacket
@@ -130,6 +151,9 @@ static pthread_mutex_t pulse_mutex;
 static pthread_cond_t pulse_cond = PTHREAD_COND_INITIALIZER;
 
 static ULONG_PTR zero_bits = 0;
+
+static UINT32 silence_buf_size = 1048576;
+static BYTE *silence_buf;
 
 static NTSTATUS pulse_not_implemented(void *args)
 {
@@ -285,6 +309,8 @@ static NTSTATUS pulse_process_detach(void *args)
     if (pulse_ml)
         pa_mainloop_quit(pulse_ml, 0);
 
+    free( silence_buf );
+    silence_buf = NULL;
     return STATUS_SUCCESS;
 }
 
@@ -378,13 +404,13 @@ static void pulse_contextcallback(pa_context *c, void *userdata)
 static void pulse_stream_state(pa_stream *s, void *user)
 {
     pa_stream_state_t state = pa_stream_get_state(s);
-    TRACE("Stream state changed to %i\n", state);
+    TRACE("%p: Stream state changed to %i\n", user, state);
     pulse_broadcast();
 }
 
 static void pulse_attr_update(pa_stream *s, void *user) {
     const pa_buffer_attr *attr = pa_stream_get_buffer_attr(s);
-    TRACE("New attributes or device moved:\n");
+    TRACE("%p: New attributes or device moved:\n", user);
     dump_attr(attr);
 }
 
@@ -397,7 +423,10 @@ static void pulse_underflow_callback(pa_stream *s, void *userdata)
 
 static void pulse_started_callback(pa_stream *s, void *userdata)
 {
+    struct pulse_stream *stream = userdata;
+
     TRACE("%p: (Re)started playing\n", userdata);
+    stream->pa_started = TRUE;
 }
 
 static void pulse_op_cb(pa_stream *s, int success, void *user)
@@ -1165,7 +1194,7 @@ static HRESULT pulse_stream_connect(struct pulse_stream *stream, const char *pul
     attr.minreq = attr.fragsize = period_bytes;
     attr.tlength = period_bytes * 3;
     attr.maxlength = stream->bufsize_frames * pa_frame_size(&stream->ss);
-    attr.prebuf = pa_frame_size(&stream->ss);
+    attr.prebuf = 0;
     dump_attr(&attr);
 
     /* If specific device was requested, use it exactly */
@@ -1314,11 +1343,12 @@ static NTSTATUS pulse_create_stream(void *args)
                 }
             }
         }
+        stream->device = strdup(params->device);
     }
 
     *params->channel_count = stream->ss.channels;
     *params->stream = (stream_handle)(UINT_PTR)stream;
-
+    TRACE("created stream %p.\n", stream);
 exit:
     if (FAILED(params->result = hr)) {
         free(stream->local_buffer);
@@ -1326,6 +1356,7 @@ exit:
             pa_stream_disconnect(stream->stream);
             pa_stream_unref(stream->stream);
         }
+        free(stream->device);
         free(stream);
     }
 
@@ -1472,6 +1503,39 @@ write:
     return pa_stream_write(stream->stream, buffer, bytes, NULL, 0, PA_SEEK_RELATIVE);
 }
 
+static void pulse_write_index_catchup(struct pulse_stream *stream)
+{
+    const pa_timing_info *ti = pa_stream_get_timing_info(stream->stream);
+    UINT32 frame_size, to_write;
+    int64_t write_index;
+
+    if (!ti || ti->read_index <= ti->write_index) return;
+    if (ti->read_index_corrupt || ti->write_index_corrupt)
+    {
+        WARN("index corrupt %d / %d.\n", ti->read_index_corrupt, ti->write_index_corrupt);
+        return;
+    }
+
+    if (!silence_buf) silence_buf = calloc(1, silence_buf_size);
+    frame_size = pa_frame_size(&stream->ss);
+
+    while (ti && ti->read_index > ti->write_index)
+    {
+        write_index = ti->write_index;
+        TRACE("stream %p, runnind %d, read is ahead of write %lld bytes.\n", stream, stream->started,
+              (long long)(ti->read_index - write_index));
+
+        to_write = min(ti->read_index - write_index, silence_buf_size) / frame_size * frame_size;
+        pa_stream_write(stream->stream, silence_buf, to_write, NULL, 0, PA_SEEK_RELATIVE);
+        ti = pa_stream_get_timing_info(stream->stream);
+        if (ti && ti->write_index <= write_index)
+        {
+            WARN("write index did not advance.\n");
+            break;
+        }
+    }
+}
+
 static void pulse_write(struct pulse_stream *stream)
 {
     /* write as much data to PA as we can */
@@ -1486,9 +1550,17 @@ static void pulse_write(struct pulse_stream *stream)
             to_write = bytes - stream->pa_held_bytes;
             TRACE("prebuffering %u frames of silence\n",
                     (int)(to_write / pa_frame_size(&stream->ss)));
-            buf = calloc(1, to_write);
-            pa_stream_write(stream->stream, buf, to_write, NULL, 0, PA_SEEK_RELATIVE);
-            free(buf);
+            if (silence_buf && to_write > silence_buf_size)
+            {
+                free(silence_buf);
+                silence_buf = NULL;
+            }
+            if (!silence_buf)
+            {
+                silence_buf_size = max(silence_buf_size, to_write);
+                silence_buf = calloc(1, silence_buf_size);
+            }
+            pa_stream_write(stream->stream, silence_buf, to_write, NULL, 0, PA_SEEK_RELATIVE);
         }
 
         stream->just_underran = FALSE;
@@ -1620,103 +1692,227 @@ static void pulse_read(struct pulse_stream *stream)
 
 static NTSTATUS pulse_timer_loop(void *args)
 {
-    struct timer_loop_params *params = args;
-    struct pulse_stream *stream = handle_get_stream(params->stream);
-    LARGE_INTEGER delay;
-    pa_usec_t last_time;
-    UINT32 adv_bytes;
-    int success;
+    /* Stream's data are read and written from the main loop timer callback. */
+    return STATUS_SUCCESS;
+}
 
-    pulse_lock();
-    delay.QuadPart = -stream->mmdev_period_usec * 10;
-    pa_stream_get_time(stream->stream, &last_time);
-    pulse_unlock();
+#define TIMER_ADJUST_DELAY (5 * PA_USEC_PER_SEC)
 
-    while (!stream->please_quit)
+static void pulse_update_timing_cb(pa_stream *s, int success, void *user)
+{
+    struct pulse_stream *stream = user;
+    struct pulse_period *period = stream->period;
+    pa_usec_t period_stream_time, stream_time;
+    int err;
+
+    stream->update_timing_info_pending = FALSE;
+    if (!success)
     {
-        pa_usec_t now, adv_usec = 0;
-        int err;
+        WARN("failed.\n");
+        return;
+    }
 
-        NtDelayExecution(FALSE, &delay);
+    period_stream_time = period->stream_time;
+    if (!stream->pa_started)
+    {
+        pulse_write_index_catchup(stream);
+        return;
+    }
 
-        pulse_lock();
+    if (period->timer_stream && (!period->timer_stream->pa_started || !period->timer_stream->timeline_start_period_time
+                                 || period_stream_time - period->timer_stream->timeline_start_period_time < TIMER_ADJUST_DELAY))
+    {
+        TRACE("stream %p is no longer timer stream, started %d, period_stream_time %lld, last_time %lld.\n",
+            period->timer_stream, period->timer_stream->pa_started, (long long)period_stream_time, (long long)period->timer_stream->timeline_start_period_time);
+        period->timer_stream->timeline_start_period_time = 0;
+        period->timer_stream = NULL;
+    }
 
-        delay.QuadPart = -stream->mmdev_period_usec * 10;
+    if ((err = pa_stream_get_time(stream->stream, &stream_time)))
+    {
+        WARN("pa_stream_get_time failed with %d.\n", err);
+        return;
+    }
 
-        wait_pa_operation_complete(pa_stream_update_timing_info(stream->stream, pulse_op_cb, &success));
-        err = pa_stream_get_time(stream->stream, &now);
-        if (err == 0)
+    if (!stream->timeline_start_period_time)
+    {
+        stream->timeline_start_period_time = period_stream_time;
+        stream->timeline_start_stream_time = stream_time;
+        TRACE("started stream %p timing at rt %lld, stream %lld.\n", stream, (long long)period_stream_time, (long long)stream_time);
+    }
+    else if (!period->timer_stream && period_stream_time - stream->timeline_start_period_time > TIMER_ADJUST_DELAY)
+    {
+        period->timer_stream = stream;
+        TRACE("stream %p is now timer stream.\n", stream);
+    }
+    if (period->timer_stream == stream)
+    {
+        period->adjust = (int64_t)((period_stream_time - stream->timeline_start_period_time) - (stream_time - stream->timeline_start_stream_time)) / 10;
+        TRACE("stream %p, peropd diff %lld, stream diff %lld.\n", stream,
+              (long long)(period_stream_time - stream->timeline_start_period_time),
+              (long long)(stream_time - stream->timeline_start_stream_time));
+        if (period->adjust < -5 * period->period && period->adjust > 5 * period->period)
         {
-            TRACE("got now: %s, last time: %s\n", wine_dbgstr_longlong(now), wine_dbgstr_longlong(last_time));
-            if (stream->started && (stream->dataflow == eCapture || stream->held_bytes))
+            WARN("stream %p, resetting period timing (adjust %lld).\n", stream, (long long)period->adjust);
+            period->adjust = 0;
+            period->timer_stream = NULL;
+            stream->timeline_start_period_time = 0;
+            stream->timeline_start_stream_time = 0;
+        }
+    }
+    pulse_write_index_catchup(stream);
+}
+
+
+static void pa_streams_timer_cb(pa_mainloop_api *api, pa_time_event *e, const struct timeval *tv, void *userdata)
+{
+    struct pulse_period *period = userdata;
+    struct pulse_stream *stream;
+    BOOL reset_timeline = FALSE;
+    pa_usec_t next_timer;
+    int64_t adjust = 0;
+    UINT32 adv_bytes;
+    pa_operation *o;
+    pa_usec_t now;
+
+    period->stream_time += period->period;
+    now = pa_rtclock_now();
+    if (period->timer_last_time + period->period < now)
+    {
+        WARN("Next period is in the past, resetting timeline.\n");
+        period->timer_last_time = now;
+        period->adjust = 0;
+        reset_timeline = TRUE;
+    }
+
+    LIST_FOR_EACH_ENTRY(stream, &period->streams, struct pulse_stream, period_entry)
+    {
+        if (stream->started)
+        {
+            if (reset_timeline)
             {
-                if(stream->just_underran)
-                {
-                    last_time = now;
-                    stream->just_started = TRUE;
-                }
-
-                if (stream->just_started)
-                {
-                    /* let it play out a period to absorb some latency and get accurate timing */
-                    pa_usec_t diff = now - last_time;
-
-                    if (diff > stream->mmdev_period_usec)
-                    {
-                        stream->just_started = FALSE;
-                        last_time = now;
-                    }
-                }
-                else
-                {
-                    INT32 adjust = last_time + stream->mmdev_period_usec - now;
-
-                    adv_usec = now - last_time;
-
-                    if(adjust > ((INT32)(stream->mmdev_period_usec / 2)))
-                        adjust = stream->mmdev_period_usec / 2;
-                    else if(adjust < -((INT32)(stream->mmdev_period_usec / 2)))
-                        adjust = -1 * stream->mmdev_period_usec / 2;
-
-                    delay.QuadPart = -(stream->mmdev_period_usec + adjust) * 10;
-
-                    last_time += stream->mmdev_period_usec;
-                }
-
-                if (stream->dataflow == eRender)
-                {
-                    pulse_write(stream);
-
-                    /* regardless of what PA does, advance one period */
-                    adv_bytes = min(stream->period_bytes, stream->held_bytes);
-                    stream->lcl_offs_bytes += adv_bytes;
-                    stream->lcl_offs_bytes %= stream->real_bufsize_bytes;
-                    stream->held_bytes -= adv_bytes;
-                }
-                else if(stream->dataflow == eCapture)
-                {
-                    pulse_read(stream);
-                }
+                stream->timeline_start_period_time = 0;
+                stream->timeline_start_stream_time = 0;
+            }
+            if (!stream->update_timing_info_pending && (o = pa_stream_update_timing_info(stream->stream, pulse_update_timing_cb, stream)))
+            {
+                pa_operation_unref(o);
+                stream->update_timing_info_pending = TRUE;
+            }
+            else if (stream->update_timing_info_pending)
+            {
+                TRACE("pa_stream_update_timing_info is still pending.\n");
             }
             else
             {
-                last_time = now;
-                delay.QuadPart = -stream->mmdev_period_usec * 10;
+                ERR("pa_stream_update_timing_info err %d.\n", pa_context_errno(pulse_ctx));
+            }
+            if (stream->dataflow == eRender && stream->held_bytes)
+            {
+                pulse_write(stream);
+
+                /* regardless of what PA does, advance one per`iod */
+                adv_bytes = min(stream->period_bytes, stream->held_bytes);
+                stream->lcl_offs_bytes += adv_bytes;
+                stream->lcl_offs_bytes %= stream->real_bufsize_bytes;
+                stream->held_bytes -= adv_bytes;
+            }
+            else if (stream->dataflow == eCapture)
+            {
+                pulse_read(stream);
             }
         }
-
         if (stream->event)
             NtSetEvent(stream->event, NULL);
-
-        TRACE("%p after update, adv usec: %d, held: %u, delay usec: %u\n",
-                stream, (int)adv_usec,
-                (int)(stream->held_bytes/ pa_frame_size(&stream->ss)),
-                (unsigned int)(-delay.QuadPart / 10));
-
-        pulse_unlock();
     }
 
-    return STATUS_SUCCESS;
+    adjust = period->adjust;
+    if (adjust > (int64_t)(period->period / 3))
+        adjust = period->period / 3;
+    else if (adjust < -(int64_t)(period->period / 3))
+        adjust = -(int64_t)period->period / 3;
+    next_timer = period->timer_last_time + period->period + adjust;
+    TRACE("period %p, timer_last_time %llu, next_timer %llu, adjust %lld.\n",
+            period, (long long)period->timer_last_time, (long long)next_timer, (long long)period->adjust);
+    period->timer_last_time = next_timer;
+    period->adjust = 0;
+    pa_context_rttime_restart(pulse_ctx, e, next_timer);
+}
+
+static void pa_streams_timer_cb_destroy(pa_mainloop_api *api, pa_time_event *e, void *userdata)
+{
+    struct pulse_period *period = userdata;
+
+    TRACE("period %p.\n", period);
+
+    list_remove(&period->entry);
+    free(period->device);
+    free(period);
+}
+
+static void remove_stream_from_period(struct pulse_stream *stream)
+{
+    if (!stream->period)
+        return;
+
+    if (stream->period->timer_stream == stream)
+        stream->period->timer_stream = NULL;
+
+    list_remove(&stream->period_entry);
+    if (list_empty(&stream->period->streams) && pulse_ml)
+    {
+        pa_mainloop_api *api = pa_mainloop_get_api(pulse_ml);
+
+        TRACE("freeing time event for period %p.\n", stream->period);
+        api->time_free(stream->period->time_event);
+        stream->period->time_event = NULL;
+    }
+}
+
+static void pulse_add_stream_to_period(struct pulse_stream *stream)
+{
+    struct pulse_period *period;
+    pa_mainloop_api *api;
+
+    if ((period = stream->period))
+    {
+        assert(stream->mmdev_period_usec == period->period);
+        assert(!strcmp(stream->device, period->device));
+        /* */
+        list_remove(&stream->period_entry);
+        list_add_tail(&period->streams, &stream->period_entry);
+        return;
+    }
+
+    LIST_FOR_EACH_ENTRY(period, &active_periods, struct pulse_period, entry)
+    {
+        if (!period->time_event)
+        {
+            /* Period is being removed but pa_streams_timer_cb_destroy was not called yet. */
+            continue;
+        }
+        if (period->period == stream->mmdev_period_usec && !strcmp(period->device, stream->device))
+        {
+            TRACE("Using period %p.\n", period);
+            stream->period = period;
+            list_add_tail(&period->streams, &stream->period_entry);
+            return;
+        }
+    }
+
+    period = calloc(1, sizeof(*period));
+    period->period = stream->mmdev_period_usec;
+    period->device = strdup(stream->device);
+    list_init(&period->streams);
+    stream->period = period;
+    list_add_tail(&period->streams, &stream->period_entry);
+    list_add_tail(&active_periods, &period->entry);
+    period->timer_last_time = pa_rtclock_now() + period->period;
+    period->time_event = pa_context_rttime_new(pulse_ctx, period->timer_last_time,
+            pa_streams_timer_cb, period);
+    api = pa_mainloop_get_api(pulse_ml);
+    api->time_set_destroy(period->time_event, pa_streams_timer_cb_destroy);
+    TRACE("Created period %p, %s, %lld.\n", period, debugstr_a(period->device), (long long)period->period);
 }
 
 static NTSTATUS pulse_release_stream(void *args)
@@ -1726,12 +1922,12 @@ static NTSTATUS pulse_release_stream(void *args)
     SIZE_T size;
 
     if(params->timer_thread) {
-        stream->please_quit = TRUE;
         NtWaitForSingleObject(params->timer_thread, FALSE, NULL);
         NtClose(params->timer_thread);
     }
 
     pulse_lock();
+    remove_stream_from_period(stream);
     if (PA_STREAM_IS_GOOD(pa_stream_get_state(stream->stream))) {
         pa_stream_disconnect(stream->stream);
         while (pulse_ml && PA_STREAM_IS_GOOD(pa_stream_get_state(stream->stream)))
@@ -1751,6 +1947,7 @@ static NTSTATUS pulse_release_stream(void *args)
                             &size, MEM_RELEASE);
     }
     free(stream->peek_buffer);
+    free(stream->device);
     free(stream);
     return STATUS_SUCCESS;
 }
@@ -1797,7 +1994,7 @@ static NTSTATUS pulse_start(void *args)
     if (SUCCEEDED(params->result))
     {
         stream->started = TRUE;
-        stream->just_started = TRUE;
+        pulse_add_stream_to_period(stream);
     }
     pulse_unlock();
     return STATUS_SUCCESS;
@@ -1833,7 +2030,12 @@ static NTSTATUS pulse_stop(void *args)
             params->result = E_FAIL;
     }
     if (SUCCEEDED(params->result))
+    {
         stream->started = FALSE;
+        stream->pa_started = FALSE;
+        stream->timeline_start_period_time = 0;
+        stream->timeline_start_stream_time = 0;
+    }
     pulse_unlock();
     return STATUS_SUCCESS;
 }
@@ -2054,11 +2256,17 @@ static NTSTATUS pulse_release_render_buffer(void *args)
 
     stream->held_bytes += written_bytes;
     stream->pa_held_bytes += written_bytes;
+    if (stream->pa_held_bytes > stream->max_pa_held_bytes)
+    {
+        stream->max_pa_held_bytes = stream->pa_held_bytes;
+        TRACE("%p max_pa_held_bytes %lld.\n", stream, (long long)stream->max_pa_held_bytes);
+    }
     if (stream->pa_held_bytes > stream->real_bufsize_bytes)
     {
-        stream->pa_offs_bytes += stream->pa_held_bytes - stream->real_bufsize_bytes;
-        stream->pa_offs_bytes %= stream->real_bufsize_bytes;
-        stream->pa_held_bytes = stream->real_bufsize_bytes;
+        WARN("%p PA buffer overflow.\n", stream);
+        stream->max_pa_held_bytes = 0;
+        stream->pa_offs_bytes = stream->lcl_offs_bytes;
+        stream->pa_held_bytes = stream->held_bytes;
     }
     stream->clock_written += written_bytes;
     stream->locked = 0;
