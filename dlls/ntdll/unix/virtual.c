@@ -2495,6 +2495,7 @@ static void fixup_effective_user_space_limit( const void **effective_user_space_
         cached = sgi &&
             (
                 !strcmp( sgi, "3092660" )
+                || !strcmp( sgi, "3513350" )
             );
     }
     if (cached)
