@@ -2484,6 +2484,24 @@ static void clear_native_views(void)
     }
 }
 
+static void fixup_effective_user_space_limit( const void **effective_user_space_limit )
+{
+#ifdef _WIN64
+    static int cached = -1;
+
+    if (cached == -1)
+    {
+        const char *sgi = getenv( "SteamGameId" );
+        cached = sgi &&
+            (
+                !strcmp( sgi, "3092660" )
+            );
+    }
+    if (cached)
+        *effective_user_space_limit = min( *effective_user_space_limit, (void *)0x700000000000 );
+#endif
+}
+
 /***********************************************************************
  *           map_view
  *
@@ -2499,6 +2517,8 @@ static NTSTATUS map_view( struct file_view **view_ret, void *base, size_t size,
     NTSTATUS status;
     const void *effective_user_space_limit = !is_win64 && wine_allocs_2g_limit ?
         (void *)0x7fff0000 : min( user_space_limit, host_addr_space_limit);
+
+    fixup_effective_user_space_limit( &effective_user_space_limit );
 
     if (alloc_type & MEM_REPLACE_PLACEHOLDER)
     {
