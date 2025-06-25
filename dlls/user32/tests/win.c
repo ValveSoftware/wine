@@ -13858,14 +13858,14 @@ static void test_startupinfo_showwindow_proc( int test_id )
                && (!test->show_affected || sa.wShowWindow != SW_HIDE);
     bval = !!IsWindowVisible( hwnd );
 
-    todo_wine_if((test->show_affected && sa.wShowWindow == SW_HIDE) || test->cmd_show == SW_FORCEMINIMIZE)
+    todo_wine_if(test->cmd_show == SW_FORCEMINIMIZE)
     ok( bval == expected, "got %d, expected %d.\n", bval, expected );
 
     /* After default args were used once SW_SHOWDEFAULT doesn't use startupinfo. */
     ShowWindow( hwnd, SW_SHOWDEFAULT );
     bval = !!IsWindowVisible( hwnd );
     expected = test->counted_as_first || sa.wShowWindow != SW_HIDE;
-    todo_wine_if(!test->counted_as_first && sa.wShowWindow == SW_HIDE) ok( bval == expected, "got %d, expected %d.\n", bval, expected );
+    ok( bval == expected, "got %d, expected %d.\n", bval, expected );
     DestroyWindow( hwnd );
     pump_messages();
 
