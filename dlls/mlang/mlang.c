@@ -1327,6 +1327,10 @@ static INT CALLBACK map_font_enum_proc(const LOGFONTW *lf, const TEXTMETRICW *nt
     UINT charset;
     struct map_font_enum_data *data = (struct map_font_enum_data *)lParam;
 
+    if ((data->charset == GB2312_CHARSET || data->charset == SHIFTJIS_CHARSET)
+            && wcscmp(lf->lfFaceName, L"Microsoft YaHei") != 0)
+        return 1;
+
     data->src_lf.lfCharSet = lf->lfCharSet;
     wcscpy(data->src_lf.lfFaceName, lf->lfFaceName);
 
