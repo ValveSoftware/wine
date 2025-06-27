@@ -1726,7 +1726,7 @@ static SIZE *get_screen_sizes( const DEVMODEW *maximum, const DEVMODEW *modes, U
     }
 
     /* Titan Souls renders incorrectly if we report modes smaller than 800x600 */
-    if ((enable_lowres = !(env = getenv( "SteamAppId" )) || strcmp( env, "297130" )))
+    if ((enable_lowres = (!(env = getenv( "SteamAppId" )) || (strcmp( env, "297130" ) && strcmp( env, "403640" )))))
     {
         memcpy( sizes + count, lowres_sizes, ARRAY_SIZE(lowres_sizes) * sizeof(*sizes) );
         count += ARRAY_SIZE(lowres_sizes);
@@ -1783,7 +1783,22 @@ static DEVMODEW *get_virtual_modes( const DEVMODEW *initial, const DEVMODEW *max
     if (freqs[1] <= 60) freqs[1] = 0;
 
     if (!(screen_sizes = get_screen_sizes( maximum, host_modes, host_modes_count, &sizes_count ))) return NULL;
-    modes = malloc( 2 * ARRAY_SIZE(freqs) * ARRAY_SIZE(depths) * (sizes_count + 2) * sizeof(*modes) );
+    modes = malloc( (2 * ARRAY_SIZE(freqs) * ARRAY_SIZE(depths) * (sizes_count + 2) + 1) * sizeof(*modes) );
+
+    if ((env = getenv( "SteamAppId" )) && !strcmp( env, "403640" ))
+    {
+        DEVMODEW mode =
+        {
+            .dmSize = sizeof(mode),
+            .dmFields = DM_DISPLAYORIENTATION | DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFLAGS | DM_DISPLAYFREQUENCY,
+            .dmDisplayFrequency = 30,
+            .dmBitsPerPel = 32,
+            .dmDisplayOrientation = initial->dmDisplayOrientation,
+            .dmPelsWidth = 800,
+            .dmPelsHeight = 600,
+        };
+        count += add_virtual_mode( modes, count, &mode, center_modes );
+    }
 
     for (i = 0; modes && i < ARRAY_SIZE(depths); ++i)
     for (f = 0; f < ARRAY_SIZE(freqs); ++f)
