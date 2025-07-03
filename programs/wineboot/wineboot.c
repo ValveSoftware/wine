@@ -378,6 +378,15 @@ static UINT64 read_tsc_frequency(void)
     return freq;
 }
 
+#elif defined(__aarch64__)
+
+static UINT64 read_tsc_frequency(void)
+{
+    UINT64 tsc_frequency;
+    __asm__ volatile( "mrs %[Res], CNTFRQ_EL0" : [Res] "=r" (tsc_frequency) );
+    return tsc_frequency;
+}
+
 #else
 
 static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
