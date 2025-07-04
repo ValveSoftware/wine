@@ -4483,7 +4483,6 @@ static void load_sources( struct makefile *make )
                 char *module;
                 if (!(module = get_expanded_arch_var( make, "MODULE", arch ))) continue;
                 strarray_add( &make->install[INSTALL_LIB], module );
-                free( module );
             }
         }
     }
