@@ -1545,6 +1545,7 @@ static void update_net_wm_states( struct x11drv_win_data *data )
 {
     static const UINT fullscreen_mask = (1 << NET_WM_STATE_MAXIMIZED) | (1 << NET_WM_STATE_FULLSCREEN);
     UINT style, ex_style, new_state = 0;
+    BOOL disable_maximize;
 
     if (data->embedded) return;
     if (data->whole_window == root_window)
@@ -1555,17 +1556,30 @@ static void update_net_wm_states( struct x11drv_win_data *data )
         return;
     }
 
+    /* Disable maximize when there is an offset difference between emulated display mode and the
+     * physical display mode. For example, when making a window maximized on an emulated 2560x1080
+     * mode on a 3840x2160 physical mode, it doesn't make sense to add NET_WM_STATE_MAXIMIZED to its
+     * X window. If NET_WM_STATE_MAXIMIZED gets added in such cases, the X window gets resized to
+     * cover the work area. Then the visible rect is no longer fullscreen, then surface offset set
+     * by set_surface_window_rects() will be zero. So then the window top-left corner will be at
+     * (0, 0) instead of (0, 540). What's worse, the window is still considered as fullscreen
+     * because it covers 2560x1080, so then Wine will add NET_WM_STATE_FULLSCREEN, then the window
+     * top-left corner will be back at (0, 540). This makes the window look like jumping up and down.
+     */
+    disable_maximize = data->rects.window.left != data->rects.visible.left ||
+                       data->rects.window.top != data->rects.visible.top;
+
     style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE );
     if (style & WS_MINIMIZE)
         new_state |= data->desired_state.net_wm_state & fullscreen_mask;
     if (data->is_fullscreen)
     {
-        if ((style & WS_MAXIMIZE) && (style & WS_CAPTION) == WS_CAPTION)
+        if (!disable_maximize && (style & WS_MAXIMIZE) && (style & WS_CAPTION) == WS_CAPTION)
             new_state |= (1 << NET_WM_STATE_MAXIMIZED);
         else if (!(style & WS_MINIMIZE))
             new_state |= (1 << NET_WM_STATE_FULLSCREEN);
     }
-    else if (style & WS_MAXIMIZE)
+    else if (!disable_maximize && style & WS_MAXIMIZE)
         new_state |= (1 << NET_WM_STATE_MAXIMIZED);
 
     ex_style = NtUserGetWindowLongW( data->hwnd, GWL_EXSTYLE );
@@ -1890,6 +1904,7 @@ static UINT window_update_client_config( struct x11drv_win_data *data )
     static const UINT fullscreen_mask = (1 << NET_WM_STATE_MAXIMIZED) | (1 << NET_WM_STATE_FULLSCREEN);
     UINT old_style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE ), new_style, flags;
     RECT rect, old_rect = data->rects.window, new_rect;
+    BOOL disable_maximize;
 
     if (!data->managed) return 0; /* unmanaged windows are managed by the Win32 side */
     if (is_virtual_desktop()) return 0; /* ignore window manager config changes in virtual desktop mode */
@@ -1904,6 +1919,11 @@ static UINT window_update_client_config( struct x11drv_win_data *data )
     if (data->current_state.wm_state != WithdrawnState) new_style |= WS_VISIBLE;
     if (data->current_state.wm_state == IconicState) new_style |= WS_MINIMIZE;
     if (data->current_state.net_wm_state & (1 << NET_WM_STATE_MAXIMIZED)) new_style |= WS_MAXIMIZE;
+
+    /* See update_net_wm_states() regarding disable_maximize */
+    disable_maximize = data->rects.window.left != data->rects.visible.left ||
+                       data->rects.window.top != data->rects.visible.top;
+    if (disable_maximize) new_style = (new_style & ~WS_MAXIMIZE) | (old_style & WS_MAXIMIZE);
 
     /* KWin sometimes combines NET_WM_STATE_FULLSCREEN with NET_WM_STATE_MAXIMIZED, but sometimes doesn't.
      * Don't feed back the maximized state to the Win32 side as it confuses many applications.
