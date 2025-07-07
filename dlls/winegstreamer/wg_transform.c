@@ -674,6 +674,7 @@ static bool transform_create_encoder_element(struct wg_transform *transform,
 NTSTATUS wg_transform_create(void *args)
 {
     struct wg_transform_create_params *params = args;
+    struct wg_media_type input_type;
     GstElement *first = NULL, *last = NULL;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     const gchar *input_mime, *output_mime;
@@ -695,7 +696,32 @@ NTSTATUS wg_transform_create(void *args)
         goto out;
     transform->attrs = params->attrs;
 
-    if (!(transform->input_caps = caps_from_media_type(&params->input_type)))
+    memcpy(&input_type, &params->input_type, sizeof(input_type));
+
+    if (IsEqualGUID(&input_type.major, &MFMediaType_Audio))
+    {
+        size_t data_size = input_type.u.audio->cbSize + sizeof(WAVEFORMATEX) - sizeof(HEAACWAVEINFO);
+
+        /* If an mfsrcsnk hack appended transcoded audio info to the user data, then restore it.
+         * This happens if the game depends on the input format belonging to a specific set of formats. */
+        if (input_type.u.audio->wFormatTag == WAVE_FORMAT_MPEG_HEAAC
+                && data_size >= sizeof(WAVEFORMATEXTENSIBLE))
+        {
+            const HEAACWAVEFORMAT *hwf = (HEAACWAVEFORMAT *)input_type.u.audio;
+            WAVEFORMATEXTENSIBLE audio;
+
+            memcpy(&audio, &hwf->pbAudioSpecificConfig[data_size - sizeof(audio)], sizeof(audio));
+            if (audio.Format.wFormatTag == WAVE_FORMAT_EXTENSIBLE
+                    && IsEqualGUID(&audio.SubFormat, &MFAudioFormat_Vorbis))
+            {
+                memmove((WAVEFORMATEXTENSIBLE *)input_type.u.audio + 1, hwf->pbAudioSpecificConfig,
+                        data_size - sizeof(audio));
+                memcpy(input_type.u.audio, &audio, sizeof(audio));
+            }
+        }
+    }
+
+    if (!(transform->input_caps = caps_from_media_type(&input_type)))
         goto out;
     GST_INFO("transform %p input caps %"GST_PTR_FORMAT, transform, transform->input_caps);
     input_mime = gst_structure_get_name(gst_caps_get_structure(transform->input_caps, 0));
@@ -708,8 +734,8 @@ NTSTATUS wg_transform_create(void *args)
     GST_INFO("transform %p output caps %"GST_PTR_FORMAT, transform, transform->output_caps);
     output_mime = gst_structure_get_name(gst_caps_get_structure(transform->output_caps, 0));
 
-    if (IsEqualGUID(&params->input_type.major, &MFMediaType_Video))
-        transform->input_info = params->input_type.u.video->videoInfo;
+    if (IsEqualGUID(&input_type.major, &MFMediaType_Video))
+        transform->input_info = input_type.u.video->videoInfo;
     if (IsEqualGUID(&params->output_type.major, &MFMediaType_Video))
         transform->output_info = params->output_type.u.video->videoInfo;
 
