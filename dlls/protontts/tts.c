@@ -166,6 +166,23 @@ static ULONG WINAPI ttsengine_Release(ISpTTSEngine *iface)
     return ref;
 }
 
+static void adjust_volume(int16_t *buf, UINT32 num, ULONG volume)
+{
+    UINT32 i;
+
+    if (volume >= 10000) return;
+
+    for (i = 0; i < num; i++)
+    {
+        int x = buf[i] * (int)volume;
+
+        if (x > 0)
+            buf[i] = (x + 5000) / 10000;
+        else
+            buf[i] = (x - 5000) / 10000;
+    }
+}
+
 static DWORD CALLBACK synthesize_thread_proc(void *params)
 {
     SetThreadDescription(GetCurrentThread(), L"protontts_synthesize");
@@ -177,6 +194,7 @@ static HRESULT WINAPI ttsengine_Speak(ISpTTSEngine *iface, DWORD flags, REFGUID 
                                       ISpTTSEngineSite *site)
 {
     struct ttsengine *This = impl_from_ISpTTSEngine(iface);
+    USHORT global_volume = 100;
     HANDLE abort_event;
     HANDLE thread = NULL;
     char *text = NULL;
@@ -220,20 +238,27 @@ static HRESULT WINAPI ttsengine_Speak(ISpTTSEngine *iface, DWORD flags, REFGUID 
 
         for (done = false; !done;)
         {
+            DWORD actions;
             void *buf;
             UINT32 size;
 
             Sleep(50);
 
-            if (ISpTTSEngineSite_GetActions(site) & SPVES_ABORT)
+            actions = ISpTTSEngineSite_GetActions(site);
+            if (actions & SPVES_ABORT)
             {
                 SetEvent(abort_event);
                 goto done;
             }
+            if (actions & SPVES_VOLUME)
+                ISpTTSEngineSite_GetVolume(site, &global_volume);
 
             tts_voice_audio_lock(This->voice, &buf, &size, &done);
             if (buf)
+            {
+                adjust_volume(buf, size / sizeof(int16_t), global_volume * frag_list->State.Volume);
                 hr = ISpTTSEngineSite_Write(site, buf, size, NULL);
+            }
             WINE_UNIX_CALL(unix_tts_voice_audio_release, &This->voice);
 
             if (FAILED(hr))
