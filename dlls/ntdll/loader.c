@@ -1720,7 +1720,7 @@ static NTSTATUS MODULE_InitDLL( WINE_MODREF *wm, UINT reason, LPVOID lpReserved 
 
     /* Skip calls for modules loaded with special load flags */
 
-    if (wm->ldr.Flags & LDR_DONT_RESOLVE_REFS) return STATUS_SUCCESS;
+    if (wm->ldr.Flags & (LDR_DONT_RESOLVE_REFS | LDR_DONT_CALL_DLLMAIN)) return STATUS_SUCCESS;
     if (wm->ldr.TlsIndex == -1) call_tls_callbacks( wm->ldr.DllBase, reason );
     if (!entry) return STATUS_SUCCESS;
 
@@ -2336,8 +2336,6 @@ static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name, 
     {
         struct steamclient_setup_trampolines_params params = {.src_mod = *module, .tgt_mod = lsteamclient};
         WINE_UNIX_CALL( unix_steamclient_setup_trampolines, &params );
-        wm->ldr.Flags |= LDR_DONT_RESOLVE_REFS;
-        flags |= DONT_RESOLVE_DLL_REFERENCES;
         if (is_steamclient32)
         {
             OBJECT_ATTRIBUTES attr;
@@ -2347,6 +2345,9 @@ static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name, 
             IO_STATUS_BLOCK io;
             DWORD protect_old;
             HANDLE file;
+
+            wm->ldr.Flags |= LDR_DONT_RESOLVE_REFS;
+            flags |= DONT_RESOLVE_DLL_REFERENCES;
 
             NtProtectVirtualMemory( NtCurrentProcess(), &addr, &size, PAGE_READWRITE, &protect_old );
             memset( &attr, 0, sizeof(attr) );
@@ -2365,8 +2366,7 @@ static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name, 
         }
         else
         {
-            fixup_imports( wm, load_path );
-            wm->ldr.Flags |= LDR_DONT_RESOLVE_REFS;
+            wm->ldr.Flags |= LDR_DONT_CALL_DLLMAIN;
         }
     }
 
