@@ -1462,8 +1462,44 @@ static HRESULT media_type_from_winedmo_format( GUID major, union winedmo_format 
 
     if (IsEqualGUID( &major, &MFMediaType_Video ))
         return media_type_from_mf_video_format( &format->video, media_type );
+
     if (IsEqualGUID( &major, &MFMediaType_Audio ))
-        return MFCreateAudioMediaType( &format->audio, (IMFAudioMediaType **)media_type );
+    {
+        const char *sgi = getenv("SteamGameId");
+        WAVEFORMATEXTENSIBLE *audio = (WAVEFORMATEXTENSIBLE *)&format->audio;
+
+        /* Warhammer 40,000: Dakka Squadron depends on the input format belonging to a specific set of formats.
+         * Append transcoded audio info to the user data so it can be restored, and create a fake AAC media
+         * type instead. If decoding support is added, PCM will work without a hack. */
+        if (!strcmp(sgi, "1253190") && format->audio.wFormatTag == WAVE_FORMAT_EXTENSIBLE
+                && IsEqualGUID(&audio->SubFormat, &MFAudioFormat_Vorbis))
+        {
+            size_t config_data_size = format->audio.cbSize + sizeof(WAVEFORMATEX) - sizeof(WAVEFORMATEXTENSIBLE);
+            size_t data_size = config_data_size + sizeof(WAVEFORMATEXTENSIBLE);
+            HEAACWAVEFORMAT *hwf;
+            HRESULT hr;
+
+            if (!(hwf = malloc(offsetof(HEAACWAVEFORMAT, pbAudioSpecificConfig[data_size]))))
+                return E_OUTOFMEMORY;
+
+            hwf->wfInfo.wfx = audio->Format;
+            hwf->wfInfo.wfx.wFormatTag = WAVE_FORMAT_MPEG_HEAAC;
+            hwf->wfInfo.wfx.cbSize = sizeof(HEAACWAVEINFO) + data_size - sizeof(WAVEFORMATEX);
+            hwf->wfInfo.wPayloadType = 0;
+            hwf->wfInfo.wAudioProfileLevelIndication = 0;
+            hwf->wfInfo.wStructType = 0;
+            hwf->wfInfo.wReserved1 = 0;
+            hwf->wfInfo.dwReserved2 = 0;
+            memcpy(hwf->pbAudioSpecificConfig, (BYTE *)(audio + 1), config_data_size);
+            memcpy(&hwf->pbAudioSpecificConfig[config_data_size], audio, sizeof(*audio));
+
+            hr = MFCreateAudioMediaType((WAVEFORMATEX *)hwf, (IMFAudioMediaType **)media_type);
+            free(hwf);
+            return hr;
+        }
+
+        return MFCreateAudioMediaType(&format->audio, (IMFAudioMediaType **)media_type);
+    }
 
     FIXME( "Unsupported major type %s\n", debugstr_guid( &major ) );
     return E_NOTIMPL;
