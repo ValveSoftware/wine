@@ -182,7 +182,9 @@ static void init_caps_from_wave_format_vorbis(GstCaps *caps, const WAVEFORMATEX 
 
 static void init_caps_from_wave_format_opus(GstCaps *caps, const WAVEFORMATEX *format, UINT32 format_size)
 {
-    init_caps_codec_data(caps, format + 1, format->cbSize);
+    const guint8 *codec_data = (const guint8 *)(format + 1);
+
+    init_caps_codec_data(caps, codec_data, format->cbSize);
 
     gst_structure_remove_field(gst_caps_get_structure(caps, 0), "format");
     gst_structure_set_name(gst_caps_get_structure(caps, 0), "audio/x-opus");
@@ -190,6 +192,37 @@ static void init_caps_from_wave_format_opus(GstCaps *caps, const WAVEFORMATEX *f
     gst_caps_set_simple(caps, "block_align", G_TYPE_INT, format->nBlockAlign, NULL);
     gst_caps_set_simple(caps, "depth", G_TYPE_INT, format->wBitsPerSample, NULL);
     gst_caps_set_simple(caps, "bitrate", G_TYPE_INT, format->nAvgBytesPerSec * 8, NULL);
+
+    if (format->nChannels > 2)
+    {
+        GValue mapping = G_VALUE_INIT;
+        GValue v = G_VALUE_INIT;
+        gint i;
+
+        if (format->cbSize < 21 + format->nChannels)
+        {
+            GST_WARNING("Invalid extra data size %u", format->cbSize);
+            return;
+        }
+
+        /* Decoding > 2 channels requires additional values,
+         * found in the extra data at fixed offsets. */
+        gst_caps_set_simple(caps, "channel-mapping-family", G_TYPE_INT, codec_data[18], NULL);
+        gst_caps_set_simple(caps, "stream-count", G_TYPE_INT, codec_data[19], NULL);
+        gst_caps_set_simple(caps, "coupled-count", G_TYPE_INT, codec_data[20], NULL);
+
+        g_value_init(&mapping, GST_TYPE_ARRAY);
+        g_value_init(&v, G_TYPE_INT);
+        for (i = 0; i < format->nChannels; ++i)
+        {
+            g_value_set_int(&v, codec_data[21 + i]);
+            gst_value_array_append_value(&mapping, &v);
+        }
+
+        gst_structure_set_value(gst_caps_get_structure(caps, 0), "channel-mapping", &mapping);
+        g_value_unset(&mapping);
+        g_value_unset(&v);
+    }
 }
 
 static void init_caps_from_wave_format(GstCaps *caps, const GUID *subtype,
