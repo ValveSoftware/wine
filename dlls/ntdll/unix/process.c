@@ -46,6 +46,9 @@
 #ifdef HAVE_SYS_PARAM_H
 # include <sys/param.h>
 #endif
+#ifdef HAVE_SYS_PRCTL_H
+# include <sys/prctl.h>
+#endif
 #ifdef HAVE_SYS_QUEUE_H
 # include <sys/queue.h>
 #endif
@@ -1147,6 +1150,35 @@ int get_unix_debugger_pid(void)
 
 #endif
 
+static BOOL set_hardware_tso( BOOL enable ) {
+#ifdef HAVE_PRCTL
+#ifndef PR_GET_MEM_MODEL
+#define PR_GET_MEM_MODEL 0x6d4d444c
+#endif
+#ifndef PR_SET_MEM_MODEL
+#define PR_SET_MEM_MODEL 0x4d4d444c
+#endif
+#ifndef PR_SET_MEM_MODEL_DEFAULT
+#define PR_SET_MEM_MODEL_DEFAULT 0
+#endif
+#ifndef PR_SET_MEM_MODEL_TSO
+#define PR_SET_MEM_MODEL_TSO 1
+#endif
+    if (enable)
+    {
+        int ret = prctl( PR_GET_MEM_MODEL, 0, 0, 0, 0 );
+        if (ret == PR_SET_MEM_MODEL_DEFAULT)
+            return !prctl( PR_SET_MEM_MODEL, PR_SET_MEM_MODEL_TSO, 0, 0, 0 );
+        return ret == PR_SET_MEM_MODEL_TSO;
+    }
+
+    prctl( PR_SET_MEM_MODEL, PR_SET_MEM_MODEL_DEFAULT, 0, 0, 0 );
+    return TRUE;
+#else
+    return FALSE;
+#endif
+}
+
 #define UNIMPLEMENTED_INFO_CLASS(c) \
     case c: \
         FIXME( "(process=%p) Unimplemented information class: " #c "\n", handle); \
@@ -1925,6 +1957,10 @@ NTSTATUS WINAPI NtSetInformationProcess( HANDLE handle, PROCESSINFOCLASS class, 
         }
         SERVER_END_REQ;
         break;
+
+    case ProcessFexHardwareTso:
+        if (size != sizeof(BOOL)) return STATUS_INFO_LENGTH_MISMATCH;
+        return set_hardware_tso( *(BOOL *)info ) ? STATUS_SUCCESS : STATUS_NOT_SUPPORTED;
 
     case ProcessPowerThrottlingState:
         FIXME( "ProcessPowerThrottlingState - stub\n" );
