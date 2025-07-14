@@ -886,10 +886,39 @@ static const IDirectMusicLoader8Vtbl loader_vtbl =
     loader_LoadObjectFromFile,
 };
 
+static inline void touch_soundfont_used_tag(void)
+{
+    WCHAR env[MAX_PATH];
+
+    if (GetEnvironmentVariableW(L"STEAM_COMPAT_TRANSCODED_MEDIA_PATH", env, ARRAY_SIZE(env)))
+    {
+        WCHAR buffer[MAX_PATH];
+        HANDLE file;
+
+        swprintf(buffer, ARRAY_SIZE(buffer), L"\\??\\unix%s/soundfont-used", env);
+
+        file = CreateFileW(buffer, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+        if (file == INVALID_HANDLE_VALUE)
+        {
+            ERR("Failed to open/create %s\n", debugstr_w(buffer));
+            return;
+        }
+
+        CloseHandle(file);
+    }
+    else
+    {
+        ERR("STEAM_COMPAT_TRANSCODED_MEDIA_PATH not set, cannot create soundfont-used file.\n");
+    }
+}
+
 static HRESULT get_default_gm_path(WCHAR *path, DWORD max_len)
 {
 	DWORD ret;
 	HKEY hkey;
+
+    touch_soundfont_used_tag();
 
 	if (!(ret = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\DirectMusic" , 0, KEY_READ, &hkey)))
     {
