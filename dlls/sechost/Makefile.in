@@ -1,7 +1,6 @@
 MODULE    = sechost.dll
 IMPORTLIB = sechost
-IMPORTS   = kernelbase
-DELAYIMPORTS = rpcrt4
+IMPORTS   = kernelbase rpcrt4
 
 SOURCES = \
 	plugplay.idl \
