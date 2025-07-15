@@ -1,0 +1,63 @@
+/*
+ * Copyright 2025 Etaash Mathamsetty
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+#pragma makedep register
+
+import "wtypes.idl";
+import "unknwn.idl";
+
+[
+    object,
+    uuid(b58d6601-7401-4234-8180-6febfc0e484c),
+    local
+]
+interface IAmdExtFfxApi : IUnknown
+{
+    HRESULT UpdateFfxApiProvider([in, out] void* pData, [in] unsigned int dataSizeInBytes);
+}
+
+[
+    object,
+    uuid(44085fbe-e839-40c5-bf38-0ebc5ab4d0a6),
+    local
+]
+interface IAmdExtAntiLagApi : IUnknown
+{
+    HRESULT UpdateAntiLagState([in, out] void* pData);
+}
+
+[
+    object,
+    uuid(014937ec-9288-446f-a9ac-d75a8e3a984f),
+    local
+]
+interface IAmdExtStub1 : IUnknown
+{
+    HRESULT QueryInterface2([in, out] void* unk, [in] REFIID iid, [in, out] void** out);
+}
+
+[
+    object,
+    uuid(ba019d53-ccab-4cbd-b56a-7230ed4330ad),
+    local
+]
+interface IAmdExtStub2 : IUnknown
+{
+    void stub();
+    void stub2([in] unsigned int unk);
+    void stub3();
+}
