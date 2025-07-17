@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include <math.h>
 #include <stdarg.h>
 
 #define COBJMACROS
@@ -62,6 +63,13 @@ static inline struct ttsengine *impl_from_ISpTTSEngine(ISpTTSEngine *iface)
 static inline struct ttsengine *impl_from_ISpObjectWithToken(ISpObjectWithToken *iface)
 {
     return CONTAINING_RECORD(iface, struct ttsengine, ISpObjectWithToken_iface);
+}
+
+static inline long lclamp(long value, long value_min, long value_max)
+{
+    if (value < value_min) return value_min;
+    if (value > value_max) return value_max;
+    return value;
 }
 
 static BOOL WINAPI init_tts(INIT_ONCE *once, void *param, void **ctx)
@@ -195,9 +203,11 @@ static HRESULT WINAPI ttsengine_Speak(ISpTTSEngine *iface, DWORD flags, REFGUID 
 {
     struct ttsengine *This = impl_from_ISpTTSEngine(iface);
     USHORT global_volume = 100;
+    LONG global_rate = 0;
     HANDLE abort_event;
     HANDLE thread = NULL;
     char *text = NULL;
+    DWORD actions;
     HRESULT hr = S_OK;
 
     TRACE("(%p, %#lx, %s, %p, %p, %p).\n", iface, flags, debugstr_guid(fmtid), wfx, frag_list, site);
@@ -208,14 +218,17 @@ static HRESULT WINAPI ttsengine_Speak(ISpTTSEngine *iface, DWORD flags, REFGUID 
     if (!(abort_event = CreateEventW(NULL, FALSE, FALSE, NULL)))
         return HRESULT_FROM_WIN32(GetLastError());
 
-    tts_voice_set_length_scale(This->voice, This->base_length_scale);
     for (; frag_list; frag_list = frag_list->pNext)
     {
         struct tts_voice_synthesize_params params;
+        long rate;
         bool done;
 
-        if (ISpTTSEngineSite_GetActions(site) & SPVES_ABORT)
+        actions = ISpTTSEngineSite_GetActions(site);
+        if (actions & SPVES_ABORT)
             return S_OK;
+        if (actions & SPVES_RATE)
+            ISpTTSEngineSite_GetRate(site, &global_rate);
 
         params.size = WideCharToMultiByte(CP_UTF8, 0, frag_list->pTextStart, frag_list->ulTextLen, NULL, 0, NULL, NULL) + 1;
         if (!(text = malloc(params.size)))
@@ -225,6 +238,9 @@ static HRESULT WINAPI ttsengine_Speak(ISpTTSEngine *iface, DWORD flags, REFGUID 
         }
         WideCharToMultiByte(CP_UTF8, 0, frag_list->pTextStart, frag_list->ulTextLen, text, params.size, NULL, NULL);
         text[params.size - 1] = '\0';
+
+        rate = lclamp(global_rate + frag_list->State.RateAdj, -10, 10);
+        tts_voice_set_length_scale(This->voice, This->base_length_scale * powf(3, rate * -0.1f));
 
         params.voice       = This->voice;
         params.text        = text;
@@ -238,7 +254,6 @@ static HRESULT WINAPI ttsengine_Speak(ISpTTSEngine *iface, DWORD flags, REFGUID 
 
         for (done = false; !done;)
         {
-            DWORD actions;
             void *buf;
             UINT32 size;
 
