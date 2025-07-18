@@ -380,10 +380,18 @@ static UINT64 read_tsc_frequency(void)
 
 #elif defined(__aarch64__)
 
+#define FEX_TSC_SCALE_MAXIMUM 1000000000
+
 static UINT64 read_tsc_frequency(void)
 {
     UINT64 tsc_frequency;
     __asm__ volatile( "mrs %[Res], CNTFRQ_EL0" : [Res] "=r" (tsc_frequency) );
+
+    /* FEX hack in order to support games relying on this to read the x86 TSC
+     * frequency which FEX scales as below, assumes SmallTSCScale is enabled. */
+    while (tsc_frequency < FEX_TSC_SCALE_MAXIMUM)
+            tsc_frequency <<= 1;
+
     return tsc_frequency;
 }
 
