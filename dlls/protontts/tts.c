@@ -257,7 +257,7 @@ static HRESULT WINAPI ttsengine_Speak(ISpTTSEngine *iface, DWORD flags, REFGUID 
             void *buf;
             UINT32 size;
 
-            Sleep(50);
+            Sleep(10);
 
             actions = ISpTTSEngineSite_GetActions(site);
             if (actions & SPVES_ABORT)
