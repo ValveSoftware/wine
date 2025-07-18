@@ -371,6 +371,17 @@ static DEVICE_OBJECT *bus_find_unix_device(UINT64 unix_device)
     return NULL;
 }
 
+static DEVICE_OBJECT *bus_find_device_from_vid_pid(const BOOL is_hidraw, struct device_desc *desc)
+{
+    struct device_extension *ext;
+
+    LIST_FOR_EACH_ENTRY(ext, &device_list, struct device_extension, entry)
+        if (ext->desc.is_hidraw == is_hidraw && ext->desc.vid == desc->vid &&
+            ext->desc.pid == desc->pid) return ext->device;
+
+    return NULL;
+}
+
 static void bus_unlink_hid_device(DEVICE_OBJECT *device)
 {
     struct device_extension *ext = (struct device_extension *)device->DeviceExtension;
@@ -914,7 +925,7 @@ static DWORD CALLBACK bus_main_thread(void *args)
             UINT buttons;
 
             usages = get_device_usages(event->device, &buttons);
-            if (!desc.is_hidraw != !is_hidraw_enabled(desc.vid, desc.pid, &usages, buttons))
+            if (desc.is_hidraw && !is_hidraw_enabled(desc.vid, desc.pid, &usages, buttons))
             {
                 struct device_remove_params params = {.device = event->device};
                 WARN("ignoring %shidraw device %04x:%04x with usages %04x:%04x\n", desc.is_hidraw ? "" : "non-",
@@ -922,11 +933,27 @@ static DWORD CALLBACK bus_main_thread(void *args)
                 winebus_call(device_remove, &params);
                 break;
             }
+            else if (desc.is_hidraw)
+            {
+                RtlEnterCriticalSection(&device_list_cs);
+                if ((device = bus_find_device_from_vid_pid(!desc.is_hidraw, &event->device_created.desc)))
+                    bus_unlink_hid_device(device);
+                device = bus_create_hid_device(&event->device_created.desc, event->device);
+                RtlLeaveCriticalSection(&device_list_cs);
+            }
+            else
+            {
+                RtlEnterCriticalSection(&device_list_cs);
+                if (bus_find_device_from_vid_pid(!desc.is_hidraw, &event->device_created.desc)) device = NULL;
+                else device = bus_create_hid_device(&event->device_created.desc, event->device);
+                RtlLeaveCriticalSection(&device_list_cs);
+            }
 
-            TRACE("creating %shidraw device %04x:%04x with usages %04x:%04x\n", desc.is_hidraw ? "" : "non-",
-                  desc.vid, desc.pid, usages.UsagePage, usages.Usage);
 
-            device = bus_create_hid_device(&event->device_created.desc, event->device);
+            if (device)
+                TRACE("creating %shidraw device %04x:%04x with usages %04x:%04x\n", desc.is_hidraw ? "" : "non-",
+                      desc.vid, desc.pid, usages.UsagePage, usages.Usage);
+
             if (device) IoInvalidateDeviceRelations(bus_pdo, BusRelations);
             else
             {
@@ -1300,8 +1327,8 @@ static NTSTATUS fdo_pnp_dispatch(DEVICE_OBJECT *device, IRP *irp)
         mouse_device_create();
         keyboard_device_create();
 
-        sdl_driver_init();
         udev_driver_init();
+        sdl_driver_init();
         iohid_driver_init();
 
         irp->IoStatus.Status = STATUS_SUCCESS;
