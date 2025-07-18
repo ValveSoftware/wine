@@ -1,10 +1,10 @@
 ## INTRODUCTION
 
-Goliath is a compatibility Layer for BlissOS that allows Microsoft Windows, 
-Linux, Android and MacOS programs to run on Bliss, and is based off of 
-Proton's version of Wine, along with the WSL, ATL and Darling compatiblilty layers.
+Goliath is a compatibility Layer for BlissOS (and other Operating Systems) that allows Microsoft Windows, 
+Linux, iOS, Android, MacOS and Legacy Hardware programs to run on Bliss, and is based off of 
+Proton's version of Wine, along with the WSL, ATL and Darling compatiblilty layers and a modified version of LibRetro, all built straight into the software.
 *Wine itself is a program which allows running Microsoft Windows programs
-(including DOS, Windows 3.x, Win32, and Win64 executables) on Unix.
+(including DOS, Windows 3.x, Win32, and Win64 executables) on Unix and Unix-Like Oper.
 It consists of a program loader which loads and executes a Microsoft
 Windows binary, and a library (called Winelib) that implements Windows
 API calls using their Unix, X11 or Mac equivalents.  The library may also
