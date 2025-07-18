@@ -2445,13 +2445,27 @@ static void SETUPDI_EnumerateInterfaces(HDEVINFO DeviceInfoSet,
 
 /* iterate over all interfaces supported by this device instance. if any of
  * them are "linked", return TRUE */
-static BOOL is_device_instance_linked(HKEY interfacesKey, const WCHAR *deviceInstance)
+static BOOL is_device_instance_linked(HKEY subKey, HKEY interfacesKey, const WCHAR *deviceInstance)
 {
     LONG l;
     DWORD class_idx = 0, device_idx, len, type;
     HKEY class_key, device_key, link_key;
     WCHAR class_keyname[40], device_keyname[MAX_DEVICE_ID_LEN];
     WCHAR interface_devinstance[MAX_DEVICE_ID_LEN];
+    WCHAR alt_devinstance[MAX_DEVICE_ID_LEN];
+    WCHAR service[40];
+
+    l = RegQueryValueExW(subKey, L"Service", NULL, &type, (BYTE *)service, &len);
+    if (!l && type == REG_SZ && !wcsicmp(service, L"winehid") && !wcsstr(deviceInstance, L"HID\\"))
+    {
+        const WCHAR *tmp = wcschr(deviceInstance, L'\\');
+
+        if (tmp && (swprintf(alt_devinstance, ARRAY_SIZE(alt_devinstance), L"HID%s", tmp) != -1))
+        {
+            TRACE("Found winehid device instance, checking for link with device instance %s.\n", debugstr_w(alt_devinstance));
+            deviceInstance = alt_devinstance;
+        }
+    }
 
     while (1)
     {
@@ -2562,10 +2576,11 @@ static void SETUPDI_EnumerateMatchingDeviceInstances(struct DeviceInfoSet *set,
                             if (swprintf(id, ARRAY_SIZE(id), fmt, enumerator,
                                         deviceName, deviceInstance) != -1 &&
                                     (!(flags & DIGCF_PRESENT) ||
-                                     is_device_instance_linked(interfacesKey, id)))
+                                     is_device_instance_linked(subKey, interfacesKey, id)))
                             {
                                 create_device(set, &deviceClass, id, FALSE);
                             }
+
                         }
                     }
                 }
