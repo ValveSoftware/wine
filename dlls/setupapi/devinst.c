@@ -2369,6 +2369,13 @@ static void SETUPDI_EnumerateMatchingInterfaces(HDEVINFO DeviceInfoSet,
                                         &deviceClass);
                                 if ((device = create_device(set, &deviceClass, deviceInst, FALSE)))
                                     SETUPDI_AddDeviceInterfaces(device, subKey, guid, flags);
+                                /*
+                                 * If there weren't any interfaces present for
+                                 * this device, remove it from the device info
+                                 * list.
+                                 */
+                                if (device && ((flags & DIGCF_PRESENT) && !list_count(&device->interfaces)))
+                                    remove_device(device);
                             }
                             RegCloseKey(deviceKey);
                         }
