@@ -1471,7 +1471,7 @@ static HRESULT media_type_from_winedmo_format( GUID major, union winedmo_format 
         /* Warhammer 40,000: Dakka Squadron depends on the input format belonging to a specific set of formats.
          * Append transcoded audio info to the user data so it can be restored, and create a fake AAC media
          * type instead. If decoding support is added, PCM will work without a hack. */
-        if (!strcmp(sgi, "1253190") && format->audio.wFormatTag == WAVE_FORMAT_EXTENSIBLE
+        if (sgi && !strcmp(sgi, "1253190") && format->audio.wFormatTag == WAVE_FORMAT_EXTENSIBLE
                 && IsEqualGUID(&audio->SubFormat, &MFAudioFormat_Vorbis))
         {
             size_t config_data_size = format->audio.cbSize + sizeof(WAVEFORMATEX) - sizeof(WAVEFORMATEXTENSIBLE);
