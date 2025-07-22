@@ -395,6 +395,31 @@ static struct x11drv_win_data *alloc_win_data( Display *display, HWND hwnd )
 }
 
 
+static BOOL thickframe_managed( DWORD style )
+{
+    static int cached = -1;
+
+    if (!(style & WS_POPUP)) return TRUE;
+
+    if (cached == -1)
+    {
+        static const WCHAR app_name[] = u"\\SocialClubHelper.exe";
+        UNICODE_STRING *name;
+        DWORD len, name_len;
+
+        cached = 1;
+
+        name = &NtCurrentTeb()->Peb->ProcessParameters->ImagePathName;
+        len = name->Length / sizeof(WCHAR);
+        name_len = ARRAY_SIZE(app_name) - 1;
+        if (len >= name_len)
+            cached = !!memcmp( name->Buffer + len - name_len, app_name, name_len * sizeof(*app_name) );
+        if (!cached) FIXME( "HACK: making popups with WS_THICKFRAME not managed.\n" );
+    }
+    return cached;
+}
+
+
 /***********************************************************************
  *		is_window_managed
  *
@@ -415,7 +440,7 @@ static BOOL is_window_managed( HWND hwnd, UINT swp_flags, BOOL fullscreen )
     /* windows with caption are managed */
     if ((style & WS_CAPTION) == WS_CAPTION) return TRUE;
     /* windows with thick frame are managed */
-    if (style & WS_THICKFRAME) return TRUE;
+    if (style & WS_THICKFRAME && thickframe_managed( style )) return TRUE;
     if (style & WS_POPUP)
     {
         /* popup with sysmenu == caption are managed */
