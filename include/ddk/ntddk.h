@@ -290,6 +290,7 @@ void      WINAPI KeSetTargetProcessorDpc(PRKDPC,CCHAR);
 BOOLEAN   WINAPI MmIsAddressValid(void *);
 HANDLE    WINAPI PsGetProcessId(PEPROCESS);
 void *    WINAPI PsGetProcessSectionBaseAddress(PEPROCESS);
+ULONG     WINAPI PsGetProcessSessionId(PEPROCESS);
 HANDLE    WINAPI PsGetThreadId(PETHREAD);
 HANDLE    WINAPI PsGetThreadProcessId(PETHREAD);
 NTSTATUS  WINAPI PsRemoveLoadImageNotifyRoutine(PLOAD_IMAGE_NOTIFY_ROUTINE);

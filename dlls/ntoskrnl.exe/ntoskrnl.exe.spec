@@ -936,7 +936,7 @@
 @ stub PsGetProcessPriorityClass
 @ stdcall PsGetProcessSectionBaseAddress(ptr)
 @ stub PsGetProcessSecurityPort
-@ stub PsGetProcessSessionId
+@ stdcall PsGetProcessSessionId(ptr)
 @ stub PsGetProcessWin32Process
 @ stub PsGetProcessWin32WindowStation
 @ stdcall -arch=x86_64 PsGetProcessWow64Process(ptr)
