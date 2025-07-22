@@ -2486,6 +2486,7 @@ static void *create_process_object( HANDLE handle )
     process->header.WaitListHead.Blink = INVALID_HANDLE_VALUE; /* mark as kernel object */
     NtQueryInformationProcess( handle, ProcessBasicInformation, &process->info, sizeof(process->info), NULL );
     NtQueryInformationProcess( handle, ProcessSessionInformation, &process->session_id, sizeof(process->session_id), NULL );
+    NtQueryInformationProcess( handle, ProcessTimes, &process->times, sizeof(process->times), NULL );
     IsWow64Process( handle, &process->wow64 );
 
     return process;
@@ -2555,6 +2556,15 @@ ULONG WINAPI PsGetProcessSessionId( PEPROCESS process )
 {
     TRACE("%p -> %lu", process, process->session_id);
     return process->session_id;
+}
+
+/*********************************************************************
+ *           PsGetProcessCreateTimeQuadPart    (NTOSKRNL.@)
+ */
+LONGLONG WINAPI PsGetProcessCreateTimeQuadPart( PEPROCESS process )
+{
+    TRACE("%p -> %I64x\n", process, process->times.CreateTime.QuadPart);
+    return process->times.CreateTime.QuadPart;
 }
 
 static void *create_thread_object( HANDLE handle )
