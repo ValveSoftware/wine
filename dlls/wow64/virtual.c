@@ -506,10 +506,11 @@ NTSTATUS WINAPI wow64_NtProtectVirtualMemory( UINT *args )
     ULONG *addr32 = get_ptr( &args );
     ULONG *size32 = get_ptr( &args );
     ULONG new_prot = get_ulong( &args );
-    ULONG *old_prot = get_ptr( &args );
+    ULONG *old_prot_ptr = get_ptr( &args );
 
     void *addr = ULongToPtr( *addr32 );
     SIZE_T size = *size32;
+    ULONG old_prot = *old_prot_ptr;
     BOOL is_current = RtlIsCurrentProcess( process );
     NTSTATUS status;
 
@@ -517,7 +518,7 @@ NTSTATUS WINAPI wow64_NtProtectVirtualMemory( UINT *args )
                                                       addr, size, 2, new_prot, 0 );
     else if (pBTCpuNotifyMemoryProtect) pBTCpuNotifyMemoryProtect( addr, size, new_prot, FALSE, 0 );
 
-    status = NtProtectVirtualMemory( process, &addr, &size, new_prot, old_prot );
+    status = NtProtectVirtualMemory( process, &addr, &size, new_prot, &old_prot );
 
     if (!is_current) send_cross_process_notification( process, CrossProcessPostVirtualProtect,
                                                       addr, size, 2, new_prot, status );
@@ -527,6 +528,7 @@ NTSTATUS WINAPI wow64_NtProtectVirtualMemory( UINT *args )
     {
         put_addr( addr32, addr );
         put_size( size32, size );
+        *old_prot_ptr = old_prot;
     }
     return status;
 }
