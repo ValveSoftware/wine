@@ -1244,42 +1244,6 @@ exit:
     return STATUS_SUCCESS;
 }
 
-static NTSTATUS pulse_release_stream(void *args)
-{
-    struct release_stream_params *params = args;
-    struct pulse_stream *stream = handle_get_stream(params->stream);
-    SIZE_T size;
-
-    if(params->timer_thread) {
-        stream->please_quit = TRUE;
-        NtWaitForSingleObject(params->timer_thread, FALSE, NULL);
-        NtClose(params->timer_thread);
-    }
-
-    pulse_lock();
-    if (PA_STREAM_IS_GOOD(pa_stream_get_state(stream->stream))) {
-        pa_stream_disconnect(stream->stream);
-        while (pulse_ml && PA_STREAM_IS_GOOD(pa_stream_get_state(stream->stream)))
-            pulse_cond_wait();
-    }
-    pa_stream_unref(stream->stream);
-    pulse_unlock();
-
-    if (stream->tmp_buffer) {
-        size = 0;
-        NtFreeVirtualMemory(GetCurrentProcess(), (void **)&stream->tmp_buffer,
-                            &size, MEM_RELEASE);
-    }
-    if (stream->local_buffer) {
-        size = 0;
-        NtFreeVirtualMemory(GetCurrentProcess(), (void **)&stream->local_buffer,
-                            &size, MEM_RELEASE);
-    }
-    free(stream->peek_buffer);
-    free(stream);
-    return STATUS_SUCCESS;
-}
-
 static int write_buffer(const struct pulse_stream *stream, BYTE *buffer, UINT32 bytes)
 {
     const float *vol = stream->vol;
@@ -1663,6 +1627,42 @@ static NTSTATUS pulse_timer_loop(void *args)
         pulse_unlock();
     }
 
+    return STATUS_SUCCESS;
+}
+
+static NTSTATUS pulse_release_stream(void *args)
+{
+    struct release_stream_params *params = args;
+    struct pulse_stream *stream = handle_get_stream(params->stream);
+    SIZE_T size;
+
+    if(params->timer_thread) {
+        stream->please_quit = TRUE;
+        NtWaitForSingleObject(params->timer_thread, FALSE, NULL);
+        NtClose(params->timer_thread);
+    }
+
+    pulse_lock();
+    if (PA_STREAM_IS_GOOD(pa_stream_get_state(stream->stream))) {
+        pa_stream_disconnect(stream->stream);
+        while (pulse_ml && PA_STREAM_IS_GOOD(pa_stream_get_state(stream->stream)))
+            pulse_cond_wait();
+    }
+    pa_stream_unref(stream->stream);
+    pulse_unlock();
+
+    if (stream->tmp_buffer) {
+        size = 0;
+        NtFreeVirtualMemory(GetCurrentProcess(), (void **)&stream->tmp_buffer,
+                            &size, MEM_RELEASE);
+    }
+    if (stream->local_buffer) {
+        size = 0;
+        NtFreeVirtualMemory(GetCurrentProcess(), (void **)&stream->local_buffer,
+                            &size, MEM_RELEASE);
+    }
+    free(stream->peek_buffer);
+    free(stream);
     return STATUS_SUCCESS;
 }
 
