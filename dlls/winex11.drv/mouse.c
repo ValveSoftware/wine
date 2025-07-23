@@ -1807,13 +1807,18 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input, BOOL send_raw
         TRACE( "event %f,%f raw value %f,%f, raw input %d,%d\n", x_value, y_value, x_raw, y_raw,
                (int)input->mi.dx, (int)input->mi.dy );
     }
-    else if (!(input->mi.dx = round( x->value )) && !(input->mi.dy = round( y->value )))
-    {
-        TRACE( "event %f,%f value %f,%f, accumulating motion\n", x_value, y_value, x->value, y->value );
-        input->mi.dwFlags &= ~MOUSEEVENTF_MOVE;
-    }
     else
     {
+        input->mi.dx = round( x->value );
+        input->mi.dy = round( y->value );
+
+        if (!input->mi.dx && !input->mi.dy)
+        {
+            TRACE( "event %f,%f value %f,%f, accumulating motion\n", x_value, y_value, x->value, y->value );
+            input->mi.dwFlags &= ~MOUSEEVENTF_MOVE;
+            return TRUE;
+        }
+
         TRACE( "event %f,%f value %f,%f, input %d,%d\n", x_value, y_value, x->value, y->value,
                (int)input->mi.dx, (int)input->mi.dy );
         x->value -= input->mi.dx;
