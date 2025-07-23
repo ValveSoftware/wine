@@ -824,7 +824,7 @@ SHORT WINAPI NtUserGetAsyncKeyState( INT key )
 
     if (use_recent_bit == -1) {
         const char *sgi = getenv("SteamGameId");
-        use_recent_bit = sgi && strcmp(sgi, "302190") == 0;
+        use_recent_bit = sgi && (!strcmp(sgi, "302190") || !strcmp(sgi, "271760"));
     }
 
     if (key < 0 || key >= 256) return 0;
