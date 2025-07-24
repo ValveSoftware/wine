@@ -2179,6 +2179,27 @@ struct shared_resource_create
     WCHAR name[1];
 };
 
+/* helper for internal ioctl calls */
+typedef struct
+{
+    union
+    {
+        NTSTATUS Status;
+        ULONG Pointer;
+    };
+    ULONG Information;
+} IO_STATUS_BLOCK32;
+
+static NTSTATUS wine_ioctl(HANDLE file, ULONG code, void *in_buffer, ULONG in_size, void *out_buffer, ULONG out_size)
+{
+    IO_STATUS_BLOCK32 io32;
+    IO_STATUS_BLOCK io;
+
+    /* the 32-bit iosb is filled for overlapped file handles */
+    io.Pointer = &io32;
+    return NtDeviceIoControlFile(file, NULL, NULL, NULL, &io, code, in_buffer, in_size, out_buffer, out_size);
+}
+
 static HANDLE create_gpu_resource(int fd, LPCWSTR name, UINT64 resource_size)
 {
     static const WCHAR shared_gpu_resourceW[] = {'\\','?','?','\\','S','h','a','r','e','d','G','p','u','R','e','s','o','u','r','c','e',0};
@@ -2219,8 +2240,7 @@ static HANDLE create_gpu_resource(int fd, LPCWSTR name, UINT64 resource_size)
     if (name)
         lstrcpyW(&inbuff->name[0], name);
 
-    if ((status = NtDeviceIoControlFile(shared_resource, NULL, NULL, NULL, &iosb, IOCTL_SHARED_GPU_RESOURCE_CREATE,
-            inbuff, in_size, NULL, 0)))
+    if ((status = wine_ioctl(shared_resource, IOCTL_SHARED_GPU_RESOURCE_CREATE, inbuff, in_size, NULL, 0)))
 
     free(inbuff);
     NtClose(unix_resource);
@@ -2280,8 +2300,7 @@ static HANDLE open_shared_resource(HANDLE kmt_handle, LPCWSTR name)
     if (name)
         lstrcpyW(&inbuff->name[0], name);
 
-    status = NtDeviceIoControlFile(shared_resource, NULL, NULL, NULL, &iosb, IOCTL_SHARED_GPU_RESOURCE_OPEN,
-            inbuff, in_size, NULL, 0);
+    status = wine_ioctl(shared_resource, IOCTL_SHARED_GPU_RESOURCE_OPEN, inbuff, in_size, NULL, 0);
 
     free(inbuff);
 
@@ -2299,11 +2318,9 @@ static HANDLE open_shared_resource(HANDLE kmt_handle, LPCWSTR name)
 
 static BOOL shared_resource_get_info(HANDLE handle, struct shared_resource_info *info)
 {
-    IO_STATUS_BLOCK iosb;
     unsigned int status;
 
-    status = NtDeviceIoControlFile(handle, NULL, NULL, NULL, &iosb, IOCTL_SHARED_GPU_RESOURCE_GET_INFO,
-            NULL, 0, info, sizeof(*info));
+    status = wine_ioctl(handle, IOCTL_SHARED_GPU_RESOURCE_GET_INFO, NULL, 0, info, sizeof(*info));
     if (status)
         ERR("Failed to get shared resource info, status %#x.\n", status);
 
@@ -2314,13 +2331,11 @@ static BOOL shared_resource_get_info(HANDLE handle, struct shared_resource_info 
 
 static int get_shared_resource_fd(HANDLE shared_resource)
 {
-    IO_STATUS_BLOCK iosb;
     obj_handle_t unix_resource;
     NTSTATUS status;
     int ret;
 
-    if (NtDeviceIoControlFile(shared_resource, NULL, NULL, NULL, &iosb, IOCTL_SHARED_GPU_RESOURCE_GET_UNIX_RESOURCE,
-            NULL, 0, &unix_resource, sizeof(unix_resource)))
+    if (wine_ioctl(shared_resource, IOCTL_SHARED_GPU_RESOURCE_GET_UNIX_RESOURCE, NULL, 0, &unix_resource, sizeof(unix_resource)))
         return -1;
 
     status = wine_server_handle_to_fd(wine_server_ptr_handle(unix_resource), FILE_READ_DATA, &ret, NULL);
@@ -2332,11 +2347,9 @@ static int get_shared_resource_fd(HANDLE shared_resource)
 
 static HANDLE get_shared_resource_kmt_handle(HANDLE shared_resource)
 {
-    IO_STATUS_BLOCK iosb;
     obj_handle_t kmt_handle;
 
-    if (NtDeviceIoControlFile(shared_resource, NULL, NULL, NULL, &iosb, IOCTL_SHARED_GPU_RESOURCE_GETKMT,
-            NULL, 0, &kmt_handle, sizeof(kmt_handle)))
+    if (wine_ioctl(shared_resource, IOCTL_SHARED_GPU_RESOURCE_GETKMT, NULL, 0, &kmt_handle, sizeof(kmt_handle)))
         return INVALID_HANDLE_VALUE;
 
     return wine_server_ptr_handle(kmt_handle);
@@ -3383,7 +3396,6 @@ VkResult wine_vkGetMemoryWin32HandlePropertiesKHR(VkDevice device_handle, VkExte
 
 static bool set_shared_resource_object(HANDLE shared_resource, unsigned int index, HANDLE handle)
 {
-    IO_STATUS_BLOCK iosb;
     struct shared_resource_set_object
     {
         unsigned int index;
@@ -3393,19 +3405,16 @@ static bool set_shared_resource_object(HANDLE shared_resource, unsigned int inde
     params.index = index;
     params.handle = wine_server_obj_handle(handle);
 
-    return NtDeviceIoControlFile(shared_resource, NULL, NULL, NULL, &iosb, IOCTL_SHARED_GPU_RESOURCE_SET_OBJECT,
-            &params, sizeof(params), NULL, 0) == STATUS_SUCCESS;
+    return wine_ioctl(shared_resource, IOCTL_SHARED_GPU_RESOURCE_SET_OBJECT, &params, sizeof(params), NULL, 0) == STATUS_SUCCESS;
 }
 
 #define IOCTL_SHARED_GPU_RESOURCE_GET_OBJECT           CTL_CODE(FILE_DEVICE_VIDEO, 6, METHOD_BUFFERED, FILE_READ_ACCESS)
 
 static HANDLE get_shared_resource_object(HANDLE shared_resource, unsigned int index)
 {
-    IO_STATUS_BLOCK iosb;
     obj_handle_t handle;
 
-    if (NtDeviceIoControlFile(shared_resource, NULL, NULL, NULL, &iosb, IOCTL_SHARED_GPU_RESOURCE_GET_OBJECT,
-            &index, sizeof(index), &handle, sizeof(handle)))
+    if (wine_ioctl(shared_resource, IOCTL_SHARED_GPU_RESOURCE_GET_OBJECT, &index, sizeof(index), &handle, sizeof(handle)))
         return NULL;
 
     return wine_server_ptr_handle(handle);
