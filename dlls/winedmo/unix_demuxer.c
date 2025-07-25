@@ -247,9 +247,8 @@ NTSTATUS demuxer_create( void *arg )
     if (!(demuxer->ctx = avformat_alloc_context())) goto failed;
     if (!(demuxer->ctx->pb = avio_alloc_context( NULL, 0, 0, params->context, unix_read_callback, NULL, unix_seek_callback ))) goto failed;
 
-    if ((ret = avformat_open_input( &demuxer->ctx, NULL, NULL, NULL )) < 0)
-        WARN( "Failed to open input, error %s.\n", debugstr_averr(ret) );
-    if ((ret = mediaconv_demuxer_open( &demuxer->ctx, params->context ) < 0))
+    ret = avformat_open_input( &demuxer->ctx, NULL, NULL, NULL );
+    if (ret < 0 || (ret = mediaconv_demuxer_open( &demuxer->ctx, params->context )) < 0)
     {
         ERR( "Failed to open input, error %s.\n", debugstr_averr(ret) );
         goto failed;
