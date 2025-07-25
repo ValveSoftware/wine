@@ -196,6 +196,7 @@ extern BOOL ac_odyssey;
 extern BOOL fsync_simulate_sched_quantum;
 extern BOOL alert_simulate_sched_quantum;
 extern BOOL fsync_yield_to_waiters;
+extern BOOL fsync_help_simulated_pulse;
 extern BOOL localsystem_sid;
 extern BOOL simulate_writecopy;
 extern long long ram_reporting_bias;
