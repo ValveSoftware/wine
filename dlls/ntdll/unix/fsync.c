@@ -720,6 +720,13 @@ NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev )
         return STATUS_OBJECT_TYPE_MISMATCH;
     }
 
+    if (fsync_help_simulated_pulse && event->signaled
+        && __atomic_load_n( &event->last_pid, __ATOMIC_SEQ_CST ) == current_pid)
+    {
+        TRACE( "event %p, helping simulated pulse.\n", handle );
+        usleep( 0 );
+    }
+
     current = __atomic_exchange_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
 
     if (prev) *prev = current;
