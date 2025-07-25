@@ -2255,6 +2255,7 @@ static ULONG_PTR get_image_address(void)
     return 0;
 }
 
+BOOL fsync_help_simulated_pulse;
 BOOL localsystem_sid;
 BOOL simulate_writecopy;
 BOOL wine_allocs_2g_limit;
@@ -2310,6 +2311,13 @@ static void hacks_init(void)
     else if (sgi) fsync_yield_to_waiters = !strcmp(sgi, "292120") || !strcmp(sgi, "345350") || !strcmp(sgi, "292140");
     if (fsync_yield_to_waiters)
         ERR("HACK: fsync: yield to waiters.\n");
+
+    env_str = getenv("WINE_FSYNC_HELP_SIMULATED_PULSE");
+    if (env_str)
+        fsync_help_simulated_pulse = !!atoi(env_str);
+    else if (sgi) fsync_help_simulated_pulse = !strcmp(sgi, "460870");
+    if (fsync_help_simulated_pulse)
+        ERR("HACK: fsync: helping simulated pulse event.\n");
 
     switch (sgi ? atoi( sgi ) : -1)
     {

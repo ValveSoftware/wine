@@ -207,6 +207,7 @@ extern sigset_t server_block_set;
 extern pthread_mutex_t fd_cache_mutex;
 extern struct _KUSER_SHARED_DATA *user_shared_data;
 
+extern BOOL fsync_help_simulated_pulse;
 extern BOOL localsystem_sid;
 extern BOOL simulate_writecopy;
 extern long long ram_reporting_bias;
