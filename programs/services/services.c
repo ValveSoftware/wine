@@ -1041,6 +1041,9 @@ found:
             L"WINEBUSCONFIG",
             L"PROTON_DISABLE_HIDRAW",
             L"PROTON_ENABLE_HIDRAW",
+            L"FEX_APP_DATA_LOCATION",
+            L"FEX_APP_CONFIG_LOCATION",
+            L"FEX_APP_CONFIG",
         };
         WCHAR buffer[1024];
 
