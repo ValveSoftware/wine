@@ -632,6 +632,7 @@ static void fixup_winver(DWORD *verval)
                     (
                         !strcmp(s, "976730")
                         || !strcmp(s, "231430")
+                        || !strcmp(s, "1017900")
                     );
         if (cached)
             ERR("HACK: setting winver 502.\n");
