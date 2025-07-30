@@ -631,6 +631,7 @@ static void fixup_winver(DWORD *verval)
         cached = (s = getenv("STEAM_COMPAT_APP_ID")) &&
                     (
                         !strcmp(s, "976730")
+                        || !strcmp(s, "231430")
                     );
         if (cached)
             ERR("HACK: setting winver 502.\n");
