@@ -75,6 +75,8 @@ static UINT wave_format_tag_from_codec_id( enum AVCodecID id )
 
 static void wave_format_ex_init( const AVCodecParameters *params, WAVEFORMATEX *format, UINT32 format_size, WORD format_tag )
 {
+    const char *sgi;
+
     memset( format, 0, format_size );
     format->cbSize = format_size - sizeof(*format);
     format->wFormatTag = format_tag;
@@ -86,6 +88,13 @@ static void wave_format_ex_init( const AVCodecParameters *params, WAVEFORMATEX *
     format->nSamplesPerSec = params->sample_rate;
     format->wBitsPerSample = av_get_bits_per_sample( params->codec_id );
     if (!format->wBitsPerSample) format->wBitsPerSample = params->bits_per_coded_sample;
+    if (!format->wBitsPerSample && (params->codec_id == AV_CODEC_ID_OPUS || params->codec_id == AV_CODEC_ID_VORBIS)
+            && (sgi = getenv("SteamGameId")) && !strcmp(sgi, "287700"))
+    {
+        /* Metal Gear Solid V: The Phantom Pain uses wBitsPerSample as a divisor in an integer division,
+         * so it must be non-zero, but is zero for transcoded audio. */
+        format->wBitsPerSample = 16;
+    }
     if (!(format->nBlockAlign = params->block_align)) format->nBlockAlign = format->wBitsPerSample * format->nChannels / 8;
     if (!(format->nAvgBytesPerSec = params->bit_rate / 8)) format->nAvgBytesPerSec = format->nSamplesPerSec * format->nBlockAlign;
 }
