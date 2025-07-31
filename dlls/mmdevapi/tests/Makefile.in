@@ -1,5 +1,5 @@
 TESTDLL   = mmdevapi.dll
-IMPORTS   = ole32 version user32 advapi32 winmm
+IMPORTS   = ole32 version user32 advapi32 winmm oleaut32 propsys
 
 SOURCES = \
 	capture.c \
