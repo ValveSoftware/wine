@@ -1052,6 +1052,14 @@ static void create_computer_name_keys(void)
 
 static void create_volatile_environment_registry_key(void)
 {
+    static const WCHAR *preserve[] =
+    {
+        L"DXVK_ENABLE_NVAPI",
+        L"DXVK_NVAPI_ALLOW_OTHER_DRIVERS",
+        L"DXVK_NVAPI_DRIVER_VERSION",
+    };
+    const WCHAR *str;
+    unsigned int i;
     WCHAR path[MAX_PATH];
     WCHAR computername[MAX_COMPUTERNAME_LENGTH + 1 + 2];
     DWORD size;
@@ -1096,6 +1104,12 @@ static void create_volatile_environment_registry_key(void)
     }
 
     set_reg_value( hkey, L"SESSIONNAME", L"Console" );
+
+    for (i = 0; i < ARRAY_SIZE(preserve); ++i)
+    {
+        if ((str = _wgetenv( preserve[i] ))) set_reg_value( hkey, preserve[i], str );
+    }
+
     RegCloseKey( hkey );
 }
 
