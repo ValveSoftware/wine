@@ -4710,6 +4710,64 @@ VkResult wine_wine_vkReleaseKeyedMutex(VkDevice device, VkDeviceMemory memory, u
     return release_keyed_mutex(vulkan_device_from_handle(device), wine_device_memory_from_handle(memory), key, NULL);
 }
 
+static void fixup_device_id(UINT *vendor_id, UINT *device_id)
+{
+    const char *sgi;
+
+    if (*vendor_id == 0x10de /* NVIDIA */ && (sgi = getenv("WINE_HIDE_NVIDIA_GPU")) && *sgi != '0')
+    {
+        *vendor_id = 0x1002; /* AMD */
+        *device_id = 0x73df; /* RX 6700XT */
+    }
+    else if (*vendor_id == 0x1002 /* AMD */ && (sgi = getenv("WINE_HIDE_AMD_GPU")) && *sgi != '0')
+    {
+        *vendor_id = 0x10de; /* NVIDIA */
+        *device_id = 0x2487; /* RTX 3060 */
+    }
+    else if (*vendor_id == 0x1002 && (*device_id == 0x163f || *device_id == 0x1435) && (sgi = getenv("WINE_HIDE_VANGOGH_GPU")) && *sgi != '0')
+    {
+        *device_id = 0x687f; /* Radeon RX Vega 56/64 */
+    }
+    else if (*vendor_id == 0x8086 /* Intel */ && (sgi = getenv("WINE_HIDE_INTEL_GPU")) && *sgi != '0')
+    {
+        *vendor_id = 0x1002; /* AMD */
+        *device_id = 0x73df; /* RX 6700XT */
+    }
+}
+
+void wine_vkGetPhysicalDeviceProperties(VkPhysicalDevice client_physical_device,
+        VkPhysicalDeviceProperties *properties)
+{
+    struct wine_phys_dev *phys_dev = wine_phys_dev_from_handle(client_physical_device);
+
+    TRACE("%p, %p\n", phys_dev, properties);
+
+    phys_dev->obj.instance->p_vkGetPhysicalDeviceProperties(phys_dev->obj.host.physical_device, properties);
+    fixup_device_id(&properties->vendorID, &properties->deviceID);
+}
+
+void wine_vkGetPhysicalDeviceProperties2(VkPhysicalDevice client_physical_device,
+        VkPhysicalDeviceProperties2 *properties)
+{
+    struct wine_phys_dev *phys_dev = wine_phys_dev_from_handle(client_physical_device);
+
+    TRACE("%p, %p\n", phys_dev, properties);
+
+    phys_dev->obj.instance->p_vkGetPhysicalDeviceProperties2(phys_dev->obj.host.physical_device, properties);
+    fixup_device_id(&properties->properties.vendorID, &properties->properties.deviceID);
+}
+
+void wine_vkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice client_physical_device,
+        VkPhysicalDeviceProperties2 *properties)
+{
+    struct wine_phys_dev *phys_dev = wine_phys_dev_from_handle(client_physical_device);
+
+    TRACE("%p, %p\n", phys_dev, properties);
+
+    phys_dev->obj.instance->p_vkGetPhysicalDeviceProperties2KHR(phys_dev->obj.host.physical_device, properties);
+    fixup_device_id(&properties->properties.vendorID, &properties->properties.deviceID);
+}
+
 DECLSPEC_EXPORT VkDevice __wine_get_native_VkDevice(VkDevice handle)
 {
     struct vulkan_device *device = vulkan_device_from_handle(handle);
