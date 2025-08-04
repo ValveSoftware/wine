@@ -280,6 +280,9 @@ static unsigned int get_vt_elem_size(VARTYPE vt)
         case VT_BOOL:
             return sizeof(VARIANT_BOOL);
 
+        case VT_CLSID:
+            return sizeof(GUID);
+
         default:
             return 0;
     }
@@ -333,6 +336,20 @@ static void deserialize_reg_prop(BYTE *data, DWORD data_size, PROPVARIANT *pv)
             memcpy(pv->cabool.pElems, reg_prop->data, elems_size);
             break;
 
+        case VT_CLSID:
+            pv->vt = reg_prop->vt;
+            pv->puuid = CoTaskMemAlloc(sizeof(*pv->puuid));
+            *pv->puuid = ((GUID *)reg_prop->data)[0];
+            break;
+
+        case VT_CLSID | VT_VECTOR:
+            pv->vt = reg_prop->vt;
+            pv->cauuid.cElems = reg_prop->elems;
+            elems_size = sizeof(*pv->cauuid.pElems) * reg_prop->elems;
+            pv->cauuid.pElems = CoTaskMemAlloc(elems_size);
+            memcpy(pv->cauuid.pElems, reg_prop->data, elems_size);
+            break;
+
         default:
             break;
     }
@@ -343,7 +360,7 @@ static HRESULT serialize_reg_prop(HKEY reg_key, const WCHAR *prop_id, PROPVARIAN
     const struct reg_prop_serialized reg_prop_init = { pv->vt, WINE_REG_PROP_MAGIC };
     struct reg_prop_serialized *reg_prop = NULL;
     unsigned int size = sizeof(reg_prop_init);
-    unsigned int elems_size, elem_count = 1;
+    unsigned int elems_size = 0, elem_count = 1;
     void *elems_val = NULL;
     LONG ret;
 
@@ -358,6 +375,21 @@ static HRESULT serialize_reg_prop(HKEY reg_key, const WCHAR *prop_id, PROPVARIAN
             elem_count = pv->cabool.cElems;
             elems_size = elem_count * get_vt_elem_size(pv->vt);
             elems_val = pv->cabool.pElems;
+            break;
+
+        case VT_CLSID:
+            elems_size = get_vt_elem_size(pv->vt);
+            elems_val = pv->puuid;
+            break;
+
+        case VT_CLSID | VT_VECTOR:
+            elem_count = pv->cauuid.cElems;
+            elems_size = elem_count * get_vt_elem_size(pv->vt);
+            elems_val = pv->cauuid.pElems;
+            break;
+
+        default:
+            assert(0);
             break;
     }
 
@@ -473,6 +505,8 @@ static HRESULT MMDevice_SetPropValue(const GUID *devguid, DWORD flow, REFPROPERT
 
         case VT_BOOL:
         case VT_BOOL | VT_VECTOR:
+        case VT_CLSID:
+        case VT_CLSID | VT_VECTOR:
         {
             hr = serialize_reg_prop(regkey, buffer, (PROPVARIANT *)pv);
             ret = 0;
