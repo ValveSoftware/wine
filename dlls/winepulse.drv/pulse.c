@@ -23,7 +23,10 @@
 #pragma makedep unix
 #endif
 
+#include "config.h"
 #include <stdarg.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include <pthread.h>
 #include <math.h>
 #include <poll.h>
@@ -42,7 +45,15 @@
 #include "wine/list.h"
 #include "wine/unixlib.h"
 
+#include "initguid.h"
+#include "devpkey.h"
+DEFINE_GUID(GUID_NULL,0,0,0,0,0,0,0,0,0,0,0);
+
 #include "../mmdevapi/unixlib.h"
+
+#ifdef HAVE_LIBUDEV_H
+#include <libudev.h>
+#endif
 
 #include "mult.h"
 
@@ -118,6 +129,7 @@ typedef struct _PhysDevice {
     UINT index;
     REFERENCE_TIME min_period, def_period;
     WAVEFORMATEXTENSIBLE fmt;
+    GUID container_id;
     char pulse_name[0];
 } PhysDevice;
 
@@ -567,6 +579,77 @@ static WCHAR *get_device_name(const char *desc, pa_proplist *proplist)
     return name;
 }
 
+#ifdef HAVE_UDEV
+static void create_usb_dev_container_id(uint64_t usec_init, uint16_t vid, uint16_t pid, uint8_t bus_num, uint8_t dev_num,
+        GUID *out)
+{
+    out->Data1 = MAKELONG(vid, pid);
+    out->Data2 = bus_num;
+    out->Data3 = dev_num;
+    memcpy(out->Data4, &usec_init, sizeof(out->Data4));
+}
+
+static GUID get_container_id(const char *sysfs_path)
+{
+    struct udev_device *audio_dev, *usb_dev;
+    struct udev *udev = udev_new();
+    char buffer[4096] = "/sys";
+    uint32_t vid, pid, version;
+    uint8_t bus_num, dev_num;
+    uint64_t init_time;
+    const char *tmp;
+    GUID tmp_guid;
+
+    tmp_guid = GUID_NULL;
+    strcat(buffer, sysfs_path);
+    audio_dev = usb_dev = NULL;
+    if (!udev)
+    {
+        ERR("Failed to get udev!\n");
+        goto exit;
+    }
+
+    audio_dev = udev_device_new_from_syspath(udev, buffer);
+    if (!audio_dev)
+        goto exit;
+
+    usb_dev = udev_device_get_parent_with_subsystem_devtype(audio_dev, "usb", "usb_device");
+    TRACE("usb dev %p, udev %p.\n", usb_dev, udev);
+    if (!usb_dev)
+        goto exit;
+
+    init_time = 0;
+    bus_num = dev_num = 0;
+    vid = pid = version = 0;
+    if ((tmp = udev_device_get_property_value(usb_dev, "PRODUCT")))
+        sscanf(tmp, "%x/%x/%x", &vid, &pid, &version);
+    if ((tmp = udev_device_get_property_value(usb_dev, "USEC_INITIALIZED")))
+        init_time = strtoull(tmp, NULL, 10);
+    if ((tmp = udev_device_get_property_value(usb_dev, "BUSNUM")))
+        bus_num = strtol(tmp, NULL, 10);
+    if ((tmp = udev_device_get_property_value(usb_dev, "DEVNUM")))
+        dev_num = strtol(tmp, NULL, 10);
+
+    create_usb_dev_container_id(init_time, vid, pid, bus_num, dev_num, &tmp_guid);
+
+exit:
+    if (udev)
+        udev_unref(udev);
+    if (audio_dev)
+        udev_device_unref(audio_dev);
+
+    TRACE("Returning %s.\n", debugstr_guid(&tmp_guid));
+    return tmp_guid;
+}
+#else
+static GUID get_container_id(const char *sysfs_path)
+{
+    FIXME("No udev, can't get device data.\n");
+    return GUID_NULL;
+}
+#endif
+
+
 static void fill_device_info(PhysDevice *dev, pa_proplist *p)
 {
     const char *buffer;
@@ -574,6 +657,7 @@ static void fill_device_info(PhysDevice *dev, pa_proplist *p)
     dev->bus_type = phys_device_bus_invalid;
     dev->vendor_id = 0;
     dev->product_id = 0;
+    memset(&dev->container_id, 0, sizeof(dev->container_id));
 
     if (!p)
         return;
@@ -590,6 +674,9 @@ static void fill_device_info(PhysDevice *dev, pa_proplist *p)
 
     if ((buffer = pa_proplist_gets(p, PA_PROP_DEVICE_PRODUCT_ID)))
         dev->product_id = strtol(buffer, NULL, 16);
+
+    if ((buffer = pa_proplist_gets(p, "sysfs.path")))
+        dev->container_id = get_container_id(buffer);
 }
 
 static void pulse_add_device(struct list *list, pa_proplist *proplist, int index, EndpointFormFactor form,
@@ -2521,6 +2608,18 @@ static NTSTATUS pulse_get_prop_value(void *args)
                 params->result = S_OK;
                 return STATUS_SUCCESS;
             }
+        } else if (IsEqualGUID(&params->prop->fmtid, &DEVPKEY_Device_ContainerId)) {
+            if (!params->buffer || *params->buffer_size < sizeof(*params->value->puuid)) {
+                *params->buffer_size = sizeof(*params->value->puuid);
+                params->result = E_NOT_SUFFICIENT_BUFFER;
+            } else {
+                params->value->vt = VT_CLSID;
+                params->value->puuid = params->buffer;
+                *params->value->puuid = dev->container_id;
+                params->result = S_OK;
+            }
+
+            return STATUS_SUCCESS;
         }
 
         params->result = E_NOTIMPL;
@@ -3028,6 +3127,7 @@ static NTSTATUS pulse_wow64_get_prop_value(void *args)
             value32->ulVal = value.ulVal;
             break;
         case VT_LPWSTR:
+        case VT_CLSID:
             value32->ptr = params32->buffer;
             break;
         default:
