@@ -254,8 +254,8 @@ static void test_setvalue_on_wow64(IPropertyStore *store)
         BOOL todo_data;
     } propvar_tests[] =
     {
-        { VT_BOOL, vt_bool_vals, sizeof(vt_bool_vals) / 2, S_OK, REG_BINARY, 0xa, TRUE, TRUE },
-        { VT_BOOL | VT_VECTOR, vt_bool_vals, sizeof(vt_bool_vals), S_OK, REG_BINARY, 0xc, TRUE, TRUE },
+        { VT_BOOL, vt_bool_vals, sizeof(vt_bool_vals) / 2, S_OK, REG_BINARY, 0xa },
+        { VT_BOOL | VT_VECTOR, vt_bool_vals, sizeof(vt_bool_vals), S_OK, REG_BINARY, 0xc },
         { VT_CLSID, vt_clsid_vals, sizeof(vt_clsid_vals) / 2, S_OK, REG_BINARY, 0x18, TRUE, TRUE },
         { VT_CLSID | VT_VECTOR, vt_clsid_vals, sizeof(vt_clsid_vals), S_OK, REG_BINARY, 0x28, TRUE, TRUE },
         { VT_BSTR, vt_bstr_val, sizeof(vt_bstr_val), S_OK, REG_BINARY, 0x14, TRUE, TRUE },
