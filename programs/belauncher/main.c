@@ -94,6 +94,11 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
             WINE_TRACE("uninstall cmd, exiting.\n");
             return 0;
         }
+        if (argc && iswdigit(argvW[0][0]) && _wtoi(argvW[0]) == 1)
+        {
+            WINE_ERR("install cmd, exiting.\n");
+            return 0;
+        }
 
         for (i = 0; i < argc; ++i)
         {
