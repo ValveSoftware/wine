@@ -11,14 +11,15 @@ WINE_DEFAULT_DEBUG_CHANNEL(belauncher);
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cmdshow)
 {
     char *configs, *config, *arch_32_exe = NULL, *arch_64_exe = NULL, *game_exe = NULL, *be_arg = NULL;
-    WCHAR path[MAX_PATH], *p, config_path[MAX_PATH], game_exeW[MAX_PATH], **argvW;
+    WCHAR orig_path[MAX_PATH], path[MAX_PATH], *p, config_path[MAX_PATH], game_exeW[MAX_PATH], **argvW;
     LARGE_INTEGER launcher_cfg_size;
     unsigned char battleye_status;
     int game_exe_len, arg_len, path_len;
     PROCESS_INFORMATION pi;
     HANDLE launcher_cfg;
     LPWSTR launch_cmd;
-    STARTUPINFOW si = {0};
+    STARTUPINFOW si = { sizeof(si) };
+    HANDLE orig_launcher_process = NULL;
     int i, argc;
     DWORD size;
     BOOL wow64;
@@ -27,8 +28,11 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
     _write(1, &battleye_status, 1);
 
     *path = 0;
-    if ((size = GetEnvironmentVariableW(L"PROTON_ORIG_LAUNCHER_NAME", path, ARRAY_SIZE(path))) && size <= ARRAY_SIZE(path))
+    *orig_path = 0;
+    if ((size = GetEnvironmentVariableW(L"PROTON_ORIG_LAUNCHER_NAME", orig_path, ARRAY_SIZE(orig_path)))
+            && size <= ARRAY_SIZE(orig_path))
     {
+        wcscpy(path, orig_path);
         WINE_TRACE("PROTON_ORIG_LAUNCHER_NAME %s.\n", wine_dbgstr_w(path));
 
         for (p = path + wcslen(path); p != path; --p)
@@ -147,6 +151,20 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
         arg_len = MultiByteToWideChar(CP_ACP, 0, be_arg, -1, NULL, 0) - 1;
     }
 
+    if (*orig_path)
+    {
+        WINE_TRACE("Launching original launcher %s.\n", debugstr_w(orig_path));
+        if (!CreateProcessW(orig_path, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi))
+        {
+            DWORD err = GetLastError();
+
+            WINE_ERR("CreateProcessW failed for original launcher %s, err %lu.\n", debugstr_w(orig_path), err);
+            return err;
+        }
+        CloseHandle(pi.hThread);
+        orig_launcher_process = pi.hProcess;
+    }
+
     WINE_TRACE("Launching game executable %s for BattlEye.\n", game_exe);
     battleye_status = 0x9; /* Launching Game */
     _write(1, &battleye_status, 1);
@@ -175,15 +193,23 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
 
     if (!CreateProcessW(NULL, launch_cmd, NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi))
     {
-        WINE_ERR("CreateProcessW failed.\n");
+        DWORD err = GetLastError();
+
+        WINE_ERR("CreateProcessW failed, error %lu.\n", err);
+        if (orig_launcher_process)
+            TerminateProcess(orig_launcher_process, err);
         battleye_status = 0xA; /* Launch Failed */
         _write(1, &battleye_status, 1);
-        return GetLastError();
+        return err;
     }
     HeapFree( GetProcessHeap(), 0, launch_cmd );
+    CloseHandle(pi.hThread);
 
     WaitForSingleObject(pi.hProcess, INFINITE);
     CloseHandle(pi.hProcess);
+
+    if (orig_launcher_process)
+        TerminateProcess(orig_launcher_process, 0);
     return 0;
 
 start_failed:
