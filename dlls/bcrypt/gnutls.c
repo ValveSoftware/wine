@@ -3449,6 +3449,7 @@ static NTSTATUS key_asymmetric_derive_key( void *args )
 
         case ALG_ID_ECDH_P256:
         case ALG_ID_ECDH_P384:
+        case ALG_ID_ECDH_P521:
 /* this is necessary since GNUTLS doesn't support ECDH public key encryption, maybe we can replace this when it does:
    https://github.com/gnutls/gnutls/blob/cdc4fc288d87f91f974aa23b6e8595a53970ce00/lib/nettle/pk.c#L495 */
 #if defined(HAVE_GCRYPT_H) && defined(SONAME_LIBGCRYPT)
@@ -3481,9 +3482,14 @@ static NTSTATUS key_asymmetric_derive_key( void *args )
                 pubkey_format = "NIST P-384";
                 key_length = 48;
             }
+            else if (priv_key->alg_id == ALG_ID_ECDH_P521)
+            {
+                pubkey_format = "NIST P-521";
+                key_length = 66;
+            }
             else return STATUS_NOT_IMPLEMENTED;
 
-            if (key_length != priv_key->u.a.bitlen / 8)
+            if (key_length != len_from_bitlen( priv_key->u.a.bitlen ))
             {
                 ERR( "Key length mismatch, key->u.a.bitlen %u, key_length %u.\n", (int)priv_key->u.a.bitlen,
                      (int)key_length );
