@@ -1179,6 +1179,17 @@ static BOOL set_hardware_tso( BOOL enable ) {
 #endif
 }
 
+static BOOL set_unalign_atomic_mode( ULONG64 flags ) {
+#ifdef HAVE_PRCTL
+#ifndef PR_ARM64_SET_UNALIGN_ATOMIC
+#define PR_ARM64_SET_UNALIGN_ATOMIC 0x46455849
+#endif
+    return !prctl( PR_ARM64_SET_UNALIGN_ATOMIC, flags, 0, 0, 0 );;
+#else
+    return FALSE;
+#endif
+}
+
 #define UNIMPLEMENTED_INFO_CLASS(c) \
     case c: \
         FIXME( "(process=%p) Unimplemented information class: " #c "\n", handle); \
@@ -1961,6 +1972,10 @@ NTSTATUS WINAPI NtSetInformationProcess( HANDLE handle, PROCESSINFOCLASS class, 
     case ProcessFexHardwareTso:
         if (size != sizeof(BOOL)) return STATUS_INFO_LENGTH_MISMATCH;
         return set_hardware_tso( *(BOOL *)info ) ? STATUS_SUCCESS : STATUS_NOT_SUPPORTED;
+
+    case ProcessFexUnalignAtomic:
+        if (size != sizeof(ULONG64)) return STATUS_INFO_LENGTH_MISMATCH;
+        return set_unalign_atomic_mode( *(ULONG64 *)info ) ? STATUS_SUCCESS : STATUS_NOT_SUPPORTED;
 
     case ProcessPowerThrottlingState:
         FIXME( "ProcessPowerThrottlingState - stub\n" );
