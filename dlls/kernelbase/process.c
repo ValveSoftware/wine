@@ -559,6 +559,12 @@ static int battleye_launcher_redirect_hack( const WCHAR *app_name, WCHAR *new_na
     static const WCHAR belauncherW[] = L"c:\\windows\\system32\\belauncher.exe";
     unsigned int len;
 
+    if (GetEnvironmentVariableW(L"PROTON_ORIG_LAUNCHER_NAME", NULL, 0))
+    {
+        /* run from builtin belauncher. */
+        return 0;
+    }
+
     /* We detect the BattlEye launcher executable through the product name property, as the executable name varies */
     if (!product_name_matches( app_name, "BattlEye Launcher" ))
         return 0;
