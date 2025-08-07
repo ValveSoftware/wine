@@ -25,8 +25,6 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <fcntl.h>
-#include <unistd.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -55,22 +53,6 @@ void get_device_options(const struct bus_options *options, UINT vid, UINT pid, s
         *opts = *device;
         break;
     }
-}
-
-USHORT get_devnode_autocenter(const char *devnode)
-{
-    char syslink[MAX_PATH], buffer[64] = {0};
-    int fd;
-
-    if (!devnode || strncmp(devnode, "/dev/input", 10)) return 0xffff;
-
-    snprintf(syslink, sizeof(syslink), "/sys/class/%s/autocenter", devnode + 5);
-    if ((fd = open(devnode, O_RDONLY)) < 0) return 0xffff;
-    read(fd, &buffer, sizeof(buffer) - 1);
-    close(fd);
-
-    TRACE("Read autocenter gain %s from %s\n", debugstr_a(buffer), debugstr_a(syslink));
-    return atoi(buffer);
 }
 
 static BOOL hid_report_descriptor_append(struct hid_report_descriptor *desc, const BYTE *buffer, SIZE_T size)
