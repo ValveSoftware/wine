@@ -90,6 +90,7 @@ static inline BOOL enter_syscall_callback(void)
 static inline void leave_syscall_callback(void)
 {
     get_arm64ec_cpu_area()->InSyscallCallback = 0;
+    if (get_arm64ec_cpu_area()->SuspendDoorbell && *get_arm64ec_cpu_area()->SuspendDoorbell) arm64ec_suspend_point();
 }
 
 /**********************************************************************

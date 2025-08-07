@@ -74,6 +74,14 @@ __ASM_GLOBAL_FUNC( invoke_arm64ec_syscall,
                    "pushq %r10\n\t"         /* and return to syscall thunk */
                    "ret" )
 
+/**************************************************************************
+ *		arm64ec_suspend_point
+ *
+ * x64 stub to support cooperative suspend when leaving a syscall callack.
+ */
+__ASM_GLOBAL_FUNC( arm64ec_suspend_point,
+                   "ret" )
+
 /*******************************************************************
  *		KiUserExceptionDispatcher (NTDLL.@)
  */
