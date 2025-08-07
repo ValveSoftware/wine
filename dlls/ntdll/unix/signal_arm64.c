@@ -204,6 +204,7 @@ struct arm64_thread_data
 {
     struct syscall_frame *syscall_frame; /* 02f0 frame pointer on syscall entry */
     SYSTEM_SERVICE_TABLE *syscall_table; /* 02f8 syscall table */
+    BOOL suspend_pending;
 };
 
 C_ASSERT( sizeof(struct arm64_thread_data) <= sizeof(((struct ntdll_thread_data *)0)->cpu_data) );
@@ -244,6 +245,10 @@ void set_process_instrumentation_callback( void *callback )
     if (callback) FIXME( "Not supported.\n" );
 }
 
+static BOOL is_arm64ec_suspend_doorbell_valid(void)
+{
+    return is_arm64ec() && NtCurrentTeb()->ChpeV2CpuAreaInfo && NtCurrentTeb()->ChpeV2CpuAreaInfo->SuspendDoorbell;
+}
 
 /***********************************************************************
  *           unwind_builtin_dll
@@ -364,7 +369,18 @@ NTSTATUS signal_set_full_context( CONTEXT *context )
     struct syscall_frame *frame = arm64_thread_data()->syscall_frame;
     NTSTATUS status = NtSetContextThread( GetCurrentThread(), context );
 
-    if (!status && (context->ContextFlags & CONTEXT_INTEGER) == CONTEXT_INTEGER)
+    if (is_arm64ec_suspend_doorbell_valid() && arm64_thread_data()->suspend_pending)
+    {
+        CONTEXT suspend_context;
+        *NtCurrentTeb()->ChpeV2CpuAreaInfo->SuspendDoorbell = 0;
+        arm64_thread_data()->suspend_pending = FALSE;
+        suspend_context.ContextFlags = CONTEXT_FULL | CONTEXT_EXCEPTION_REPORTING; /* TODO: check */
+        NtGetContextThread( GetCurrentThread(), &suspend_context );
+        wait_suspend( &suspend_context );
+        NtSetContextThread( GetCurrentThread(), &suspend_context );
+    }
+
+    if (!status && (context->ContextFlags & CONTEXT_INTEGER) == CONTEXT_INTEGER) /* TODO: also check with susp */
         frame->restore_flags |= CONTEXT_INTEGER;
 
     if (is_arm64ec() && !is_ec_code( frame->pc ))
@@ -455,12 +471,20 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
 {
     struct syscall_frame *frame = arm64_thread_data()->syscall_frame;
     DWORD needed_flags = context->ContextFlags & ~CONTEXT_ARM64;
-    BOOL self = (handle == GetCurrentThread());
+    THREAD_BASIC_INFORMATION info;
+    NTSTATUS ret;
+    BOOL self;
+
+    NtQueryInformationThread( handle, ThreadBasicInformation, &info, sizeof(info), NULL );
+    self = HandleToULong( info.ClientId.UniqueThread ) == GetCurrentThreadId();
 
     if (!self)
     {
-        NTSTATUS ret = get_thread_context( handle, context, &self, IMAGE_FILE_MACHINE_ARM64 );
-        if (ret || !self) return ret;
+        /* Avoid exposing JIT code pointers to other processes on ARM64EC */
+        if (is_arm64ec()) NtSuspendThread( handle, NULL );
+        ret = get_thread_context( handle, context, &self, IMAGE_FILE_MACHINE_ARM64 );
+        if (is_arm64ec()) NtResumeThread( handle, NULL );
+        return ret;
     }
 
     if (needed_flags & CONTEXT_INTEGER)
@@ -1318,6 +1342,14 @@ static void usr1_handler( int signal, siginfo_t *siginfo, void *sigcontext )
 {
     CONTEXT context;
 
+    if (is_arm64ec_suspend_doorbell_valid() &&
+        (NtCurrentTeb()->ChpeV2CpuAreaInfo->InSimulation || NtCurrentTeb()->ChpeV2CpuAreaInfo->InSyscallCallback))
+    {
+        *NtCurrentTeb()->ChpeV2CpuAreaInfo->SuspendDoorbell = 1;
+        arm64_thread_data()->suspend_pending = TRUE;
+        return;
+    }
+
     if (is_inside_syscall( sigcontext ))
     {
         context.ContextFlags = CONTEXT_FULL | CONTEXT_EXCEPTION_REQUEST;
@@ -1487,6 +1519,7 @@ void call_init_thunk( LPTHREAD_START_ROUTINE entry, void *arg, BOOL suspend, TEB
     ARM_CONTEXT *arm_context;
 
     thread_data->syscall_table = KeServiceDescriptorTable;
+    thread_data->suspend_pending = FALSE;
 
     context.X0  = (DWORD64)entry;
     context.X1  = (DWORD64)arg;

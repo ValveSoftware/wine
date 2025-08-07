@@ -184,6 +184,7 @@ extern IMAGE_ARM64EC_METADATA *arm64ec_get_module_metadata( HMODULE module );
 extern void arm64ec_update_hybrid_metadata( void *module, IMAGE_NT_HEADERS *nt,
                                             const IMAGE_ARM64EC_METADATA *metadata );
 extern void invoke_arm64ec_syscall(void);
+extern void arm64ec_suspend_point(void);
 
 extern void *__os_arm64x_check_call;
 extern void *__os_arm64x_check_icall;
