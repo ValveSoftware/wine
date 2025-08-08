@@ -221,6 +221,18 @@ static GLenum color_format_from_pfd( const struct wgl_pixel_format *desc )
     return 0;
 }
 
+static GLenum format_from_pfd( const struct wgl_pixel_format *desc )
+{
+    if (desc->pfd.cAlphaBits) return GL_RGBA;
+    if (desc->pfd.cBlueBits) return GL_RGB;
+    if (desc->pfd.cGreenBits) return GL_RG;
+    if (desc->pfd.cRedBits) return GL_RED;
+
+    FIXME( "Unsupported format type %u bits %u/%u/%u/%u\n", desc->pixel_type, desc->pfd.cRedBits,
+           desc->pfd.cGreenBits, desc->pfd.cBlueBits, desc->pfd.cAlphaBits );
+    return 0;
+}
+
 static GLenum depth_format_from_pfd( const struct wgl_pixel_format *desc )
 {
     TRACE( "format bits %u/%u\n", desc->pfd.cStencilBits, desc->pfd.cDepthBits );
@@ -253,8 +265,16 @@ static GLuint create_framebuffer( struct opengl_drawable *drawable, const struct
 
     for (GLuint i = 0; i < count; i++)
     {
-        funcs->p_glCreateRenderbuffers( 1, &name );
-        funcs->p_glNamedFramebufferRenderbuffer( fbo, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, name );
+        if (desc->samples)
+        {
+            funcs->p_glCreateRenderbuffers( 1, &name );
+            funcs->p_glNamedFramebufferRenderbuffer( fbo, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, name );
+        }
+        else
+        {
+            name = WINE_OPENGL_RESERVED_TEXTURE0 + i;
+            funcs->p_glNamedFramebufferTexture( fbo, GL_COLOR_ATTACHMENT0 + i, name, 0 );
+        }
         TRACE( "drawable %p/%u created color buffer %#x/%u\n", drawable, fbo, GL_COLOR_ATTACHMENT0 + i, name );
     }
 
@@ -273,6 +293,18 @@ static GLuint create_framebuffer( struct opengl_drawable *drawable, const struct
     return fbo;
 }
 
+static void resize_texture( GLuint name, const struct wgl_pixel_format *desc, int width, int height )
+{
+    const struct opengl_funcs *funcs = &display_funcs;
+    GLuint prev;
+
+    funcs->p_glGetIntegerv( GL_TEXTURE_BINDING_2D, (GLint *)&prev );
+    funcs->p_glBindTexture( GL_TEXTURE_2D, name );
+    funcs->p_glTexImage2D( GL_TEXTURE_2D, 0, color_format_from_pfd( desc ), width, height, 0, format_from_pfd( desc ), GL_BYTE, NULL );
+    funcs->p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0 );
+    funcs->p_glBindTexture( GL_TEXTURE_2D, prev );
+}
+
 static void resize_framebuffer( struct opengl_drawable *drawable, const struct wgl_pixel_format *desc, GLuint fbo,
                                 int width, int height )
 {
@@ -286,7 +318,8 @@ static void resize_framebuffer( struct opengl_drawable *drawable, const struct w
     for (GLuint i = 0; i < count; i++)
     {
         funcs->p_glGetNamedFramebufferAttachmentParameteriv( fbo, GL_COLOR_ATTACHMENT0 + i, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, (GLint *)&name );
-        funcs->p_glNamedRenderbufferStorageMultisample( name, desc->samples, color_format_from_pfd( desc ), width, height );
+        if (desc->samples) funcs->p_glNamedRenderbufferStorageMultisample( name, desc->samples, color_format_from_pfd( desc ), width, height );
+        else resize_texture( name, desc, width, height );
         TRACE( "drawable %p/%u resized color buffer %#x/%u to %d,%d\n", drawable, fbo, GL_COLOR_ATTACHMENT0 + i, name, width, height );
     }
 
@@ -313,7 +346,8 @@ static void destroy_framebuffer( struct opengl_drawable *drawable, const struct 
     for (GLuint i = 0; i < count; i++)
     {
         funcs->p_glGetNamedFramebufferAttachmentParameteriv( fbo, GL_COLOR_ATTACHMENT0 + i, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, (GLint *)&name );
-        funcs->p_glDeleteRenderbuffers( 1, &name );
+        if (desc->samples) funcs->p_glDeleteRenderbuffers( 1, &name );
+        else resize_texture( name, desc, 1, 1 );
         TRACE( "drawable %p/%u destroyed color buffer %#x/%u\n", drawable, fbo, GL_COLOR_ATTACHMENT0 + i, name );
     }
 
@@ -2524,6 +2558,7 @@ static void display_funcs_init(void)
     USE_GL_FUNC(glNamedFramebufferDrawBuffer)
     USE_GL_FUNC(glNamedFramebufferReadBuffer)
     USE_GL_FUNC(glNamedFramebufferRenderbuffer)
+    USE_GL_FUNC(glNamedFramebufferTexture)
     USE_GL_FUNC(glNamedRenderbufferStorageMultisample)
 #undef USE_GL_FUNC
 
