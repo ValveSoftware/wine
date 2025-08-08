@@ -1701,6 +1701,20 @@ static BOOL context_sync_drawables( struct wgl_context *context, HDC draw_hdc, H
         if (old_draw) opengl_drawable_release( old_draw );
         if (old_read) opengl_drawable_release( old_read );
 
+        if (!context->reserved_textures)
+        {
+            GLuint dummy[WINE_OPENGL_RESERVED_TEXTURE0 - 1], textures[WINE_OPENGL_RESERVED_TEXTURE7 - WINE_OPENGL_RESERVED_TEXTURE0 + 1];
+            const struct opengl_funcs *funcs = &display_funcs;
+
+            /* create some reserved textures for internal usage */
+            funcs->p_glGenTextures( ARRAY_SIZE(dummy), dummy );
+            funcs->p_glCreateTextures( GL_TEXTURE_2D, ARRAY_SIZE(textures), textures );
+            assert( textures[0] == WINE_OPENGL_RESERVED_TEXTURE0 && textures[7] == WINE_OPENGL_RESERVED_TEXTURE7 );
+            funcs->p_glDeleteTextures( ARRAY_SIZE(dummy), dummy );
+
+            context->reserved_textures = TRUE;
+        }
+
         opengl_drawable_set_context( new_read, context );
         if (new_read != new_draw) opengl_drawable_set_context( new_draw, context );
 
@@ -2503,6 +2517,7 @@ static void display_funcs_init(void)
     USE_GL_FUNC(glCheckNamedFramebufferStatus)
     USE_GL_FUNC(glCreateFramebuffers)
     USE_GL_FUNC(glCreateRenderbuffers)
+    USE_GL_FUNC(glCreateTextures)
     USE_GL_FUNC(glDeleteFramebuffers)
     USE_GL_FUNC(glDeleteRenderbuffers)
     USE_GL_FUNC(glGetNamedFramebufferAttachmentParameteriv)

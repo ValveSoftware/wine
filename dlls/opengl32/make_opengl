@@ -277,6 +277,26 @@ my %map_default_fbo_thunks =
      "glNamedFramebufferSamplePositionsfvAMD" => [ "framebuffer" ],
      "glNamedFramebufferTextureMultiviewOVR" => [ "framebuffer" ],
     );
+my %textures_in_thunks =
+    (
+     "glAreTexturesResident" => "n",
+     "glAreTexturesResidentEXT" => "n",
+     "glBindImageTextures" => "count",
+     "glBindTextures" => "count",
+     "glDeleteTextures" => "n",
+     "glDeleteTexturesEXT" => "n",
+     "glPrioritizeTextures" => "n",
+     "glPrioritizeTexturesEXT" => "n",
+     "glPrioritizeTexturesxOES" => "n",
+     "glSignalSemaphoreEXT" => "numTextureBarriers",
+     "glWaitSemaphoreEXT" => "numTextureBarriers",
+    );
+my %textures_out_thunks =
+    (
+     "glCreateTextures" => "n",
+     "glGenTextures" => "n",
+     "glGenTexturesEXT" => "n",
+    );
 my %manual_wow64_wrappers =
     (
      "glBufferStorage" => 0,
@@ -449,6 +469,7 @@ sub generate_unix_thunk($$$$)
     my $invalidation = "";
     my $input_conv = "";
     my $output_conv = "";
+    my $has_texture = 0;
     my $call_args = "";
     my $ret_expr = "";
     my $use_dc = 0;
@@ -458,6 +479,7 @@ sub generate_unix_thunk($$$$)
     foreach my $arg (@{$func->[1]})
     {
         $need_lock = 1 if $arg->textContent() =~ /HGLRC|HPBUFFERARB/;
+        $has_texture = 1 if $arg->textContent() =~ /GLuint texture/;
     }
 
     $ret .= "static NTSTATUS ";
@@ -587,6 +609,16 @@ sub generate_unix_thunk($$$$)
         $ret .= "    if (!funcs->p_$name) return STATUS_NOT_IMPLEMENTED;\n";
     }
     $ret .= $input_conv;
+    $ret .= "    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );\n" if $has_texture;
+    if (defined $textures_in_thunks{$name})
+    {
+        my $textures = $is_wow64 ? "UlongToPtr(params->textures)" : "params->textures";
+        $ret .= "    if ($textures)\n";
+        $ret .= "    {\n";
+        $ret .= "        for (const GLuint *tex = $textures, *end = tex + params->$textures_in_thunks{$name}; tex != end; tex++)\n";
+        $ret .= "            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );\n";
+        $ret .= "    }\n";
+    }
     foreach my $arg (@{$map_default_fbo_thunks{$name}})
     {
         my $target = "GL_DRAW_FRAMEBUFFER";
@@ -615,6 +647,12 @@ sub generate_unix_thunk($$$$)
     $ret .= "    pthread_mutex_unlock( &wgl_lock );\n" if $need_lock;
     $ret .= "    set_current_fbo( $teb, params->target, params->framebuffer );\n" if $name =~ /glBindFramebuffer/;
     $ret .= "    pop_default_fbo( $teb );\n" if defined $hide_default_fbo_thunks{$name};
+    if (defined $textures_out_thunks{$name})
+    {
+        my $textures = $is_wow64 ? "UlongToPtr(params->textures)" : "params->textures";
+        $ret .= "    for (const GLuint *tex = $textures, *end = tex + params->$textures_out_thunks{$name}; tex != end; tex++) ";
+        $ret .= "assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );\n";
+    }
     if (defined $state_attrib_funcs{$name})
     {
         my $state_args = $state_attrib_funcs{$name};
@@ -1491,6 +1529,7 @@ print OUT "#endif\n\n";
 
 print OUT "#include <stdarg.h>\n";
 print OUT "#include <stddef.h>\n\n";
+print OUT "#include <assert.h>\n\n";
 
 print OUT "#include \"ntstatus.h\"\n";
 print OUT "#define WIN32_NO_STATUS\n";

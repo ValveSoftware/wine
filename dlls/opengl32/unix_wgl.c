@@ -445,6 +445,7 @@ static void update_handle_context( TEB *teb, HGLRC handle, struct wgl_handle *pt
         ctx->buffers = shared->buffers;
         ctx->buffers->ref++;
     }
+    ctx->base.reserved_textures = shared ? shared->base.reserved_textures : FALSE;
     ctx->share = (HGLRC)-1; /* initial shared context */
     copy_context_attributes( teb, funcs, handle, ctx, handle, ctx, ctx->used );
 }

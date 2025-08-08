@@ -7,6 +7,8 @@
 #include <stdarg.h>
 #include <stddef.h>
 
+#include <assert.h>
+
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
 #include "windef.h"
@@ -129,6 +131,11 @@ static NTSTATUS gl_glAreTexturesResident( void *args )
     struct glAreTexturesResident_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glAreTexturesResident) return STATUS_NOT_IMPLEMENTED;
+    if (params->textures)
+    {
+        for (const GLuint *tex = params->textures, *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     params->ret = funcs->p_glAreTexturesResident( params->n, params->textures, params->residences );
     return STATUS_SUCCESS;
 }
@@ -158,6 +165,7 @@ static NTSTATUS gl_glBindTexture( void *args )
     struct glBindTexture_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBindTexture) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindTexture( params->target, params->texture );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -701,6 +709,11 @@ static NTSTATUS gl_glDeleteTextures( void *args )
     struct glDeleteTextures_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glDeleteTextures) return STATUS_NOT_IMPLEMENTED;
+    if (params->textures)
+    {
+        for (const GLuint *tex = params->textures, *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glDeleteTextures( params->n, params->textures );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -1084,6 +1097,7 @@ static NTSTATUS gl_glGenTextures( void *args )
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGenTextures) return STATUS_NOT_IMPLEMENTED;
     funcs->p_glGenTextures( params->n, params->textures );
+    for (const GLuint *tex = params->textures, *end = tex + params->n; tex != end; tex++) assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
 }
@@ -1510,6 +1524,7 @@ static NTSTATUS gl_glIsTexture( void *args )
     struct glIsTexture_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glIsTexture) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glIsTexture( params->texture );
     return STATUS_SUCCESS;
 }
@@ -2129,6 +2144,11 @@ static NTSTATUS gl_glPrioritizeTextures( void *args )
     struct glPrioritizeTextures_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glPrioritizeTextures) return STATUS_NOT_IMPLEMENTED;
+    if (params->textures)
+    {
+        for (const GLuint *tex = params->textures, *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glPrioritizeTextures( params->n, params->textures, params->priorities );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -3583,6 +3603,11 @@ static NTSTATUS ext_glAreTexturesResidentEXT( void *args )
     struct glAreTexturesResidentEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glAreTexturesResidentEXT) return STATUS_NOT_IMPLEMENTED;
+    if (params->textures)
+    {
+        for (const GLuint *tex = params->textures, *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     params->ret = funcs->p_glAreTexturesResidentEXT( params->n, params->textures, params->residences );
     return STATUS_SUCCESS;
 }
@@ -4016,6 +4041,7 @@ static NTSTATUS ext_glBindImageTexture( void *args )
     struct glBindImageTexture_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBindImageTexture) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindImageTexture( params->unit, params->texture, params->level, params->layered, params->layer, params->access, params->format );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -4026,6 +4052,7 @@ static NTSTATUS ext_glBindImageTextureEXT( void *args )
     struct glBindImageTextureEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBindImageTextureEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindImageTextureEXT( params->index, params->texture, params->level, params->layered, params->layer, params->access, params->format );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -4036,6 +4063,11 @@ static NTSTATUS ext_glBindImageTextures( void *args )
     struct glBindImageTextures_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBindImageTextures) return STATUS_NOT_IMPLEMENTED;
+    if (params->textures)
+    {
+        for (const GLuint *tex = params->textures, *end = tex + params->count; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glBindImageTextures( params->first, params->count, params->textures );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -4066,6 +4098,7 @@ static NTSTATUS ext_glBindMultiTextureEXT( void *args )
     struct glBindMultiTextureEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBindMultiTextureEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindMultiTextureEXT( params->texunit, params->target, params->texture );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -4156,6 +4189,7 @@ static NTSTATUS ext_glBindShadingRateImageNV( void *args )
     struct glBindShadingRateImageNV_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBindShadingRateImageNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindShadingRateImageNV( params->texture );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -4176,6 +4210,7 @@ static NTSTATUS ext_glBindTextureEXT( void *args )
     struct glBindTextureEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBindTextureEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindTextureEXT( params->target, params->texture );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -4186,6 +4221,7 @@ static NTSTATUS ext_glBindTextureUnit( void *args )
     struct glBindTextureUnit_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBindTextureUnit) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindTextureUnit( params->unit, params->texture );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -4206,6 +4242,11 @@ static NTSTATUS ext_glBindTextures( void *args )
     struct glBindTextures_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBindTextures) return STATUS_NOT_IMPLEMENTED;
+    if (params->textures)
+    {
+        for (const GLuint *tex = params->textures, *end = tex + params->count; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glBindTextures( params->first, params->count, params->textures );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -4296,6 +4337,7 @@ static NTSTATUS ext_glBindVideoCaptureStreamTextureNV( void *args )
     struct glBindVideoCaptureStreamTextureNV_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBindVideoCaptureStreamTextureNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindVideoCaptureStreamTextureNV( params->video_capture_slot, params->stream, params->frame_region, params->target, params->texture );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -5174,6 +5216,7 @@ static NTSTATUS ext_glClearTexImage( void *args )
     struct glClearTexImage_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glClearTexImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glClearTexImage( params->texture, params->level, params->format, params->type, params->data );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -5184,6 +5227,7 @@ static NTSTATUS ext_glClearTexSubImage( void *args )
     struct glClearTexSubImage_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glClearTexSubImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glClearTexSubImage( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->format, params->type, params->data );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -5994,6 +6038,7 @@ static NTSTATUS ext_glCompressedTextureImage1DEXT( void *args )
     struct glCompressedTextureImage1DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCompressedTextureImage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureImage1DEXT( params->texture, params->target, params->level, params->internalformat, params->width, params->border, params->imageSize, params->bits );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6004,6 +6049,7 @@ static NTSTATUS ext_glCompressedTextureImage2DEXT( void *args )
     struct glCompressedTextureImage2DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCompressedTextureImage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureImage2DEXT( params->texture, params->target, params->level, params->internalformat, params->width, params->height, params->border, params->imageSize, params->bits );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6014,6 +6060,7 @@ static NTSTATUS ext_glCompressedTextureImage3DEXT( void *args )
     struct glCompressedTextureImage3DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCompressedTextureImage3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureImage3DEXT( params->texture, params->target, params->level, params->internalformat, params->width, params->height, params->depth, params->border, params->imageSize, params->bits );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6024,6 +6071,7 @@ static NTSTATUS ext_glCompressedTextureSubImage1D( void *args )
     struct glCompressedTextureSubImage1D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCompressedTextureSubImage1D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureSubImage1D( params->texture, params->level, params->xoffset, params->width, params->format, params->imageSize, params->data );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6034,6 +6082,7 @@ static NTSTATUS ext_glCompressedTextureSubImage1DEXT( void *args )
     struct glCompressedTextureSubImage1DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCompressedTextureSubImage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureSubImage1DEXT( params->texture, params->target, params->level, params->xoffset, params->width, params->format, params->imageSize, params->bits );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6044,6 +6093,7 @@ static NTSTATUS ext_glCompressedTextureSubImage2D( void *args )
     struct glCompressedTextureSubImage2D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCompressedTextureSubImage2D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureSubImage2D( params->texture, params->level, params->xoffset, params->yoffset, params->width, params->height, params->format, params->imageSize, params->data );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6054,6 +6104,7 @@ static NTSTATUS ext_glCompressedTextureSubImage2DEXT( void *args )
     struct glCompressedTextureSubImage2DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCompressedTextureSubImage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureSubImage2DEXT( params->texture, params->target, params->level, params->xoffset, params->yoffset, params->width, params->height, params->format, params->imageSize, params->bits );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6064,6 +6115,7 @@ static NTSTATUS ext_glCompressedTextureSubImage3D( void *args )
     struct glCompressedTextureSubImage3D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCompressedTextureSubImage3D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureSubImage3D( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->format, params->imageSize, params->data );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6074,6 +6126,7 @@ static NTSTATUS ext_glCompressedTextureSubImage3DEXT( void *args )
     struct glCompressedTextureSubImage3DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCompressedTextureSubImage3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureSubImage3DEXT( params->texture, params->target, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->format, params->imageSize, params->bits );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6486,6 +6539,7 @@ static NTSTATUS ext_glCopyTextureImage1DEXT( void *args )
     struct glCopyTextureImage1DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTextureImage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCopyTextureImage1DEXT( params->texture, params->target, params->level, params->internalformat, params->x, params->y, params->width, params->border );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6496,6 +6550,7 @@ static NTSTATUS ext_glCopyTextureImage2DEXT( void *args )
     struct glCopyTextureImage2DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTextureImage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCopyTextureImage2DEXT( params->texture, params->target, params->level, params->internalformat, params->x, params->y, params->width, params->height, params->border );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6506,6 +6561,7 @@ static NTSTATUS ext_glCopyTextureSubImage1D( void *args )
     struct glCopyTextureSubImage1D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTextureSubImage1D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     resolve_default_fbo( params->teb, TRUE );
     funcs->p_glCopyTextureSubImage1D( params->texture, params->level, params->xoffset, params->x, params->y, params->width );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
@@ -6517,6 +6573,7 @@ static NTSTATUS ext_glCopyTextureSubImage1DEXT( void *args )
     struct glCopyTextureSubImage1DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTextureSubImage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCopyTextureSubImage1DEXT( params->texture, params->target, params->level, params->xoffset, params->x, params->y, params->width );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6527,6 +6584,7 @@ static NTSTATUS ext_glCopyTextureSubImage2D( void *args )
     struct glCopyTextureSubImage2D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTextureSubImage2D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     resolve_default_fbo( params->teb, TRUE );
     funcs->p_glCopyTextureSubImage2D( params->texture, params->level, params->xoffset, params->yoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
@@ -6538,6 +6596,7 @@ static NTSTATUS ext_glCopyTextureSubImage2DEXT( void *args )
     struct glCopyTextureSubImage2DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTextureSubImage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCopyTextureSubImage2DEXT( params->texture, params->target, params->level, params->xoffset, params->yoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6548,6 +6607,7 @@ static NTSTATUS ext_glCopyTextureSubImage3D( void *args )
     struct glCopyTextureSubImage3D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTextureSubImage3D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     resolve_default_fbo( params->teb, TRUE );
     funcs->p_glCopyTextureSubImage3D( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
@@ -6559,6 +6619,7 @@ static NTSTATUS ext_glCopyTextureSubImage3DEXT( void *args )
     struct glCopyTextureSubImage3DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTextureSubImage3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCopyTextureSubImage3DEXT( params->texture, params->target, params->level, params->xoffset, params->yoffset, params->zoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6820,6 +6881,7 @@ static NTSTATUS ext_glCreateTextures( void *args )
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCreateTextures) return STATUS_NOT_IMPLEMENTED;
     funcs->p_glCreateTextures( params->target, params->n, params->textures );
+    for (const GLuint *tex = params->textures, *end = tex + params->n; tex != end; tex++) assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
 }
@@ -7329,6 +7391,11 @@ static NTSTATUS ext_glDeleteTexturesEXT( void *args )
     struct glDeleteTexturesEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glDeleteTexturesEXT) return STATUS_NOT_IMPLEMENTED;
+    if (params->textures)
+    {
+        for (const GLuint *tex = params->textures, *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glDeleteTexturesEXT( params->n, params->textures );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -8009,6 +8076,7 @@ static NTSTATUS ext_glDrawTextureNV( void *args )
     struct glDrawTextureNV_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glDrawTextureNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glDrawTextureNV( params->texture, params->sampler, params->x0, params->y0, params->x1, params->y1, params->z, params->s0, params->t0, params->s1, params->t1 );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -8089,6 +8157,7 @@ static NTSTATUS ext_glEGLImageTargetTextureStorageEXT( void *args )
     struct glEGLImageTargetTextureStorageEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glEGLImageTargetTextureStorageEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glEGLImageTargetTextureStorageEXT( params->texture, params->image, params->attrib_list );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -9123,6 +9192,7 @@ static NTSTATUS ext_glFramebufferTexture( void *args )
     struct glFramebufferTexture_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTexture) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTexture( params->target, params->attachment, params->texture, params->level );
     pop_default_fbo( params->teb );
@@ -9135,6 +9205,7 @@ static NTSTATUS ext_glFramebufferTexture1D( void *args )
     struct glFramebufferTexture1D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTexture1D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTexture1D( params->target, params->attachment, params->textarget, params->texture, params->level );
     pop_default_fbo( params->teb );
@@ -9147,6 +9218,7 @@ static NTSTATUS ext_glFramebufferTexture1DEXT( void *args )
     struct glFramebufferTexture1DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTexture1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTexture1DEXT( params->target, params->attachment, params->textarget, params->texture, params->level );
     pop_default_fbo( params->teb );
@@ -9159,6 +9231,7 @@ static NTSTATUS ext_glFramebufferTexture2D( void *args )
     struct glFramebufferTexture2D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTexture2D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTexture2D( params->target, params->attachment, params->textarget, params->texture, params->level );
     pop_default_fbo( params->teb );
@@ -9171,6 +9244,7 @@ static NTSTATUS ext_glFramebufferTexture2DEXT( void *args )
     struct glFramebufferTexture2DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTexture2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTexture2DEXT( params->target, params->attachment, params->textarget, params->texture, params->level );
     pop_default_fbo( params->teb );
@@ -9183,6 +9257,7 @@ static NTSTATUS ext_glFramebufferTexture3D( void *args )
     struct glFramebufferTexture3D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTexture3D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTexture3D( params->target, params->attachment, params->textarget, params->texture, params->level, params->zoffset );
     pop_default_fbo( params->teb );
@@ -9195,6 +9270,7 @@ static NTSTATUS ext_glFramebufferTexture3DEXT( void *args )
     struct glFramebufferTexture3DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTexture3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTexture3DEXT( params->target, params->attachment, params->textarget, params->texture, params->level, params->zoffset );
     pop_default_fbo( params->teb );
@@ -9207,6 +9283,7 @@ static NTSTATUS ext_glFramebufferTextureARB( void *args )
     struct glFramebufferTextureARB_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTextureARB) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTextureARB( params->target, params->attachment, params->texture, params->level );
     pop_default_fbo( params->teb );
@@ -9219,6 +9296,7 @@ static NTSTATUS ext_glFramebufferTextureEXT( void *args )
     struct glFramebufferTextureEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTextureEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTextureEXT( params->target, params->attachment, params->texture, params->level );
     pop_default_fbo( params->teb );
@@ -9231,6 +9309,7 @@ static NTSTATUS ext_glFramebufferTextureFaceARB( void *args )
     struct glFramebufferTextureFaceARB_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTextureFaceARB) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTextureFaceARB( params->target, params->attachment, params->texture, params->level, params->face );
     pop_default_fbo( params->teb );
@@ -9243,6 +9322,7 @@ static NTSTATUS ext_glFramebufferTextureFaceEXT( void *args )
     struct glFramebufferTextureFaceEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTextureFaceEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTextureFaceEXT( params->target, params->attachment, params->texture, params->level, params->face );
     pop_default_fbo( params->teb );
@@ -9255,6 +9335,7 @@ static NTSTATUS ext_glFramebufferTextureLayer( void *args )
     struct glFramebufferTextureLayer_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTextureLayer) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTextureLayer( params->target, params->attachment, params->texture, params->level, params->layer );
     pop_default_fbo( params->teb );
@@ -9267,6 +9348,7 @@ static NTSTATUS ext_glFramebufferTextureLayerARB( void *args )
     struct glFramebufferTextureLayerARB_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTextureLayerARB) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTextureLayerARB( params->target, params->attachment, params->texture, params->level, params->layer );
     pop_default_fbo( params->teb );
@@ -9279,6 +9361,7 @@ static NTSTATUS ext_glFramebufferTextureLayerEXT( void *args )
     struct glFramebufferTextureLayerEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTextureLayerEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTextureLayerEXT( params->target, params->attachment, params->texture, params->level, params->layer );
     pop_default_fbo( params->teb );
@@ -9291,6 +9374,7 @@ static NTSTATUS ext_glFramebufferTextureMultiviewOVR( void *args )
     struct glFramebufferTextureMultiviewOVR_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glFramebufferTextureMultiviewOVR) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( params->teb );
     funcs->p_glFramebufferTextureMultiviewOVR( params->target, params->attachment, params->texture, params->level, params->baseViewIndex, params->numViews );
     pop_default_fbo( params->teb );
@@ -9584,6 +9668,7 @@ static NTSTATUS ext_glGenTexturesEXT( void *args )
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGenTexturesEXT) return STATUS_NOT_IMPLEMENTED;
     funcs->p_glGenTexturesEXT( params->n, params->textures );
+    for (const GLuint *tex = params->textures, *end = tex + params->n; tex != end; tex++) assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
 }
@@ -9673,6 +9758,7 @@ static NTSTATUS ext_glGenerateTextureMipmap( void *args )
     struct glGenerateTextureMipmap_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGenerateTextureMipmap) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGenerateTextureMipmap( params->texture );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -9683,6 +9769,7 @@ static NTSTATUS ext_glGenerateTextureMipmapEXT( void *args )
     struct glGenerateTextureMipmapEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGenerateTextureMipmapEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGenerateTextureMipmapEXT( params->texture, params->target );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -10152,6 +10239,7 @@ static NTSTATUS ext_glGetCompressedTextureImage( void *args )
     struct glGetCompressedTextureImage_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetCompressedTextureImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetCompressedTextureImage( params->texture, params->level, params->bufSize, params->pixels );
     return STATUS_SUCCESS;
 }
@@ -10161,6 +10249,7 @@ static NTSTATUS ext_glGetCompressedTextureImageEXT( void *args )
     struct glGetCompressedTextureImageEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetCompressedTextureImageEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetCompressedTextureImageEXT( params->texture, params->target, params->lod, params->img );
     return STATUS_SUCCESS;
 }
@@ -10170,6 +10259,7 @@ static NTSTATUS ext_glGetCompressedTextureSubImage( void *args )
     struct glGetCompressedTextureSubImage_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetCompressedTextureSubImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetCompressedTextureSubImage( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->bufSize, params->pixels );
     return STATUS_SUCCESS;
 }
@@ -10615,6 +10705,7 @@ static NTSTATUS ext_glGetImageHandleARB( void *args )
     struct glGetImageHandleARB_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetImageHandleARB) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glGetImageHandleARB( params->texture, params->level, params->layered, params->layer, params->format );
     return STATUS_SUCCESS;
 }
@@ -10624,6 +10715,7 @@ static NTSTATUS ext_glGetImageHandleNV( void *args )
     struct glGetImageHandleNV_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetImageHandleNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glGetImageHandleNV( params->texture, params->level, params->layered, params->layer, params->format );
     return STATUS_SUCCESS;
 }
@@ -12438,6 +12530,7 @@ static NTSTATUS ext_glGetTextureHandleARB( void *args )
     struct glGetTextureHandleARB_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureHandleARB) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glGetTextureHandleARB( params->texture );
     return STATUS_SUCCESS;
 }
@@ -12447,6 +12540,7 @@ static NTSTATUS ext_glGetTextureHandleNV( void *args )
     struct glGetTextureHandleNV_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureHandleNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glGetTextureHandleNV( params->texture );
     return STATUS_SUCCESS;
 }
@@ -12456,6 +12550,7 @@ static NTSTATUS ext_glGetTextureImage( void *args )
     struct glGetTextureImage_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureImage( params->texture, params->level, params->format, params->type, params->bufSize, params->pixels );
     return STATUS_SUCCESS;
 }
@@ -12465,6 +12560,7 @@ static NTSTATUS ext_glGetTextureImageEXT( void *args )
     struct glGetTextureImageEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureImageEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureImageEXT( params->texture, params->target, params->level, params->format, params->type, params->pixels );
     return STATUS_SUCCESS;
 }
@@ -12474,6 +12570,7 @@ static NTSTATUS ext_glGetTextureLevelParameterfv( void *args )
     struct glGetTextureLevelParameterfv_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureLevelParameterfv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureLevelParameterfv( params->texture, params->level, params->pname, params->params );
     return STATUS_SUCCESS;
 }
@@ -12483,6 +12580,7 @@ static NTSTATUS ext_glGetTextureLevelParameterfvEXT( void *args )
     struct glGetTextureLevelParameterfvEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureLevelParameterfvEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureLevelParameterfvEXT( params->texture, params->target, params->level, params->pname, params->params );
     return STATUS_SUCCESS;
 }
@@ -12492,6 +12590,7 @@ static NTSTATUS ext_glGetTextureLevelParameteriv( void *args )
     struct glGetTextureLevelParameteriv_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureLevelParameteriv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureLevelParameteriv( params->texture, params->level, params->pname, params->params );
     return STATUS_SUCCESS;
 }
@@ -12501,6 +12600,7 @@ static NTSTATUS ext_glGetTextureLevelParameterivEXT( void *args )
     struct glGetTextureLevelParameterivEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureLevelParameterivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureLevelParameterivEXT( params->texture, params->target, params->level, params->pname, params->params );
     return STATUS_SUCCESS;
 }
@@ -12510,6 +12610,7 @@ static NTSTATUS ext_glGetTextureParameterIiv( void *args )
     struct glGetTextureParameterIiv_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureParameterIiv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterIiv( params->texture, params->pname, params->params );
     return STATUS_SUCCESS;
 }
@@ -12519,6 +12620,7 @@ static NTSTATUS ext_glGetTextureParameterIivEXT( void *args )
     struct glGetTextureParameterIivEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureParameterIivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterIivEXT( params->texture, params->target, params->pname, params->params );
     return STATUS_SUCCESS;
 }
@@ -12528,6 +12630,7 @@ static NTSTATUS ext_glGetTextureParameterIuiv( void *args )
     struct glGetTextureParameterIuiv_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureParameterIuiv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterIuiv( params->texture, params->pname, params->params );
     return STATUS_SUCCESS;
 }
@@ -12537,6 +12640,7 @@ static NTSTATUS ext_glGetTextureParameterIuivEXT( void *args )
     struct glGetTextureParameterIuivEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureParameterIuivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterIuivEXT( params->texture, params->target, params->pname, params->params );
     return STATUS_SUCCESS;
 }
@@ -12546,6 +12650,7 @@ static NTSTATUS ext_glGetTextureParameterfv( void *args )
     struct glGetTextureParameterfv_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureParameterfv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterfv( params->texture, params->pname, params->params );
     return STATUS_SUCCESS;
 }
@@ -12555,6 +12660,7 @@ static NTSTATUS ext_glGetTextureParameterfvEXT( void *args )
     struct glGetTextureParameterfvEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureParameterfvEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterfvEXT( params->texture, params->target, params->pname, params->params );
     return STATUS_SUCCESS;
 }
@@ -12564,6 +12670,7 @@ static NTSTATUS ext_glGetTextureParameteriv( void *args )
     struct glGetTextureParameteriv_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureParameteriv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameteriv( params->texture, params->pname, params->params );
     return STATUS_SUCCESS;
 }
@@ -12573,6 +12680,7 @@ static NTSTATUS ext_glGetTextureParameterivEXT( void *args )
     struct glGetTextureParameterivEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureParameterivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterivEXT( params->texture, params->target, params->pname, params->params );
     return STATUS_SUCCESS;
 }
@@ -12582,6 +12690,7 @@ static NTSTATUS ext_glGetTextureSamplerHandleARB( void *args )
     struct glGetTextureSamplerHandleARB_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureSamplerHandleARB) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glGetTextureSamplerHandleARB( params->texture, params->sampler );
     return STATUS_SUCCESS;
 }
@@ -12591,6 +12700,7 @@ static NTSTATUS ext_glGetTextureSamplerHandleNV( void *args )
     struct glGetTextureSamplerHandleNV_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureSamplerHandleNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glGetTextureSamplerHandleNV( params->texture, params->sampler );
     return STATUS_SUCCESS;
 }
@@ -12600,6 +12710,7 @@ static NTSTATUS ext_glGetTextureSubImage( void *args )
     struct glGetTextureSubImage_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glGetTextureSubImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureSubImage( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->format, params->type, params->bufSize, params->pixels );
     return STATUS_SUCCESS;
 }
@@ -14010,6 +14121,7 @@ static NTSTATUS ext_glInvalidateTexImage( void *args )
     struct glInvalidateTexImage_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glInvalidateTexImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glInvalidateTexImage( params->texture, params->level );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -14020,6 +14132,7 @@ static NTSTATUS ext_glInvalidateTexSubImage( void *args )
     struct glInvalidateTexSubImage_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glInvalidateTexSubImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glInvalidateTexSubImage( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -14345,6 +14458,7 @@ static NTSTATUS ext_glIsTextureEXT( void *args )
     struct glIsTextureEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glIsTextureEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glIsTextureEXT( params->texture );
     return STATUS_SUCCESS;
 }
@@ -15036,6 +15150,7 @@ static NTSTATUS ext_glMapTexture2DINTEL( void *args )
     struct glMapTexture2DINTEL_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glMapTexture2DINTEL) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glMapTexture2DINTEL( params->texture, params->level, params->access, params->stride, params->layout );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -17761,6 +17876,7 @@ static NTSTATUS ext_glNamedFramebufferTexture( void *args )
     struct glNamedFramebufferTexture_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glNamedFramebufferTexture) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTexture( params->framebuffer, params->attachment, params->texture, params->level );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -17771,6 +17887,7 @@ static NTSTATUS ext_glNamedFramebufferTexture1DEXT( void *args )
     struct glNamedFramebufferTexture1DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glNamedFramebufferTexture1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTexture1DEXT( params->framebuffer, params->attachment, params->textarget, params->texture, params->level );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -17781,6 +17898,7 @@ static NTSTATUS ext_glNamedFramebufferTexture2DEXT( void *args )
     struct glNamedFramebufferTexture2DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glNamedFramebufferTexture2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTexture2DEXT( params->framebuffer, params->attachment, params->textarget, params->texture, params->level );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -17791,6 +17909,7 @@ static NTSTATUS ext_glNamedFramebufferTexture3DEXT( void *args )
     struct glNamedFramebufferTexture3DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glNamedFramebufferTexture3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTexture3DEXT( params->framebuffer, params->attachment, params->textarget, params->texture, params->level, params->zoffset );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -17801,6 +17920,7 @@ static NTSTATUS ext_glNamedFramebufferTextureEXT( void *args )
     struct glNamedFramebufferTextureEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glNamedFramebufferTextureEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTextureEXT( params->framebuffer, params->attachment, params->texture, params->level );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -17811,6 +17931,7 @@ static NTSTATUS ext_glNamedFramebufferTextureFaceEXT( void *args )
     struct glNamedFramebufferTextureFaceEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glNamedFramebufferTextureFaceEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTextureFaceEXT( params->framebuffer, params->attachment, params->texture, params->level, params->face );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -17821,6 +17942,7 @@ static NTSTATUS ext_glNamedFramebufferTextureLayer( void *args )
     struct glNamedFramebufferTextureLayer_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glNamedFramebufferTextureLayer) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTextureLayer( params->framebuffer, params->attachment, params->texture, params->level, params->layer );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -17831,6 +17953,7 @@ static NTSTATUS ext_glNamedFramebufferTextureLayerEXT( void *args )
     struct glNamedFramebufferTextureLayerEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glNamedFramebufferTextureLayerEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTextureLayerEXT( params->framebuffer, params->attachment, params->texture, params->level, params->layer );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -17841,6 +17964,7 @@ static NTSTATUS ext_glNamedFramebufferTextureMultiviewOVR( void *args )
     struct glNamedFramebufferTextureMultiviewOVR_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glNamedFramebufferTextureMultiviewOVR) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     if (!params->framebuffer) params->framebuffer = get_default_fbo( params->teb, GL_DRAW_FRAMEBUFFER );
     funcs->p_glNamedFramebufferTextureMultiviewOVR( params->framebuffer, params->attachment, params->texture, params->level, params->baseViewIndex, params->numViews );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
@@ -19132,6 +19256,11 @@ static NTSTATUS ext_glPrioritizeTexturesEXT( void *args )
     struct glPrioritizeTexturesEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glPrioritizeTexturesEXT) return STATUS_NOT_IMPLEMENTED;
+    if (params->textures)
+    {
+        for (const GLuint *tex = params->textures, *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glPrioritizeTexturesEXT( params->n, params->textures, params->priorities );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -19142,6 +19271,11 @@ static NTSTATUS ext_glPrioritizeTexturesxOES( void *args )
     struct glPrioritizeTexturesxOES_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glPrioritizeTexturesxOES) return STATUS_NOT_IMPLEMENTED;
+    if (params->textures)
+    {
+        for (const GLuint *tex = params->textures, *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glPrioritizeTexturesxOES( params->n, params->textures, params->priorities );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -22522,6 +22656,11 @@ static NTSTATUS ext_glSignalSemaphoreEXT( void *args )
     struct glSignalSemaphoreEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glSignalSemaphoreEXT) return STATUS_NOT_IMPLEMENTED;
+    if (params->textures)
+    {
+        for (const GLuint *tex = params->textures, *end = tex + params->numTextureBarriers; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glSignalSemaphoreEXT( params->semaphore, params->numBufferBarriers, params->buffers, params->numTextureBarriers, params->textures, params->dstLayouts );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -22832,6 +22971,7 @@ static NTSTATUS ext_glSyncTextureINTEL( void *args )
     struct glSyncTextureINTEL_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glSyncTextureINTEL) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glSyncTextureINTEL( params->texture );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24032,6 +24172,7 @@ static NTSTATUS ext_glTextureAttachMemoryNV( void *args )
     struct glTextureAttachMemoryNV_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureAttachMemoryNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureAttachMemoryNV( params->texture, params->memory, params->offset );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24062,6 +24203,7 @@ static NTSTATUS ext_glTextureBuffer( void *args )
     struct glTextureBuffer_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureBuffer) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureBuffer( params->texture, params->internalformat, params->buffer );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24072,6 +24214,7 @@ static NTSTATUS ext_glTextureBufferEXT( void *args )
     struct glTextureBufferEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureBufferEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureBufferEXT( params->texture, params->target, params->internalformat, params->buffer );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24082,6 +24225,7 @@ static NTSTATUS ext_glTextureBufferRange( void *args )
     struct glTextureBufferRange_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureBufferRange) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureBufferRange( params->texture, params->internalformat, params->buffer, params->offset, params->size );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24092,6 +24236,7 @@ static NTSTATUS ext_glTextureBufferRangeEXT( void *args )
     struct glTextureBufferRangeEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureBufferRangeEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureBufferRangeEXT( params->texture, params->target, params->internalformat, params->buffer, params->offset, params->size );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24112,6 +24257,7 @@ static NTSTATUS ext_glTextureImage1DEXT( void *args )
     struct glTextureImage1DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureImage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage1DEXT( params->texture, params->target, params->level, params->internalformat, params->width, params->border, params->format, params->type, params->pixels );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24122,6 +24268,7 @@ static NTSTATUS ext_glTextureImage2DEXT( void *args )
     struct glTextureImage2DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureImage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage2DEXT( params->texture, params->target, params->level, params->internalformat, params->width, params->height, params->border, params->format, params->type, params->pixels );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24132,6 +24279,7 @@ static NTSTATUS ext_glTextureImage2DMultisampleCoverageNV( void *args )
     struct glTextureImage2DMultisampleCoverageNV_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureImage2DMultisampleCoverageNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage2DMultisampleCoverageNV( params->texture, params->target, params->coverageSamples, params->colorSamples, params->internalFormat, params->width, params->height, params->fixedSampleLocations );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24142,6 +24290,7 @@ static NTSTATUS ext_glTextureImage2DMultisampleNV( void *args )
     struct glTextureImage2DMultisampleNV_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureImage2DMultisampleNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage2DMultisampleNV( params->texture, params->target, params->samples, params->internalFormat, params->width, params->height, params->fixedSampleLocations );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24152,6 +24301,7 @@ static NTSTATUS ext_glTextureImage3DEXT( void *args )
     struct glTextureImage3DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureImage3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage3DEXT( params->texture, params->target, params->level, params->internalformat, params->width, params->height, params->depth, params->border, params->format, params->type, params->pixels );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24162,6 +24312,7 @@ static NTSTATUS ext_glTextureImage3DMultisampleCoverageNV( void *args )
     struct glTextureImage3DMultisampleCoverageNV_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureImage3DMultisampleCoverageNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage3DMultisampleCoverageNV( params->texture, params->target, params->coverageSamples, params->colorSamples, params->internalFormat, params->width, params->height, params->depth, params->fixedSampleLocations );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24172,6 +24323,7 @@ static NTSTATUS ext_glTextureImage3DMultisampleNV( void *args )
     struct glTextureImage3DMultisampleNV_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureImage3DMultisampleNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage3DMultisampleNV( params->texture, params->target, params->samples, params->internalFormat, params->width, params->height, params->depth, params->fixedSampleLocations );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24212,6 +24364,7 @@ static NTSTATUS ext_glTexturePageCommitmentEXT( void *args )
     struct glTexturePageCommitmentEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTexturePageCommitmentEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTexturePageCommitmentEXT( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->commit );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24222,6 +24375,7 @@ static NTSTATUS ext_glTexturePageCommitmentMemNV( void *args )
     struct glTexturePageCommitmentMemNV_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTexturePageCommitmentMemNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTexturePageCommitmentMemNV( params->texture, params->layer, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->memory, params->offset, params->commit );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24232,6 +24386,7 @@ static NTSTATUS ext_glTextureParameterIiv( void *args )
     struct glTextureParameterIiv_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureParameterIiv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterIiv( params->texture, params->pname, params->params );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24242,6 +24397,7 @@ static NTSTATUS ext_glTextureParameterIivEXT( void *args )
     struct glTextureParameterIivEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureParameterIivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterIivEXT( params->texture, params->target, params->pname, params->params );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24252,6 +24408,7 @@ static NTSTATUS ext_glTextureParameterIuiv( void *args )
     struct glTextureParameterIuiv_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureParameterIuiv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterIuiv( params->texture, params->pname, params->params );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24262,6 +24419,7 @@ static NTSTATUS ext_glTextureParameterIuivEXT( void *args )
     struct glTextureParameterIuivEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureParameterIuivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterIuivEXT( params->texture, params->target, params->pname, params->params );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24272,6 +24430,7 @@ static NTSTATUS ext_glTextureParameterf( void *args )
     struct glTextureParameterf_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureParameterf) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterf( params->texture, params->pname, params->param );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24282,6 +24441,7 @@ static NTSTATUS ext_glTextureParameterfEXT( void *args )
     struct glTextureParameterfEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureParameterfEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterfEXT( params->texture, params->target, params->pname, params->param );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24292,6 +24452,7 @@ static NTSTATUS ext_glTextureParameterfv( void *args )
     struct glTextureParameterfv_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureParameterfv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterfv( params->texture, params->pname, params->param );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24302,6 +24463,7 @@ static NTSTATUS ext_glTextureParameterfvEXT( void *args )
     struct glTextureParameterfvEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureParameterfvEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterfvEXT( params->texture, params->target, params->pname, params->params );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24312,6 +24474,7 @@ static NTSTATUS ext_glTextureParameteri( void *args )
     struct glTextureParameteri_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureParameteri) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameteri( params->texture, params->pname, params->param );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24322,6 +24485,7 @@ static NTSTATUS ext_glTextureParameteriEXT( void *args )
     struct glTextureParameteriEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureParameteriEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameteriEXT( params->texture, params->target, params->pname, params->param );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24332,6 +24496,7 @@ static NTSTATUS ext_glTextureParameteriv( void *args )
     struct glTextureParameteriv_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureParameteriv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameteriv( params->texture, params->pname, params->param );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24342,6 +24507,7 @@ static NTSTATUS ext_glTextureParameterivEXT( void *args )
     struct glTextureParameterivEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureParameterivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterivEXT( params->texture, params->target, params->pname, params->params );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24362,6 +24528,7 @@ static NTSTATUS ext_glTextureRenderbufferEXT( void *args )
     struct glTextureRenderbufferEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureRenderbufferEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureRenderbufferEXT( params->texture, params->target, params->renderbuffer );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24372,6 +24539,7 @@ static NTSTATUS ext_glTextureStorage1D( void *args )
     struct glTextureStorage1D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorage1D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage1D( params->texture, params->levels, params->internalformat, params->width );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24382,6 +24550,7 @@ static NTSTATUS ext_glTextureStorage1DEXT( void *args )
     struct glTextureStorage1DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage1DEXT( params->texture, params->target, params->levels, params->internalformat, params->width );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24392,6 +24561,7 @@ static NTSTATUS ext_glTextureStorage2D( void *args )
     struct glTextureStorage2D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorage2D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage2D( params->texture, params->levels, params->internalformat, params->width, params->height );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24402,6 +24572,7 @@ static NTSTATUS ext_glTextureStorage2DEXT( void *args )
     struct glTextureStorage2DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage2DEXT( params->texture, params->target, params->levels, params->internalformat, params->width, params->height );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24412,6 +24583,7 @@ static NTSTATUS ext_glTextureStorage2DMultisample( void *args )
     struct glTextureStorage2DMultisample_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorage2DMultisample) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage2DMultisample( params->texture, params->samples, params->internalformat, params->width, params->height, params->fixedsamplelocations );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24422,6 +24594,7 @@ static NTSTATUS ext_glTextureStorage2DMultisampleEXT( void *args )
     struct glTextureStorage2DMultisampleEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorage2DMultisampleEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage2DMultisampleEXT( params->texture, params->target, params->samples, params->internalformat, params->width, params->height, params->fixedsamplelocations );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24432,6 +24605,7 @@ static NTSTATUS ext_glTextureStorage3D( void *args )
     struct glTextureStorage3D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorage3D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage3D( params->texture, params->levels, params->internalformat, params->width, params->height, params->depth );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24442,6 +24616,7 @@ static NTSTATUS ext_glTextureStorage3DEXT( void *args )
     struct glTextureStorage3DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorage3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage3DEXT( params->texture, params->target, params->levels, params->internalformat, params->width, params->height, params->depth );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24452,6 +24627,7 @@ static NTSTATUS ext_glTextureStorage3DMultisample( void *args )
     struct glTextureStorage3DMultisample_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorage3DMultisample) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage3DMultisample( params->texture, params->samples, params->internalformat, params->width, params->height, params->depth, params->fixedsamplelocations );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24462,6 +24638,7 @@ static NTSTATUS ext_glTextureStorage3DMultisampleEXT( void *args )
     struct glTextureStorage3DMultisampleEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorage3DMultisampleEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage3DMultisampleEXT( params->texture, params->target, params->samples, params->internalformat, params->width, params->height, params->depth, params->fixedsamplelocations );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24472,6 +24649,7 @@ static NTSTATUS ext_glTextureStorageMem1DEXT( void *args )
     struct glTextureStorageMem1DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorageMem1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorageMem1DEXT( params->texture, params->levels, params->internalFormat, params->width, params->memory, params->offset );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24482,6 +24660,7 @@ static NTSTATUS ext_glTextureStorageMem2DEXT( void *args )
     struct glTextureStorageMem2DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorageMem2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorageMem2DEXT( params->texture, params->levels, params->internalFormat, params->width, params->height, params->memory, params->offset );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24492,6 +24671,7 @@ static NTSTATUS ext_glTextureStorageMem2DMultisampleEXT( void *args )
     struct glTextureStorageMem2DMultisampleEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorageMem2DMultisampleEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorageMem2DMultisampleEXT( params->texture, params->samples, params->internalFormat, params->width, params->height, params->fixedSampleLocations, params->memory, params->offset );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24502,6 +24682,7 @@ static NTSTATUS ext_glTextureStorageMem3DEXT( void *args )
     struct glTextureStorageMem3DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorageMem3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorageMem3DEXT( params->texture, params->levels, params->internalFormat, params->width, params->height, params->depth, params->memory, params->offset );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24512,6 +24693,7 @@ static NTSTATUS ext_glTextureStorageMem3DMultisampleEXT( void *args )
     struct glTextureStorageMem3DMultisampleEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorageMem3DMultisampleEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorageMem3DMultisampleEXT( params->texture, params->samples, params->internalFormat, params->width, params->height, params->depth, params->fixedSampleLocations, params->memory, params->offset );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24522,6 +24704,7 @@ static NTSTATUS ext_glTextureStorageSparseAMD( void *args )
     struct glTextureStorageSparseAMD_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureStorageSparseAMD) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorageSparseAMD( params->texture, params->target, params->internalFormat, params->width, params->height, params->depth, params->layers, params->flags );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24532,6 +24715,7 @@ static NTSTATUS ext_glTextureSubImage1D( void *args )
     struct glTextureSubImage1D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureSubImage1D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureSubImage1D( params->texture, params->level, params->xoffset, params->width, params->format, params->type, params->pixels );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24542,6 +24726,7 @@ static NTSTATUS ext_glTextureSubImage1DEXT( void *args )
     struct glTextureSubImage1DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureSubImage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureSubImage1DEXT( params->texture, params->target, params->level, params->xoffset, params->width, params->format, params->type, params->pixels );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24552,6 +24737,7 @@ static NTSTATUS ext_glTextureSubImage2D( void *args )
     struct glTextureSubImage2D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureSubImage2D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureSubImage2D( params->texture, params->level, params->xoffset, params->yoffset, params->width, params->height, params->format, params->type, params->pixels );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24562,6 +24748,7 @@ static NTSTATUS ext_glTextureSubImage2DEXT( void *args )
     struct glTextureSubImage2DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureSubImage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureSubImage2DEXT( params->texture, params->target, params->level, params->xoffset, params->yoffset, params->width, params->height, params->format, params->type, params->pixels );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24572,6 +24759,7 @@ static NTSTATUS ext_glTextureSubImage3D( void *args )
     struct glTextureSubImage3D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureSubImage3D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureSubImage3D( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->format, params->type, params->pixels );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24582,6 +24770,7 @@ static NTSTATUS ext_glTextureSubImage3DEXT( void *args )
     struct glTextureSubImage3DEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureSubImage3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureSubImage3DEXT( params->texture, params->target, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->format, params->type, params->pixels );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -24592,6 +24781,7 @@ static NTSTATUS ext_glTextureView( void *args )
     struct glTextureView_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glTextureView) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureView( params->texture, params->target, params->origtexture, params->internalformat, params->minlevel, params->numlevels, params->minlayer, params->numlayers );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -25952,6 +26142,7 @@ static NTSTATUS ext_glUnmapTexture2DINTEL( void *args )
     struct glUnmapTexture2DINTEL_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glUnmapTexture2DINTEL) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glUnmapTexture2DINTEL( params->texture, params->level );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -29572,6 +29763,11 @@ static NTSTATUS ext_glWaitSemaphoreEXT( void *args )
     struct glWaitSemaphoreEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glWaitSemaphoreEXT) return STATUS_NOT_IMPLEMENTED;
+    if (params->textures)
+    {
+        for (const GLuint *tex = params->textures, *end = tex + params->numTextureBarriers; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glWaitSemaphoreEXT( params->semaphore, params->numBufferBarriers, params->buffers, params->numTextureBarriers, params->textures, params->srcLayouts );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -33805,6 +34001,11 @@ static NTSTATUS wow64_gl_glAreTexturesResident( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glAreTexturesResident) return STATUS_NOT_IMPLEMENTED;
+    if (UlongToPtr(params->textures))
+    {
+        for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     params->ret = funcs->p_glAreTexturesResident( params->n, ULongToPtr(params->textures), ULongToPtr(params->residences) );
     return STATUS_SUCCESS;
 }
@@ -33850,6 +34051,7 @@ static NTSTATUS wow64_gl_glBindTexture( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBindTexture) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindTexture( params->target, params->texture );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -34757,6 +34959,11 @@ static NTSTATUS wow64_gl_glDeleteTextures( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glDeleteTextures) return STATUS_NOT_IMPLEMENTED;
+    if (UlongToPtr(params->textures))
+    {
+        for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glDeleteTextures( params->n, ULongToPtr(params->textures) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -35364,6 +35571,7 @@ static NTSTATUS wow64_gl_glGenTextures( void *args )
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGenTextures) return STATUS_NOT_IMPLEMENTED;
     funcs->p_glGenTextures( params->n, ULongToPtr(params->textures) );
+    for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->n; tex != end; tex++) assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
 }
@@ -36083,6 +36291,7 @@ static NTSTATUS wow64_gl_glIsTexture( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glIsTexture) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glIsTexture( params->texture );
     return STATUS_SUCCESS;
 }
@@ -37103,6 +37312,11 @@ static NTSTATUS wow64_gl_glPrioritizeTextures( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glPrioritizeTextures) return STATUS_NOT_IMPLEMENTED;
+    if (UlongToPtr(params->textures))
+    {
+        for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glPrioritizeTextures( params->n, ULongToPtr(params->textures), ULongToPtr(params->priorities) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -39506,6 +39720,11 @@ static NTSTATUS wow64_ext_glAreTexturesResidentEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glAreTexturesResidentEXT) return STATUS_NOT_IMPLEMENTED;
+    if (UlongToPtr(params->textures))
+    {
+        for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     params->ret = funcs->p_glAreTexturesResidentEXT( params->n, ULongToPtr(params->textures), ULongToPtr(params->residences) );
     return STATUS_SUCCESS;
 }
@@ -40260,6 +40479,7 @@ static NTSTATUS wow64_ext_glBindImageTexture( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBindImageTexture) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindImageTexture( params->unit, params->texture, params->level, params->layered, params->layer, params->access, params->format );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -40281,6 +40501,7 @@ static NTSTATUS wow64_ext_glBindImageTextureEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBindImageTextureEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindImageTextureEXT( params->index, params->texture, params->level, params->layered, params->layer, params->access, params->format );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -40298,6 +40519,11 @@ static NTSTATUS wow64_ext_glBindImageTextures( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBindImageTextures) return STATUS_NOT_IMPLEMENTED;
+    if (UlongToPtr(params->textures))
+    {
+        for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->count; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glBindImageTextures( params->first, params->count, ULongToPtr(params->textures) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -40349,6 +40575,7 @@ static NTSTATUS wow64_ext_glBindMultiTextureEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBindMultiTextureEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindMultiTextureEXT( params->texunit, params->target, params->texture );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -40492,6 +40719,7 @@ static NTSTATUS wow64_ext_glBindShadingRateImageNV( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBindShadingRateImageNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindShadingRateImageNV( params->texture );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -40526,6 +40754,7 @@ static NTSTATUS wow64_ext_glBindTextureEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBindTextureEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindTextureEXT( params->target, params->texture );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -40542,6 +40771,7 @@ static NTSTATUS wow64_ext_glBindTextureUnit( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBindTextureUnit) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindTextureUnit( params->unit, params->texture );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -40576,6 +40806,11 @@ static NTSTATUS wow64_ext_glBindTextures( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBindTextures) return STATUS_NOT_IMPLEMENTED;
+    if (UlongToPtr(params->textures))
+    {
+        for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->count; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glBindTextures( params->first, params->count, ULongToPtr(params->textures) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -40730,6 +40965,7 @@ static NTSTATUS wow64_ext_glBindVideoCaptureStreamTextureNV( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBindVideoCaptureStreamTextureNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glBindVideoCaptureStreamTextureNV( params->video_capture_slot, params->stream, params->frame_region, params->target, params->texture );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -42302,6 +42538,7 @@ static NTSTATUS wow64_ext_glClearTexImage( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glClearTexImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glClearTexImage( params->texture, params->level, params->format, params->type, ULongToPtr(params->data) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -42327,6 +42564,7 @@ static NTSTATUS wow64_ext_glClearTexSubImage( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glClearTexSubImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glClearTexSubImage( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->format, params->type, ULongToPtr(params->data) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -43848,6 +44086,7 @@ static NTSTATUS wow64_ext_glCompressedTextureImage1DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCompressedTextureImage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureImage1DEXT( params->texture, params->target, params->level, params->internalformat, params->width, params->border, params->imageSize, ULongToPtr(params->bits) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -43871,6 +44110,7 @@ static NTSTATUS wow64_ext_glCompressedTextureImage2DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCompressedTextureImage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureImage2DEXT( params->texture, params->target, params->level, params->internalformat, params->width, params->height, params->border, params->imageSize, ULongToPtr(params->bits) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -43895,6 +44135,7 @@ static NTSTATUS wow64_ext_glCompressedTextureImage3DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCompressedTextureImage3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureImage3DEXT( params->texture, params->target, params->level, params->internalformat, params->width, params->height, params->depth, params->border, params->imageSize, ULongToPtr(params->bits) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -43916,6 +44157,7 @@ static NTSTATUS wow64_ext_glCompressedTextureSubImage1D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCompressedTextureSubImage1D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureSubImage1D( params->texture, params->level, params->xoffset, params->width, params->format, params->imageSize, ULongToPtr(params->data) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -43938,6 +44180,7 @@ static NTSTATUS wow64_ext_glCompressedTextureSubImage1DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCompressedTextureSubImage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureSubImage1DEXT( params->texture, params->target, params->level, params->xoffset, params->width, params->format, params->imageSize, ULongToPtr(params->bits) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -43961,6 +44204,7 @@ static NTSTATUS wow64_ext_glCompressedTextureSubImage2D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCompressedTextureSubImage2D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureSubImage2D( params->texture, params->level, params->xoffset, params->yoffset, params->width, params->height, params->format, params->imageSize, ULongToPtr(params->data) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -43985,6 +44229,7 @@ static NTSTATUS wow64_ext_glCompressedTextureSubImage2DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCompressedTextureSubImage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureSubImage2DEXT( params->texture, params->target, params->level, params->xoffset, params->yoffset, params->width, params->height, params->format, params->imageSize, ULongToPtr(params->bits) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -44010,6 +44255,7 @@ static NTSTATUS wow64_ext_glCompressedTextureSubImage3D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCompressedTextureSubImage3D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureSubImage3D( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->format, params->imageSize, ULongToPtr(params->data) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -44036,6 +44282,7 @@ static NTSTATUS wow64_ext_glCompressedTextureSubImage3DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCompressedTextureSubImage3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCompressedTextureSubImage3DEXT( params->texture, params->target, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->format, params->imageSize, ULongToPtr(params->bits) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -44854,6 +45101,7 @@ static NTSTATUS wow64_ext_glCopyTextureImage1DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTextureImage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCopyTextureImage1DEXT( params->texture, params->target, params->level, params->internalformat, params->x, params->y, params->width, params->border );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -44877,6 +45125,7 @@ static NTSTATUS wow64_ext_glCopyTextureImage2DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTextureImage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCopyTextureImage2DEXT( params->texture, params->target, params->level, params->internalformat, params->x, params->y, params->width, params->height, params->border );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -44897,6 +45146,7 @@ static NTSTATUS wow64_ext_glCopyTextureSubImage1D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTextureSubImage1D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     resolve_default_fbo( teb, TRUE );
     funcs->p_glCopyTextureSubImage1D( params->texture, params->level, params->xoffset, params->x, params->y, params->width );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
@@ -44919,6 +45169,7 @@ static NTSTATUS wow64_ext_glCopyTextureSubImage1DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTextureSubImage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCopyTextureSubImage1DEXT( params->texture, params->target, params->level, params->xoffset, params->x, params->y, params->width );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -44941,6 +45192,7 @@ static NTSTATUS wow64_ext_glCopyTextureSubImage2D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTextureSubImage2D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     resolve_default_fbo( teb, TRUE );
     funcs->p_glCopyTextureSubImage2D( params->texture, params->level, params->xoffset, params->yoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
@@ -44965,6 +45217,7 @@ static NTSTATUS wow64_ext_glCopyTextureSubImage2DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTextureSubImage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCopyTextureSubImage2DEXT( params->texture, params->target, params->level, params->xoffset, params->yoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -44988,6 +45241,7 @@ static NTSTATUS wow64_ext_glCopyTextureSubImage3D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTextureSubImage3D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     resolve_default_fbo( teb, TRUE );
     funcs->p_glCopyTextureSubImage3D( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
@@ -45013,6 +45267,7 @@ static NTSTATUS wow64_ext_glCopyTextureSubImage3DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTextureSubImage3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glCopyTextureSubImage3DEXT( params->texture, params->target, params->level, params->xoffset, params->yoffset, params->zoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -45442,6 +45697,7 @@ static NTSTATUS wow64_ext_glCreateTextures( void *args )
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCreateTextures) return STATUS_NOT_IMPLEMENTED;
     funcs->p_glCreateTextures( params->target, params->n, ULongToPtr(params->textures) );
+    for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->n; tex != end; tex++) assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
 }
@@ -46296,6 +46552,11 @@ static NTSTATUS wow64_ext_glDeleteTexturesEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glDeleteTexturesEXT) return STATUS_NOT_IMPLEMENTED;
+    if (UlongToPtr(params->textures))
+    {
+        for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glDeleteTexturesEXT( params->n, ULongToPtr(params->textures) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -47477,6 +47738,7 @@ static NTSTATUS wow64_ext_glDrawTextureNV( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glDrawTextureNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glDrawTextureNV( params->texture, params->sampler, params->x0, params->y0, params->x1, params->y1, params->z, params->s0, params->t0, params->s1, params->t1 );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -47620,6 +47882,7 @@ static NTSTATUS wow64_ext_glEGLImageTargetTextureStorageEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glEGLImageTargetTextureStorageEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glEGLImageTargetTextureStorageEXT( params->texture, ULongToPtr(params->image), ULongToPtr(params->attrib_list) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -49245,6 +49508,7 @@ static NTSTATUS wow64_ext_glFramebufferTexture( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTexture) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTexture( params->target, params->attachment, params->texture, params->level );
     pop_default_fbo( teb );
@@ -49266,6 +49530,7 @@ static NTSTATUS wow64_ext_glFramebufferTexture1D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTexture1D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTexture1D( params->target, params->attachment, params->textarget, params->texture, params->level );
     pop_default_fbo( teb );
@@ -49287,6 +49552,7 @@ static NTSTATUS wow64_ext_glFramebufferTexture1DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTexture1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTexture1DEXT( params->target, params->attachment, params->textarget, params->texture, params->level );
     pop_default_fbo( teb );
@@ -49308,6 +49574,7 @@ static NTSTATUS wow64_ext_glFramebufferTexture2D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTexture2D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTexture2D( params->target, params->attachment, params->textarget, params->texture, params->level );
     pop_default_fbo( teb );
@@ -49329,6 +49596,7 @@ static NTSTATUS wow64_ext_glFramebufferTexture2DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTexture2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTexture2DEXT( params->target, params->attachment, params->textarget, params->texture, params->level );
     pop_default_fbo( teb );
@@ -49351,6 +49619,7 @@ static NTSTATUS wow64_ext_glFramebufferTexture3D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTexture3D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTexture3D( params->target, params->attachment, params->textarget, params->texture, params->level, params->zoffset );
     pop_default_fbo( teb );
@@ -49373,6 +49642,7 @@ static NTSTATUS wow64_ext_glFramebufferTexture3DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTexture3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTexture3DEXT( params->target, params->attachment, params->textarget, params->texture, params->level, params->zoffset );
     pop_default_fbo( teb );
@@ -49393,6 +49663,7 @@ static NTSTATUS wow64_ext_glFramebufferTextureARB( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTextureARB) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTextureARB( params->target, params->attachment, params->texture, params->level );
     pop_default_fbo( teb );
@@ -49413,6 +49684,7 @@ static NTSTATUS wow64_ext_glFramebufferTextureEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTextureEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTextureEXT( params->target, params->attachment, params->texture, params->level );
     pop_default_fbo( teb );
@@ -49434,6 +49706,7 @@ static NTSTATUS wow64_ext_glFramebufferTextureFaceARB( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTextureFaceARB) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTextureFaceARB( params->target, params->attachment, params->texture, params->level, params->face );
     pop_default_fbo( teb );
@@ -49455,6 +49728,7 @@ static NTSTATUS wow64_ext_glFramebufferTextureFaceEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTextureFaceEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTextureFaceEXT( params->target, params->attachment, params->texture, params->level, params->face );
     pop_default_fbo( teb );
@@ -49476,6 +49750,7 @@ static NTSTATUS wow64_ext_glFramebufferTextureLayer( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTextureLayer) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTextureLayer( params->target, params->attachment, params->texture, params->level, params->layer );
     pop_default_fbo( teb );
@@ -49497,6 +49772,7 @@ static NTSTATUS wow64_ext_glFramebufferTextureLayerARB( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTextureLayerARB) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTextureLayerARB( params->target, params->attachment, params->texture, params->level, params->layer );
     pop_default_fbo( teb );
@@ -49518,6 +49794,7 @@ static NTSTATUS wow64_ext_glFramebufferTextureLayerEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTextureLayerEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTextureLayerEXT( params->target, params->attachment, params->texture, params->level, params->layer );
     pop_default_fbo( teb );
@@ -49540,6 +49817,7 @@ static NTSTATUS wow64_ext_glFramebufferTextureMultiviewOVR( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glFramebufferTextureMultiviewOVR) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     push_default_fbo( teb );
     funcs->p_glFramebufferTextureMultiviewOVR( params->target, params->attachment, params->texture, params->level, params->baseViewIndex, params->numViews );
     pop_default_fbo( teb );
@@ -50026,6 +50304,7 @@ static NTSTATUS wow64_ext_glGenTexturesEXT( void *args )
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGenTexturesEXT) return STATUS_NOT_IMPLEMENTED;
     funcs->p_glGenTexturesEXT( params->n, ULongToPtr(params->textures) );
+    for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->n; tex != end; tex++) assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
 }
@@ -50166,6 +50445,7 @@ static NTSTATUS wow64_ext_glGenerateTextureMipmap( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGenerateTextureMipmap) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGenerateTextureMipmap( params->texture );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -50182,6 +50462,7 @@ static NTSTATUS wow64_ext_glGenerateTextureMipmapEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGenerateTextureMipmapEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGenerateTextureMipmapEXT( params->texture, params->target );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -51062,6 +51343,7 @@ static NTSTATUS wow64_ext_glGetCompressedTextureImage( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetCompressedTextureImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetCompressedTextureImage( params->texture, params->level, params->bufSize, ULongToPtr(params->pixels) );
     return STATUS_SUCCESS;
 }
@@ -51079,6 +51361,7 @@ static NTSTATUS wow64_ext_glGetCompressedTextureImageEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetCompressedTextureImageEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetCompressedTextureImageEXT( params->texture, params->target, params->lod, ULongToPtr(params->img) );
     return STATUS_SUCCESS;
 }
@@ -51102,6 +51385,7 @@ static NTSTATUS wow64_ext_glGetCompressedTextureSubImage( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetCompressedTextureSubImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetCompressedTextureSubImage( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->bufSize, ULongToPtr(params->pixels) );
     return STATUS_SUCCESS;
 }
@@ -51908,6 +52192,7 @@ static NTSTATUS wow64_ext_glGetImageHandleARB( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetImageHandleARB) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glGetImageHandleARB( params->texture, params->level, params->layered, params->layer, params->format );
     return STATUS_SUCCESS;
 }
@@ -51927,6 +52212,7 @@ static NTSTATUS wow64_ext_glGetImageHandleNV( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetImageHandleNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glGetImageHandleNV( params->texture, params->level, params->layered, params->layer, params->format );
     return STATUS_SUCCESS;
 }
@@ -55267,6 +55553,7 @@ static NTSTATUS wow64_ext_glGetTextureHandleARB( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureHandleARB) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glGetTextureHandleARB( params->texture );
     return STATUS_SUCCESS;
 }
@@ -55282,6 +55569,7 @@ static NTSTATUS wow64_ext_glGetTextureHandleNV( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureHandleNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glGetTextureHandleNV( params->texture );
     return STATUS_SUCCESS;
 }
@@ -55301,6 +55589,7 @@ static NTSTATUS wow64_ext_glGetTextureImage( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureImage( params->texture, params->level, params->format, params->type, params->bufSize, ULongToPtr(params->pixels) );
     return STATUS_SUCCESS;
 }
@@ -55320,6 +55609,7 @@ static NTSTATUS wow64_ext_glGetTextureImageEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureImageEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureImageEXT( params->texture, params->target, params->level, params->format, params->type, ULongToPtr(params->pixels) );
     return STATUS_SUCCESS;
 }
@@ -55337,6 +55627,7 @@ static NTSTATUS wow64_ext_glGetTextureLevelParameterfv( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureLevelParameterfv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureLevelParameterfv( params->texture, params->level, params->pname, ULongToPtr(params->params) );
     return STATUS_SUCCESS;
 }
@@ -55355,6 +55646,7 @@ static NTSTATUS wow64_ext_glGetTextureLevelParameterfvEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureLevelParameterfvEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureLevelParameterfvEXT( params->texture, params->target, params->level, params->pname, ULongToPtr(params->params) );
     return STATUS_SUCCESS;
 }
@@ -55372,6 +55664,7 @@ static NTSTATUS wow64_ext_glGetTextureLevelParameteriv( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureLevelParameteriv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureLevelParameteriv( params->texture, params->level, params->pname, ULongToPtr(params->params) );
     return STATUS_SUCCESS;
 }
@@ -55390,6 +55683,7 @@ static NTSTATUS wow64_ext_glGetTextureLevelParameterivEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureLevelParameterivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureLevelParameterivEXT( params->texture, params->target, params->level, params->pname, ULongToPtr(params->params) );
     return STATUS_SUCCESS;
 }
@@ -55406,6 +55700,7 @@ static NTSTATUS wow64_ext_glGetTextureParameterIiv( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureParameterIiv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterIiv( params->texture, params->pname, ULongToPtr(params->params) );
     return STATUS_SUCCESS;
 }
@@ -55423,6 +55718,7 @@ static NTSTATUS wow64_ext_glGetTextureParameterIivEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureParameterIivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterIivEXT( params->texture, params->target, params->pname, ULongToPtr(params->params) );
     return STATUS_SUCCESS;
 }
@@ -55439,6 +55735,7 @@ static NTSTATUS wow64_ext_glGetTextureParameterIuiv( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureParameterIuiv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterIuiv( params->texture, params->pname, ULongToPtr(params->params) );
     return STATUS_SUCCESS;
 }
@@ -55456,6 +55753,7 @@ static NTSTATUS wow64_ext_glGetTextureParameterIuivEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureParameterIuivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterIuivEXT( params->texture, params->target, params->pname, ULongToPtr(params->params) );
     return STATUS_SUCCESS;
 }
@@ -55472,6 +55770,7 @@ static NTSTATUS wow64_ext_glGetTextureParameterfv( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureParameterfv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterfv( params->texture, params->pname, ULongToPtr(params->params) );
     return STATUS_SUCCESS;
 }
@@ -55489,6 +55788,7 @@ static NTSTATUS wow64_ext_glGetTextureParameterfvEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureParameterfvEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterfvEXT( params->texture, params->target, params->pname, ULongToPtr(params->params) );
     return STATUS_SUCCESS;
 }
@@ -55505,6 +55805,7 @@ static NTSTATUS wow64_ext_glGetTextureParameteriv( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureParameteriv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameteriv( params->texture, params->pname, ULongToPtr(params->params) );
     return STATUS_SUCCESS;
 }
@@ -55522,6 +55823,7 @@ static NTSTATUS wow64_ext_glGetTextureParameterivEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureParameterivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureParameterivEXT( params->texture, params->target, params->pname, ULongToPtr(params->params) );
     return STATUS_SUCCESS;
 }
@@ -55538,6 +55840,7 @@ static NTSTATUS wow64_ext_glGetTextureSamplerHandleARB( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureSamplerHandleARB) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glGetTextureSamplerHandleARB( params->texture, params->sampler );
     return STATUS_SUCCESS;
 }
@@ -55554,6 +55857,7 @@ static NTSTATUS wow64_ext_glGetTextureSamplerHandleNV( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureSamplerHandleNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glGetTextureSamplerHandleNV( params->texture, params->sampler );
     return STATUS_SUCCESS;
 }
@@ -55579,6 +55883,7 @@ static NTSTATUS wow64_ext_glGetTextureSubImage( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glGetTextureSubImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glGetTextureSubImage( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->format, params->type, params->bufSize, ULongToPtr(params->pixels) );
     return STATUS_SUCCESS;
 }
@@ -58090,6 +58395,7 @@ static NTSTATUS wow64_ext_glInvalidateTexImage( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glInvalidateTexImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glInvalidateTexImage( params->texture, params->level );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -58112,6 +58418,7 @@ static NTSTATUS wow64_ext_glInvalidateTexSubImage( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glInvalidateTexSubImage) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glInvalidateTexSubImage( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -58664,6 +58971,7 @@ static NTSTATUS wow64_ext_glIsTextureEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glIsTextureEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     params->ret = funcs->p_glIsTextureEXT( params->texture );
     return STATUS_SUCCESS;
 }
@@ -64631,6 +64939,7 @@ static NTSTATUS wow64_ext_glNamedFramebufferTexture( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glNamedFramebufferTexture) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTexture( params->framebuffer, params->attachment, params->texture, params->level );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -64650,6 +64959,7 @@ static NTSTATUS wow64_ext_glNamedFramebufferTexture1DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glNamedFramebufferTexture1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTexture1DEXT( params->framebuffer, params->attachment, params->textarget, params->texture, params->level );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -64669,6 +64979,7 @@ static NTSTATUS wow64_ext_glNamedFramebufferTexture2DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glNamedFramebufferTexture2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTexture2DEXT( params->framebuffer, params->attachment, params->textarget, params->texture, params->level );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -64689,6 +65000,7 @@ static NTSTATUS wow64_ext_glNamedFramebufferTexture3DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glNamedFramebufferTexture3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTexture3DEXT( params->framebuffer, params->attachment, params->textarget, params->texture, params->level, params->zoffset );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -64707,6 +65019,7 @@ static NTSTATUS wow64_ext_glNamedFramebufferTextureEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glNamedFramebufferTextureEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTextureEXT( params->framebuffer, params->attachment, params->texture, params->level );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -64726,6 +65039,7 @@ static NTSTATUS wow64_ext_glNamedFramebufferTextureFaceEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glNamedFramebufferTextureFaceEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTextureFaceEXT( params->framebuffer, params->attachment, params->texture, params->level, params->face );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -64745,6 +65059,7 @@ static NTSTATUS wow64_ext_glNamedFramebufferTextureLayer( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glNamedFramebufferTextureLayer) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTextureLayer( params->framebuffer, params->attachment, params->texture, params->level, params->layer );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -64764,6 +65079,7 @@ static NTSTATUS wow64_ext_glNamedFramebufferTextureLayerEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glNamedFramebufferTextureLayerEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glNamedFramebufferTextureLayerEXT( params->framebuffer, params->attachment, params->texture, params->level, params->layer );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -64784,6 +65100,7 @@ static NTSTATUS wow64_ext_glNamedFramebufferTextureMultiviewOVR( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glNamedFramebufferTextureMultiviewOVR) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     if (!params->framebuffer) params->framebuffer = get_default_fbo( teb, GL_DRAW_FRAMEBUFFER );
     funcs->p_glNamedFramebufferTextureMultiviewOVR( params->framebuffer, params->attachment, params->texture, params->level, params->baseViewIndex, params->numViews );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
@@ -67033,6 +67350,11 @@ static NTSTATUS wow64_ext_glPrioritizeTexturesEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glPrioritizeTexturesEXT) return STATUS_NOT_IMPLEMENTED;
+    if (UlongToPtr(params->textures))
+    {
+        for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glPrioritizeTexturesEXT( params->n, ULongToPtr(params->textures), ULongToPtr(params->priorities) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -67050,6 +67372,11 @@ static NTSTATUS wow64_ext_glPrioritizeTexturesxOES( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glPrioritizeTexturesxOES) return STATUS_NOT_IMPLEMENTED;
+    if (UlongToPtr(params->textures))
+    {
+        for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->n; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glPrioritizeTexturesxOES( params->n, ULongToPtr(params->textures), ULongToPtr(params->priorities) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -73031,6 +73358,11 @@ static NTSTATUS wow64_ext_glSignalSemaphoreEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glSignalSemaphoreEXT) return STATUS_NOT_IMPLEMENTED;
+    if (UlongToPtr(params->textures))
+    {
+        for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->numTextureBarriers; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glSignalSemaphoreEXT( params->semaphore, params->numBufferBarriers, ULongToPtr(params->buffers), params->numTextureBarriers, ULongToPtr(params->textures), ULongToPtr(params->dstLayouts) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -73573,6 +73905,7 @@ static NTSTATUS wow64_ext_glSyncTextureINTEL( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glSyncTextureINTEL) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glSyncTextureINTEL( params->texture );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -75729,6 +76062,7 @@ static NTSTATUS wow64_ext_glTextureAttachMemoryNV( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureAttachMemoryNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureAttachMemoryNV( params->texture, params->memory, params->offset );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -75774,6 +76108,7 @@ static NTSTATUS wow64_ext_glTextureBuffer( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureBuffer) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureBuffer( params->texture, params->internalformat, params->buffer );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -75792,6 +76127,7 @@ static NTSTATUS wow64_ext_glTextureBufferEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureBufferEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureBufferEXT( params->texture, params->target, params->internalformat, params->buffer );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -75811,6 +76147,7 @@ static NTSTATUS wow64_ext_glTextureBufferRange( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureBufferRange) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureBufferRange( params->texture, params->internalformat, params->buffer, (GLintptr)ULongToPtr(params->offset), (GLsizeiptr)ULongToPtr(params->size) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -75831,6 +76168,7 @@ static NTSTATUS wow64_ext_glTextureBufferRangeEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureBufferRangeEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureBufferRangeEXT( params->texture, params->target, params->internalformat, params->buffer, (GLintptr)ULongToPtr(params->offset), (GLsizeiptr)ULongToPtr(params->size) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -75872,6 +76210,7 @@ static NTSTATUS wow64_ext_glTextureImage1DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureImage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage1DEXT( params->texture, params->target, params->level, params->internalformat, params->width, params->border, params->format, params->type, ULongToPtr(params->pixels) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -75896,6 +76235,7 @@ static NTSTATUS wow64_ext_glTextureImage2DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureImage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage2DEXT( params->texture, params->target, params->level, params->internalformat, params->width, params->height, params->border, params->format, params->type, ULongToPtr(params->pixels) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -75918,6 +76258,7 @@ static NTSTATUS wow64_ext_glTextureImage2DMultisampleCoverageNV( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureImage2DMultisampleCoverageNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage2DMultisampleCoverageNV( params->texture, params->target, params->coverageSamples, params->colorSamples, params->internalFormat, params->width, params->height, params->fixedSampleLocations );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -75939,6 +76280,7 @@ static NTSTATUS wow64_ext_glTextureImage2DMultisampleNV( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureImage2DMultisampleNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage2DMultisampleNV( params->texture, params->target, params->samples, params->internalFormat, params->width, params->height, params->fixedSampleLocations );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -75964,6 +76306,7 @@ static NTSTATUS wow64_ext_glTextureImage3DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureImage3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage3DEXT( params->texture, params->target, params->level, params->internalformat, params->width, params->height, params->depth, params->border, params->format, params->type, ULongToPtr(params->pixels) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -75987,6 +76330,7 @@ static NTSTATUS wow64_ext_glTextureImage3DMultisampleCoverageNV( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureImage3DMultisampleCoverageNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage3DMultisampleCoverageNV( params->texture, params->target, params->coverageSamples, params->colorSamples, params->internalFormat, params->width, params->height, params->depth, params->fixedSampleLocations );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76009,6 +76353,7 @@ static NTSTATUS wow64_ext_glTextureImage3DMultisampleNV( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureImage3DMultisampleNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureImage3DMultisampleNV( params->texture, params->target, params->samples, params->internalFormat, params->width, params->height, params->depth, params->fixedSampleLocations );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76078,6 +76423,7 @@ static NTSTATUS wow64_ext_glTexturePageCommitmentEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTexturePageCommitmentEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTexturePageCommitmentEXT( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->commit );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76104,6 +76450,7 @@ static NTSTATUS wow64_ext_glTexturePageCommitmentMemNV( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTexturePageCommitmentMemNV) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTexturePageCommitmentMemNV( params->texture, params->layer, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->memory, params->offset, params->commit );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76121,6 +76468,7 @@ static NTSTATUS wow64_ext_glTextureParameterIiv( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureParameterIiv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterIiv( params->texture, params->pname, ULongToPtr(params->params) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76139,6 +76487,7 @@ static NTSTATUS wow64_ext_glTextureParameterIivEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureParameterIivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterIivEXT( params->texture, params->target, params->pname, ULongToPtr(params->params) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76156,6 +76505,7 @@ static NTSTATUS wow64_ext_glTextureParameterIuiv( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureParameterIuiv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterIuiv( params->texture, params->pname, ULongToPtr(params->params) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76174,6 +76524,7 @@ static NTSTATUS wow64_ext_glTextureParameterIuivEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureParameterIuivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterIuivEXT( params->texture, params->target, params->pname, ULongToPtr(params->params) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76191,6 +76542,7 @@ static NTSTATUS wow64_ext_glTextureParameterf( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureParameterf) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterf( params->texture, params->pname, params->param );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76209,6 +76561,7 @@ static NTSTATUS wow64_ext_glTextureParameterfEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureParameterfEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterfEXT( params->texture, params->target, params->pname, params->param );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76226,6 +76579,7 @@ static NTSTATUS wow64_ext_glTextureParameterfv( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureParameterfv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterfv( params->texture, params->pname, ULongToPtr(params->param) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76244,6 +76598,7 @@ static NTSTATUS wow64_ext_glTextureParameterfvEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureParameterfvEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterfvEXT( params->texture, params->target, params->pname, ULongToPtr(params->params) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76261,6 +76616,7 @@ static NTSTATUS wow64_ext_glTextureParameteri( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureParameteri) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameteri( params->texture, params->pname, params->param );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76279,6 +76635,7 @@ static NTSTATUS wow64_ext_glTextureParameteriEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureParameteriEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameteriEXT( params->texture, params->target, params->pname, params->param );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76296,6 +76653,7 @@ static NTSTATUS wow64_ext_glTextureParameteriv( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureParameteriv) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameteriv( params->texture, params->pname, ULongToPtr(params->param) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76314,6 +76672,7 @@ static NTSTATUS wow64_ext_glTextureParameterivEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureParameterivEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureParameterivEXT( params->texture, params->target, params->pname, ULongToPtr(params->params) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76348,6 +76707,7 @@ static NTSTATUS wow64_ext_glTextureRenderbufferEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureRenderbufferEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureRenderbufferEXT( params->texture, params->target, params->renderbuffer );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76366,6 +76726,7 @@ static NTSTATUS wow64_ext_glTextureStorage1D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorage1D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage1D( params->texture, params->levels, params->internalformat, params->width );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76385,6 +76746,7 @@ static NTSTATUS wow64_ext_glTextureStorage1DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage1DEXT( params->texture, params->target, params->levels, params->internalformat, params->width );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76404,6 +76766,7 @@ static NTSTATUS wow64_ext_glTextureStorage2D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorage2D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage2D( params->texture, params->levels, params->internalformat, params->width, params->height );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76424,6 +76787,7 @@ static NTSTATUS wow64_ext_glTextureStorage2DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage2DEXT( params->texture, params->target, params->levels, params->internalformat, params->width, params->height );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76444,6 +76808,7 @@ static NTSTATUS wow64_ext_glTextureStorage2DMultisample( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorage2DMultisample) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage2DMultisample( params->texture, params->samples, params->internalformat, params->width, params->height, params->fixedsamplelocations );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76465,6 +76830,7 @@ static NTSTATUS wow64_ext_glTextureStorage2DMultisampleEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorage2DMultisampleEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage2DMultisampleEXT( params->texture, params->target, params->samples, params->internalformat, params->width, params->height, params->fixedsamplelocations );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76485,6 +76851,7 @@ static NTSTATUS wow64_ext_glTextureStorage3D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorage3D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage3D( params->texture, params->levels, params->internalformat, params->width, params->height, params->depth );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76506,6 +76873,7 @@ static NTSTATUS wow64_ext_glTextureStorage3DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorage3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage3DEXT( params->texture, params->target, params->levels, params->internalformat, params->width, params->height, params->depth );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76527,6 +76895,7 @@ static NTSTATUS wow64_ext_glTextureStorage3DMultisample( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorage3DMultisample) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage3DMultisample( params->texture, params->samples, params->internalformat, params->width, params->height, params->depth, params->fixedsamplelocations );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76549,6 +76918,7 @@ static NTSTATUS wow64_ext_glTextureStorage3DMultisampleEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorage3DMultisampleEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorage3DMultisampleEXT( params->texture, params->target, params->samples, params->internalformat, params->width, params->height, params->depth, params->fixedsamplelocations );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76569,6 +76939,7 @@ static NTSTATUS wow64_ext_glTextureStorageMem1DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorageMem1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorageMem1DEXT( params->texture, params->levels, params->internalFormat, params->width, params->memory, params->offset );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76590,6 +76961,7 @@ static NTSTATUS wow64_ext_glTextureStorageMem2DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorageMem2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorageMem2DEXT( params->texture, params->levels, params->internalFormat, params->width, params->height, params->memory, params->offset );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76612,6 +76984,7 @@ static NTSTATUS wow64_ext_glTextureStorageMem2DMultisampleEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorageMem2DMultisampleEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorageMem2DMultisampleEXT( params->texture, params->samples, params->internalFormat, params->width, params->height, params->fixedSampleLocations, params->memory, params->offset );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76634,6 +77007,7 @@ static NTSTATUS wow64_ext_glTextureStorageMem3DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorageMem3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorageMem3DEXT( params->texture, params->levels, params->internalFormat, params->width, params->height, params->depth, params->memory, params->offset );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76657,6 +77031,7 @@ static NTSTATUS wow64_ext_glTextureStorageMem3DMultisampleEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorageMem3DMultisampleEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorageMem3DMultisampleEXT( params->texture, params->samples, params->internalFormat, params->width, params->height, params->depth, params->fixedSampleLocations, params->memory, params->offset );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76679,6 +77054,7 @@ static NTSTATUS wow64_ext_glTextureStorageSparseAMD( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureStorageSparseAMD) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureStorageSparseAMD( params->texture, params->target, params->internalFormat, params->width, params->height, params->depth, params->layers, params->flags );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76700,6 +77076,7 @@ static NTSTATUS wow64_ext_glTextureSubImage1D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureSubImage1D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureSubImage1D( params->texture, params->level, params->xoffset, params->width, params->format, params->type, ULongToPtr(params->pixels) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76722,6 +77099,7 @@ static NTSTATUS wow64_ext_glTextureSubImage1DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureSubImage1DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureSubImage1DEXT( params->texture, params->target, params->level, params->xoffset, params->width, params->format, params->type, ULongToPtr(params->pixels) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76745,6 +77123,7 @@ static NTSTATUS wow64_ext_glTextureSubImage2D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureSubImage2D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureSubImage2D( params->texture, params->level, params->xoffset, params->yoffset, params->width, params->height, params->format, params->type, ULongToPtr(params->pixels) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76769,6 +77148,7 @@ static NTSTATUS wow64_ext_glTextureSubImage2DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureSubImage2DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureSubImage2DEXT( params->texture, params->target, params->level, params->xoffset, params->yoffset, params->width, params->height, params->format, params->type, ULongToPtr(params->pixels) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76794,6 +77174,7 @@ static NTSTATUS wow64_ext_glTextureSubImage3D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureSubImage3D) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureSubImage3D( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->format, params->type, ULongToPtr(params->pixels) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76820,6 +77201,7 @@ static NTSTATUS wow64_ext_glTextureSubImage3DEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureSubImage3DEXT) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureSubImage3DEXT( params->texture, params->target, params->level, params->xoffset, params->yoffset, params->zoffset, params->width, params->height, params->depth, params->format, params->type, ULongToPtr(params->pixels) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -76842,6 +77224,7 @@ static NTSTATUS wow64_ext_glTextureView( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glTextureView) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glTextureView( params->texture, params->target, params->origtexture, params->internalformat, params->minlevel, params->numlevels, params->minlayer, params->numlayers );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -79199,6 +79582,7 @@ static NTSTATUS wow64_ext_glUnmapTexture2DINTEL( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glUnmapTexture2DINTEL) return STATUS_NOT_IMPLEMENTED;
+    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
     funcs->p_glUnmapTexture2DINTEL( params->texture, params->level );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -85321,6 +85705,11 @@ static NTSTATUS wow64_ext_glWaitSemaphoreEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glWaitSemaphoreEXT) return STATUS_NOT_IMPLEMENTED;
+    if (UlongToPtr(params->textures))
+    {
+        for (const GLuint *tex = UlongToPtr(params->textures), *end = tex + params->numTextureBarriers; tex != end; tex++)
+            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );
+    }
     funcs->p_glWaitSemaphoreEXT( params->semaphore, params->numBufferBarriers, ULongToPtr(params->buffers), params->numTextureBarriers, ULongToPtr(params->textures), ULongToPtr(params->srcLayouts) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;

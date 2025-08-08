@@ -70,6 +70,10 @@ struct opengl_drawable;
 struct wgl_context;
 struct wgl_pbuffer;
 
+/* Wine reserved texture names for internal usage */
+#define WINE_OPENGL_RESERVED_TEXTURE0  0x10000
+#define WINE_OPENGL_RESERVED_TEXTURE7  0x10007
+
 struct wgl_context
 {
     void                   *driver_private;     /* driver context / private data */
@@ -78,6 +82,7 @@ struct wgl_context
     struct opengl_drawable *draw;               /* currently bound draw surface */
     struct opengl_drawable *read;               /* currently bound read surface */
     GLenum                  error;              /* wrapped GL error */
+    BOOL                    reserved_textures;  /* internal texture names have been reserved */
 };
 
 /* interface between opengl32 and win32u */
