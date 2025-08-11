@@ -1347,6 +1347,7 @@ NTSTATUS WINAPI NtCreateThreadEx( HANDLE *handle, ACCESS_MASK access, OBJECT_ATT
     struct ntdll_thread_data *thread_data;
     DWORD tid = 0;
     int request_pipe[2];
+    WOW_TEB *wow_teb;
     TEB *teb;
     unsigned int status;
 
@@ -1435,6 +1436,10 @@ NTSTATUS WINAPI NtCreateThreadEx( HANDLE *handle, ACCESS_MASK access, OBJECT_ATT
 
     teb->SkipThreadAttach = !!(flags & THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH);
     teb->SkipLoaderInit = !!(flags & THREAD_CREATE_FLAGS_SKIP_LOADER_INIT);
+    wow_teb = get_wow_teb( teb );
+    if (wow_teb) {
+        wow_teb->SameTebFlags = teb->SameTebFlags;
+    }
 
     thread_data = (struct ntdll_thread_data *)&teb->GdiTebBatch;
     thread_data->request_fd  = request_pipe[1];

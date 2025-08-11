@@ -667,19 +667,69 @@ BOOLEAN WINAPI RtlIsProcessorFeaturePresent( UINT feature )
             user_shared_data->ProcessorFeatures[feature]);
 }
 
+static void suspend_remote_breakin( HANDLE thread )
+{
+    ULONG count;
+    NTSTATUS status = pWow64SuspendLocalThread( thread, &count );
+    if (status >= 0) status = count;
+    NtTerminateThread( GetCurrentThread(),  status );
+}
+
 /***********************************************************************
  *              RtlWow64SuspendThread (NTDLL.@)
  */
 NTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )
 {
+    HANDLE thread_dup;
     THREAD_BASIC_INFORMATION tbi;
+    NTSTATUS status = NtDuplicateObject( NtCurrentProcess(), thread, NtCurrentProcess(), &thread_dup,
+                                         THREAD_QUERY_INFORMATION | THREAD_SUSPEND_RESUME, 0, 0 );
+    if (status) return status;
+    status = NtQueryInformationThread( thread_dup, ThreadBasicInformation, &tbi, sizeof(tbi), NULL);
+    NtClose( thread_dup );
+    if (status) return status;
 
-    NTSTATUS ret = NtQueryInformationThread( thread, ThreadBasicInformation, &tbi, sizeof(tbi), NULL);
-    if (ret) return ret;
+    if (tbi.ClientId.UniqueProcess != NtCurrentTeb()->ClientId.UniqueProcess)
+    {
+        HANDLE process;
+        HANDLE suspender_thread;
+        HANDLE remote_suspendee_thread;
+        OBJECT_ATTRIBUTES attr = { .Length = sizeof(attr) };
 
-    if (tbi.ClientId.UniqueProcess != NtCurrentTeb()->ClientId.UniqueProcess) {
-        FIXME( "Non-local process thread suspend\n" );
-        return STATUS_SUCCESS;
+        status = NtOpenProcess( &process, PROCESS_CREATE_THREAD | PROCESS_DUP_HANDLE, &attr, &tbi.ClientId );
+        if (status) return status;
+
+        status = NtDuplicateObject( NtCurrentProcess(), thread, process, &remote_suspendee_thread, 0, 0,
+                                    DUPLICATE_SAME_ACCESS );
+        if (status) goto err_close_proc;
+
+        status = NtCreateThreadEx( &suspender_thread, SYNCHRONIZE | THREAD_QUERY_INFORMATION, NULL, process,
+                                   suspend_remote_breakin, remote_suspendee_thread,
+                                   THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH | THREAD_CREATE_FLAGS_SKIP_LOADER_INIT |
+                                   THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER | THREAD_CREATE_FLAGS_BYPASS_PROCESS_FREEZE,
+                                   0, 0, 0, NULL );
+        if (status) goto err_close_remote_hnd;
+
+        NtWaitForSingleObject( suspender_thread, FALSE, NULL );
+        status = NtQueryInformationThread( suspender_thread, ThreadBasicInformation, &tbi, sizeof(tbi), NULL );
+        if (!status)
+        {
+            if (tbi.ExitStatus < 0)
+            {
+                status = tbi.ExitStatus;
+            }
+            else if (count)
+            {
+                *count = (ULONG)tbi.ExitStatus;
+            }
+        }
+
+        NtClose( suspender_thread );
+err_close_remote_hnd:
+        NtDuplicateObject( process, remote_suspendee_thread, NULL, NULL, 0, 0, DUPLICATE_CLOSE_SOURCE );
+err_close_proc:
+        NtClose( process );
+        return status;
     }
 
     return pWow64SuspendLocalThread( thread, count );
