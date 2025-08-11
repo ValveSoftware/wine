@@ -4089,6 +4089,11 @@ void WINAPI LdrShutdownThread(void)
     /* don't do any detach calls if process is exiting */
     if (process_detaching) return;
 
+    if (NtCurrentTeb()->SkipThreadAttach) {
+        heap_thread_detach();
+        return;
+    }
+
     RtlProcessFlsData( NtCurrentTeb()->FlsSlots, 1 );
 
     RtlEnterCriticalSection( &loader_section );
@@ -4700,6 +4705,13 @@ void loader_init( CONTEXT *context, void **entry )
 #ifdef __arm64ec__
         arm64ec_thread_init();
 #endif
+
+        if (NtCurrentTeb()->SkipThreadAttach)
+        {
+            RtlLeaveCriticalSection( &loader_section );
+            return;
+        }
+
         wm = get_modref( NtCurrentTeb()->Peb->ImageBaseAddress );
     }
 
