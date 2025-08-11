@@ -1179,6 +1179,9 @@ static void session_start(struct media_session *session, const GUID *time_format
                 session->state = SESSION_STATE_RESTARTING_SOURCES;
                 break;
             }
+            else if (session->state == SESSION_STATE_STARTED)
+                return session_command_complete_with_event(session, MESessionStarted, S_OK, NULL);
+
             /* fallthrough; we're resuming from the current position */
         case SESSION_STATE_STOPPED:
             /* Start request with no current topology. */
