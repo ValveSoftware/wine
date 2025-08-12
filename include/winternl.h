@@ -599,7 +599,27 @@ typedef struct _TEB
     PVOID                        MergedPrefLanguages;               /* fc0/17e0 */
     ULONG                        MuiImpersonation;                  /* fc4/17e8 */
     USHORT                       CrossTebFlags;                     /* fc8/17ec */
-    USHORT                       SameTebFlags;                      /* fca/17ee */
+    union {
+        USHORT SameTebFlags;                                        /* fca/17ee */
+        struct {
+            USHORT SafeThunkCall : 1;
+            USHORT InDebugPrint : 1;
+            USHORT HasFiberData : 1;
+            USHORT SkipThreadAttach : 1;
+            USHORT WerInShipAssertCode : 1;
+            USHORT RanProcessInit : 1;
+            USHORT ClonedThread : 1;
+            USHORT SuppressDebugMsg : 1;
+            USHORT DisableUserStackWalk : 1;
+            USHORT RtlExceptionAttached : 1;
+            USHORT InitialThread : 1;
+            USHORT SessionAware : 1;
+            USHORT LoadOwner : 1;
+            USHORT LoaderWorker : 1;
+            USHORT SkipLoaderInit : 1;
+            USHORT SkipFileAPIBrokering : 1;
+        } DUMMYSTRUCTNAME;
+    } DUMMYUNIONNAME1;
     PVOID                        TxnScopeEnterCallback;             /* fcc/17f0 */
     PVOID                        TxnScopeExitCallback;              /* fd0/17f8 */
     PVOID                        TxnScopeContext;                   /* fd4/1800 */
