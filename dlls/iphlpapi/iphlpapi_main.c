@@ -4963,6 +4963,14 @@ DWORD WINAPI Icmp6SendEcho2( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc_ro
     return 0;
 }
 
+DWORD WINAPI Icmp6ParseReplies( void *buffer, DWORD size )
+{
+    FIXME( "(%p, %lu) stub.\n", buffer, size );
+
+    SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
+    return 0;
+}
+
 /***********************************************************************
  *    GetCurrentThreadCompartmentId (IPHLPAPI.@)
  */
