@@ -155,6 +155,7 @@ typedef enum AsicFamily
     AsicFamily_RDNA,                                            ///< AMD RDNA architecture
     AsicFamily_RDNA2,                                           ///< AMD RDNA2 architecture
     AsicFamily_RDNA3,                                           ///< AMD RDNA3 architecture
+    AsicFamily_RDNA4,
 } AsicFamily;
 
 /* Constants from Mesa source. */
@@ -176,6 +177,7 @@ typedef enum AsicFamily
 #define FAMILY_GFX1103 0x94
 #define FAMILY_GFX1150 0x96
 #define FAMILY_MDN     0x97 /* # 151 / Mendocino */
+#define FAMILY_GFX12   0x98
 
 #define ROUND_DIV(value, div) (((value) + (div) / 2) / (div))
 
@@ -219,6 +221,10 @@ static void fill_device_info(struct drm_amdgpu_info_device *info, struct get_dev
         case FAMILY_GFX1103:
         case FAMILY_GFX1150:
             out->asic_family = AsicFamily_RDNA3;
+            break;
+
+        case FAMILY_GFX12:
+            out->asic_family = AsicFamily_RDNA4;
             break;
     }
     TRACE("family %u, erev %#x -> asicFamily %d.\n", info->family, erev, out->asic_family);

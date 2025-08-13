@@ -475,6 +475,7 @@ typedef enum AsicFamily
     AsicFamily_RDNA,                                            ///< AMD RDNA architecture
     AsicFamily_RDNA2,                                           ///< AMD RDNA2 architecture
     AsicFamily_RDNA3,                                           ///< AMD RDNA3 architecture
+    AsicFamily_RDNA4,                                           ///< AMD RDNA4 architecture
 
     AsicFamily_Count                                            ///< Number of enumerated ASIC families
 } AsicFamily;
@@ -986,6 +987,8 @@ AMD_AGS_API AGSReturnCode agsDeInit( AGSContext* context );
 /// \param [in] context                             Pointer to a context. This function will deallocate the context from the heap.
 ///
 AMD_AGS_API AGSReturnCode agsDeInitialize( AGSContext* context );
+
+AMD_AGS_API AGSReturnCode agsGetGPUInfo( AGSContext* context, AGSGPUInfo_600 *gpu_info );
 
 ///
 /// Function used to query the number of GPUs used for Crossfire acceleration.

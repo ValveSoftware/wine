@@ -63,3 +63,4 @@
 @ stdcall agsGetGPUMemorySize(ptr long ptr)
 @ stdcall agsGetEyefinityConfigInfo(ptr long ptr ptr ptr)
 @ stdcall agsDriverExtensions_SetCrossfireMode(ptr long)
+@ stdcall agsGetGPUInfo(ptr ptr)
