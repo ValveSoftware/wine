@@ -372,7 +372,7 @@ static HRESULT WINAPI memory_1d_2d_buffer_Unlock(IMFMediaBuffer *iface)
     EnterCriticalSection(&buffer->cs);
 
     if (!buffer->_2d.linear_buffer && buffer->_2d.width == buffer->_2d.pitch
-            && (sgi = getenv("SteamGameId")) && !strcmp(sgi, "418370"))
+            && (sgi = getenv("SteamGameId")) && (!strcmp(sgi, "418370") || !strcmp(sgi, "287700")))
     {
         if (buffer->_2d.locks)
             --buffer->_2d.locks;
