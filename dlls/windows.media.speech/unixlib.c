@@ -125,9 +125,7 @@ static const char* map_lang_to_phasmophobia_dir(const char* lang, size_t len)
         return "Arabic";
     if (!strncmp(lang, "ca", len))
         return "Catalan";
-    if (!strncmp(lang, "zn", len) ||
-        !strncmp(lang, "schinese", len) ||
-        !strncmp(lang, "tchinese", len))
+    if (!strncmp(lang, "zn", len))
         return "Chinese";
     if (!strncmp(lang, "cs", len))
         return "Czech";
@@ -139,19 +137,19 @@ static const char* map_lang_to_phasmophobia_dir(const char* lang, size_t len)
         return "French";
     if (!strncmp(lang, "de", len))
         return "German";
+    if (!strncmp(lang, "de", len))
+        return "German";
     if (!strncmp(lang, "el", len))
         return "Greek";
     if (!strncmp(lang, "it", len))
         return "Italian";
     if (!strncmp(lang, "ja", len))
         return "Japanese";
-    if (!strncmp(lang, "pt", len) ||
-        !strncmp(lang, "brazilian", len))
+    if (!strncmp(lang, "pt", len))
         return "Portuguese";
     if (!strncmp(lang, "ru", len))
         return "Russian";
-    if (!strncmp(lang, "es", len) ||
-        !strncmp(lang, "latam", len))
+    if (!strncmp(lang, "es", len))
         return "Spanish";
     if (!strncmp(lang, "sw", len))
         return "Swedish";
@@ -160,8 +158,7 @@ static const char* map_lang_to_phasmophobia_dir(const char* lang, size_t len)
     if (!strncmp(lang, "uk", len))
         return "Ukrainian";
 
-    /* default to English */
-    return "English";
+    return "";
 }
 
 static NTSTATUS find_model_by_locale_and_path( const char *path, const char *locale, VoskModel **model )
@@ -204,7 +201,7 @@ static NTSTATUS find_model_by_locale_and_path( const char *path, const char *loc
          * Find the first matching model for lang and region (en-us).
          * If there isn't any, pick the first one just matching lang (en).
          */
-        if (!strncasecmp(ent_name, locale, len))
+        if (!strncmp(ent_name, locale, len))
         {
             if (best_match) free(best_match);
             best_match = strdup(dirent->d_name);
@@ -214,9 +211,6 @@ static NTSTATUS find_model_by_locale_and_path( const char *path, const char *loc
         if (!best_match && !strncmp(ent_name, locale, delim - locale))
             best_match = strdup(dirent->d_name);
 
-        /*
-         * Note: With the hack for Phasmophobia, "locale" can also contain the Steam UI language.
-         */
         if (!best_match && !strcmp(appid, "739630"))
         {
             if ((str = (char *)map_lang_to_phasmophobia_dir(locale, delim - locale)))
