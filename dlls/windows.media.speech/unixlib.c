@@ -122,74 +122,56 @@ static inline VoskRecognizer *vosk_recognizer_from_handle( speech_recognizer_han
     return (VoskRecognizer *)(UINT_PTR)handle;
 }
 
+/*
+ * The main idea here is to map Steam's language strings to Phasmophobia's Vosk model directories.
+ * We only map languages for which a "system language" option is available in game,
+ * as these are the only ones expected to be used with the windows.meida.speech API.
+ */
 static const char* map_lang_to_phasmophobia_dir(const char* lang, size_t len)
 {
-    if (!strncmp(lang, "ar", len))
-        return "Arabic";
-    if (!strncmp(lang, "ca", len))
-        return "Catalan";
-    if (!strncmp(lang, "zn", len))
+    if (!strncmp(lang, "schinese", len) ||
+        !strncmp(lang, "tchinese", len))
         return "Chinese";
-    if (!strncmp(lang, "cs", len))
-        return "Czech";
-    if (!strncmp(lang, "nl", len))
-        return "Dutch";
-    if (!strncmp(lang, "en", len))
-        return "English";
-    if (!strncmp(lang, "fr", len))
+    if (!strncmp(lang, "french", len))
         return "French";
-    if (!strncmp(lang, "de", len))
+    if (!strncmp(lang, "german", len))
         return "German";
-    if (!strncmp(lang, "de", len))
-        return "German";
-    if (!strncmp(lang, "el", len))
-        return "Greek";
-    if (!strncmp(lang, "it", len))
-        return "Italian";
-    if (!strncmp(lang, "ja", len))
+    if (!strncmp(lang, "japanese", len))
         return "Japanese";
-    if (!strncmp(lang, "pt", len))
-        return "Portuguese";
-    if (!strncmp(lang, "ru", len))
-        return "Russian";
-    if (!strncmp(lang, "es", len))
+    if (!strncmp(lang, "spanish", len) ||
+        !strncmp(lang, "latam", len))
         return "Spanish";
-    if (!strncmp(lang, "sw", len))
-        return "Swedish";
-    if (!strncmp(lang, "tr", len))
-        return "Turkish";
-    if (!strncmp(lang, "uk", len))
-        return "Ukrainian";
 
-    return "";
+    /* default to English */
+    return "English";
 }
 
 static NTSTATUS find_model_by_locale_and_path( const char *path, const char *locale, VoskModel **model )
 {
     static const char *vosk_model_identifier_small = "vosk-model-small-";
     static const char *vosk_model_identifier = "vosk-model-";
+    char *ent_name, *model_path, *best_match, *delim, *appid = getenv("SteamAppId");
     size_t ident_small_len = strlen(vosk_model_identifier_small);
     size_t ident_len = strlen(vosk_model_identifier);
-    char *ent_name, *model_path, *best_match, *delim, *appid = getenv("SteamAppId"), *str = NULL;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
+    size_t path_len, locale_len;
     struct dirent *dirent;
-    size_t path_len, len;
     DIR *dir;
 
     TRACE("path %s, locale %s, model %p.\n", path, debugstr_a(locale), model);
 
-    if (!path || !locale || (len = strlen(locale)) < 4)
-        return STATUS_UNSUCCESSFUL;
+    if (!path || !locale || (locale_len = strlen(locale)) < 4)
+        return STATUS_INVALID_PARAMETER;
 
     if (!(dir = opendir(path)))
-        return STATUS_UNSUCCESSFUL;
+        return STATUS_OBJECT_PATH_NOT_FOUND;
 
     delim = strchr(locale, '-');
     path_len = strlen(path);
     best_match = NULL;
     *model = NULL;
 
-    while ((dirent = readdir(dir)))
+    while (!best_match && (dirent = readdir(dir)))
     {
         ent_name = dirent->d_name;
 
@@ -197,28 +179,29 @@ static NTSTATUS find_model_by_locale_and_path( const char *path, const char *loc
             ent_name += ident_small_len;
         else if (!strncmp(ent_name, vosk_model_identifier, ident_len))
             ent_name += ident_len;
-        else if (strcmp(appid, "739630") != 0)
-            continue;
+        else if (!strcmp(appid, "739630"))
+        {
+            /*
+             * Note: With the hack for Phasmophobia, "locale" can also contain the Steam UI language.
+             */
+            const char *str = map_lang_to_phasmophobia_dir(locale, delim - locale);
+
+            if (str && !strncmp(ent_name, str, strlen(str)))
+            {
+                best_match = strdup(str);
+                break;
+            }
+        }
+        else continue;
 
         /*
          * Find the first matching model for lang and region (en-us).
          * If there isn't any, pick the first one just matching lang (en).
          */
-        if (!strncmp(ent_name, locale, len))
-        {
-            if (best_match) free(best_match);
+        if (!strncmp(ent_name, locale, locale_len))
             best_match = strdup(dirent->d_name);
-            break;
-        }
-
-        if (!best_match && !strncmp(ent_name, locale, delim - locale))
+        else if (!strncmp(ent_name, locale, delim - locale))
             best_match = strdup(dirent->d_name);
-
-        if (!best_match && !strcmp(appid, "739630"))
-        {
-            if ((str = (char *)map_lang_to_phasmophobia_dir(locale, delim - locale)))
-                best_match = strdup(str);
-        }
     }
 
     closedir(dir);
