@@ -1498,10 +1498,19 @@ static HRESULT recognizer_create_unix_instance( struct session *session, const c
     NTSTATUS status;
     INT len;
 
-    if (!strcmp(appid, "739630") && !RegGetValueW(HKEY_CURRENT_USER, L"Software\\Valve\\Steam", L"language", RRF_RT_REG_SZ, NULL, locale, &locale_len))
+    memset(locale, 0, locale_len);
+
+    if ((locale_len = GetEnvironmentVariableW(L"WINE_FORCE_SR_LOCALE", locale, locale_len)) && locale_len <= LOCALE_NAME_MAX_LENGTH)
         len = locale_len;
-    else if (!(len = GetUserDefaultLocaleName(locale, LOCALE_NAME_MAX_LENGTH)))
-        return E_FAIL;
+    else
+    {
+        locale_len = LOCALE_NAME_MAX_LENGTH;
+
+        if (!strcmp(appid, "739630") && !RegGetValueW(HKEY_CURRENT_USER, L"Software\\Valve\\Steam", L"language", RRF_RT_REG_SZ, NULL, locale, &locale_len))
+            len = locale_len;
+        else if (!(len = GetUserDefaultLocaleName(locale, LOCALE_NAME_MAX_LENGTH)))
+            return E_FAIL;
+    }
 
     if (CharLowerBuffW(locale, len) != len)
         return E_FAIL;
