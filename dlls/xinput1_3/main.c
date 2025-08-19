@@ -54,7 +54,6 @@ WINE_DEFAULT_DEBUG_CHANNEL(xinput);
 struct xinput_controller
 {
     CRITICAL_SECTION crit;
-    XINPUT_CAPABILITIES caps;
     XINPUT_STATE state;
     XINPUT_GAMEPAD last_keystroke;
     XINPUT_VIBRATION vibration;
@@ -198,7 +197,6 @@ static void check_waveform_caps(struct xinput_controller *controller, HANDLE dev
 static BOOL controller_check_caps(struct xinput_controller *controller, HANDLE device, PHIDP_PREPARSED_DATA preparsed)
 {
     USHORT caps_count = 0, waveform_caps_count = 0;
-    XINPUT_CAPABILITIES *caps = &controller->caps;
     HIDP_LINK_COLLECTION_NODE *collections;
     HIDP_VALUE_CAPS waveform_caps[8];
     HIDP_BUTTON_CAPS *button_caps;
@@ -206,9 +204,6 @@ static BOOL controller_check_caps(struct xinput_controller *controller, HANDLE d
     HIDP_VALUE_CAPS *value_caps;
     int i, u, button_count = 0;
     NTSTATUS status;
-
-    /* Count buttons */
-    memset(caps, 0, sizeof(XINPUT_CAPABILITIES));
 
     if (!(button_caps = malloc(sizeof(*button_caps) * controller->hid.caps.NumberInputButtonCaps))) return FALSE;
     status = HidP_GetButtonCaps(HidP_Input, button_caps, &controller->hid.caps.NumberInputButtonCaps, preparsed);
@@ -223,9 +218,7 @@ static BOOL controller_check_caps(struct xinput_controller *controller, HANDLE d
             button_count = max(button_count, button_caps[i].NotRange.Usage);
     }
     free(button_caps);
-    if (button_count < 11)
-        WARN("Too few buttons, continuing anyway\n");
-    caps->Gamepad.wButtons = 0xffff;
+    if (button_count < 11) WARN("Too few buttons, continuing anyway\n");
 
     if (!(value_caps = malloc(sizeof(*value_caps) * controller->hid.caps.NumberInputValueCaps))) return FALSE;
     status = HidP_GetValueCaps(HidP_Input, value_caps, &controller->hid.caps.NumberInputValueCaps, preparsed);
@@ -240,20 +233,11 @@ static BOOL controller_check_caps(struct xinput_controller *controller, HANDLE d
     free(value_caps);
 
     if (!controller->hid.lt_caps.UsagePage) WARN("Missing axis LeftTrigger\n");
-    else caps->Gamepad.bLeftTrigger = (1u << (sizeof(caps->Gamepad.bLeftTrigger) + 1)) - 1;
     if (!controller->hid.rt_caps.UsagePage) WARN("Missing axis RightTrigger\n");
-    else caps->Gamepad.bRightTrigger = (1u << (sizeof(caps->Gamepad.bRightTrigger) + 1)) - 1;
     if (!controller->hid.lx_caps.UsagePage) WARN("Missing axis ThumbLX\n");
-    else caps->Gamepad.sThumbLX = (1u << (sizeof(caps->Gamepad.sThumbLX) + 1)) - 1;
     if (!controller->hid.ly_caps.UsagePage) WARN("Missing axis ThumbLY\n");
-    else caps->Gamepad.sThumbLY = (1u << (sizeof(caps->Gamepad.sThumbLY) + 1)) - 1;
     if (!controller->hid.rx_caps.UsagePage) WARN("Missing axis ThumbRX\n");
-    else caps->Gamepad.sThumbRX = (1u << (sizeof(caps->Gamepad.sThumbRX) + 1)) - 1;
     if (!controller->hid.ry_caps.UsagePage) WARN("Missing axis ThumbRY\n");
-    else caps->Gamepad.sThumbRY = (1u << (sizeof(caps->Gamepad.sThumbRY) + 1)) - 1;
-
-    caps->Type = XINPUT_DEVTYPE_GAMEPAD;
-    caps->SubType = XINPUT_DEVSUBTYPE_GAMEPAD;
 
     collections_count = controller->hid.caps.NumberLinkCollectionNodes;
     if (!(collections = malloc(sizeof(*collections) * controller->hid.caps.NumberLinkCollectionNodes))) return FALSE;
@@ -273,14 +257,6 @@ static BOOL controller_check_caps(struct xinput_controller *controller, HANDLE d
     for (i = 0; i < waveform_caps_count; ++i) check_waveform_caps(controller, device, preparsed, collections, waveform_caps + i);
     free(collections);
 
-    if (controller->hid.haptics_rumble_caps.UsagePage ||
-        controller->hid.haptics_buzz_caps.UsagePage)
-    {
-        caps->Flags |= XINPUT_CAPS_FFB_SUPPORTED;
-        caps->Vibration.wLeftMotorSpeed = 255;
-        caps->Vibration.wRightMotorSpeed = 255;
-    }
-
     return TRUE;
 }
 
@@ -294,7 +270,7 @@ static DWORD HID_set_state(struct xinput_controller *controller, XINPUT_VIBRATIO
     NTSTATUS status;
     BYTE report_id;
 
-    if (!(controller->caps.Flags & XINPUT_CAPS_FFB_SUPPORTED)) return ERROR_SUCCESS;
+    if (!controller->hid.haptics_rumble_caps.UsagePage && !controller->hid.haptics_buzz_caps.UsagePage) return ERROR_SUCCESS;
 
     update_rumble = (controller->vibration.wLeftMotorSpeed != state->wLeftMotorSpeed);
     controller->vibration.wLeftMotorSpeed = state->wLeftMotorSpeed;
@@ -330,7 +306,7 @@ static void controller_disable(struct xinput_controller *controller)
     XINPUT_VIBRATION state = {0};
 
     if (!controller->enabled) return;
-    if (controller->caps.Flags & XINPUT_CAPS_FFB_SUPPORTED) HID_set_state(controller, &state);
+    HID_set_state(controller, &state);
     controller->enabled = FALSE;
 
     CancelIoEx(controller->device, &controller->hid.read_ovl);
@@ -368,7 +344,7 @@ static void controller_enable(struct xinput_controller *controller)
     BOOL ret;
 
     if (controller->enabled) return;
-    if (controller->caps.Flags & XINPUT_CAPS_FFB_SUPPORTED) HID_set_state(controller, &state);
+    HID_set_state(controller, &state);
     controller->enabled = TRUE;
 
     memset(&controller->hid.read_ovl, 0, sizeof(controller->hid.read_ovl));
@@ -1151,6 +1127,10 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputGetBatteryInformation(DWORD index, BYTE typ
 
 DWORD WINAPI DECLSPEC_HOTPATCH XInputGetCapabilitiesEx(DWORD unk, DWORD index, DWORD flags, XINPUT_CAPABILITIES_EX *caps)
 {
+    static const UINT XINPUT_BUTTONS_ALL = XINPUT_GAMEPAD_DPAD_UP | XINPUT_GAMEPAD_DPAD_DOWN | XINPUT_GAMEPAD_DPAD_LEFT | XINPUT_GAMEPAD_DPAD_RIGHT
+                                         | XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK | XINPUT_GAMEPAD_LEFT_THUMB | XINPUT_GAMEPAD_RIGHT_THUMB
+                                         | XINPUT_GAMEPAD_LEFT_SHOULDER | XINPUT_GAMEPAD_RIGHT_SHOULDER
+                                         | XINPUT_GAMEPAD_A | XINPUT_GAMEPAD_B | XINPUT_GAMEPAD_X | XINPUT_GAMEPAD_Y;
     HIDD_ATTRIBUTES attr;
     DWORD ret = ERROR_SUCCESS;
 
@@ -1162,13 +1142,33 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputGetCapabilitiesEx(DWORD unk, DWORD index, D
 
     if (!controller_lock(&controllers[index])) return ERROR_DEVICE_NOT_CONNECTED;
 
-    if (flags & XINPUT_FLAG_GAMEPAD && controllers[index].caps.SubType != XINPUT_DEVSUBTYPE_GAMEPAD)
-        ret = ERROR_DEVICE_NOT_CONNECTED;
-    else if (!HidD_GetAttributes(controllers[index].device, &attr))
+    if (!HidD_GetAttributes(controllers[index].device, &attr))
         ret = ERROR_DEVICE_NOT_CONNECTED;
     else
     {
-        caps->Capabilities = controllers[index].caps;
+        memset(caps, 0, sizeof(*caps));
+
+#if XINPUT_VER >= 4
+        caps->Capabilities.Type = XINPUT_DEVTYPE_GAMEPAD;
+#endif
+        caps->Capabilities.SubType = XINPUT_DEVSUBTYPE_GAMEPAD;
+#if XINPUT_VER >= 4
+        caps->Capabilities.Flags |= XINPUT_CAPS_PMD_SUPPORTED;
+#endif
+#if XINPUT_VER >= 3
+        caps->Capabilities.Flags |= XINPUT_CAPS_VOICE_SUPPORTED;
+#endif
+
+        caps->Capabilities.Gamepad.wButtons = XINPUT_BUTTONS_ALL;
+        caps->Capabilities.Gamepad.bLeftTrigger = 0xff;
+        caps->Capabilities.Gamepad.bRightTrigger = 0xff;
+        caps->Capabilities.Gamepad.sThumbLX = ~0x3f;
+        caps->Capabilities.Gamepad.sThumbLY = ~0x3f;
+        caps->Capabilities.Gamepad.sThumbRX = ~0x3f;
+        caps->Capabilities.Gamepad.sThumbRY = ~0x3f;
+        caps->Capabilities.Vibration.wLeftMotorSpeed = 0xff;
+        caps->Capabilities.Vibration.wRightMotorSpeed = 0xff;
+
         caps->VendorId = attr.VendorID;
         caps->ProductId = attr.ProductID;
         caps->VersionNumber = attr.VersionNumber;

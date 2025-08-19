@@ -1,3 +1,4 @@
+EXTRADEFS = -DXINPUT_VER=4
 MODULE    = xinput1_4.dll
 IMPORTS   = hid setupapi advapi32 user32
 PARENTSRC = ../xinput1_3
