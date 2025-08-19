@@ -2959,13 +2959,22 @@ BOOL X11DRV_CreateWindow( HWND hwnd )
 {
     if (hwnd == NtUserGetDesktopWindow())
     {
+        static const WCHAR winsta0[] = {'W','i','n','S','t','a','0',0};
         struct x11drv_thread_data *data = x11drv_init_thread_data();
+        WCHAR winstation_name[64];
         XSetWindowAttributes attr;
 
-        /* listen to raw xinput event in the desktop window thread */
-        data->xinput2_rawinput = TRUE;
-        x11drv_xinput2_enable( data->display, DefaultRootWindow( data->display ) );
-
+        if (NtUserGetObjectInformation( NtUserGetProcessWindowStation(), UOI_NAME, winstation_name,
+                                        sizeof(winstation_name), NULL ))
+        {
+            TRACE( "winstation name %s.\n", debugstr_w(winstation_name) );
+            if (!wcscmp( winstation_name, winsta0 ))
+            {
+                /* listen to raw xinput event in the desktop window thread */
+                data->xinput2_rawinput = TRUE;
+                x11drv_xinput2_enable( data->display, DefaultRootWindow( data->display ) );
+            }
+        }
         /* create the cursor clipping window */
         attr.override_redirect = TRUE;
         attr.event_mask = StructureNotifyMask | FocusChangeMask;
