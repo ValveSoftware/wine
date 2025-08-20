@@ -1172,8 +1172,14 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputGetCapabilitiesEx(DWORD unk, DWORD index, D
         caps->VendorId = attr.VendorID;
         caps->ProductId = attr.ProductID;
         caps->VersionNumber = attr.VersionNumber;
+
         /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
-        caps->unk2 = index;
+        if (attr.VendorID == 0x28de && attr.ProductID == 0x11ff)
+        {
+            caps->Capabilities.Type = XINPUT_DEVTYPE_GAMEPAD;
+            caps->Capabilities.Flags = XINPUT_CAPS_WIRELESS;
+            caps->unk2 = index;
+        }
     }
 
     controller_unlock(&controllers[index]);
