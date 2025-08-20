@@ -1581,6 +1581,14 @@ static HRESULT hid_joystick_device_try_open( const WCHAR *path, HANDLE *device, 
     instance->wUsagePage = caps->UsagePage;
     instance->wUsage = caps->Usage;
 
+    /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+    if (attrs->VendorID == 0x28de && attrs->ProductID == 0x11ff)
+    {
+        instance->guidProduct.Data2 = 0x28de;
+        instance->guidInstance = instance->guidProduct;
+        instance->guidInstance.Data3 = 1;
+    }
+
     node_count = ARRAY_SIZE(nodes);
     status = HidP_GetLinkCollectionNodes( nodes, &node_count, preparsed_data );
     if (status != HIDP_STATUS_SUCCESS) node_count = 0;
