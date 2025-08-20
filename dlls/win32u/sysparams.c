@@ -7372,6 +7372,7 @@ ULONG_PTR WINAPI NtUserCallTwoParam( ULONG_PTR arg1, ULONG_PTR arg2, ULONG code 
                  !((params->style & WS_POPUP) && (params->ex_style & WS_EX_TOOLWINDOW)) /* Bug 20038: game splash screens */
                  && !(sgi && !strcmp( sgi, "2563800" )) /* Bug 23342: The Last Game */
                  && !(sgi && !strcmp( sgi, "1240440" )) /* Bug 23802: Halo Infinite */
+                 && !(sgi && !strcmp( sgi, "613830" ))  /* Bug 25747: CHRONO TRIGGER */
                 )
                 return TRUE;
         }
