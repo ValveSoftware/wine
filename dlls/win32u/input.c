@@ -1033,17 +1033,30 @@ SHORT WINAPI NtUserGetKeyState( INT vkey )
 {
     struct object_lock lock = OBJECT_LOCK_INIT;
     const input_shm_t *input_shm;
-    BOOL ret = FALSE;
+    UINT64 keystate_serial = 0;
+    int input_state = 0;
     SHORT retval = 0;
     NTSTATUS status;
 
     while ((status = get_shared_input( GetCurrentThreadId(), &lock, &input_shm )) == STATUS_PENDING)
     {
-        ret = !!input_shm->keystate_lock; /* needs a request for sync_input_keystate */
+        /* when input is not locked needs a request for sync_input_keystate if desktop input state
+         * changed. */
+        input_state = input_shm->keystate_lock ? 1 : -1;
+        keystate_serial = input_shm->desktop_keystate_serial;
         retval = (signed char)(input_shm->keystate[vkey & 0xff] & 0x81);
     }
 
-    if (!ret) SERVER_START_REQ( get_key_state )
+    if (input_state < 0)
+    {
+        struct object_lock lock = OBJECT_LOCK_INIT;
+        const desktop_shm_t *desktop_shm;
+
+        while ((status = get_shared_desktop( &lock, &desktop_shm )) == STATUS_PENDING)
+            input_state = (keystate_serial == desktop_shm->keystate_serial);
+    }
+
+    if (input_state != 1) SERVER_START_REQ( get_key_state )
     {
         req->key = vkey;
         if (!wine_server_call( req )) retval = (signed char)(reply->state & 0x81);
