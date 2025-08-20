@@ -145,9 +145,20 @@ static HRESULT WINAPI wine_provider_get_DisplayName( IWineGameControllerProvider
 {
     struct provider *impl = impl_from_IWineGameControllerProvider( iface );
     DIDEVICEINSTANCEW instance = {.dwSize = sizeof(DIDEVICEINSTANCEW)};
+    UINT16 vid, pid;
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    if (FAILED(hr = IGameControllerProvider_get_HardwareVendorId( &impl->IGameControllerProvider_iface, &vid ))) return hr;
+    if (FAILED(hr = IGameControllerProvider_get_HardwareProductId( &impl->IGameControllerProvider_iface, &pid ))) return hr;
+
+    /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+    if (vid == 0x28de && pid == 0x11ff)
+    {
+        static const WCHAR name[] = L"Xbox 360 Controller for Windows";
+        return WindowsCreateString( name, wcslen( name ), value );
+    }
 
     if (FAILED(hr = IDirectInputDevice8_GetDeviceInfo( impl->dinput_device, &instance ))) return hr;
     return WindowsCreateString( instance.tszProductName, wcslen( instance.tszProductName ), value );
