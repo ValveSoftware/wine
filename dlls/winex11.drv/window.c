@@ -3481,23 +3481,8 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, HWND owner_hint, UIN
 {
     struct x11drv_win_data *data;
     UINT new_style = NtUserGetWindowLongW( hwnd, GWL_STYLE ), old_style;
-    struct window_rects old_rects, tmp_rects;
+    struct window_rects old_rects;
     BOOL was_fullscreen, activate = !(swp_flags & SWP_NOACTIVATE);
-    RECT virtual;
-
-    /* If the visible rect is fullscreen on any one of the monitors, limit the visible rect to the
-     * virtual screen rect. This is needed because adding __NET_WM_STATE_FULLSCREEN will make WMs
-     * move the window to cover exactly the monitor rect. If the application sets a visible rect
-     * slightly larger than the monitor rect and insists on changing to the rect that it previously
-     * set when the rect is changed by the WM, then the window rect will be repeatedly changed by
-     * the WM and the application, causing a flickering effect */
-    if (fullscreen)
-    {
-        virtual = NtUserGetVirtualScreenRect( MDT_RAW_DPI );
-        tmp_rects = *new_rects;
-        intersect_rect( &tmp_rects.visible, &tmp_rects.visible, &virtual );
-        new_rects = &tmp_rects;
-    }
 
     set_surface_window_rects( surface, new_rects );
 
