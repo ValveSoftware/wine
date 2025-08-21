@@ -945,54 +945,11 @@ static HRESULT handle_stream_type_change(struct video_decoder *decoder)
     return MF_E_TRANSFORM_STREAM_CHANGE;
 }
 
-static void buffer_fixup_nv12(IMFMediaBuffer *buffer, UINT dst_width, UINT src_width, UINT height)
-{
-    DWORD length = 0;
-    BYTE *src, *dst;
-    HRESULT hr;
-    UINT i;
-
-    dst_width = (dst_width + 1) & ~1;
-    height = (height + 1) & ~1;
-
-    IMFMediaBuffer_GetCurrentLength(buffer, &length);
-    if (length < (src_width + src_width / 2u) * height)
-    {
-        WARN("Unexpected buffer %p length %lu.\n", buffer, length);
-        return;
-    }
-
-    if (FAILED(hr = IMFMediaBuffer_Lock(buffer, &src, NULL, NULL)))
-    {
-        WARN("Failed to lock buffer %p, hr %#lx.\n", buffer, hr);
-        return;
-    }
-
-    for (i = 0, dst = src; i < height; ++i)
-    {
-        memmove(dst, src, dst_width);
-        dst += dst_width;
-        src += src_width;
-    }
-    for (i = 0; i < height; ++i)
-    {
-        memmove(dst, src, dst_width / 2u);
-        dst += dst_width / 2u;
-        src += src_width / 2u;
-    }
-
-    IMFMediaBuffer_Unlock(buffer);
-
-    if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, (dst_width + dst_width / 2u) * height)))
-        WARN("Failed to set buffer %p length, hr %#lx.\n", buffer, hr);
-}
-
 static HRESULT WINAPI transform_ProcessOutput(IMFTransform *iface, DWORD flags, DWORD count,
         MFT_OUTPUT_DATA_BUFFER *samples, DWORD *status)
 {
     struct video_decoder *decoder = impl_from_IMFTransform(iface);
-    UINT32 sample_size, frame_width;
-    BOOL fixup_nv12 = FALSE;
+    UINT32 sample_size;
     LONGLONG duration, sample_duration;
     IMFSample *sample;
     UINT64 frame_size, frame_rate;
@@ -1017,20 +974,7 @@ static HRESULT WINAPI transform_ProcessOutput(IMFTransform *iface, DWORD flags, 
         return hr;
     if (FAILED(hr = IMFMediaType_GetUINT64(decoder->output_type, &MF_MT_FRAME_SIZE, &frame_size)))
         return hr;
-    frame_width = frame_size >> 32;
-    if ((frame_width & 3) && (frame_width & 3) != 3 && IsEqualGUID(&subtype, &MFVideoFormat_NV12))
-    {
-        /* GStreamer uses a hard-coded 4-pixel width alignment for NV12. So far this has only been an issue
-         * when decoded from theora (for a cutscene in Resident Evil Village). Streams only provide samples
-         * to support D3D-awareness, which in Windows supports few compressed formats (theora support here
-         * is a hack). This issue could also occur when the sample is supplied externally, but there is no
-         * test case for it. This issue cannot occur with H.264 due to its own alignment requirement. */
-        if (!(decoder->output_info.dwFlags & MFT_OUTPUT_STREAM_PROVIDES_SAMPLES))
-            FIXME("Alignment fixup for external samples is unimplemented.\n");
-        frame_width = (frame_width + 3) & ~3;
-        fixup_nv12 = TRUE;
-    }
-    if (FAILED(hr = MFCalculateImageSize(&subtype, frame_width, (UINT32)frame_size, &sample_size)))
+    if (FAILED(hr = MFCalculateImageSize(&subtype, frame_size >> 32, (UINT32)frame_size, &sample_size)))
         return hr;
 
     if (decoder->output_info.dwFlags & MFT_OUTPUT_STREAM_PROVIDES_SAMPLES)
@@ -1095,8 +1039,6 @@ static HRESULT WINAPI transform_ProcessOutput(IMFTransform *iface, DWORD flags, 
 
     if (decoder->output_info.dwFlags & MFT_OUTPUT_STREAM_PROVIDES_SAMPLES)
     {
-        if (fixup_nv12)
-            buffer_fixup_nv12(decoder->temp_buffer, frame_size >> 32, frame_width, (UINT32)frame_size);
         if (hr == S_OK && FAILED(hr = output_sample(decoder, &samples->pSample, sample)))
             ERR("Failed to output sample, hr %#lx.\n", hr);
         IMFSample_Release(sample);
