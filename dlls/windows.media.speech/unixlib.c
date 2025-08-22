@@ -67,6 +67,9 @@ MAKE_FUNCPTR(vosk_recognizer_reset);
 
 static NTSTATUS process_attach( void *args )
 {
+    TRACE("setting OPENBLAS_NUM_THREADS to 1.\n");
+    setenv("OPENBLAS_NUM_THREADS", "1", 1);
+
     if (!(vosk_handle = dlopen(SONAME_LIBVOSK, RTLD_NOW)))
     {
         ERR_(winediag)("Wine is unable to load the Unix side dependencies for speech recognition. "
@@ -232,7 +235,6 @@ static NTSTATUS find_model_by_locale_and_path( const char *path, const char *loc
     sprintf(model_path, "%s/%s", path, best_match);
 
     TRACE("trying to load Vosk model %s.\n", debugstr_a(model_path));
-
     if ((*model = p_vosk_model_new(model_path)) != NULL)
         status = STATUS_SUCCESS;
 
