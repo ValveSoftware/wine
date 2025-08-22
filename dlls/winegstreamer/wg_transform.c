@@ -104,7 +104,7 @@ static struct wg_transform *get_transform(wg_transform_t trans)
     return (struct wg_transform *)(ULONG_PTR)trans;
 }
 
-static void align_video_info_planes(MFVideoInfo *video_info, gsize plane_align,
+static void align_video_info_planes(MFVideoInfo *video_info, gsize plane_align, guint stride,
         GstVideoInfo *info, GstVideoAlignment *align)
 {
     bool fix_nv12 = !plane_align && info->finfo->format == GST_VIDEO_FORMAT_NV12 && (info->width & 3) && (info->width & 3) != 3;
@@ -121,6 +121,27 @@ static void align_video_info_planes(MFVideoInfo *video_info, gsize plane_align,
         align->padding_bottom = max(align->padding_bottom, video_info->dwHeight - aperture->OffsetY.value - aperture->Area.cy);
         align->padding_top = aperture->OffsetX.value;
         align->padding_left = aperture->OffsetY.value;
+    }
+
+    if (stride)
+    {
+        /* The MF sample has a 2D buffer. Set padding_right to match its stride. */
+        guint width = align->padding_left + info->width + align->padding_right;
+        const GstVideoFormatInfo *finfo = info->finfo;
+        gint comp[GST_VIDEO_MAX_COMPONENTS];
+        gint pixel_stride;
+
+        gst_video_format_info_component(finfo, 0, comp);
+        pixel_stride = finfo->pixel_stride[comp[0]];
+
+        if (stride % pixel_stride)
+            GST_ERROR("Stride %u not aligned to pixel size", stride);
+        stride /= pixel_stride;
+
+        if (stride < width)
+            GST_ERROR("Invalid stride %u", stride);
+        else
+            align->padding_right += stride - width;
     }
 
     if (video_info->VideoFlags & MFVideoFlag_BottomUpLinearRep)
@@ -217,7 +238,7 @@ static void wg_video_buffer_pool_class_init(WgVideoBufferPoolClass *klass)
     pool_class->alloc_buffer = wg_video_buffer_pool_alloc_buffer;
 }
 
-static WgVideoBufferPool *wg_video_buffer_pool_create(GstCaps *caps, gsize plane_align,
+static WgVideoBufferPool *wg_video_buffer_pool_create(GstCaps *caps, gsize plane_align, gsize output_plane_stride,
         GstAllocator *allocator, MFVideoInfo *video_info, GstVideoAlignment *align)
 {
     WgVideoBufferPool *pool;
@@ -229,7 +250,7 @@ static WgVideoBufferPool *wg_video_buffer_pool_create(GstCaps *caps, gsize plane
 
     gst_video_info_from_caps(&pool->info, caps);
     max_size = pool->info.size;
-    align_video_info_planes(video_info, plane_align, &pool->info, align);
+    align_video_info_planes(video_info, plane_align, output_plane_stride, &pool->info, align);
     /* GStreamer assumes NV12 pools must accommodate a stride alignment of 4, but we use 2 */
     max_size = max(max_size, pool->info.size);
 
@@ -313,7 +334,7 @@ static gboolean transform_sink_query_allocation(struct wg_transform *transform, 
         return false;
 
     if (!(pool = wg_video_buffer_pool_create(caps, transform->attrs.output_plane_align,
-            transform->allocator, &transform->output_info, &align)))
+            transform->attrs.output_plane_stride, transform->allocator, &transform->output_info, &align)))
         return false;
 
     if ((params = gst_structure_new("video-meta",
@@ -1012,7 +1033,7 @@ NTSTATUS wg_transform_push_data(void *args)
     }
 
     if (!(buffer = gst_buffer_new_wrapped_full(GST_MEMORY_FLAG_READONLY, wg_sample_data(sample), sample->max_size,
-            0, sample->size, sample, wg_sample_free_notify)))
+            0, sample->stride ? sample->max_size : sample->size, sample, wg_sample_free_notify)))
     {
         GST_ERROR("Failed to allocate input buffer");
         return STATUS_NO_MEMORY;
@@ -1027,7 +1048,7 @@ NTSTATUS wg_transform_push_data(void *args)
     if (!strcmp(input_mime, "video/x-raw") && gst_video_info_from_caps(&video_info, transform->input_caps))
     {
         GstVideoAlignment align;
-        align_video_info_planes(&transform->input_info, 0, &video_info, &align);
+        align_video_info_planes(&transform->input_info, 0, sample->stride, &video_info, &align);
         buffer_add_video_meta(buffer, &video_info);
     }
 
@@ -1359,6 +1380,13 @@ NTSTATUS wg_transform_read_data(void *args)
     bool discard_data;
     NTSTATUS status;
 
+    if (sample->stride != transform->attrs.output_plane_stride)
+    {
+        GST_INFO("Reconfiguring to stride %u", sample->stride);
+        transform->attrs.output_plane_stride = sample->stride;
+        push_event(transform->my_sink, gst_event_new_reconfigure());
+    }
+
     if (!transform->output_sample && !get_transform_output(transform, sample))
     {
         sample->size = 0;
@@ -1382,7 +1410,7 @@ NTSTATUS wg_transform_read_data(void *args)
         dst_video_info = src_video_info;
 
         /* set the desired output buffer alignment and stride on the dest video info */
-        align_video_info_planes(&transform->output_info, plane_align, &dst_video_info, &align);
+        align_video_info_planes(&transform->output_info, plane_align, sample->stride, &dst_video_info, &align);
 
         /* copy the actual output buffer alignment and stride to the src video info */
         if ((meta = gst_buffer_get_video_meta(output_buffer)))

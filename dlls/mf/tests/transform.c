@@ -4840,7 +4840,7 @@ static void test_h264_decoder(BOOL use_2d_buffer)
         .attributes = output_sample_attributes,
         .sample_time = 0, .sample_duration = 333667,
         .total_length = aligned_width_2d * actual_height * 3 / 2,
-        .buffer_count = 1, .buffers = &output_buffer_desc_nv12, .todo_length = TRUE,
+        .buffer_count = 1, .buffers = &output_buffer_desc_nv12,
     };
     const struct buffer_desc output_buffer_desc_nv12_2d =
     {
