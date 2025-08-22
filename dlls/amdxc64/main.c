@@ -110,97 +110,106 @@ static const struct IAmdExtFfxApiVtbl AMDFSR4FFX_vtable = {
     AMDFSR4FFX_UpdateFfxApiProvider
 };
 
-struct AMDExtStub2
+struct AmdExtD3DShaderIntrinsics
 {
-    IAmdExtStub2 IAmdExtStub2_iface;
+    IAmdExtD3DShaderIntrinsics IAmdExtD3DShaderIntrinsics_iface;
     LONG ref;
 };
 
-struct AMDExtStub2* impl_from_IAMDExtStub2(IAmdExtStub2 *iface)
+struct AmdExtD3DShaderIntrinsics* impl_from_IAmdExtD3DShaderIntrinsics(IAmdExtD3DShaderIntrinsics *iface)
 {
-    return CONTAINING_RECORD(iface, struct AMDExtStub2, IAmdExtStub2_iface);
+    return CONTAINING_RECORD(iface, struct AmdExtD3DShaderIntrinsics, IAmdExtD3DShaderIntrinsics_iface);
 }
 
-ULONG STDMETHODCALLTYPE AMDExtStub2_AddRef(IAmdExtStub2 *iface)
+ULONG STDMETHODCALLTYPE AmdExtD3DShaderIntrinsics_AddRef(IAmdExtD3DShaderIntrinsics *iface)
 {
-    struct AMDExtStub2 *this = impl_from_IAMDExtStub2(iface);
+    struct AmdExtD3DShaderIntrinsics *this = impl_from_IAmdExtD3DShaderIntrinsics(iface);
     return InterlockedIncrement(&this->ref);
 }
 
-ULONG STDMETHODCALLTYPE AMDExtStub2_Release(IAmdExtStub2 *iface)
+ULONG STDMETHODCALLTYPE AmdExtD3DShaderIntrinsics_Release(IAmdExtD3DShaderIntrinsics *iface)
 {
-    struct AMDExtStub2 *this = impl_from_IAMDExtStub2(iface);
+    struct AmdExtD3DShaderIntrinsics *this = impl_from_IAmdExtD3DShaderIntrinsics(iface);
     ULONG ret = InterlockedDecrement(&this->ref);
     if (!ret) free(this);
     return ret;
 }
 
-HRESULT STDMETHODCALLTYPE AMDExtStub2_QueryInterface(IAmdExtStub2 *iface, REFIID iid, void **out)
+HRESULT STDMETHODCALLTYPE AmdExtD3DShaderIntrinsics_QueryInterface(IAmdExtD3DShaderIntrinsics *iface, REFIID iid, void **out)
 {
     FIXME("%p %s %p stub!\n", iface, debugstr_guid(iid), out);
     return E_NOINTERFACE;
 }
 
-void STDMETHODCALLTYPE AMDExtStub2_stub1(IAmdExtStub2 *iface)
+HRESULT STDMETHODCALLTYPE AmdExtD3DShaderIntrinsics_GetInfo(IAmdExtD3DShaderIntrinsics *iface,
+                                                            AmdExtD3DShaderIntrinsicsInfo *info)
 {
-    FIXME("%p stub!\n", iface);
+    FIXME("%p %p stub!\n", iface, info);
+    return S_OK;
 }
 
-void STDMETHODCALLTYPE AMDExtStub2_stub2(IAmdExtStub2 *iface, unsigned int unk)
+HRESULT STDMETHODCALLTYPE AmdExtD3DShaderIntrinsics_CheckSupport(IAmdExtD3DShaderIntrinsics *iface,
+                                                                 AmdExtD3DShaderIntrinsicsSupport opcode)
 {
-    FIXME("%p %u stub!\n", iface, unk);
+    if (opcode == AmdExtD3DShaderIntrinsicsSupport_Float8Conversion) return S_OK;
+    if (opcode == AmdExtD3DShaderIntrinsicsSupport_WaveMatrix) return S_OK;
+
+    FIXME("%p %u stub!\n", iface, opcode);
+    return S_OK;
 }
 
-void STDMETHODCALLTYPE AMDExtStub2_stub3(IAmdExtStub2 *iface)
+HRESULT STDMETHODCALLTYPE AmdExtD3DShaderIntrinsics_Enable(IAmdExtD3DShaderIntrinsics *iface)
 {
-    FIXME("%p stub!\n", iface);
+    TRACE("%p\n", iface);
+    /* shader intrinsics are always handled by vkd3d-proton */
+    return S_OK;
 }
 
-const static struct IAmdExtStub2Vtbl AMDSTUB2_vtable = {
-    AMDExtStub2_QueryInterface,
-    AMDExtStub2_AddRef,
-    AMDExtStub2_Release,
-    AMDExtStub2_stub1,
-    AMDExtStub2_stub2,
-    AMDExtStub2_stub3
+const static struct IAmdExtD3DShaderIntrinsicsVtbl AmdExtD3DShaderIntrinsics_vtable = {
+    AmdExtD3DShaderIntrinsics_QueryInterface,
+    AmdExtD3DShaderIntrinsics_AddRef,
+    AmdExtD3DShaderIntrinsics_Release,
+    AmdExtD3DShaderIntrinsics_GetInfo,
+    AmdExtD3DShaderIntrinsics_CheckSupport,
+    AmdExtD3DShaderIntrinsics_Enable
 };
 
-struct AMDExtStub1
+struct AmdExtD3DFactory
 {
-    IAmdExtStub1 IAmdExtStub1_iface;
+    IAmdExtD3DFactory IAmdExtD3DFactory_iface;
     LONG ref;
 };
 
-struct AMDExtStub1* impl_from_IAMDExtStub1(IAmdExtStub1 *iface)
+struct AmdExtD3DFactory* impl_from_IAmdExtD3DFactory(IAmdExtD3DFactory *iface)
 {
-    return CONTAINING_RECORD(iface, struct AMDExtStub1, IAmdExtStub1_iface);
+    return CONTAINING_RECORD(iface, struct AmdExtD3DFactory, IAmdExtD3DFactory_iface);
 }
 
-ULONG STDMETHODCALLTYPE AMDExtStub1_AddRef(IAmdExtStub1 *iface)
+ULONG STDMETHODCALLTYPE AmdExtD3DFactory_AddRef(IAmdExtD3DFactory *iface)
 {
-    struct AMDExtStub1 *this = impl_from_IAMDExtStub1(iface);
+    struct AmdExtD3DFactory *this = impl_from_IAmdExtD3DFactory(iface);
     return InterlockedIncrement(&this->ref);
 }
 
-ULONG STDMETHODCALLTYPE AMDExtStub1_Release(IAmdExtStub1 *iface)
+ULONG STDMETHODCALLTYPE AmdExtD3DFactory_Release(IAmdExtD3DFactory *iface)
 {
-    struct AMDExtStub1 *this = impl_from_IAMDExtStub1(iface);
+    struct AmdExtD3DFactory *this = impl_from_IAmdExtD3DFactory(iface);
     ULONG ret = InterlockedDecrement(&this->ref);
     if (!ret) free(this);
     return ret;
 }
 
-HRESULT STDMETHODCALLTYPE AmdExtStub1_QueryInterface2(IAmdExtStub1 *iface, void* unk, REFIID iid, void **out)
+HRESULT STDMETHODCALLTYPE AmdExtD3DFactory_CreateInterface(IAmdExtD3DFactory *iface, IUnknown *outer, REFIID iid, void **out)
 {
-    TRACE("%p %p %s %p\n", iface, unk, debugstr_guid(iid), out);
+    TRACE("%p %p %s %p\n", iface, outer, debugstr_guid(iid), out);
 
-    if(IsEqualGUID(iid, &IID_IAmdExtStub2))
+    if(IsEqualGUID(iid, &IID_IAmdExtD3DShaderIntrinsics))
     {
-        struct AMDExtStub2 *this = calloc(1, sizeof(struct AMDExtStub2));
+        struct AmdExtD3DShaderIntrinsics *this = calloc(1, sizeof(struct AmdExtD3DShaderIntrinsics));
 
-        this->IAmdExtStub2_iface.lpVtbl = &AMDSTUB2_vtable;
+        this->IAmdExtD3DShaderIntrinsics_iface.lpVtbl = &AmdExtD3DShaderIntrinsics_vtable;
         this->ref = 1;
-        *out = &this->IAmdExtStub2_iface;
+        *out = &this->IAmdExtD3DShaderIntrinsics_iface;
         return S_OK;
     } else {
         FIXME("unknown guid %s\n", debugstr_guid(iid));
@@ -209,16 +218,17 @@ HRESULT STDMETHODCALLTYPE AmdExtStub1_QueryInterface2(IAmdExtStub1 *iface, void*
     return E_NOINTERFACE;
 }
 
-HRESULT STDMETHODCALLTYPE AmdExtStub1_QueryInterface(IAmdExtStub1 *iface, REFIID iid, void **out)
+HRESULT STDMETHODCALLTYPE AmdExtD3DFactory_QueryInterface(IAmdExtD3DFactory *iface, REFIID iid, void **out)
 {
-    return AmdExtStub1_QueryInterface2(iface, NULL, iid, out);
+    TRACE("%p %s %p", iface, debugstr_guid(iid), out);
+    return E_NOINTERFACE;
 }
 
-static const struct IAmdExtStub1Vtbl AMDSTUB1_vtable = {
-    AmdExtStub1_QueryInterface,
-    AMDExtStub1_AddRef,
-    AMDExtStub1_Release,
-    AmdExtStub1_QueryInterface2
+static const struct IAmdExtD3DFactoryVtbl AmdExtD3DFactory_vtable = {
+    AmdExtD3DFactory_QueryInterface,
+    AmdExtD3DFactory_AddRef,
+    AmdExtD3DFactory_Release,
+    AmdExtD3DFactory_CreateInterface
 };
 
 HRESULT CDECL AmdExtD3DCreateInterface(IUnknown *outer, REFIID iid, void **obj)
@@ -234,11 +244,11 @@ HRESULT CDECL AmdExtD3DCreateInterface(IUnknown *outer, REFIID iid, void **obj)
         return S_OK;
     } else if (IsEqualGUID(iid, &IID_IAmdExtAntiLagApi)) {
         return ID3D12Device_QueryInterface((ID3D12Device *)outer, &IID_IAmdExtAntiLagApi, obj);
-    } else if(IsEqualGUID(iid, &IID_IAmdExtStub1)) {
-        struct AMDExtStub1 *this = calloc(1, sizeof(struct AMDExtStub1));
-        this->IAmdExtStub1_iface.lpVtbl = &AMDSTUB1_vtable;
+    } else if(IsEqualGUID(iid, &IID_IAmdExtD3DFactory)) {
+        struct AmdExtD3DFactory *this = calloc(1, sizeof(struct AmdExtD3DFactory));
+        this->IAmdExtD3DFactory_iface.lpVtbl = &AmdExtD3DFactory_vtable;
         this->ref = 1;
-        *obj = &this->IAmdExtStub1_iface;
+        *obj = &this->IAmdExtD3DFactory_iface;
         return S_OK;
     } else {
         FIXME("unknown guid: %s\n", debugstr_guid(iid));
