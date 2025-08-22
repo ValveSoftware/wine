@@ -103,4 +103,45 @@ asm( "\t.section .rdata,\"dr\"\n"
      "\t.rva __os_arm64x_helper7\n"
      "\t.rva __os_arm64x_helper8\n" );
 
+/*
+ * HACK, bug 25841: Provide an exit thunk for memcpy/memmove/memset to work around
+ * https://github.com/llvm/llvm-project/issues/101355
+ */
+asm( "\t.def $iexit_thunk$cdecl$i8$i8i8i8; .scl 2; .type 32; .endef\n"
+     "\t.section .wowthk$aa,\"xr\",discard,$iexit_thunk$cdecl$i8$i8i8i8\n"
+     "\t.globl  $iexit_thunk$cdecl$i8$i8i8i8\n"
+     "\t.p2align 2\n"
+     "$iexit_thunk$cdecl$i8$i8i8i8:\n"
+     "\t.seh_proc $iexit_thunk$cdecl$i8$i8i8i8\n"
+     "\tsub     sp, sp, #48\n"
+     "\t.seh_stackalloc 48\n"
+     "\tstp     x29, x30, [sp, #32]\n"
+     "\t.seh_save_fplr 32\n"
+     "\tadd     x29, sp, #32\n"
+     "\t.seh_add_fp 32\n"
+     "\t.seh_endprologue\n"
+     "\tadrp    x8, __os_arm64x_dispatch_call_no_redirect\n"
+     "\tldr     x16, [x8, :lo12:__os_arm64x_dispatch_call_no_redirect]\n"
+     "\tblr     x16\n"
+     "\tmov     x0, x8\n"
+     "\t.seh_startepilogue\n"
+     "\tldp     x29, x30, [sp, #32]\n"
+     "\t.seh_save_fplr  32\n"
+     "\tadd     sp, sp, #48\n"
+     "\t.seh_stackalloc 48\n"
+     "\t.seh_endepilogue\n"
+     "\tret\n"
+     "\t.seh_endproc\n"
+
+     "\t.section .hybmp$x,\"yi\"\n"
+     "\t.symidx memcpy\n"
+     "\t.symidx $iexit_thunk$cdecl$i8$i8i8i8\n"
+     "\t.word 4\n"
+     "\t.symidx memmove\n"
+     "\t.symidx $iexit_thunk$cdecl$i8$i8i8i8\n"
+     "\t.word 4\n"
+     "\t.symidx memset\n"
+     "\t.symidx $iexit_thunk$cdecl$i8$i8i8i8\n"
+     "\t.word 4\n" );
+
 #endif /* __arm64ec__ */
