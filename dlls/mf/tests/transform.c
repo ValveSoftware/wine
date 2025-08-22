@@ -1183,7 +1183,8 @@ static void enum_mf_media_buffers(IMFSample *sample, const struct sample_desc *s
         ok(hr == S_OK, "GetBufferByIndex returned %#lx\n", hr);
         ok(i < sample_desc->buffer_count, "got unexpected buffer\n");
 
-        callback(buffer, sample_desc->buffers + i, context);
+        if (i < sample_desc->buffer_count)
+            callback(buffer, sample_desc->buffers + i, context);
 
         IMFMediaBuffer_Release(buffer);
         winetest_pop_context();
@@ -1219,6 +1220,8 @@ static void enum_mf_samples(IMFCollection *samples, const struct sample_desc *co
 
         IMFSample_Release(sample);
         winetest_pop_context();
+        if (!state.sample.buffer_count)
+            break;
     }
     ok(hr == E_INVALIDARG, "GetElement returned %#lx\n", hr);
 }
