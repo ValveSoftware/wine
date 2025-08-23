@@ -174,6 +174,171 @@ const static struct IAmdExtD3DShaderIntrinsicsVtbl AmdExtD3DShaderIntrinsics_vta
     AmdExtD3DShaderIntrinsics_Enable
 };
 
+struct AmdExtD3DDevice8
+{
+    IAmdExtD3DDevice8 IAmdExtD3DDevice8_iface;
+    LONG ref;
+};
+
+struct AmdExtD3DDevice8 *impl_from_IAmdExtD3DDevice8(IAmdExtD3DDevice8 *iface)
+{
+    return CONTAINING_RECORD(iface, struct AmdExtD3DDevice8, IAmdExtD3DDevice8_iface);
+}
+
+HRESULT STDMETHODCALLTYPE AmdExtD3DDevice8_QueryInterface(IAmdExtD3DDevice8 *iface, REFIID iid, void **out)
+{
+    TRACE("%p %s %p\n", iface, debugstr_guid(iid), out);
+    return E_NOINTERFACE;
+}
+
+ULONG STDMETHODCALLTYPE AmdExtD3DDevice8_AddRef(IAmdExtD3DDevice8 *iface)
+{
+    struct AmdExtD3DDevice8* this = impl_from_IAmdExtD3DDevice8(iface);
+    return InterlockedIncrement(&this->ref);
+}
+
+ULONG STDMETHODCALLTYPE AmdExtD3DDevice8_Release(IAmdExtD3DDevice8 *iface)
+{
+    struct AmdExtD3DDevice8* this = impl_from_IAmdExtD3DDevice8(iface);
+    ULONG ret = InterlockedDecrement(&this->ref);
+    if (!ret) free(this);
+    return ret;
+}
+
+HRESULT STDMETHODCALLTYPE AmdExtD3DDevice8_CreateGraphicsPipelineState(IAmdExtD3DDevice8 *iface,
+                                                                       const AmdExtD3DCreateInfo *pCreateInfo,
+                                                                       const D3D12_GRAPHICS_PIPELINE_STATE_DESC *pDesc,
+                                                                       REFIID iid, void **ppPipelineState)
+{
+    FIXME("%p %p %p %s %p stub!\n", iface, pCreateInfo, pDesc, debugstr_guid(iid), ppPipelineState);
+    return E_NOTIMPL;
+}
+
+void STDMETHODCALLTYPE AmdExtD3DDevice8_PushMarker(IAmdExtD3DDevice8 *iface, ID3D12GraphicsCommandList *pGfxCmdList,
+                                                   const char *pMarkerData)
+{
+    FIXME("%p %p %s stub!\n", iface, pGfxCmdList, pMarkerData);
+}
+
+void STDMETHODCALLTYPE AmdExtD3DDevice8_PopMarker(IAmdExtD3DDevice8 *iface, ID3D12GraphicsCommandList *pGfxCmdList)
+{
+    FIXME("%p %p stub!\n", iface, pGfxCmdList);
+}
+
+void STDMETHODCALLTYPE AmdExtD3DDevice8_SetMarker(IAmdExtD3DDevice8 *iface, ID3D12GraphicsCommandList *pGfxCmdList,
+                                                  const char *pMarkerData)
+{
+    FIXME("%p %p %s stub!\n", iface, pGfxCmdList, pMarkerData);
+}
+
+HRESULT STDMETHODCALLTYPE AmdExtD3DDevice8_CheckExtFeatureSupport(IAmdExtD3DDevice8 *iface, AmdExtD3DCheckFeatureSupportType type,
+                                                                  void *data, SIZE_T size)
+{
+    FIXME("%p %u %p %lu stub!\n", iface, type, data, (ULONG)size);
+    return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE AmdExtD3DDevice8_CreateComputePipelineState(IAmdExtD3DDevice8 *iface,
+                                                                      const AmdExtD3DCreateInfo* pAmdExtCreateInfo,
+                                                                      const D3D12_COMPUTE_PIPELINE_STATE_DESC* pDesc,
+                                                                      REFIID iid, void **ppPipelineState)
+{
+    FIXME("%p %p %p %s %p stub!\n", iface, pAmdExtCreateInfo, pDesc, debugstr_guid(iid), ppPipelineState);
+    return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE AmdExtD3DDevice8_CreatePipelineState(IAmdExtD3DDevice8 *iface,
+                                                               const AmdExtD3DCreateInfo *pAmdExtCreateInfo,
+                                                               const D3D12_PIPELINE_STATE_STREAM_DESC* pDesc,
+                                                               REFIID iid, void **ppPipelineState)
+{
+    FIXME("%p %p %p %s %p stub!\n", iface, pAmdExtCreateInfo, pDesc, debugstr_guid(iid), ppPipelineState);
+    return E_NOTIMPL;
+}
+
+void STDMETHODCALLTYPE AmdExtD3DDevice8_SetPrimitiveTopology(IAmdExtD3DDevice8 *iface,
+                                                             ID3D12GraphicsCommandList *pGfxCmdList,
+                                                             AmdExtD3DPrimitiveTopology topology)
+{
+    FIXME("%p %p %u stub!\n", iface, pGfxCmdList, topology);
+}
+
+HRESULT STDMETHODCALLTYPE AmdExtD3DDevice8_CreateComputePipelineFromElf(IAmdExtD3DDevice8 *iface,
+                                                                        AmdExtD3DPipelineElfInfo *pAmdExtCreateInfo,
+                                                                        REFIID iid, void **ppPipelineState)
+{
+    FIXME("%p %p %s %p stub!\n", iface, pAmdExtCreateInfo, debugstr_guid(iid), ppPipelineState);
+    return E_NOTIMPL;
+}
+
+void STDMETHODCALLTYPE AmdExtD3DDevice8_SetKernelArguments(IAmdExtD3DDevice8 *iface,
+                                                           ID3D12GraphicsCommandList *pCmdList,
+                                                           ULONG first, ULONG count, const void *ppValues)
+{
+    FIXME("%p %p %lu %lu %p stub!\n", iface, pCmdList, first, count, ppValues);
+}
+
+void STDMETHODCALLTYPE AmdExtD3DDevice8_GetGpuRtInterfaceVersion(IAmdExtD3DDevice8 *iface,
+                                                                 AmdExtD3DGpuRtVersion *pInterfaceVersion)
+{
+    FIXME("%p %p stub!\n", iface, pInterfaceVersion);
+}
+
+void STDMETHODCALLTYPE AmdExtD3DDevice8_GetGpuRtBinaryVersion(IAmdExtD3DDevice8 *iface,
+                                                              AmdExtD3DGpuRtVersion *pBinaryVersion)
+{
+    FIXME("%p %p stub!\n", iface, pBinaryVersion);
+}
+
+HRESULT STDMETHODCALLTYPE AmdExtD3DDevice8_CreateComputePipelineCrossCompile(IAmdExtD3DDevice8 *iface,
+                                                                             const AmdExtD3DPipelineCrossCompileInfo* pAmdExtCreateInfo,
+                                                                             REFIID iid, void **ppPipelineState)
+{
+    FIXME("%p %p %s %p stub!\n", iface, pAmdExtCreateInfo, debugstr_guid(iid), ppPipelineState);
+    return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE AmdExtD3DDevice8_GetWaveMatrixProperties(IAmdExtD3DDevice8 *iface,
+                                                                   SIZE_T *pCount, AmdExtWaveMatrixProperties *pProperties)
+{
+    static AmdExtWaveMatrixProperties prop[1] = {{
+        16, 16, 16, AMD_EXT_WMMA_TYPE_FP8, AMD_EXT_WMMA_TYPE_FP8,
+        AMD_EXT_WMMA_TYPE_FP32, AMD_EXT_WMMA_TYPE_FP32, FALSE}};
+
+    TRACE("%p %p %p\n", iface, pCount, pProperties);
+
+    if (!pCount) return E_INVALIDARG;
+
+    if (*pCount >= 1)
+    {
+        *pCount = 1;
+        memcpy(pProperties, prop, sizeof(prop));
+        return S_OK;
+    } /* FIXME: Handle pCount == 0 */
+
+    return S_OK;
+}
+
+static const struct IAmdExtD3DDevice8Vtbl AmdExtD3DDevice8_vtable = {
+    AmdExtD3DDevice8_QueryInterface,
+    AmdExtD3DDevice8_AddRef,
+    AmdExtD3DDevice8_Release,
+    AmdExtD3DDevice8_CreateGraphicsPipelineState,
+    AmdExtD3DDevice8_PushMarker,
+    AmdExtD3DDevice8_PopMarker,
+    AmdExtD3DDevice8_SetMarker,
+    AmdExtD3DDevice8_CheckExtFeatureSupport,
+    AmdExtD3DDevice8_CreateComputePipelineState,
+    AmdExtD3DDevice8_CreatePipelineState,
+    AmdExtD3DDevice8_SetPrimitiveTopology,
+    AmdExtD3DDevice8_CreateComputePipelineFromElf,
+    AmdExtD3DDevice8_SetKernelArguments,
+    AmdExtD3DDevice8_GetGpuRtInterfaceVersion,
+    AmdExtD3DDevice8_GetGpuRtBinaryVersion,
+    AmdExtD3DDevice8_CreateComputePipelineCrossCompile,
+    AmdExtD3DDevice8_GetWaveMatrixProperties
+};
+
 struct AmdExtD3DFactory
 {
     IAmdExtD3DFactory IAmdExtD3DFactory_iface;
@@ -203,13 +368,18 @@ HRESULT STDMETHODCALLTYPE AmdExtD3DFactory_CreateInterface(IAmdExtD3DFactory *if
 {
     TRACE("%p %p %s %p\n", iface, outer, debugstr_guid(iid), out);
 
-    if(IsEqualGUID(iid, &IID_IAmdExtD3DShaderIntrinsics))
+    if (IsEqualGUID(iid, &IID_IAmdExtD3DShaderIntrinsics))
     {
         struct AmdExtD3DShaderIntrinsics *this = calloc(1, sizeof(struct AmdExtD3DShaderIntrinsics));
-
         this->IAmdExtD3DShaderIntrinsics_iface.lpVtbl = &AmdExtD3DShaderIntrinsics_vtable;
         this->ref = 1;
         *out = &this->IAmdExtD3DShaderIntrinsics_iface;
+        return S_OK;
+    } else if (IsEqualGUID(iid, &IID_IAmdExtD3DDevice8)) {
+        struct AmdExtD3DDevice8 *this = calloc(1, sizeof(struct AmdExtD3DDevice8));
+        this->IAmdExtD3DDevice8_iface.lpVtbl = &AmdExtD3DDevice8_vtable;
+        this->ref = 1;
+        *out = &this->IAmdExtD3DDevice8_iface;
         return S_OK;
     } else {
         FIXME("unknown guid %s\n", debugstr_guid(iid));
