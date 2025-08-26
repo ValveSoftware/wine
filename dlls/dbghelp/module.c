@@ -1346,6 +1346,14 @@ BOOL  WINAPI EnumerateLoadedModulesW64(HANDLE process,
     WCHAR*              wowdir = NULL;
     size_t              sysdir_len = 0, wowdir_len = 0;
 
+    TRACE("process %p.\n", process);
+
+    if (GetCurrentProcessId() == GetProcessId(process))
+    {
+        TRACE("same process.\n");
+        process = GetCurrentProcess();
+    }
+
     /* process might not be a handle to a live process */
     if (!IsWow64Process2(process, &pcs_machine, &native_machine))
     {
@@ -1426,6 +1434,7 @@ BOOL  WINAPI EnumerateLoadedModulesW64(HANDLE process,
     HeapFree(GetProcessHeap(), 0, hmods);
     HeapFree(GetProcessHeap(), 0, sysdir);
 
+    TRACE("done, count %d.\n", count);
     return count != 0;
 }
 
