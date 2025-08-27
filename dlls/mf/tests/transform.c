@@ -4518,7 +4518,7 @@ failed:
     CoUninitialize();
 }
 
-static void test_h264_decoder(void)
+static void test_h264_decoder(BOOL use_2d_buffer)
 {
     const GUID *const class_id = &CLSID_MSH264DecoderMFT;
     const struct transform_info expect_mft_info =
@@ -4560,7 +4560,7 @@ static void test_h264_decoder(void)
         ATTR_UINT32(CODECAPI_AVDecVideoAcceleration_H264, 1),
         {0},
     };
-    static const DWORD input_width = 120, input_height = 248;
+    static const DWORD input_width = 120, input_height = 248, aligned_width_2d = 128;
     const media_type_desc default_outputs[] =
     {
         {
@@ -4804,6 +4804,20 @@ static void test_h264_decoder(void)
         .cbSize = 0x1000,
     };
 
+    const struct attribute_desc nv12_default_stride[] =
+    {
+        ATTR_GUID(MF_MT_MAJOR_TYPE, MFMediaType_Video, .required = TRUE),
+        ATTR_GUID(MF_MT_SUBTYPE, MFVideoFormat_NV12, .required = TRUE),
+        ATTR_RATIO(MF_MT_FRAME_SIZE, actual_width, actual_height, .required = TRUE),
+        {0},
+    };
+    const struct attribute_desc i420_default_stride[] =
+    {
+        ATTR_GUID(MF_MT_MAJOR_TYPE, MFMediaType_Video, .required = TRUE),
+        ATTR_GUID(MF_MT_SUBTYPE, MFVideoFormat_I420, .required = TRUE),
+        ATTR_RATIO(MF_MT_FRAME_SIZE, actual_width, actual_height, .required = TRUE),
+        {0},
+    };
     const struct attribute_desc output_sample_attributes[] =
     {
         ATTR_UINT32(MFSampleExtension_CleanPoint, 1),
@@ -4821,6 +4835,25 @@ static void test_h264_decoder(void)
         .sample_time = 0, .sample_duration = 333667,
         .buffer_count = 1, .buffers = &output_buffer_desc_nv12,
     };
+    const struct sample_desc output_sample_desc_nv12_1d =
+    {
+        .attributes = output_sample_attributes,
+        .sample_time = 0, .sample_duration = 333667,
+        .total_length = aligned_width_2d * actual_height * 3 / 2,
+        .buffer_count = 1, .buffers = &output_buffer_desc_nv12, .todo_length = TRUE,
+    };
+    const struct buffer_desc output_buffer_desc_nv12_2d =
+    {
+        .length = aligned_width_2d * actual_height * 3 / 2,
+        .compare = compare_nv12, .compare_rect = {.right = 82, .bottom = 84},
+        .dump = dump_nv12, .size = {.cx = aligned_width_2d, .cy = actual_height},
+    };
+    const struct sample_desc output_sample_desc_nv12_2d =
+    {
+        .attributes = output_sample_attributes,
+        .sample_time = 0, .sample_duration = 333667,
+        .buffer_count = 1, .buffers = &output_buffer_desc_nv12_2d,
+    };
     const struct buffer_desc output_buffer_desc_i420 =
     {
         .length = actual_width * actual_height * 3 / 2,
@@ -4833,9 +4866,29 @@ static void test_h264_decoder(void)
         .sample_time = 333667, .sample_duration = 333667,
         .buffer_count = 1, .buffers = &output_buffer_desc_i420,
     };
+    const struct sample_desc output_sample_desc_i420_1d =
+    {
+        .attributes = output_sample_attributes,
+        .sample_time = 333667, .sample_duration = 333667,
+        .total_length = aligned_width_2d * actual_height * 3 / 2,
+        .buffer_count = 1, .buffers = &output_buffer_desc_i420, .todo_length = TRUE,
+    };
+    const struct buffer_desc output_buffer_desc_i420_2d =
+    {
+        .length = aligned_width_2d * actual_height * 3 / 2,
+        .compare = compare_i420, .compare_rect = {.right = 82, .bottom = 84},
+        .dump = dump_i420, .size = {.cx = aligned_width_2d, .cy = actual_height},
+    };
+    const struct sample_desc output_sample_desc_i420_2d =
+    {
+        .attributes = output_sample_attributes,
+        .sample_time = 333667, .sample_duration = 333667,
+        .buffer_count = 1, .buffers = &output_buffer_desc_i420_2d,
+    };
 
     MFT_REGISTER_TYPE_INFO input_type = {MFMediaType_Video, MFVideoFormat_H264};
     MFT_REGISTER_TYPE_INFO output_type = {MFMediaType_Video, MFVideoFormat_NV12};
+    const struct attribute_desc *sample_attr_desc;
     IMFSample *input_sample, *output_sample;
     const BYTE *h264_encoded_data;
     IMFCollection *output_samples;
@@ -4848,10 +4901,16 @@ static void test_h264_decoder(void)
     DWORD flags;
     HRESULT hr;
 
+    if (use_2d_buffer && !pMFCreateMediaBufferFromMediaType)
+    {
+        win_skip("MFCreateMediaBufferFromMediaType() is unsupported.\n");
+        return;
+    }
+
     hr = CoInitialize(NULL);
     ok(hr == S_OK, "Failed to initialize, hr %#lx.\n", hr);
 
-    winetest_push_context("h264dec");
+    winetest_push_context("h264dec %s", use_2d_buffer ? "2d" : "1d");
 
     if (!check_mft_enum(MFT_CATEGORY_VIDEO_DECODER, &input_type, &output_type, class_id))
         goto failed;
@@ -4960,10 +5019,11 @@ static void test_h264_decoder(void)
     ok(output_status == 0, "got output[0].dwStatus %#lx\n", output_status);
 
     i = 0;
+    sample_attr_desc = use_2d_buffer ? nv12_default_stride : NULL;
     input_sample = next_h264_sample(&h264_encoded_data, &h264_encoded_data_len);
     while (1)
     {
-        output_sample = create_sample(NULL, output_info.cbSize);
+        output_sample = create_sample_(NULL, actual_width * actual_height * 3 / 2, sample_attr_desc);
         hr = check_mft_process_output(transform, output_sample, &output_status);
         if (hr != MF_E_TRANSFORM_NEED_MORE_INPUT) break;
 
@@ -5033,7 +5093,7 @@ static void test_h264_decoder(void)
     hr = MFCreateCollection(&output_samples);
     ok(hr == S_OK, "MFCreateCollection returned %#lx\n", hr);
 
-    output_sample = create_sample(NULL, output_info.cbSize);
+    output_sample = create_sample_(NULL, actual_width * actual_height * 3 / 2, sample_attr_desc);
     hr = check_mft_process_output(transform, output_sample, &output_status);
     ok(hr == S_OK, "ProcessOutput returned %#lx\n", hr);
     ok(output_status == 0, "got output[0].dwStatus %#lx\n", output_status);
@@ -5042,8 +5102,18 @@ static void test_h264_decoder(void)
     ref = IMFSample_Release(output_sample);
     ok(ref == 1, "Release returned %ld\n", ref);
 
-    ret = check_mf_sample_collection(output_samples, &output_sample_desc_nv12, L"nv12frame.bmp");
-    ok(ret == 0, "got %lu%% diff\n", ret);
+    if (!use_2d_buffer)
+    {
+        ret = check_mf_sample_collection(output_samples, &output_sample_desc_nv12, L"nv12frame.bmp");
+        ok(ret == 0, "got %lu%% diff\n", ret);
+    }
+    else
+    {
+        ret = check_mf_sample_collection(output_samples, &output_sample_desc_nv12_1d, L"nv12frame.bmp");
+        ok(ret == 0, "got %lu%% diff\n", ret);
+        ret = check_2d_mf_sample_collection(output_samples, &output_sample_desc_nv12_2d, L"nv12frame-2d.bmp");
+        ok(ret == 0, "2d got %lu%% diff\n", ret);
+    }
     IMFCollection_Release(output_samples);
 
     /* we can change it, but only with the correct frame size */
@@ -5060,7 +5130,8 @@ static void test_h264_decoder(void)
 
     check_mft_get_output_current_type_(__LINE__, transform, expect_new_output_type_desc, FALSE, TRUE);
 
-    output_sample = create_sample(NULL, actual_width * actual_height * 2);
+    sample_attr_desc = use_2d_buffer ? i420_default_stride : NULL;
+    output_sample = create_sample_(NULL, actual_width * actual_height * 3 / 2, sample_attr_desc);
     hr = check_mft_process_output(transform, output_sample, &output_status);
     todo_wine
     ok(hr == MF_E_TRANSFORM_STREAM_CHANGE, "ProcessOutput returned %#lx\n", hr);
@@ -5090,7 +5161,7 @@ static void test_h264_decoder(void)
     hr = MFCreateCollection(&output_samples);
     ok(hr == S_OK, "MFCreateCollection returned %#lx\n", hr);
 
-    output_sample = create_sample(NULL, actual_width * actual_height * 2);
+    output_sample = create_sample_(NULL, actual_width * actual_height * 3 / 2, sample_attr_desc);
     hr = check_mft_process_output(transform, output_sample, &output_status);
     ok(hr == S_OK, "ProcessOutput returned %#lx\n", hr);
     ok(output_status == 0, "got output[0].dwStatus %#lx\n", output_status);
@@ -5099,14 +5170,26 @@ static void test_h264_decoder(void)
     ref = IMFSample_Release(output_sample);
     ok(ref == 1, "Release returned %ld\n", ref);
 
-    ret = check_mf_sample_collection(output_samples, &expect_output_sample_i420, L"i420frame.bmp");
-    /* wg_transform_set_output_format() should convert already processed samples instead of dropping,
-     * but test failure seems to depend upon the gstreamer version */
-    flaky_wine
-    ok(ret == 0, "got %lu%% diff\n", ret);
+    if (!use_2d_buffer)
+    {
+        ret = check_mf_sample_collection(output_samples, &expect_output_sample_i420, L"i420frame.bmp");
+        /* wg_transform_set_output_format() should convert already processed samples instead of dropping,
+         * but test failure seems to depend upon the gstreamer version */
+        flaky_wine
+        ok(ret == 0, "got %lu%% diff\n", ret);
+    }
+    else
+    {
+        ret = check_mf_sample_collection(output_samples, &output_sample_desc_i420_1d, L"i420frame.bmp");
+        flaky_wine /* see above */
+        ok(ret == 0, "got %lu%% diff\n", ret);
+        ret = check_2d_mf_sample_collection(output_samples, &output_sample_desc_i420_2d, L"i420frame-2d.bmp");
+        flaky_wine /* see above */
+        ok(ret == 0, "2d got %lu%% diff\n", ret);
+    }
     IMFCollection_Release(output_samples);
 
-    output_sample = create_sample(NULL, actual_width * actual_height * 2);
+    output_sample = create_sample_(NULL, actual_width * actual_height * 3 / 2, sample_attr_desc);
     hr = check_mft_process_output(transform, output_sample, &output_status);
     todo_wine_if(hr == S_OK)  /* when VA-API plugin is used */
     ok(hr == MF_E_TRANSFORM_NEED_MORE_INPUT, "ProcessOutput returned %#lx\n", hr);
@@ -11368,7 +11451,8 @@ START_TEST(transform)
     test_wma_decoder_dmo_input_type();
     test_wma_decoder_dmo_output_type();
     test_h264_encoder();
-    test_h264_decoder();
+    test_h264_decoder(FALSE);
+    test_h264_decoder(TRUE);
     test_h264_decoder_timestamps();
     test_h264_decoder_alignment();
     test_wmv_encoder();

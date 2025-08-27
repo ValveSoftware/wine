@@ -122,6 +122,10 @@ nv12frame-flip-2d.bmp RCDATA nv12frame-flip-2d.bmp
 i420frame.bmp RCDATA i420frame.bmp
 
 /* Generated from running the tests on Windows */
+/* @makedep: i420frame.bmp */
+i420frame-2d.bmp RCDATA i420frame-2d.bmp
+
+/* Generated from running the tests on Windows */
 /* @makedep: rgb32frame.bmp */
 rgb32frame.bmp RCDATA rgb32frame.bmp
 
