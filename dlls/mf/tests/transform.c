@@ -8615,7 +8615,7 @@ static void test_wmv_decoder_media_object(void)
     winetest_pop_context();
 }
 
-static void test_color_convert(void)
+static void test_color_convert(BOOL use_2d_buffer)
 {
     const GUID *const class_id = &CLSID_CColorConvertDMO;
     const struct transform_info expect_mft_info =
@@ -8866,6 +8866,7 @@ static void test_color_convert(void)
         const struct attribute_desc *expect_output_type_desc;
         const WCHAR *result_bitmap;
         ULONG delta;
+        const struct attribute_desc *flipped_output_type_desc;
     }
     color_conversion_tests[] =
     {
@@ -8894,10 +8895,31 @@ static void test_color_convert(void)
             .delta = 4, /* Windows return 0, Wine needs 4 */
         },
 
+        {
+            /* YUV -> RGB (negative stride with positive sample stride)
+             * Sample stride is ignored when writing the data. */
+            .output_type_desc = output_type_desc_negative_stride,
+            .expect_output_type_desc = expect_output_type_desc_negative_stride,
+            .result_bitmap = L"rgb32frame-flip.bmp",
+            .delta = 6,
+            .flipped_output_type_desc = output_type_desc_positive_stride,
+        },
+
+        {
+            /* YUV -> RGB (positive stride with negative sample stride)
+             * Sample stride is ignored when writing the data. */
+            .output_type_desc = output_type_desc_positive_stride,
+            .expect_output_type_desc = expect_output_type_desc,
+            .result_bitmap = L"rgb32frame.bmp",
+            .delta = 4, /* Windows return 0, Wine needs 4 */
+            .flipped_output_type_desc = output_type_desc_negative_stride,
+        },
+
     };
 
     MFT_REGISTER_TYPE_INFO output_type = {MFMediaType_Video, MFVideoFormat_NV12};
     MFT_REGISTER_TYPE_INFO input_type = {MFMediaType_Video, MFVideoFormat_I420};
+    const struct attribute_desc *sample_attr_desc;
     IMFSample *input_sample, *output_sample;
     IMFCollection *output_samples;
     DWORD length, output_status;
@@ -8908,10 +8930,16 @@ static void test_color_convert(void)
     ULONG i, ret, ref;
     HRESULT hr;
 
+    if (use_2d_buffer && !pMFCreateMediaBufferFromMediaType)
+    {
+        win_skip("MFCreateMediaBufferFromMediaType() is unsupported.\n");
+        return;
+    }
+
     hr = CoInitialize(NULL);
     ok(hr == S_OK, "Failed to initialize, hr %#lx.\n", hr);
 
-    winetest_push_context("colorconv");
+    winetest_push_context("colorconv %s", use_2d_buffer ? "2d" : "1d");
 
     if (!check_mft_enum(MFT_CATEGORY_VIDEO_EFFECT, &input_type, &output_type, class_id))
         goto failed;
@@ -8970,6 +8998,10 @@ static void test_color_convert(void)
 
     for (i = 0; i < ARRAY_SIZE(color_conversion_tests); i++)
     {
+        /* flipped sample tests apply only to 2D buffers */
+        if (!use_2d_buffer && color_conversion_tests[i].flipped_output_type_desc)
+            continue;
+
         winetest_push_context("color conversion #%lu", i);
         check_mft_set_output_type_required(transform, color_conversion_tests[i].output_type_desc);
         check_mft_set_output_type(transform, color_conversion_tests[i].output_type_desc, S_OK);
@@ -9002,7 +9034,10 @@ static void test_color_convert(void)
         hr = MFCreateCollection(&output_samples);
         ok(hr == S_OK, "MFCreateCollection returned %#lx\n", hr);
 
-        output_sample = create_sample(NULL, output_info.cbSize);
+        sample_attr_desc = use_2d_buffer ? color_conversion_tests[i].output_type_desc : NULL;
+        if (color_conversion_tests[i].flipped_output_type_desc)
+            sample_attr_desc = color_conversion_tests[i].flipped_output_type_desc;
+        output_sample = create_sample_(NULL, output_info.cbSize, sample_attr_desc);
         hr = check_mft_process_output(transform, output_sample, &output_status);
         ok(hr == S_OK, "ProcessOutput returned %#lx\n", hr);
         ok(output_status == 0, "got output[0].dwStatus %#lx\n", output_status);
@@ -9013,15 +9048,20 @@ static void test_color_convert(void)
 
         ret = check_mf_sample_collection(output_samples, &output_sample_desc, color_conversion_tests[i].result_bitmap);
         ok(ret <= color_conversion_tests[i].delta, "got %lu%% diff\n", ret);
+        if (use_2d_buffer)
+        {
+            ret = check_2d_mf_sample_collection(output_samples, &output_sample_desc, color_conversion_tests[i].result_bitmap);
+            ok(ret <= color_conversion_tests[i].delta, "got %lu%% diff\n", ret);
+        }
         IMFCollection_Release(output_samples);
 
-        output_sample = create_sample(NULL, output_info.cbSize);
+        output_sample = create_sample_(NULL, output_info.cbSize, sample_attr_desc);
         hr = check_mft_process_output(transform, output_sample, &output_status);
         ok(hr == MF_E_TRANSFORM_NEED_MORE_INPUT, "ProcessOutput returned %#lx\n", hr);
         ok(output_status == 0, "got output[0].dwStatus %#lx\n", output_status);
         hr = IMFSample_GetTotalLength(output_sample, &length);
         ok(hr == S_OK, "GetTotalLength returned %#lx\n", hr);
-        ok(length == 0, "got length %lu\n", length);
+        ok(length == 0 || broken(use_2d_buffer && length == output_info.cbSize), "got length %lu\n", length);
         ret = IMFSample_Release(output_sample);
         ok(ret == 0, "Release returned %lu\n", ret);
         winetest_pop_context();
@@ -11520,7 +11560,8 @@ START_TEST(transform)
     test_wmv_decoder_dmo_get_size_info();
     test_wmv_decoder_media_object();
     test_audio_convert();
-    test_color_convert();
+    test_color_convert(FALSE);
+    test_color_convert(TRUE);
     test_video_processor(FALSE);
     test_video_processor(TRUE);
     test_mp3_decoder();
