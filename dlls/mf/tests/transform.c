@@ -1775,7 +1775,7 @@ static BOOL is_sample_copier_available_type(IMFMediaType *type)
     return IsEqualGUID(&major, &MFMediaType_Video) || IsEqualGUID(&major, &MFMediaType_Audio);
 }
 
-static void test_sample_copier(void)
+static void test_sample_copier(BOOL use_2d_buffer)
 {
     static const struct attribute_desc expect_transform_attributes[] =
     {
@@ -1798,8 +1798,13 @@ static void test_sample_copier(void)
         win_skip("MFCreateSampleCopierMFT() is not available.\n");
         return;
     }
+    if (use_2d_buffer && !pMFCreateMediaBufferFromMediaType)
+    {
+        win_skip("MFCreateMediaBufferFromMediaType() is unsupported.\n");
+        return;
+    }
 
-    winetest_push_context("copier");
+    winetest_push_context("copier %s", use_2d_buffer ? "2d" : "1d");
 
     hr = pMFCreateSampleCopierMFT(&copier);
     ok(hr == S_OK, "Failed to create sample copier, hr %#lx.\n", hr);
@@ -1929,7 +1934,10 @@ static void test_sample_copier(void)
     ok(!flags, "Unexpected flags %#lx.\n", flags);
 
     /* Pushing samples. */
-    hr = MFCreateAlignedMemoryBuffer(output_info.cbSize, output_info.cbAlignment, &media_buffer);
+    if (use_2d_buffer)
+        hr = pMFCreateMediaBufferFromMediaType(mediatype, 0, 0, 0, &media_buffer);
+    else
+        hr = MFCreateAlignedMemoryBuffer(output_info.cbSize, output_info.cbAlignment, &media_buffer);
     ok(hr == S_OK, "Failed to create media buffer, hr %#lx.\n", hr);
 
     hr = IMFSample_AddBuffer(sample, media_buffer);
@@ -11349,7 +11357,8 @@ START_TEST(transform)
 
     init_functions();
 
-    test_sample_copier();
+    test_sample_copier(FALSE);
+    test_sample_copier(TRUE);
     test_sample_copier_output_processing();
     test_aac_encoder();
     test_aac_decoder();
