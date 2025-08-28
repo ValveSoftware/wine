@@ -82,6 +82,21 @@ static void load_functions(void)
 #undef LOAD_FUNC
 }
 
+static BOOL check_win_version(int min_major, int min_minor)
+{
+    HMODULE hntdll = GetModuleHandleA("ntdll.dll");
+    NTSTATUS (WINAPI *pRtlGetVersion)(RTL_OSVERSIONINFOEXW *);
+    RTL_OSVERSIONINFOEXW rtlver;
+
+    rtlver.dwOSVersionInfoSize = sizeof(RTL_OSVERSIONINFOEXW);
+    pRtlGetVersion = (void *)GetProcAddress(hntdll, "RtlGetVersion");
+    pRtlGetVersion(&rtlver);
+    return rtlver.dwMajorVersion > min_major ||
+           (rtlver.dwMajorVersion == min_major &&
+            rtlver.dwMinorVersion >= min_minor);
+}
+#define is_win8_plus() check_win_version(6, 2)
+
 struct heap
 {
     UINT_PTR unknown1[2];
@@ -3456,6 +3471,49 @@ static void test_heap_layout( HANDLE handle, DWORD global_flag, DWORD heap_flags
     }
 }
 
+static void test_heap_tail_zeroing( DWORD heap_flags )
+{
+    static const ULONG_PTR large_block_min_size = 65536 * (2 * sizeof(void *));
+    BOOL before_win8 = !is_win8_plus();
+    HANDLE heap = GetProcessHeap();
+    size_t size, size_aligned;
+    ULONG_PTR v, expected;
+    char *p1, *p2;
+
+    if (heap_flags & HEAP_PAGE_ALLOCS)
+    {
+        /* This behaves differently, no support yet. */
+        skip( "Skipping test with HEAP_PAGE_ALLOCS.\n" );
+        return;
+    }
+
+    for (size = 1; size <= 1048576 * 2; size *= 2)
+    {
+        winetest_push_context( "heap_flags %#lx, size %Iu", heap_flags, size );
+        p1 = HeapAlloc( heap, 0, size + 1 );
+        ok( !!p1, "got NULL.\n" );
+        size_aligned = (size + 1 + sizeof(ULONG_PTR) - 1) & ~(sizeof(ULONG_PTR) - 1);
+        /* This and read access below is going to make valgrind or ASAN unhappy but the purpose of this test is
+         * to specifically check what happens with the tail bytes following the allocation. */
+        if (!(heap_flags & (HEAP_VALIDATE_PARAMS | HEAP_VALIDATE_ALL)))
+            memset( p1, 0xcc, size_aligned );
+        HeapFree( heap, 0, p1 );
+
+        /* We are not guarenteed to get the same pointer here but that often happens, especially when the test
+         * is run first, and spoling the data before that adds certainity to the results. */
+        p2 = HeapAlloc( heap, HEAP_ZERO_MEMORY, size + 1 );
+        ok( !!p2, "got NULL.\n" );
+        v = 0;
+        memcpy( &v, p2 + size, size_aligned - size );
+        expected = 0;
+        if (size_aligned - size > 1 && size + 1 < large_block_min_size && heap_flags & HEAP_TAIL_CHECKING_ENABLED)
+            memset( (char *)&expected + 1, 0xab, size_aligned - size - 1 );
+        ok( v == expected || broken( before_win8 && !expected ), "got %#Ix, expected %#Ix.\n", v, expected );
+        HeapFree( heap, 0, p2 );
+        winetest_pop_context();
+    }
+}
+
 static void test_child_heap( const char *arg )
 {
     char buffer[32];
@@ -3535,6 +3593,7 @@ static void test_child_heap( const char *arg )
     ok( ret, "HeapDestroy failed, error %lu\n", GetLastError() );
 
     test_heap_checks( heap_flags );
+    test_heap_tail_zeroing( heap_flags );
 }
 
 static void test_GetPhysicallyInstalledSystemMemory(void)
@@ -3760,6 +3819,7 @@ START_TEST(heap)
 
     test_GetPhysicallyInstalledSystemMemory();
     test_GlobalMemoryStatus();
+    test_heap_tail_zeroing( 0 );
 
     if (pRtlGetNtGlobalFlags)
     {
