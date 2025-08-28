@@ -2767,8 +2767,8 @@ RECT map_rect_virt_to_raw_for_monitor( HMONITOR handle, RECT rect, UINT dpi_from
 struct window_rects map_window_rects_virt_to_raw( struct window_rects rects, UINT dpi_from )
 {
     RECT rect, monitor_rect, virt_visible_rect = rects.visible;
-    BOOL is_fullscreen, first_fullscreen = TRUE;
     struct monitor *monitor;
+    BOOL is_fullscreen;
 
     if (!lock_display_devices( FALSE )) return rects;
     if ((monitor = get_monitor_from_rect( rects.window, MONITOR_DEFAULTTONEAREST, dpi_from, MDT_DEFAULT )))
@@ -2786,18 +2786,6 @@ struct window_rects map_window_rects_virt_to_raw( struct window_rects rects, UIN
         is_fullscreen = intersect_rect( &rect, &monitor_rect, &virt_visible_rect ) && EqualRect( &rect, &monitor_rect );
         if (is_fullscreen)
         {
-            /* If the visible rect is fullscreen on any one of the monitors, limit the visible rect
-             * to the monitor rects. This is needed because adding __NET_WM_STATE_FULLSCREEN will
-             * make WMs move the window to cover exactly the monitor rect. If the application sets a
-             * visible rect slightly larger than the monitor rect and insists on changing to the rect
-             * that it previously set when the rect is changed by the WM, then the window rect will
-             * be repeatedly changed by :wthe WM and the application, causing a flickering effect */
-            if (first_fullscreen)
-            {
-                SetRectEmpty( &rects.visible );
-                first_fullscreen = FALSE;
-            }
-
             rect = monitor_get_rect( monitor, 0, MDT_RAW_DPI );
             union_rect( &rects.visible, &rects.visible, &rect );
         }
