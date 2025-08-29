@@ -28,6 +28,7 @@
 #include "winternl.h"
 #include "wine/debug.h"
 #include "wine/heap.h"
+#include "wine/vulkan.h"
 
 #define COBJMACROS
 #include "initguid.h"
@@ -37,10 +38,84 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(amdxc);
 
+static BOOL check_fsr4_supported(ID3D12Device *device)
+{
+    ID3D12DXVKInteropDevice *interop;
+    VkInstance instance;
+    VkDevice vk_device;
+    VkPhysicalDevice phys_device;
+    VkPhysicalDeviceProperties2 prop = {0};
+    VkPhysicalDeviceDriverProperties driver_prop = {0};
+    const char **extensions = NULL;
+    UINT extension_count = 0;
+    UINT major, minor;
+    BOOL has_float8 = FALSE, has_coopmat2 = FALSE, has_coopmat = FALSE;
+    BOOL rdna3_workaround = FALSE, ret = FALSE;
+    const char *env = getenv("DXIL_SPIRV_CONFIG");
+
+    if (FAILED(ID3D12Device_QueryInterface(device, &IID_ID3D12DXVKInteropDevice, (void **)&interop)))
+        return FALSE;
+
+    if (FAILED(ID3D12DXVKInteropDevice_GetVulkanHandles(interop, &instance, &phys_device, &vk_device)))
+        goto fail;
+
+    prop.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    prop.pNext = &driver_prop;
+    driver_prop.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+
+    vkGetPhysicalDeviceProperties2(phys_device, &prop);
+
+    if (prop.properties.vendorID != 0x1002) goto fail;
+    /* only RADV supports FSR4 */
+    if (driver_prop.driverID != VK_DRIVER_ID_MESA_RADV) goto fail;
+
+    major = VK_API_VERSION_MAJOR(prop.properties.driverVersion);
+    minor = VK_API_VERSION_MINOR(prop.properties.driverVersion);
+
+    if (FAILED(ID3D12DXVKInteropDevice_GetDeviceExtensions(interop, &extension_count, NULL)))
+        goto fail;
+
+    extensions = malloc(sizeof(*extensions) * extension_count);
+
+    if (FAILED(ID3D12DXVKInteropDevice_GetDeviceExtensions(interop, &extension_count, extensions)))
+        goto fail;
+
+    for (UINT i = 0; i < extension_count; i++)
+    {
+        if (!strcmp("VK_NV_cooperative_matrix2", extensions[i]))
+            has_coopmat2 = TRUE;
+        if (!strcmp("VK_KHR_cooperative_matrix", extensions[i]))
+            has_coopmat = TRUE;
+        if (!strcmp("VK_EXT_shader_float8", extensions[i]))
+            has_float8 = TRUE;
+    }
+
+    if (env && strstr(env, "wmma_rdna3_workaround"))
+        rdna3_workaround = TRUE;
+
+    if (major > 25 || (major == 25 && minor >= 2))
+    {
+        /* RDNA 4+ */
+        if (has_coopmat2 && has_float8) ret = TRUE;
+        /*
+         * RDNA3 (or RDNA 2/1 with layer),
+         * ensure the user is doing stuff correctly
+         */
+        if (has_coopmat && rdna3_workaround) ret = TRUE;
+    }
+
+fail:
+    if (extensions) free(extensions);
+    ID3D12DXVKInteropDevice_Release(interop);
+
+    return ret;
+}
+
 struct AMDFSR4FFX
 {
     IAmdExtFfxApi IAmdExtFfxApi_iface;
     LONG ref;
+    BOOL fsr4_supported;
 };
 
 static struct AMDFSR4FFX* impl_from_IAmdExtFfxApi(IAmdExtFfxApi* iface)
@@ -77,6 +152,7 @@ HRESULT STDMETHODCALLTYPE AMDFSR4FFX_UpdateFfxApiProvider(IAmdExtFfxApi *iface, 
     const char *env;
     updateffxapi_pfn pfn;
     HMODULE amdffx;
+    struct AMDFSR4FFX *this = impl_from_IAmdExtFfxApi(iface);
 
     TRACE("%p %p %u\n", iface, data, size);
 
@@ -87,7 +163,13 @@ HRESULT STDMETHODCALLTYPE AMDFSR4FFX_UpdateFfxApiProvider(IAmdExtFfxApi *iface, 
         amdffx = LoadLibraryA("amdxcffx64");
         if (!amdffx)
         {
-            ERR("Failed to load FSR4 dll (amdxcffx)!\n");
+            ERR("Failed to load FSR4 dll (amdxcffx64)!\n");
+            return E_NOINTERFACE;
+        }
+
+        if (!this->fsr4_supported)
+        {
+            ERR("FSR4 not supported on this system!\n");
             return E_NOINTERFACE;
         }
 
@@ -178,6 +260,7 @@ struct AmdExtD3DDevice8
 {
     IAmdExtD3DDevice8 IAmdExtD3DDevice8_iface;
     LONG ref;
+    BOOL fsr4_supported;
 };
 
 struct AmdExtD3DDevice8 *impl_from_IAmdExtD3DDevice8(IAmdExtD3DDevice8 *iface)
@@ -301,6 +384,7 @@ HRESULT STDMETHODCALLTYPE AmdExtD3DDevice8_CreateComputePipelineCrossCompile(IAm
 HRESULT STDMETHODCALLTYPE AmdExtD3DDevice8_GetWaveMatrixProperties(IAmdExtD3DDevice8 *iface,
                                                                    SIZE_T *pCount, AmdExtWaveMatrixProperties *pProperties)
 {
+    struct AmdExtD3DDevice8 *this = impl_from_IAmdExtD3DDevice8(iface);
     static AmdExtWaveMatrixProperties prop[1] = {{
         16, 16, 16, AMD_EXT_WMMA_TYPE_FP8, AMD_EXT_WMMA_TYPE_FP8,
         AMD_EXT_WMMA_TYPE_FP32, AMD_EXT_WMMA_TYPE_FP32, FALSE}};
@@ -311,9 +395,15 @@ HRESULT STDMETHODCALLTYPE AmdExtD3DDevice8_GetWaveMatrixProperties(IAmdExtD3DDev
 
     if (*pCount >= 1)
     {
-        *pCount = 1;
-        memcpy(pProperties, prop, sizeof(prop));
-        return S_OK;
+        if (this->fsr4_supported)
+        {
+            *pCount = 1;
+            memcpy(pProperties, prop, sizeof(prop));
+            return S_OK;
+        } else {
+            *pCount = 0;
+            return S_OK;
+        }
     } /* FIXME: Handle pCount == 0 */
 
     return S_OK;
@@ -379,6 +469,8 @@ HRESULT STDMETHODCALLTYPE AmdExtD3DFactory_CreateInterface(IAmdExtD3DFactory *if
         struct AmdExtD3DDevice8 *this = calloc(1, sizeof(struct AmdExtD3DDevice8));
         this->IAmdExtD3DDevice8_iface.lpVtbl = &AmdExtD3DDevice8_vtable;
         this->ref = 1;
+        this->fsr4_supported = check_fsr4_supported((ID3D12Device *)outer);
+        TRACE("FSR 4 supported: %d\n", this->fsr4_supported);
         *out = &this->IAmdExtD3DDevice8_iface;
         return S_OK;
     } else {
@@ -410,6 +502,8 @@ HRESULT CDECL AmdExtD3DCreateInterface(IUnknown *outer, REFIID iid, void **obj)
         struct AMDFSR4FFX* ffx = calloc(1, sizeof(struct AMDFSR4FFX));
         ffx->IAmdExtFfxApi_iface.lpVtbl = &AMDFSR4FFX_vtable;
         ffx->ref = 1;
+        ffx->fsr4_supported = check_fsr4_supported((ID3D12Device *)outer);
+        TRACE("FSR 4 supported: %d\n", ffx->fsr4_supported);
         *obj = &ffx->IAmdExtFfxApi_iface;
         return S_OK;
     } else if (IsEqualGUID(iid, &IID_IAmdExtAntiLagApi)) {
