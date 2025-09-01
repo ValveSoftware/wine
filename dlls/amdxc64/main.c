@@ -390,7 +390,7 @@ HRESULT STDMETHODCALLTYPE AmdExtD3DFactory_CreateInterface(IAmdExtD3DFactory *if
 
 HRESULT STDMETHODCALLTYPE AmdExtD3DFactory_QueryInterface(IAmdExtD3DFactory *iface, REFIID iid, void **out)
 {
-    TRACE("%p %s %p", iface, debugstr_guid(iid), out);
+    TRACE("%p %s %p\n", iface, debugstr_guid(iid), out);
     return E_NOINTERFACE;
 }
 
@@ -430,4 +430,24 @@ HRESULT CDECL AmdExtD3DCreateInterface(IUnknown *outer, REFIID iid, void **obj)
 HMODULE WINAPI AmdGetDxcModuleHandle(void)
 {
     return GetModuleHandleA(NULL);
+}
+
+BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, void *reserved)
+{
+    const char *env;
+
+    switch (reason)
+    {
+        case DLL_PROCESS_ATTACH:
+        {
+            if ((env = getenv("FSR4_WATERMARK")) && !strcmp(env, "1"))
+            {
+                _putenv("MLSR-WATERMARK=1");
+            }
+            break;
+        }
+        default: break;
+    }
+
+    return TRUE;
 }
