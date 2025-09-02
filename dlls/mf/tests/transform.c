@@ -8607,7 +8607,6 @@ static void test_video_processor(BOOL use_2d_buffer)
 
     flags = 0xdeadbeef;
     hr = IMFTransform_GetOutputStatus(transform, &flags);
-    todo_wine
     ok(hr == S_OK, "GetOutputStatus returned %#lx.\n", hr);
     todo_wine
     ok(flags == 0, "Unexpected output status %#lx.\n", flags);
@@ -8635,9 +8634,7 @@ static void test_video_processor(BOOL use_2d_buffer)
 
     flags = 0xdeadbeef;
     hr = IMFTransform_GetOutputStatus(transform, &flags);
-    todo_wine
     ok(hr == S_OK, "GetOutputStatus returned %#lx.\n", hr);
-    todo_wine
     ok(flags == MFT_OUTPUT_STATUS_SAMPLE_READY, "Unexpected output status %#lx.\n", flags);
 
     hr = IMFTransform_ProcessInput(transform, 0, input_sample, 0);
@@ -8674,7 +8671,6 @@ static void test_video_processor(BOOL use_2d_buffer)
 
         flags = 0xdeadbeef;
         hr = IMFTransform_GetOutputStatus(transform, &flags);
-        todo_wine
         ok(hr == S_OK, "GetOutputStatus returned %#lx.\n", hr);
         todo_wine
         ok(flags == 0, "Unexpected output status %#lx.\n", flags);
