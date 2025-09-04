@@ -204,6 +204,43 @@ static const struct column col_logicaldisktopartition[] =
     { L"Antecedent", CIM_REFERENCE|COL_FLAG_DYNAMIC|COL_FLAG_KEY },
     { L"Dependent",  CIM_REFERENCE|COL_FLAG_DYNAMIC|COL_FLAG_KEY },
 };
+static const struct column col_msft_phys_disk[] =
+{
+    { L"AdapterSerialNumber",               CIM_STRING },
+    { L"AllocatedSize",                     CIM_UINT64 },
+    { L"BusType",                           CIM_UINT16 },
+    { L"CannotPoolReason",                  CIM_UINT16|CIM_FLAG_ARRAY },
+    { L"CanPool",                           CIM_BOOLEAN },
+    { L"Description",                       CIM_STRING },
+    { L"DeviceId",                          CIM_STRING|COL_FLAG_DYNAMIC|COL_FLAG_KEY },
+    { L"EnclosureNumber",                   CIM_UINT16 },
+    { L"FirmwareVersion",                   CIM_STRING },
+    { L"FriendlyName",                      CIM_STRING },
+    { L"FruId",                             CIM_STRING },
+    { L"HealthStatus",                      CIM_UINT16 },
+    { L"IsIndicationEnabled",               CIM_BOOLEAN },
+    { L"IsPartial",                         CIM_BOOLEAN },
+    { L"LogicalSectorSize",                 CIM_UINT64 },
+    { L"Manufacturer",                      CIM_STRING },
+    { L"MediaType",                         CIM_UINT16 },
+    { L"Model",                             CIM_STRING },
+    { L"OperationalDetails",                CIM_STRING|CIM_FLAG_ARRAY },
+    { L"OperationalStatus",                 CIM_UINT16|CIM_FLAG_ARRAY|COL_FLAG_DYNAMIC },
+    { L"OtherCannotPoolReasonDescription",  CIM_STRING },
+    { L"PartNumber",                        CIM_STRING },
+    { L"PhysicalLocation",                  CIM_STRING },
+    { L"PhysicalSectorSize",                CIM_UINT64 },
+    { L"SerialNumber",                      CIM_STRING|COL_FLAG_DYNAMIC },
+    { L"Size",                              CIM_UINT64 },
+    { L"SlotNumber",                        CIM_UINT16 },
+    { L"SoftwareVersion",                   CIM_STRING },
+    { L"SpindleSpeed",                      CIM_UINT32 },
+    { L"SupportedUsages",                   CIM_UINT16|CIM_FLAG_ARRAY|COL_FLAG_DYNAMIC },
+    { L"UniqueId",                          CIM_STRING|COL_FLAG_DYNAMIC },
+    { L"UniqueIdFormat",                    CIM_UINT16 },
+    { L"Usage",                             CIM_UINT16 },
+    { L"VirtualDiskFootprint",              CIM_UINT64 },
+};
 static const struct column col_networkadapter[] =
 {
     { L"AdapterType",         CIM_STRING },
@@ -708,6 +745,43 @@ struct record_logicaldisktopartition
 {
     const WCHAR *antecedent;
     const WCHAR *dependent;
+};
+struct record_msft_phys_disk
+{
+    const WCHAR  *adapter_serial_number;
+    UINT64        allocated_size;
+    UINT16        bus_type;
+    struct array *cannot_pool_reason;
+    int           can_pool;
+    const WCHAR  *description;
+    const WCHAR  *device_id;
+    UINT16        enclosure_number;
+    const WCHAR  *firmware_version;
+    const WCHAR  *friendly_name;
+    const WCHAR  *fru_id;
+    UINT16        health_status;
+    int           is_indication_enabled;
+    int           is_partial;
+    UINT64        logical_sector_size;
+    const WCHAR  *manufacturer;
+    UINT16        media_type;
+    const WCHAR  *model;
+    struct array *operational_details;
+    struct array *operational_status;
+    const WCHAR  *other_cannot_pool_reason_description;
+    const WCHAR  *part_number;
+    const WCHAR  *physical_location;
+    UINT64        physical_sector_size;
+    const WCHAR  *serial_number;
+    UINT64        size;
+    UINT16        slot_number;
+    const WCHAR  *software_version;
+    UINT32        spindle_speed;
+    struct array *supported_usages;
+    const WCHAR  *unique_id;
+    UINT16        unique_id_format;
+    UINT16        usage;
+    UINT64        virtual_disk_footprint;
 };
 struct record_networkadapter
 {
@@ -4548,6 +4622,99 @@ static struct table wmi_builtin_classes[] =
 {
     { L"MSSMBios_RawSMBiosTables", C(col_rawsmbiostables), D(data_rawsmbiostables) },
 };
+
+static enum fill_status fill_msft_phys_disk( struct table *table, const struct expr *cond )
+{
+    static UINT16 operational_status[] = { 2 };
+    static struct array operational_status_array =
+    {
+        .elem_size = sizeof(*operational_status),
+        .count = ARRAY_SIZE(operational_status),
+        .ptr = &operational_status,
+    };
+    static UINT16 supported_usages[] = { 1, 2, 3, 4, 5 };
+    static struct array supported_usages_array =
+    {
+        .elem_size = sizeof(*supported_usages),
+        .count = ARRAY_SIZE(supported_usages),
+        .ptr = supported_usages,
+    };
+    WCHAR device_id[10], root[] = L"A:\\";
+    struct record_msft_phys_disk *rec;
+    UINT i, row = 0, offset = 0, index = 0, type;
+    UINT64 size;
+    DWORD drives = GetLogicalDrives();
+    enum fill_status status = FILL_STATUS_UNFILTERED;
+
+    if (!resize_table( table, 2, sizeof(*rec) )) return FILL_STATUS_FAILED;
+
+    for (i = 0; i < 26; i++)
+    {
+        if (drives & (1 << i))
+        {
+            root[0] = 'A' + i;
+            type = GetDriveTypeW( root );
+            if (type != DRIVE_FIXED && type != DRIVE_REMOVABLE) continue;
+
+            if (!resize_table( table, row + 1, sizeof(*rec) )) return FILL_STATUS_FAILED;
+
+            get_freespace( root, &size );
+            rec = (struct record_msft_phys_disk *)(table->data + offset);
+            rec->adapter_serial_number = NULL;
+            rec->allocated_size = size;
+            rec->bus_type = type == DRIVE_FIXED ? 17 /* NVME */: 1 /* USB */;
+            rec->cannot_pool_reason = NULL;
+            rec->can_pool = -1;
+            rec->description = NULL;
+            swprintf( device_id, ARRAY_SIZE( device_id ), L"%d", index );
+            rec->device_id      = wcsdup( device_id );
+            rec->enclosure_number = 0;
+            rec->firmware_version = L"1234";
+            rec->friendly_name = L"Wine disk";
+            rec->fru_id = NULL;
+            rec->health_status = 0; /* Healthy */
+            rec->is_indication_enabled = 0;
+            rec->is_partial = 0;
+            rec->logical_sector_size = 512;
+            rec->manufacturer = NULL;
+            rec->media_type     = 4; /* SSD */
+            rec->model = wcsdup( L"Wine disk" );
+            rec->operational_details = NULL;
+            rec->operational_status = dup_array( &operational_status_array );
+            rec->other_cannot_pool_reason_description = NULL;
+            rec->part_number = NULL;
+            rec->physical_location = L"Integrated : Bus 0 : Device 0 : Function 0 : Adapter 0 : Port 0";
+            rec->physical_sector_size = 4096;
+            rec->serial_number = get_diskdrive_serialnumber( root[0] );
+            rec->size = size;
+            rec->slot_number = 0;
+            rec->software_version = NULL;
+            rec->spindle_speed = 0;
+            rec->supported_usages = dup_array( &supported_usages_array );
+            rec->unique_id = wcsdup( rec->serial_number );
+            rec->unique_id_format = 0; /* Vendor specific */
+            rec->usage = 1; /* Auto select */
+            rec->virtual_disk_footprint = 0;
+            ++index;
+            if (!match_row( table, row, cond, &status ))
+            {
+                free_row_values( table, row );
+                continue;
+            }
+            offset += sizeof(*rec);
+            row++;
+        }
+    }
+    TRACE("created %u rows\n", row);
+    table->num_rows = row;
+    return status;
+}
+
+static struct table win_storage_builtin_classes[] =
+{
+    { L"MSFT_PhysicalDisk", C(col_msft_phys_disk), 0, 0, NULL, fill_msft_phys_disk },
+};
+
 #undef C
 #undef D
 
@@ -4560,7 +4727,7 @@ static const struct
 builtin_namespaces[WBEMPROX_NAMESPACE_LAST] =
 {
     {L"cimv2", cimv2_builtin_classes, ARRAY_SIZE(cimv2_builtin_classes)},
-    {L"Microsoft\\Windows\\Storage", NULL, 0},
+    {L"Microsoft\\Windows\\Storage", win_storage_builtin_classes, ARRAY_SIZE(win_storage_builtin_classes)},
     {L"StandardCimv2", NULL, 0},
     {L"wmi", wmi_builtin_classes, ARRAY_SIZE(wmi_builtin_classes)},
 };
