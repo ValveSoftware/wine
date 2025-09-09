@@ -926,7 +926,7 @@ static void test_tcp_stats( int family )
 static void test_tcp_tables( int family, int table_type )
 {
     DWORD dyn_sizes[] = { FIELD_OFFSET(struct nsi_tcp_conn_dynamic, unk[2]), FIELD_OFFSET(struct nsi_tcp_conn_dynamic, unk[3]),
-                          sizeof(struct nsi_tcp_conn_dynamic) };
+                          FIELD_OFFSET(struct nsi_tcp_conn_dynamic, unk[4]), sizeof(struct nsi_tcp_conn_dynamic) };
     DWORD i, err, count, table_num, dyn_size, size;
     struct nsi_tcp_conn_key *keys;
     struct nsi_tcp_conn_dynamic *dyn_tbl, *dyn;
@@ -949,7 +949,7 @@ static void test_tcp_tables( int family, int table_type )
     for (i = 0; i < ARRAY_SIZE(dyn_sizes); i++)
     {
         err = NsiAllocateAndGetTable( 1, &NPI_MS_TCP_MODULEID, table_num, (void **)&keys, sizeof(*keys), NULL, 0,
-                                      (void **)&dyn_tbl, dyn_sizes[i], (void **)&stat, sizeof(*stat), &count, 0 );
+                                      (void **)&dyn_tbl, dyn_sizes[i] + 4, (void **)&stat, sizeof(*stat), &count, 0 );
         if (!err) break;
     }
     ok( !err, "got %ld\n", err );
