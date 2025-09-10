@@ -862,9 +862,12 @@ unsigned int wg_format_get_stride(const struct wg_format *format)
             return ALIGN(width * 2, 4);
 
         case WG_VIDEO_FORMAT_I420:
-        case WG_VIDEO_FORMAT_NV12:
         case WG_VIDEO_FORMAT_YV12:
             return ALIGN(width, 4); /* Y plane */
+
+        /* NV12 stride in Windows has alignment 2. GStreamer output is reformatted to 2 where necessary. */
+        case WG_VIDEO_FORMAT_NV12:
+            return ALIGN(width, 2); /* Y plane */
 
         case WG_VIDEO_FORMAT_UNKNOWN:
             FIXME("Cannot calculate stride for unknown video format.\n");
