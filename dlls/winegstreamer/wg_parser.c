@@ -126,7 +126,7 @@ struct wg_parser_stream
     GstBuffer *buffer;
     GstMapInfo map_info;
 
-    bool flushing, eos, enabled, has_tags, has_buffer, no_more_pads;
+    bool flushing, eos, enabled, has_tags, has_buffer, no_more_pads, fix_nv12;
 
     uint64_t duration;
     gchar *tags[WG_PARSER_TAG_COUNT];
@@ -737,11 +737,29 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
 
         case GST_EVENT_CAPS:
         {
+            GstStructure *structure;
+            GstVideoInfo video_info;
+            bool fix_nv12 = false;
             GstCaps *caps;
 
             gst_event_parse_caps(event, &caps);
+            structure = gst_caps_get_structure(caps, 0);
+            if (gst_structure_has_name(structure, "video/x-raw") && gst_video_info_from_caps(&video_info, caps))
+            {
+                fix_nv12 = video_info.stride[0] > GST_ROUND_UP_2(video_info.width)
+                        && GST_VIDEO_INFO_FORMAT(&video_info) == GST_VIDEO_FORMAT_NV12;
+                if (fix_nv12 && GST_VIDEO_INFO_IS_INTERLACED(&video_info))
+                {
+                    GST_WARNING("NV12 alignment fix is not implemented for interlaced NV12.\n");
+                    fix_nv12 = false;
+                }
+                if (fix_nv12)
+                    GST_INFO("Enabling the NV12 alignment fix.");
+            }
+
             pthread_mutex_lock(&parser->mutex);
             stream->current_caps = gst_caps_ref(caps);
+            stream->fix_nv12 = fix_nv12;
             pthread_mutex_unlock(&parser->mutex);
             pthread_cond_signal(&parser->init_cond);
             break;
@@ -759,6 +777,54 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
     }
     gst_event_unref(event);
     return TRUE;
+}
+
+static void buffer_fix_nv12(GstBuffer *buffer, GstCaps *caps)
+{
+    GstVideoInfo src_info, dst_info;
+    gint i, aligned_height;
+    GstMapInfo map_info;
+    guint8 *dst, *src;
+
+    if (!gst_video_info_from_caps(&src_info, caps))
+    {
+        GST_ERROR("Failed to get video info from %"GST_PTR_FORMAT, caps);
+        return;
+    }
+    if (!gst_buffer_map(buffer, &map_info, GST_MAP_READWRITE))
+    {
+        GST_ERROR("Failed to map buffer.");
+        return;
+    }
+
+    dst_info = src_info;
+
+    aligned_height = GST_ROUND_UP_2(dst_info.height);
+    dst_info.stride[0] = GST_ROUND_UP_2(dst_info.width);
+    dst_info.stride[1] = dst_info.stride[0];
+    dst_info.offset[0] = 0;
+    dst_info.offset[1] = dst_info.stride[0] * aligned_height;
+    dst_info.size = dst_info.offset[1] + dst_info.stride[0] * aligned_height / 2;
+
+    dst = src = map_info.data;
+    for (i = 0; i < aligned_height; ++i)
+    {
+        memmove(dst, src, dst_info.stride[0]);
+        dst += dst_info.stride[0];
+        src += src_info.stride[0];
+    }
+
+    dst = map_info.data + dst_info.offset[1];
+    src = map_info.data + src_info.offset[1];
+    for (i = 0; i < aligned_height / 2; ++i)
+    {
+        memmove(dst, src, dst_info.stride[1]);
+        dst += dst_info.stride[1];
+        src += src_info.stride[1];
+    }
+
+    gst_buffer_unmap(buffer, &map_info);
+    gst_buffer_set_size(buffer, dst_info.size);
 }
 
 static GstFlowReturn sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *buffer)
@@ -797,6 +863,9 @@ static GstFlowReturn sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *bu
         gst_buffer_unref(buffer);
         return GST_FLOW_FLUSHING;
     }
+
+    if (stream->fix_nv12)
+        buffer_fix_nv12(buffer, stream->current_caps);
 
     if (!gst_buffer_map(buffer, &stream->map_info, GST_MAP_READ))
     {
