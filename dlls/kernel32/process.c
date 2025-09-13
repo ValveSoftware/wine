@@ -40,7 +40,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(process);
 
-/* Prototypes NUMA manquants dans certains niveaux d'API headers */
+/* Missing NUMA prototypes in some API header levels */
 extern BOOL WINAPI GetNumaHighestNodeNumber( ULONG *node );
 extern BOOL WINAPI GetNumaNodeProcessorMaskEx( USHORT node, GROUP_AFFINITY *mask );
 extern BOOL WINAPI GetNumaProximityNodeEx( ULONG proximity_id, USHORT *node );
@@ -890,7 +890,7 @@ BOOL WINAPI GetNumaProcessorNodeEx(PPROCESSOR_NUMBER processor, PUSHORT node_num
     }
     if (processor->Group != 0)
     {
-        /* Implémentation actuelle: un seul groupe supporté */
+        /* Current implementation: only one group supported */
         SetLastError(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
@@ -902,7 +902,7 @@ BOOL WINAPI GetNumaProcessorNodeEx(PPROCESSOR_NUMBER processor, PUSHORT node_num
     if (!GetNumaHighestNodeNumber(&highest)) return FALSE;
     if (highest == 0)
     {
-        *node_number = 0; /* système non NUMA */
+        *node_number = 0; /* non-NUMA system */
         return TRUE;
     }
     for (n = 0; n <= highest; ++n)
