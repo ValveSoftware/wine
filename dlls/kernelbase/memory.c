@@ -30,7 +30,6 @@
 #include "winbase.h"
 #include "winnls.h"
 #include "winternl.h"
-#define __WINESRC__
 #include "winerror.h"
 #include "ddk/wdm.h"
 
