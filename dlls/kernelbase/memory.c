@@ -30,6 +30,7 @@
 #include "winbase.h"
 #include "winnls.h"
 #include "winternl.h"
+#define __WINESRC__
 #include "winerror.h"
 #include "ddk/wdm.h"
 
@@ -40,7 +41,7 @@
 WINE_DEFAULT_DEBUG_CHANNEL(heap);
 WINE_DECLARE_DEBUG_CHANNEL(virtual);
 WINE_DECLARE_DEBUG_CHANNEL(globalmem);
-
+WINE_DECLARE_DEBUG_CHANNEL(numa);
 
 
 static CROSS_PROCESS_WORK_LIST *open_cross_process_connection( HANDLE process )
@@ -1429,6 +1430,134 @@ BOOL WINAPI DECLSPEC_HOTPATCH MapUserPhysicalPages( void *addr, ULONG_PTR page_c
  * NUMA functions
  ***********************************************************************/
 
+/* NUMA support using Windows logical processor information */
+static ULONG numa_highest_node_number = 0;
+static BOOL numa_initialized = FALSE;
+static RTL_CRITICAL_SECTION numa_cs;
+static RTL_CRITICAL_SECTION_DEBUG numa_cs_debug =
+{
+    0, 0, &numa_cs,
+    { &numa_cs_debug.ProcessLocksList, &numa_cs_debug.ProcessLocksList },
+    0, 0, { (DWORD_PTR)(__FILE__ ": numa_cs") }
+};
+static RTL_CRITICAL_SECTION numa_cs = { &numa_cs_debug, -1, 0, 0, 0, 0 };
+
+/* Structure to hold CPU mask for each NUMA node */
+static struct numa_node_info {
+    ULONG_PTR cpu_mask;
+    BOOL valid;
+} numa_nodes[64]; /* Windows supports up to 64 NUMA nodes */
+
+/* NUMA runtime tweak flags */
+static int numa_env_checked = 0;
+static BOOL numa_force_single = FALSE;   /* WINE_NUMA_FORCE_SINGLE=1 -> force single node */
+static BOOL numa_contig = FALSE;         /* WINE_NUMA_CONTIG=1 -> remap contiguous masks */
+
+static unsigned int popcount_ulongptr( ULONG_PTR v )
+{
+#if defined(__GNUC__)
+    return __builtin_popcountll( (unsigned long long)v );
+#else
+    unsigned int c = 0; while (v) { v &= (v-1); c++; } return c;
+#endif
+}
+
+static void initialize_numa_info(void)
+{
+    SYSTEM_LOGICAL_PROCESSOR_INFORMATION *info = NULL;
+    DWORD len = 0, i;
+    ULONG max_node = 0;
+
+    if (numa_initialized) return;
+
+    if (!numa_env_checked)
+    {
+        char buffer[256];
+        numa_env_checked = 1;
+        if (GetEnvironmentVariableA("WINE_NUMA_FORCE_SINGLE", buffer, sizeof(buffer))) numa_force_single = TRUE;
+        if (GetEnvironmentVariableA("WINE_NUMA_CONTIG", buffer, sizeof(buffer)))       numa_contig = TRUE;
+        TRACE_(numa)("NUMA env: FORCE_SINGLE=%d CONTIG=%d\n", numa_force_single, numa_contig);
+    }
+
+    memset(numa_nodes, 0, sizeof(numa_nodes));
+
+    if (!numa_force_single)
+    {
+        /* Query logical processor information to get NUMA topology */
+        if (!GetLogicalProcessorInformation(NULL, &len) && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+        {
+            info = HeapAlloc(GetProcessHeap(), 0, len);
+            if (info && GetLogicalProcessorInformation(info, &len))
+            {
+                DWORD count = len / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+                for (i = 0; i < count; i++)
+                {
+                    if (info[i].Relationship == RelationNumaNode)
+                    {
+                        ULONG node_number = info[i].NumaNode.NodeNumber;
+                        if (node_number < 64)
+                        {
+                            numa_nodes[node_number].cpu_mask = info[i].ProcessorMask;
+                            numa_nodes[node_number].valid = TRUE;
+                            if (node_number > max_node) max_node = node_number;
+                            TRACE_(numa)("NUMA raw: node=%lu mask=0x%llx\n", (unsigned long)node_number, (unsigned long long)info[i].ProcessorMask);
+                        }
+                    }
+                }
+            }
+            HeapFree(GetProcessHeap(), 0, info);
+        }
+    }
+    /* Fallback single node if requested or none discovered */
+    if (numa_force_single || (max_node == 0 && !numa_nodes[0].valid))
+    {
+        SYSTEM_INFO si; GetSystemInfo(&si);
+        numa_nodes[0].cpu_mask = (si.dwNumberOfProcessors >= (sizeof(ULONG_PTR)*8)) ? ~(ULONG_PTR)0 : ((1ULL << si.dwNumberOfProcessors) - 1);
+        numa_nodes[0].valid = TRUE; max_node = 0;
+        TRACE_(numa)("NUMA fallback single: mask=0x%llx procs=%u\n", (unsigned long long)numa_nodes[0].cpu_mask, (unsigned)popcount_ulongptr(numa_nodes[0].cpu_mask));
+    }
+    else if (numa_contig && max_node > 0)
+    {
+        /* Remap each node to a contiguous block of bits in ascending order */
+        ULONG_PTR new_masks[64] = {0}; unsigned int bit_offset = 0; BOOL ok = TRUE;
+        for (i = 0; i <= max_node; i++) if (numa_nodes[i].valid)
+        {
+            unsigned int cnt = popcount_ulongptr(numa_nodes[i].cpu_mask);
+            if (!cnt || bit_offset + cnt > sizeof(ULONG_PTR)*8) { ok = FALSE; break; }
+            new_masks[i] = (((ULONG_PTR)1 << cnt) - 1) << bit_offset;
+            TRACE_(numa)("NUMA remap: node=%lu raw=0x%llx cnt=%u -> contig=0x%llx base=%u\n",
+                  (unsigned long)i, (unsigned long long)numa_nodes[i].cpu_mask, cnt,
+                  (unsigned long long)new_masks[i], bit_offset);
+            bit_offset += cnt;
+        }
+        if (ok)
+        {
+            for (i = 0; i <= max_node; i++) if (numa_nodes[i].valid && new_masks[i]) numa_nodes[i].cpu_mask = new_masks[i];
+        }
+        else TRACE_(numa)("NUMA remap: aborted (ok=%d)\n", ok);
+    }
+
+    numa_highest_node_number = max_node;
+    numa_initialized = TRUE;
+    TRACE_(numa)("NUMA init done: highest_node=%lu\n", (unsigned long)numa_highest_node_number);
+}
+
+static BOOL get_numa_node_cpu_mask(UCHAR node, GROUP_AFFINITY *mask)
+{
+    RtlEnterCriticalSection(&numa_cs);
+    if (!numa_initialized) initialize_numa_info();
+    if (node >= 64 || !numa_nodes[node].valid)
+    {
+        RtlLeaveCriticalSection(&numa_cs); SetLastError(ERROR_INVALID_PARAMETER); return FALSE;
+    }
+    TRACE_(numa)("get_numa_node_cpu_mask: node=%u mask=0x%llx\n", node, (unsigned long long)numa_nodes[node].cpu_mask);
+    RtlLeaveCriticalSection(&numa_cs);
+    memset(mask, 0, sizeof(*mask));
+    mask->Group = 0; /* Single processor group for now */
+    mask->Mask = numa_nodes[node].cpu_mask;
+    TRACE_(numa)("get_numa_node_cpu_mask: returning Group=%hu Mask=0x%llx\n", mask->Group, (unsigned long long)mask->Mask);
+    return TRUE;
+}
 
 /***********************************************************************
  *             AllocateUserPhysicalPagesNuma   (kernelbase.@)
@@ -1533,10 +1662,24 @@ BOOL WINAPI SetProcessDefaultCpuSets(HANDLE process, const ULONG *cpu_set_ids, U
 /**********************************************************************
  *             GetNumaHighestNodeNumber   (kernelbase.@)
  */
-BOOL WINAPI DECLSPEC_HOTPATCH GetNumaHighestNodeNumber( ULONG *node )
+BOOL WINAPI GetNumaHighestNodeNumber( ULONG *node )
 {
-    FIXME( "semi-stub: %p\n", node );
-    *node = 0;
+    TRACE("(%p)\n", node);
+
+    if (!node)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    RtlEnterCriticalSection(&numa_cs);
+    
+    if (!numa_initialized)
+        initialize_numa_info();
+    
+    *node = numa_highest_node_number;
+    RtlLeaveCriticalSection(&numa_cs);
+    
     return TRUE;
 }
 
@@ -1544,20 +1687,48 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetNumaHighestNodeNumber( ULONG *node )
 /**********************************************************************
  *             GetNumaNodeProcessorMaskEx   (kernelbase.@)
  */
-BOOL WINAPI DECLSPEC_HOTPATCH GetNumaNodeProcessorMaskEx( USHORT node, GROUP_AFFINITY *mask )
+BOOL WINAPI GetNumaNodeProcessorMaskEx( USHORT node, GROUP_AFFINITY *mask )
 {
-    FIXME( "stub: %hu %p\n", node, mask );
-    SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
-    return FALSE;
+    TRACE("(%hu, %p)\n", node, mask);
+
+    if (!mask)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    return get_numa_node_cpu_mask((UCHAR)node, mask);
 }
 
 
 /***********************************************************************
  *             GetNumaProximityNodeEx   (kernelbase.@)
  */
-BOOL WINAPI DECLSPEC_HOTPATCH GetNumaProximityNodeEx( ULONG proximity_id, USHORT *node )
+BOOL WINAPI GetNumaProximityNodeEx( ULONG proximity_id, USHORT *node )
 {
-    SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
+    TRACE("(%lu, %p)\n", proximity_id, node);
+
+    if (!node)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    RtlEnterCriticalSection(&numa_cs);
+    
+    if (!numa_initialized)
+        initialize_numa_info();
+        
+    /* For simplicity, assume proximity_id maps directly to node number */
+    if (proximity_id <= numa_highest_node_number)
+    {
+        *node = (USHORT)proximity_id;
+        RtlLeaveCriticalSection(&numa_cs);
+        return TRUE;
+    }
+    
+    RtlLeaveCriticalSection(&numa_cs);
+    SetLastError(ERROR_INVALID_PARAMETER);
     return FALSE;
 }
 

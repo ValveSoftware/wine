@@ -498,7 +498,34 @@ BOOL WINAPI SetThreadErrorMode( DWORD mode, DWORD *old )
 BOOL WINAPI DECLSPEC_HOTPATCH SetThreadGroupAffinity( HANDLE thread, const GROUP_AFFINITY *new,
                                                       GROUP_AFFINITY *old )
 {
+    GROUP_AFFINITY local_old;
+
     if (old && !GetThreadGroupAffinity( thread, old )) return FALSE;
+
+    /* Debug: log requested group/mask and previous affinity if available */
+    if (new)
+    {
+        TRACE("SetThreadGroupAffinity: thread=%p new->Group=%hu new->Mask=0x%llx\n",
+              thread, new->Group, (unsigned long long)new->Mask);
+    }
+    else
+    {
+        TRACE("SetThreadGroupAffinity: thread=%p new=NULL\n", thread);
+    }
+
+    if (old)
+    {
+        TRACE("SetThreadGroupAffinity: previous old->Group=%hu old->Mask=0x%llx\n",
+              old->Group, (unsigned long long)old->Mask);
+    }
+    else
+    {
+        /* If caller didn't supply 'old', fetch it locally for logging */
+        if (GetThreadGroupAffinity(thread, &local_old))
+            TRACE("SetThreadGroupAffinity: fetched previous Group=%hu Mask=0x%llx\n",
+                  local_old.Group, (unsigned long long)local_old.Mask);
+    }
+
     return set_ntstatus( NtSetInformationThread( thread, ThreadGroupInformation, new, sizeof(*new) ));
 }
 

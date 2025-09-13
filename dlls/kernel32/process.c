@@ -40,6 +40,12 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(process);
 
+/* Prototypes NUMA manquants dans certains niveaux d'API headers */
+extern BOOL WINAPI GetNumaHighestNodeNumber( ULONG *node );
+extern BOOL WINAPI GetNumaNodeProcessorMaskEx( USHORT node, GROUP_AFFINITY *mask );
+extern BOOL WINAPI GetNumaProximityNodeEx( ULONG proximity_id, USHORT *node );
+
+
 static const struct _KUSER_SHARED_DATA *user_shared_data = (struct _KUSER_SHARED_DATA *)0x7ffe0000;
 
 typedef struct
@@ -775,9 +781,17 @@ BOOL WINAPI GetFirmwareType(FIRMWARE_TYPE *type)
  */
 BOOL WINAPI GetNumaNodeProcessorMask(UCHAR node, PULONGLONG mask)
 {
-    FIXME("(%c %p): stub\n", node, mask);
-    SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
-    return FALSE;
+
+    GROUP_AFFINITY affinity;
+    TRACE("GetNumaNodeProcessorMask(node=%u, mask=%p)\n", node, mask);
+    if (!mask)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    if (!GetNumaNodeProcessorMaskEx(node, &affinity)) return FALSE;
+    *mask = affinity.Mask;
+    return TRUE;
 }
 
 /**********************************************************************
@@ -785,9 +799,25 @@ BOOL WINAPI GetNumaNodeProcessorMask(UCHAR node, PULONGLONG mask)
  */
 BOOL WINAPI GetNumaAvailableMemoryNode(UCHAR node, PULONGLONG available_bytes)
 {
-    FIXME("(%c %p): stub\n", node, available_bytes);
-    SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
-    return FALSE;
+    MEMORYSTATUSEX status;
+    ULONG highest;
+    TRACE("GetNumaAvailableMemoryNode(node=%u, avail=%p)\n", node, available_bytes);
+    if (!available_bytes)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    if (!GetNumaHighestNodeNumber(&highest)) return FALSE;
+    if (node > highest)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    status.dwLength = sizeof(status);
+    if (!GlobalMemoryStatusEx(&status)) return FALSE;
+    /* Approximation: spreads free memory between known nodes */
+    *available_bytes = status.ullAvailPhys / (highest + 1);
+    return TRUE;
 }
 
 /**********************************************************************
@@ -795,9 +825,8 @@ BOOL WINAPI GetNumaAvailableMemoryNode(UCHAR node, PULONGLONG available_bytes)
  */
 BOOL WINAPI GetNumaAvailableMemoryNodeEx(USHORT node, PULONGLONG available_bytes)
 {
-    FIXME("(%hu %p): stub\n", node, available_bytes);
-    SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
-    return FALSE;
+    /* Same approximation as the 8-bit version */
+    return GetNumaAvailableMemoryNode((UCHAR)node, available_bytes);
 }
 
 /***********************************************************************
@@ -805,14 +834,42 @@ BOOL WINAPI GetNumaAvailableMemoryNodeEx(USHORT node, PULONGLONG available_bytes
  */
 BOOL WINAPI GetNumaProcessorNode(UCHAR processor, PUCHAR node)
 {
-    TRACE("(%d, %p)\n", processor, node);
-
-    if (processor < system_info.NumberOfProcessors)
+    ULONG highest, n;
+    GROUP_AFFINITY affinity;
+    TRACE("GetNumaProcessorNode(proc=%u, node=%p)\n", processor, node);
+    if (!node)
     {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    /* Vérification basique */
+    if (processor >= system_info.NumberOfProcessors)
+    {
+        *node = 0xFF;
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    if (!GetNumaHighestNodeNumber(&highest))
+    {
+        /* if failure -> consider mono-node */
         *node = 0;
         return TRUE;
     }
-
+    
+    if (highest == 0)
+    {
+        *node = 0; /* non-NUMA system (or fallback) */
+        return TRUE;
+    }
+    for (n = 0; n <= highest; ++n)
+    {
+        if (GetNumaNodeProcessorMaskEx((USHORT)n, &affinity) && (affinity.Mask & ((ULONGLONG)1 << processor)))
+        {
+            *node = (UCHAR)n;
+            return TRUE;
+        }
+    }
+    /* Not found: invalid */
     *node = 0xFF;
     SetLastError(ERROR_INVALID_PARAMETER);
     return FALSE;
@@ -823,17 +880,63 @@ BOOL WINAPI GetNumaProcessorNode(UCHAR processor, PUCHAR node)
  */
 BOOL WINAPI GetNumaProcessorNodeEx(PPROCESSOR_NUMBER processor, PUSHORT node_number)
 {
-    SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
+    ULONG highest, n;
+    GROUP_AFFINITY affinity;
+    TRACE("GetNumaProcessorNodeEx(proc=%p, node_number=%p)\n", processor, node_number);
+    if (!processor || !node_number)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    if (processor->Group != 0)
+    {
+        /* Implémentation actuelle: un seul groupe supporté */
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    if (processor->Number >= system_info.NumberOfProcessors || processor->Number >= 8 * sizeof(affinity.Mask))
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    if (!GetNumaHighestNodeNumber(&highest)) return FALSE;
+    if (highest == 0)
+    {
+        *node_number = 0; /* système non NUMA */
+        return TRUE;
+    }
+    for (n = 0; n <= highest; ++n)
+    {
+        if (GetNumaNodeProcessorMaskEx((USHORT)n, &affinity) && (affinity.Mask & ((ULONGLONG)1 << processor->Number)))
+        {
+            *node_number = (USHORT)n;
+            return TRUE;
+        }
+    }
+    SetLastError(ERROR_INVALID_PARAMETER);
     return FALSE;
 }
 
 /***********************************************************************
  *           GetNumaProximityNode (KERNEL32.@)
  */
-BOOL WINAPI GetNumaProximityNode(ULONG  proximity_id, PUCHAR node_number)
+BOOL WINAPI GetNumaProximityNode(ULONG proximity_id, PUCHAR node_number)
 {
-    SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
-    return FALSE;
+    USHORT node16;
+    TRACE("GetNumaProximityNode(proximity=%lu, node_number=%p)\n", proximity_id, node_number);
+    if (!node_number)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    if (!GetNumaProximityNodeEx(proximity_id, &node16)) return FALSE;
+    if (node16 > 0xFF)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    *node_number = (UCHAR)node16;
+    return TRUE;
 }
 
 /**********************************************************************
