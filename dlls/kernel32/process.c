@@ -842,7 +842,7 @@ BOOL WINAPI GetNumaProcessorNode(UCHAR processor, PUCHAR node)
         SetLastError(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
-    /* Vérification basique */
+    /* basic validation */
     if (processor >= system_info.NumberOfProcessors)
     {
         *node = 0xFF;
