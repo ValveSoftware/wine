@@ -341,16 +341,23 @@ static void X11DRV_vulkan_surface_presented( HWND hwnd, void *private, VkResult 
     NtUserMapWindowPoints( hwnd, toplevel, (POINT *)&rect_dst, 2, dpi );
     if (IsRectEmpty( &rect_dst ) || IsRectEmpty( &surface->rect )) return;
     rect_dst = map_rect_virt_to_raw_for_monitor( NtUserMonitorFromWindow( toplevel, MONITOR_DEFAULTTONEAREST ), rect_dst, dpi );
+
+    if (!(hdc = NtUserGetDCEx( hwnd, 0, DCX_CACHE | DCX_USESTYLE ))) return;
+    window = X11DRV_get_whole_window( toplevel );
+    region = get_dc_monitor_region( hwnd, hdc );
+
     if ((data = get_win_data( toplevel )))
     {
         OffsetRect( &rect_dst, data->rects.client.left - data->rects.visible.left,
                     data->rects.client.top - data->rects.visible.top );
         release_win_data( data );
     }
-
-    if (!(hdc = NtUserGetDCEx( hwnd, 0, DCX_CACHE | DCX_USESTYLE ))) return;
-    window = X11DRV_get_whole_window( toplevel );
-    region = get_dc_monitor_region( hwnd, hdc );
+    else
+    {
+        get_dc_drawable( hdc, &rect );
+        OffsetRect( &rect_dst, rect.left, rect.top );
+        WARN( "Using rect %s for other process window\n", wine_dbgstr_rect( &rect_dst ) );
+    }
 
     if (get_dc_drawable( surface->hdc_dst, &rect ) != window || !EqualRect( &rect, &rect_dst ))
         set_dc_drawable( surface->hdc_dst, window, &rect_dst, IncludeInferiors );
