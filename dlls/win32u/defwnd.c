@@ -258,20 +258,6 @@ BOOL adjust_window_rect( RECT *rect, DWORD style, BOOL menu, DWORD ex_style, UIN
     NONCLIENTMETRICSW ncm = {.cbSize = sizeof(ncm)};
     int adjust = 0;
 
-    if (user_driver->pHasWindowManager( "steamcompmgr" ))
-    {
-        /* Disable gamescope undecorated windows hack for following games. They don't expect client
-         * rect equals to window rect when in windowed mode. */
-        const char *sgi = getenv( "SteamGameId" );
-        if (
-             !((style & WS_POPUP) && (ex_style & WS_EX_TOOLWINDOW)) /* Bug 20038: game splash screens */
-             && !(sgi && !strcmp( sgi, "2563800" )) /* Bug 23342: The Last Game */
-             && !(sgi && !strcmp( sgi, "1240440" )) /* Bug 23802: Halo Infinite */
-             && !(sgi && !strcmp( sgi, "613830" ))  /* Bug 25747: CHRONO TRIGGER */
-            )
-            return TRUE;
-    }
-
     NtUserSystemParametersInfoForDpi( SPI_GETNONCLIENTMETRICS, 0, &ncm, 0, dpi );
 
     if ((ex_style & (WS_EX_STATICEDGE|WS_EX_DLGMODALFRAME)) == WS_EX_STATICEDGE)
