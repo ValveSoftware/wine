@@ -1404,7 +1404,7 @@ static HRESULT hid_joystick_read( IDirectInputDevice8W *iface )
             {
                 usages = impl->usages_buf + count;
                 if (usages->UsagePage != HID_USAGE_PAGE_BUTTON)
-                    WARN( "unimplemented usage page %x.\n", usages->UsagePage );
+                    FIXME( "unimplemented usage page %x.\n", usages->UsagePage );
                 else if (usages->Usage >= 128)
                     FIXME( "ignoring extraneous button %d.\n", usages->Usage );
                 else
