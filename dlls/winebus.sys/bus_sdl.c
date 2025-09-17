@@ -416,13 +416,9 @@ static NTSTATUS build_controller_report_descriptor(struct unix_device *iface)
     if (!descriptor_add_haptic(impl, FALSE)) return STATUS_NO_MEMORY;
     if (!hid_device_end_report_descriptor(iface)) return STATUS_NO_MEMORY;
 
+    /* Initialize axis in the report */
     for (int i = SDL_CONTROLLER_AXIS_LEFTX; i < SDL_CONTROLLER_AXIS_MAX; i++)
-    {
-        int value = pSDL_GameControllerGetAxis(impl->sdl_controller, i);
-        if (i == SDL_CONTROLLER_AXIS_LEFTY || i == SDL_CONTROLLER_AXIS_RIGHTY)
-            value = -value - 1; /* match XUSB / GIP protocol */
-        hid_device_set_abs_axis(iface, i, value);
-    }
+        hid_device_set_abs_axis(iface, i, pSDL_GameControllerGetAxis(impl->sdl_controller, i));
 
     state = pSDL_GameControllerGetButton(impl->sdl_controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
     hid_device_move_hatswitch(iface, 0, 0, state ? -1 : +1);
@@ -910,9 +906,6 @@ static BOOL set_report_from_controller_event(struct sdl_device *impl, SDL_Event 
         case SDL_CONTROLLERAXISMOTION:
         {
             SDL_ControllerAxisEvent *ie = &event->caxis;
-
-            if (ie->axis == SDL_CONTROLLER_AXIS_LEFTY || ie->axis == SDL_CONTROLLER_AXIS_RIGHTY)
-                ie->value = -ie->value - 1; /* match XUSB / GIP protocol */
 
             hid_device_set_abs_axis(iface, ie->axis, ie->value);
             bus_event_queue_input_report(&event_queue, iface, state->report_buf, state->report_len);
