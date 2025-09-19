@@ -2134,6 +2134,7 @@ BOOL simulate_writecopy;
 BOOL wine_allocs_2g_limit;
 SIZE_T kernel_stack_size = 0x100000;
 long long ram_reporting_bias;
+char *release_reserved_memory_low_bound;
 
 static void hacks_init(void)
 {
@@ -2262,6 +2263,15 @@ static void hacks_init(void)
         setenv("vk_x11_override_min_image_count", "2", 0);
         setenv("vk_x11_strict_image_count", "true", 0);
     }
+
+#ifndef __x86_64__
+    if ((env_str = getenv( "WINE_RES_MEM_LOW_BOUND" )))
+        release_reserved_memory_low_bound = (void *)strtol( env_str, NULL, 0x10 );
+    else if (sgi && (
+                        !strcmp( sgi, "518920" )
+                    ))
+        release_reserved_memory_low_bound = (void *)0x00200000;
+#endif
 }
 
 /***********************************************************************
