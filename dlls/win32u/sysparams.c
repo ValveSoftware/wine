@@ -7362,21 +7362,6 @@ ULONG_PTR WINAPI NtUserCallTwoParam( ULONG_PTR arg1, ULONG_PTR arg2, ULONG code 
     case NtUserCallTwoParam_AdjustWindowRect:
     {
         struct adjust_window_rect_params *params = (void *)arg2;
-
-        if (user_driver->pHasWindowManager( "steamcompmgr" ))
-        {
-            /* Disable gamescope undecorated windows hack for following games. They don't expect client
-             * rect equals to window rect when in windowed mode. */
-            const char *sgi = getenv( "SteamGameId" );
-            if (
-                 !((params->style & WS_POPUP) && (params->ex_style & WS_EX_TOOLWINDOW)) /* Bug 20038: game splash screens */
-                 && !(sgi && !strcmp( sgi, "2563800" )) /* Bug 23342: The Last Game */
-                 && !(sgi && !strcmp( sgi, "1240440" )) /* Bug 23802: Halo Infinite */
-                 && !(sgi && !strcmp( sgi, "613830" ))  /* Bug 25747: CHRONO TRIGGER */
-                )
-                return TRUE;
-        }
-
         return adjust_window_rect( (RECT *)arg1, params->style, params->menu, params->ex_style, params->dpi );
     }
 
