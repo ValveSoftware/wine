@@ -5333,9 +5333,12 @@ static void free_reserved_memory( char *base, char *limit )
 static void virtual_release_address_space(void)
 {
 #ifndef __APPLE__  /* On macOS, we still want to free some of low memory, for OpenGL resources */
-    if (user_space_limit > (void *)limit_2g) return;
+    if (user_space_limit > (void *)limit_2g && !release_reserved_memory_low_bound) return;
 #endif
-    free_reserved_memory( (char *)0x20000000, (char *)0x7f000000 );
+    if (release_reserved_memory_low_bound)
+        ERR( "HACK: release_reserved_memory_low_bound %p.\n", release_reserved_memory_low_bound );
+    free_reserved_memory( release_reserved_memory_low_bound ? release_reserved_memory_low_bound : (char *)0x20000000,
+                          (char *)0x7f000000 );
 }
 
 #endif  /* _WIN64 */
