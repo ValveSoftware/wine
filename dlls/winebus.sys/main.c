@@ -455,7 +455,12 @@ static const WCHAR *wcscasestr(const WCHAR *search, const WCHAR *needle)
 
     while (needle_str.Length <= search_str.Length)
     {
-        if (!RtlCompareUnicodeString(&search_str, &needle_str, TRUE)) return search_str.Buffer;
+        UNICODE_STRING tmp;
+
+        tmp.Buffer = search_str.Buffer;
+        tmp.Length = tmp.MaximumLength = needle_str.Length;
+
+        if (!RtlCompareUnicodeString(&tmp, &needle_str, TRUE)) return search_str.Buffer;
         search_str.Length -= sizeof(WCHAR);
         search_str.Buffer += 1;
     }
@@ -490,7 +495,7 @@ static BOOL is_hidraw_enabled(WORD vid, WORD pid, const USAGE_AND_PAGE *usages, 
         return FALSE;
     }
 
-    if (!RtlQueryEnvironmentVariable(NULL, L"PROTON_DISABLE_HIDRAW", 20, value, ARRAY_SIZE(value) - 1, &len))
+    if (!RtlQueryEnvironmentVariable(NULL, L"PROTON_DISABLE_HIDRAW", 21, value, ARRAY_SIZE(value) - 1, &len))
     {
         value[len] = 0;
         if (!wcscmp(value, L"1")) return FALSE;
