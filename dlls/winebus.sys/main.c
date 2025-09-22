@@ -481,6 +481,14 @@ static BOOL is_hidraw_enabled(WORD vid, WORD pid, const USAGE_AND_PAGE *usages, 
 
     if (options.disable_hidraw) return FALSE;
 
+    if (!RtlQueryEnvironmentVariable(NULL, L"PROTON_DISABLE_HIDRAW", 21, value, ARRAY_SIZE(value) - 1, &len))
+    {
+        value[len] = 0;
+        if (!wcscmp(value, L"1")) return FALSE;
+        swprintf(vidpid, ARRAY_SIZE(vidpid), L"0x%04X/0x%04X", vid, pid);
+        if (wcscasestr(value, vidpid)) return FALSE;
+    }
+
     LIST_FOR_EACH_ENTRY(device, &options.devices, struct device_options, entry)
     {
         if (device->vid != vid) continue;
@@ -495,13 +503,6 @@ static BOOL is_hidraw_enabled(WORD vid, WORD pid, const USAGE_AND_PAGE *usages, 
         return FALSE;
     }
 
-    if (!RtlQueryEnvironmentVariable(NULL, L"PROTON_DISABLE_HIDRAW", 21, value, ARRAY_SIZE(value) - 1, &len))
-    {
-        value[len] = 0;
-        if (!wcscmp(value, L"1")) return FALSE;
-        swprintf(vidpid, ARRAY_SIZE(vidpid), L"0x%04X/0x%04X", vid, pid);
-        if (wcscasestr(value, vidpid)) return FALSE;
-    }
     if (!RtlQueryEnvironmentVariable(NULL, L"PROTON_ENABLE_HIDRAW", 20, value, ARRAY_SIZE(value) - 1, &len))
     {
         value[len] = 0;
