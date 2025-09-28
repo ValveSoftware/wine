@@ -1455,26 +1455,6 @@ DECL_HANDLER(get_startup_info)
 DECL_HANDLER(init_process_done)
 {
     struct process *process = current->process;
-    const struct cpu_topology_override *cpu_override = get_req_data();
-    unsigned int have_cpu_override = get_req_data_size() / sizeof(*cpu_override);
-    unsigned int i;
-
-    if (have_cpu_override)
-    {
-        if (cpu_override->cpu_count > ARRAY_SIZE(process->wine_cpu_id_from_host))
-        {
-            set_error( STATUS_INVALID_PARAMETER );
-            return;
-        }
-        for (i = 0; i < cpu_override->cpu_count; ++i)
-        {
-            if (cpu_override->host_cpu_id[i] >= ARRAY_SIZE(process->wine_cpu_id_from_host))
-            {
-                set_error( STATUS_INVALID_PARAMETER );
-                return;
-            }
-        }
-    }
 
     if (is_process_init_done(process))
     {
@@ -1496,14 +1476,6 @@ DECL_HANDLER(init_process_done)
         process->idle_event = create_event( NULL, NULL, 0, 1, 0, NULL );
     if (process->debug_obj) set_process_debug_flag( process, 1 );
     reply->suspend = (current->suspend || process->suspend);
-
-    if (have_cpu_override)
-    {
-        process->cpu_override = *cpu_override;
-        memset( process->wine_cpu_id_from_host, 0, sizeof(process->wine_cpu_id_from_host) );
-        for (i = 0; i < process->cpu_override.cpu_count; ++i)
-            process->wine_cpu_id_from_host[process->cpu_override.host_cpu_id[i]] = i;
-    }
 }
 
 /* open a handle to a process */
@@ -1928,7 +1900,15 @@ DECL_HANDLER(set_job_completion_port)
 
     if (!job) return;
 
-    if (!job->completion_port)
+    if (!req->port)
+    {
+        if (job->completion_port)
+        {
+            release_object( job->completion_port );
+            job->completion_port = NULL;
+        }
+    }
+    else if (!job->completion_port)
     {
         job->completion_port = get_completion_obj( current->process, req->port, IO_COMPLETION_MODIFY_STATE );
         job->completion_key = req->key;

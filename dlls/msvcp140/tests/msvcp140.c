@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <locale.h>
 #include <share.h>
+#include <uchar.h>
+#include <process.h>
 
 #include "windef.h"
 #include "winbase.h"
@@ -27,6 +29,8 @@
 
 #include "wine/test.h"
 #include "winbase.h"
+
+#include "threaddll.h"
 
 #define SECSPERDAY        86400
 /* 1601 to 1970 is 369 years plus 89 leap days */
@@ -89,6 +93,10 @@ struct thiscall_thunk
 
 static void * (WINAPI *call_thiscall_func1)( void *func, void *this );
 static void * (WINAPI *call_thiscall_func2)( void *func, void *this, const void *a );
+static void * (WINAPI *call_thiscall_func5)( void *func, void *this, const void *a, const void *b,
+        const void *c, const void *d );
+static void * (WINAPI *call_thiscall_func8)( void *func, void *this, const void *a, const void *b,
+        const void *c, const void *d, const void *e, const void *f, const void *g );
 
 static void init_thiscall_thunk(void)
 {
@@ -101,16 +109,24 @@ static void init_thiscall_thunk(void)
     thunk->jmp_edx  = 0xe2ff; /* jmp  *%edx */
     call_thiscall_func1 = (void *)thunk;
     call_thiscall_func2 = (void *)thunk;
+    call_thiscall_func5 = (void *)thunk;
+    call_thiscall_func8 = (void *)thunk;
 }
 
 #define call_func1(func,_this) call_thiscall_func1(func,_this)
-#define call_func2(func,_this,a) call_thiscall_func2(func,_this,a)
+#define call_func2(func,_this,a) call_thiscall_func2(func,_this,(const void*)(a))
+#define call_func5(func,_this,a,b,c,d) call_thiscall_func5(func,_this,(const void*)(a),(const void*)(b), \
+        (const void*)(c), (const void*)(d))
+#define call_func8(func,_this,a,b,c,d,e,f,g) call_thiscall_func8(func,_this,(const void*)(a),(const void*)(b), \
+        (const void*)(c), (const void*)(d), (const void*)(e), (const void*)(f), (const void*)(g))
 
 #else
 
 #define init_thiscall_thunk()
 #define call_func1(func,_this) func(_this)
 #define call_func2(func,_this,a) func(_this,a)
+#define call_func5(func,_this,a,b,c,d) func(_this,a,b,c,d)
+#define call_func8(func,_this,a,b,c,d,e,f,g) func(_this,a,b,c,d,e,f,g)
 
 #endif /* __i386__ */
 typedef unsigned char MSVCP_bool;
@@ -147,7 +163,7 @@ typedef struct {
 typedef struct
 {
     HANDLE hnd;
-    DWORD  id;
+    unsigned int id;
 } _Thrd_t;
 
 typedef struct cs_queue
@@ -166,16 +182,23 @@ typedef struct
     void *tail;
 } critical_section;
 
-typedef struct
-{
+typedef union {
+    critical_section conc;
+    SRWLOCK win;
+} cs;
+
+typedef struct {
     DWORD flags;
-    critical_section cs;
     ULONG_PTR unknown;
+    cs cs;
     DWORD thread_id;
     DWORD count;
 } *_Mtx_t;
 
-typedef void *_Cnd_t;
+typedef struct {
+    ULONG_PTR unknown;
+    CONDITION_VARIABLE cv;
+} *_Cnd_t;
 
 typedef struct {
     __time64_t sec;
@@ -218,6 +241,8 @@ static int (__cdecl *p__Mtx_init)(_Mtx_t*, int);
 static void (__cdecl *p__Mtx_destroy)(_Mtx_t);
 static int (__cdecl *p__Mtx_lock)(_Mtx_t);
 static int (__cdecl *p__Mtx_unlock)(_Mtx_t);
+static void (__cdecl *p__Mtx_clear_owner)(_Mtx_t);
+static void (__cdecl *p__Mtx_reset_owner)(_Mtx_t);
 static int (__cdecl *p__Cnd_init)(_Cnd_t*);
 static void (__cdecl *p__Cnd_destroy)(_Cnd_t);
 static int (__cdecl *p__Cnd_wait)(_Cnd_t, _Mtx_t);
@@ -225,6 +250,7 @@ static int (__cdecl *p__Cnd_timedwait)(_Cnd_t, _Mtx_t, const xtime*);
 static int (__cdecl *p__Cnd_broadcast)(_Cnd_t);
 static int (__cdecl *p__Cnd_signal)(_Cnd_t);
 static int (__cdecl *p__Thrd_create)(_Thrd_t*, _Thrd_start_t, void*);
+static int (__cdecl *p__Thrd_start)(_Thrd_t*, _beginthreadex_start_routine_t, void *);
 static int (__cdecl *p__Thrd_join)(_Thrd_t, int*);
 static int (__cdecl *p__Xtime_diff_to_millis2)(const xtime*, const xtime*);
 static int (__cdecl *p_xtime_get)(xtime*, int);
@@ -275,6 +301,58 @@ static int (__cdecl *p__unlink)(const char*);
 
 static BOOLEAN (WINAPI *pCreateSymbolicLinkW)(const WCHAR *, const WCHAR *, DWORD);
 
+typedef void (*vtable_ptr)(void);
+typedef SIZE_T MSVCP_size_t;
+
+/* class locale::facet */
+typedef struct {
+    const vtable_ptr *vtable;
+    unsigned int refs;
+} locale_facet;
+
+/* class codecvt_base */
+typedef struct {
+    locale_facet facet;
+} codecvt_base;
+
+typedef enum convert_mode
+{
+    consume_header = 4,
+    generate_header = 2,
+    little_endian = 1
+} codecvt_convert_mode;
+
+/* class codecvt<char16> */
+typedef struct {
+    codecvt_base base;
+    unsigned int max_code;
+    codecvt_convert_mode convert_mode;
+} codecvt_char16;
+
+typedef struct {
+    int wchar;
+    unsigned short byte, state;
+} _Mbstatet;
+
+typedef enum {
+    CODECVT_ok      = 0,
+    CODECVT_partial = 1,
+    CODECVT_error   = 2,
+    CODECVT_noconv  = 3
+} codecvt_base_result;
+
+static codecvt_char16 *(__thiscall * p_codecvt_char16_ctor)(codecvt_char16 *this);
+static codecvt_char16 *(__thiscall * p_codecvt_char16_ctor_refs)(codecvt_char16 *this, unsigned int refs);
+static codecvt_char16 * (__thiscall * p_codecvt_char16_ctor_mode)(codecvt_char16 *this, void *locinfo,
+        ULONG max_code, codecvt_convert_mode mode, unsigned int refs);
+static void (__thiscall * p_codecvt_char16_dtor)(codecvt_char16 *this);
+static int (__thiscall * p_codecvt_char16_do_out)(const codecvt_char16 *this, _Mbstatet *state,
+        const char16_t *from, const char16_t *from_end, const char16_t **from_next,
+        char *to, char *to_end, char **to_next);
+static int (__thiscall * p_codecvt_char16_do_in)(const codecvt_char16 *this, _Mbstatet *state,
+        const char *from, const char *from_end, const char **from_next,
+        char16_t *to, char16_t *to_end, char16_t **to_next);
+
 static HMODULE msvcp;
 #define SETNOFAIL(x,y) x = (void*)GetProcAddress(msvcp,y)
 #define SET(x,y) do { SETNOFAIL(x,y); ok(x != NULL, "Export '%s' not found\n", y); } while(0)
@@ -314,6 +392,12 @@ static BOOL init(void)
 
         SET(p__Fiopen_wchar, "?_Fiopen@std@@YAPEAU_iobuf@@PEB_WHH@Z");
         SET(p__Fiopen, "?_Fiopen@std@@YAPEAU_iobuf@@PEBDHH@Z");
+        SET(p_codecvt_char16_ctor, "??_F?$codecvt@_SDU_Mbstatet@@@std@@QEAAXXZ");
+        SET(p_codecvt_char16_ctor_refs, "??0?$codecvt@_SDU_Mbstatet@@@std@@QEAA@_K@Z");
+        SET(p_codecvt_char16_ctor_mode, "??0?$codecvt@_SDU_Mbstatet@@@std@@QEAA@AEBV_Locinfo@1@KW4_Codecvt_mode@1@_K@Z");
+        SET(p_codecvt_char16_dtor, "??1?$codecvt@_SDU_Mbstatet@@@std@@MEAA@XZ");
+        SET(p_codecvt_char16_do_out, "?do_out@?$codecvt@_SDU_Mbstatet@@@std@@MEBAHAEAU_Mbstatet@@PEB_S1AEAPEB_SPEAD3AEAPEAD@Z");
+        SET(p_codecvt_char16_do_in, "?do_in@?$codecvt@_SDU_Mbstatet@@@std@@MEBAHAEAU_Mbstatet@@PEBD1AEAPEBDPEA_S3AEAPEA_S@Z");
     } else {
 #ifdef __arm__
         SET(p_task_continuation_context_ctor, "??0task_continuation_context@Concurrency@@AAA@XZ");
@@ -327,6 +411,12 @@ static BOOL init(void)
         SET(p__TaskEventLogger__LogTaskExecutionCompleted, "?_LogTaskExecutionCompleted@_TaskEventLogger@details@Concurrency@@QAAXXZ");
         SET(p__TaskEventLogger__LogWorkItemCompleted, "?_LogWorkItemCompleted@_TaskEventLogger@details@Concurrency@@QAAXXZ");
         SET(p__TaskEventLogger__LogWorkItemStarted, "?_LogWorkItemStarted@_TaskEventLogger@details@Concurrency@@QAAXXZ");
+        SET(p_codecvt_char16_ctor, "??_F?$codecvt@_SDU_Mbstatet@@@std@@QAAXXZ");
+        SET(p_codecvt_char16_ctor_refs, "??0?$codecvt@_SDU_Mbstatet@@@std@@QAA@I@Z");
+        SET(p_codecvt_char16_ctor_mode, "??0?$codecvt@_SDU_Mbstatet@@@std@@QAA@ABV_Locinfo@1@KW4_Codecvt_mode@1@I@Z");
+        SET(p_codecvt_char16_dtor, "??1?$codecvt@_SDU_Mbstatet@@@std@@MAA@XZ(ptr)");
+        SET(p_codecvt_char16_do_out, "?do_out@?$codecvt@_SDU_Mbstatet@@@std@@MBAHAAU_Mbstatet@@PB_S1AAPB_SPAD3AAPAD@Z");
+        SET(p_codecvt_char16_do_in, "?do_in@?$codecvt@_SDU_Mbstatet@@@std@@MBAHAAU_Mbstatet@@PBD1AAPBDPA_S3AAPA_S@Z");
 #else
         SET(p_task_continuation_context_ctor, "??0task_continuation_context@Concurrency@@AAE@XZ");
         SET(p__ContextCallback__Assign, "?_Assign@_ContextCallback@details@Concurrency@@AAEXPAX@Z");
@@ -339,6 +429,12 @@ static BOOL init(void)
         SET(p__TaskEventLogger__LogTaskExecutionCompleted, "?_LogTaskExecutionCompleted@_TaskEventLogger@details@Concurrency@@QAEXXZ");
         SET(p__TaskEventLogger__LogWorkItemCompleted, "?_LogWorkItemCompleted@_TaskEventLogger@details@Concurrency@@QAEXXZ");
         SET(p__TaskEventLogger__LogWorkItemStarted, "?_LogWorkItemStarted@_TaskEventLogger@details@Concurrency@@QAEXXZ");
+        SET(p_codecvt_char16_ctor, "??_F?$codecvt@_SDU_Mbstatet@@@std@@QAEXXZ");
+        SET(p_codecvt_char16_ctor_refs, "??0?$codecvt@_SDU_Mbstatet@@@std@@QAE@I@Z");
+        SET(p_codecvt_char16_ctor_mode, "??0?$codecvt@_SDU_Mbstatet@@@std@@QAE@ABV_Locinfo@1@KW4_Codecvt_mode@1@I@Z");
+        SET(p_codecvt_char16_dtor, "??1?$codecvt@_SDU_Mbstatet@@@std@@MAE@XZ");
+        SET(p_codecvt_char16_do_out, "?do_out@?$codecvt@_SDU_Mbstatet@@@std@@MBEHAAU_Mbstatet@@PB_S1AAPB_SPAD3AAPAD@Z");
+        SET(p_codecvt_char16_do_in, "?do_in@?$codecvt@_SDU_Mbstatet@@@std@@MBEHAAU_Mbstatet@@PBD1AAPBDPA_S3AAPA_S@Z");
 #endif
         SET(p__Schedule_chore, "?_Schedule_chore@details@Concurrency@@YAHPAU_Threadpool_chore@12@@Z");
         SET(p__Reschedule_chore, "?_Reschedule_chore@details@Concurrency@@YAHPBU_Threadpool_chore@12@@Z");
@@ -354,6 +450,8 @@ static BOOL init(void)
     SET(p__Mtx_destroy, "_Mtx_destroy");
     SET(p__Mtx_lock, "_Mtx_lock");
     SET(p__Mtx_unlock, "_Mtx_unlock");
+    SET(p__Mtx_clear_owner, "_Mtx_clear_owner");
+    SET(p__Mtx_reset_owner, "_Mtx_reset_owner");
     SET(p__Cnd_init, "_Cnd_init");
     SET(p__Cnd_destroy, "_Cnd_destroy");
     SET(p__Cnd_wait, "_Cnd_wait");
@@ -361,6 +459,7 @@ static BOOL init(void)
     SET(p__Cnd_broadcast, "_Cnd_broadcast");
     SET(p__Cnd_signal, "_Cnd_signal");
     SET(p__Thrd_create, "_Thrd_create");
+    SET(p__Thrd_start, "_Thrd_start");
     SET(p__Thrd_join, "_Thrd_join");
     SET(p__Xtime_diff_to_millis2, "_Xtime_diff_to_millis2");
     SET(p_xtime_get, "xtime_get");
@@ -1500,6 +1599,7 @@ struct cndmtx
     _Cnd_t cnd;
     _Mtx_t mtx;
     BOOL timed_wait;
+    BOOL use_cnd_func;
 };
 
 static int __cdecl cnd_wait_thread(void *arg)
@@ -1512,16 +1612,23 @@ static int __cdecl cnd_wait_thread(void *arg)
     if(InterlockedIncrement(&cm->started) == cm->thread_no)
         SetEvent(cm->initialized);
 
-    if(cm->timed_wait) {
-        xtime xt;
+    if(cm->use_cnd_func) {
+        if(cm->timed_wait) {
+            xtime xt;
+            p_xtime_get(&xt, 1);
+            xt.sec += 2;
 
-        p_xtime_get(&xt, 1);
-        xt.sec += 2;
-        r = p__Cnd_timedwait(cm->cnd, cm->mtx, &xt);
-        ok(!r, "timed wait failed\n");
-    } else {
-        r = p__Cnd_wait(cm->cnd, cm->mtx);
+            r = p__Cnd_timedwait(cm->cnd, cm->mtx, &xt);
+        } else {
+            r = p__Cnd_wait(cm->cnd, cm->mtx);
+        }
         ok(!r, "wait failed\n");
+    } else {
+        p__Mtx_clear_owner(cm->mtx);
+        r = SleepConditionVariableSRW(&cm->cnd->cv, &cm->mtx->cs.win,
+                                      cm->timed_wait ? 2000 : INFINITE, 0);
+        ok(r, "wait failed\n");
+        p__Mtx_reset_owner(cm->mtx);
     }
 
     p__Mtx_unlock(cm->mtx);
@@ -1552,12 +1659,27 @@ static void test_cnd(void)
     cm.cnd = cnd;
     cm.mtx = mtx;
     cm.timed_wait = FALSE;
+    cm.use_cnd_func = TRUE;
     p__Thrd_create(&threads[0], cnd_wait_thread, (void*)&cm);
 
     WaitForSingleObject(cm.initialized, INFINITE);
     p__Mtx_lock(mtx);
     p__Mtx_unlock(mtx);
 
+    /* signal cnd function with kernel function */
+    WakeConditionVariable(&cm.cnd->cv);
+    p__Thrd_join(threads[0], NULL);
+
+    cm.started = 0;
+    cm.thread_no = 1;
+    cm.use_cnd_func = FALSE;
+    p__Thrd_create(&threads[0], cnd_wait_thread, (void*)&cm);
+
+    WaitForSingleObject(cm.initialized, INFINITE);
+    p__Mtx_lock(mtx);
+    p__Mtx_unlock(mtx);
+
+    /* signal kernel functions with cnd function */
     r = p__Cnd_signal(cm.cnd);
     ok(!r, "failed to signal\n");
     p__Thrd_join(threads[0], NULL);
@@ -1580,20 +1702,35 @@ static void test_cnd(void)
     /* test _Cnd_timedwait */
     cm.started = 0;
     cm.timed_wait = TRUE;
+    cm.use_cnd_func = TRUE;
     p__Thrd_create(&threads[0], cnd_wait_thread, (void*)&cm);
 
     WaitForSingleObject(cm.initialized, INFINITE);
     p__Mtx_lock(mtx);
     p__Mtx_unlock(mtx);
 
+    /* signal cnd function with kernel function */
+    WakeConditionVariable(&cm.cnd->cv);
+    p__Thrd_join(threads[0], NULL);
+
+    cm.started = 0;
+    cm.use_cnd_func = FALSE;
+    p__Thrd_create(&threads[0], cnd_wait_thread, (void*)&cm);
+
+    WaitForSingleObject(cm.initialized, INFINITE);
+    p__Mtx_lock(mtx);
+    p__Mtx_unlock(mtx);
+
+    /* signal kernel functions with cnd function */
     r = p__Cnd_signal(cm.cnd);
     ok(!r, "failed to signal\n");
     p__Thrd_join(threads[0], NULL);
 
     /* test _Cnd_broadcast */
     cm.started = 0;
+    cm.timed_wait = FALSE;
+    cm.use_cnd_func = TRUE;
     cm.thread_no = NUM_THREADS;
-
     for(i = 0; i < cm.thread_no; i++)
         p__Thrd_create(&threads[i], cnd_wait_thread, (void*)&cm);
 
@@ -1601,6 +1738,21 @@ static void test_cnd(void)
     p__Mtx_lock(mtx);
     p__Mtx_unlock(mtx);
 
+    /* signal cnd function with kernel function */
+    WakeAllConditionVariable(&cm.cnd->cv);
+    for(i = 0; i < cm.thread_no; i++)
+        p__Thrd_join(threads[i], NULL);
+
+    cm.started = 0;
+    cm.use_cnd_func = FALSE;
+    for(i = 0; i < cm.thread_no; i++)
+        p__Thrd_create(&threads[i], cnd_wait_thread, (void*)&cm);
+
+    WaitForSingleObject(cm.initialized, INFINITE);
+    p__Mtx_lock(mtx);
+    p__Mtx_unlock(mtx);
+
+    /* signal kernel functions with cnd function */
     r = p__Cnd_broadcast(cnd);
     ok(!r, "failed to broadcast\n");
     for(i = 0; i < cm.thread_no; i++)
@@ -1682,15 +1834,19 @@ static void test__Mtx(void)
 
     ok(mtx->thread_id == -1, "mtx.thread_id = %lx\n", mtx->thread_id);
     ok(mtx->count == 0, "mtx.count = %lx\n", mtx->count);
+    ok(mtx->cs.win.Ptr == 0, "mtx.cs == %p\n", mtx->cs.win.Ptr);
     p__Mtx_lock(mtx);
     ok(mtx->thread_id == GetCurrentThreadId(), "mtx.thread_id = %lx\n", mtx->thread_id);
     ok(mtx->count == 1, "mtx.count = %lx\n", mtx->count);
+    ok(mtx->cs.win.Ptr != 0, "mtx.cs == %p\n", mtx->cs.win.Ptr);
     p__Mtx_lock(mtx);
     ok(mtx->thread_id == GetCurrentThreadId(), "mtx.thread_id = %lx\n", mtx->thread_id);
     ok(mtx->count == 1, "mtx.count = %lx\n", mtx->count);
+    ok(mtx->cs.win.Ptr != 0, "mtx.cs == %p\n", mtx->cs.win.Ptr);
     p__Mtx_unlock(mtx);
     ok(mtx->thread_id == -1, "mtx.thread_id = %lx\n", mtx->thread_id);
     ok(mtx->count == 0, "mtx.count = %lx\n", mtx->count);
+    ok(mtx->cs.win.Ptr == 0, "mtx.cs == %p\n", mtx->cs.win.Ptr);
     p__Mtx_unlock(mtx);
     ok(mtx->thread_id == -1, "mtx.thread_id = %lx\n", mtx->thread_id);
     ok(mtx->count == -1, "mtx.count = %lx\n", mtx->count);
@@ -1742,6 +1898,541 @@ static void test__Fiopen(void)
     p_setlocale(LC_ALL, "C");
 }
 
+static const char bom_header[] = { 0xef, 0xbb, 0xbf };
+
+static BOOL str_has_bom_header(const char *str)
+{
+    return !strncmp(str, bom_header, sizeof(bom_header));
+}
+
+void test_codecvt_char16(void)
+{
+    static const struct
+    {
+        const WCHAR *wstr;
+        const char *str;
+        int short_output;
+    }
+    tests[] =
+    {
+        { L"\xfeff", "\xef\xbb\xbf" },
+        { L"\xfffe", "\xef\xbf\xbe" },
+        { L"\xfeff""a", "\xef\xbb\xbf""a", 1 },
+        { L"abc", "abc", 1 },
+        { L"\x2a8", "\xca\xa8" },
+        { L"\xd83d\xdcd8\xd83d\xde79", "\xf0\x9f\x93\x98\xf0\x9f\x99\xb9", 3 },
+        { L"\x08a4", "\xe0\xa2\xa4", },
+        { L"\x01a7", "\xc6\xa7", },
+        { L"\x01a7\x08a4", "\xc6\xa7\xe0\xa2\xa4", 3},
+    };
+    static DWORD test_flags[] =
+    {
+        0,
+        consume_header,
+        generate_header,
+        consume_header | generate_header,
+    };
+    char16_t str16[16], *str16_ptr;
+    codecvt_char16 *this, *this2;
+    unsigned int i, j, len, wlen;
+    char str[16], expect_str[16];
+    char buffer[256], *str_ptr;
+    _Mbstatet state;
+    int ret;
+
+    this = (codecvt_char16 *)buffer;
+    memset(buffer, 0xcc, sizeof(buffer));
+    this2 = call_func1(p_codecvt_char16_ctor, this);
+    ok(!this->base.facet.refs, "got %u.\n", this->base.facet.refs);
+    ok(this->convert_mode == consume_header, "got %#x.\n", this->max_code);
+    ok(this->max_code == MAX_UCSCHAR, "got %#x.\n", this->max_code);
+    ok(*(unsigned int *)(buffer + sizeof(*this)) == 0xcccccccc, "got %#x.\n", *(unsigned int *)(buffer + sizeof(*this)));
+    call_func1(p_codecvt_char16_dtor, this);
+
+    this = (codecvt_char16 *)buffer;
+    memset(buffer, 0xcc, sizeof(buffer));
+    this2 = call_func2(p_codecvt_char16_ctor_refs, this, 12);
+    ok(this2 == this, "got %p, %p.\n", this2, this);
+    ok(this->base.facet.refs == 12, "got %u.\n", this->base.facet.refs);
+    ok(this->convert_mode == consume_header, "got %#x.\n", this->max_code);
+    ok(this->max_code == MAX_UCSCHAR, "got %#x.\n", this->max_code);
+    ok(*(unsigned int *)(buffer + sizeof(*this)) == 0xcccccccc, "got %#x.\n", *(unsigned int *)(buffer + sizeof(*this)));
+    call_func1(p_codecvt_char16_dtor, this);
+
+    this = (codecvt_char16 *)buffer;
+    memset(buffer, 0xcc, sizeof(buffer));
+    this2 = call_func5(p_codecvt_char16_ctor_mode, this, (void *)0xdeadbeef, 0xffffffff, 0x44, 12);
+    ok(this2 == this, "got %p, %p.\n", this2, this);
+    ok(this->base.facet.refs == 12, "got %#x.\n", this->base.facet.refs);
+    ok(this->convert_mode == 0x44, "got %#x.\n", this->convert_mode);
+    ok(this->max_code == 0xffffffff, "got %#x.\n", this->max_code);
+    ok(*(unsigned int *)(buffer + sizeof(*this)) == 0xcccccccc, "got %#x.\n", *(unsigned int *)(buffer + sizeof(*this)));
+    call_func1(p_codecvt_char16_dtor, this);
+
+    for (j = 0; j < ARRAY_SIZE(test_flags); ++j)
+    {
+        winetest_push_context("flags %#lx", test_flags[j]);
+        this = (codecvt_char16 *)buffer;
+        memset(buffer, 0xcc, sizeof(buffer));
+        call_func5(p_codecvt_char16_ctor_mode, this, (void *)0xdeadbeef, MAX_UCSCHAR, test_flags[j], 0);
+
+        str16[0] = 'a';
+        memset(&state, 0, sizeof(state));
+        ret = (int)call_func8(p_codecvt_char16_do_out, this, &state, str16, str16 + 1, (const char16_t **)&str16_ptr, str, str, &str_ptr);
+        ok(ret == CODECVT_partial, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+        ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 0, "got %#x.\n", state.wchar);
+
+        memset(&state, 0, sizeof(state));
+        ret = (int)call_func8(p_codecvt_char16_do_out, this, &state, str16, str16, (const char16_t **)&str16_ptr, str, str, &str_ptr);
+        ok(ret == CODECVT_partial, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+        ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 0, "got %#x.\n", state.wchar);
+
+        wcscpy(str16, L"\xd83d\xdcd8\xd83d\xde79");
+
+        memset(&state, 0, sizeof(state));
+        memset(str, 0, sizeof(str));
+        ret = (int)call_func8(p_codecvt_char16_do_out, this, &state, str16, str16 + 1, (const char16_t **)&str16_ptr, str, str + 1, &str_ptr);
+        if (test_flags[j] & generate_header)
+        {
+            ok(ret == CODECVT_partial, "got %d.\n", ret);
+            ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+            ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+            ok(state.wchar == 0, "got %#x.\n", state.wchar);
+        }
+        else
+        {
+            ok(ret == CODECVT_ok, "got %d.\n", ret);
+            ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+            ok(!strcmp(str, "\xf0"), "got %s.\n", debugstr_a(str));
+            ok(str_ptr - str == 1, "got %Id.\n", str_ptr - str);
+            ok(state.wchar == 0x7d, "got %#x.\n", state.wchar);
+        }
+
+        memset(&state, 0, sizeof(state));
+        memset(str, 0, sizeof(str));
+        ret = (int)call_func8(p_codecvt_char16_do_out, this, &state, str16, str16 + 1, (const char16_t **)&str16_ptr, str, str + 2, &str_ptr);
+        if (test_flags[j] & generate_header)
+        {
+            ok(ret == CODECVT_partial, "got %d.\n", ret);
+            ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+            ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+            ok(state.wchar == 0, "got %#x.\n", state.wchar);
+        }
+        else
+        {
+            ok(ret == CODECVT_ok, "got %d.\n", ret);
+            ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+            ok(!strcmp(str, "\xf0"), "got %s.\n", debugstr_a(str));
+            ok(str_ptr - str == 1, "got %Id.\n", str_ptr - str);
+            ok(state.wchar == 0x7d, "got %#x.\n", state.wchar);
+        }
+
+        memset(&state, 0, sizeof(state));
+        memset(str, 0, sizeof(str));
+        ret = (int)call_func8(p_codecvt_char16_do_out, this, &state, str16, str16 + 1, (const char16_t **)&str16_ptr, str, str + 3, &str_ptr);
+        if (test_flags[j] & generate_header)
+        {
+            ok(ret == CODECVT_partial, "got %d.\n", ret);
+            ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+            ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+            ok(state.wchar == 0, "got %#x.\n", state.wchar);
+        }
+        else
+        {
+            ok(ret == CODECVT_ok, "got %d.\n", ret);
+            ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+            ok(!strcmp(str, "\xf0"), "got %s.\n", debugstr_a(str));
+            ok(str_ptr - str == 1, "got %Id.\n", str_ptr - str);
+            ok(state.wchar == 0x7d, "got %#x.\n", state.wchar);
+        }
+
+        memset(&state, 0, sizeof(state));
+        memset(str, 0, sizeof(str));
+        ret = (int)call_func8(p_codecvt_char16_do_out, this, &state, str16, str16 + 1, (const char16_t **)&str16_ptr, str, str + 4, &str_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+        if (test_flags[j] & generate_header)
+        {
+            ok(!strcmp(str, "\xef\xbb\xbf\xf0"), "got %s.\n", debugstr_a(str));
+            ok(str_ptr - str == 4, "got %Id.\n", str_ptr - str);
+        }
+        else
+        {
+            ok(!strcmp(str, "\xf0"), "got %s.\n", debugstr_a(str));
+            ok(str_ptr - str == 1, "got %Id.\n", str_ptr - str);
+        }
+        ok(state.wchar == 0x7d, "got %#x.\n", state.wchar);
+        ret = (int)call_func8(p_codecvt_char16_do_out, this, &state, str16_ptr, str16 + wcslen(str16), (const char16_t **)&str16_ptr, str, str + 8, &str_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 4, "got %Id.\n", str16_ptr - str16);
+        ok(str_ptr - str == 7, "got %Id.\n", str_ptr - str);
+        ok(!strcmp(str, "\x9f\x93\x98\xf0\x9f\x99\xb9"), "got %s.\n", debugstr_a(str));
+        ok(state.wchar == 1, "got %#x.\n", state.wchar);
+
+        memset(&state, 0, sizeof(state));
+        memset(str, 0, sizeof(str));
+        ret = (int)call_func8(p_codecvt_char16_do_out, this, &state, str16, str16 + 1, (const char16_t **)&str16_ptr, str, str + 3, &str_ptr);
+        if (test_flags[j] & generate_header)
+        {
+            ok(ret == CODECVT_partial, "got %d.\n", ret);
+            ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+            ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+            ok(state.wchar == 0, "got %#x.\n", state.wchar);
+        }
+        else
+        {
+            ok(ret == CODECVT_ok, "got %d.\n", ret);
+            ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+            ok(!strcmp(str, "\xf0"), "got %s.\n", debugstr_a(str));
+            ok(str_ptr - str == 1, "got %Id.\n", str_ptr - str);
+            ok(state.wchar == 0x7d, "got %#x.\n", state.wchar);
+        }
+
+        strcpy(str, "abc");
+
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 3, (const char **)&str_ptr, str16, str16 + 2, &str16_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 2, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"ab"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 2, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 1, "got %#x.\n", state.wchar);
+
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 2, (const char **)&str_ptr, str16, str16 + 3, &str16_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 2, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"ab"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 2, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 1, "got %#x.\n", state.wchar);
+
+        strcpy(str, "\xf0\x92\x80\x92");
+
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 4, (const char **)&str_ptr, str16, str16 + 2, &str16_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 2, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"\xd808\xdc12"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 4, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 1, "got %#x.\n", state.wchar);
+
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 1, (const char **)&str_ptr, str16, str16 + 2, &str16_ptr);
+        ok(ret == CODECVT_partial, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"\xd808\xdc12"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 1, "got %#x.\n", state.wchar);
+
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 2, (const char **)&str_ptr, str16, str16 + 2, &str16_ptr);
+        ok(ret == CODECVT_partial, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"\xd808\xdc12"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 1, "got %#x.\n", state.wchar);
+
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 3, (const char **)&str_ptr, str16, str16 + 1, &str16_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"\xd808"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 3, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 0xdc00, "got %#x.\n", state.wchar);
+
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 4, (const char **)&str_ptr, str16, str16 , &str16_ptr);
+        ok(ret == CODECVT_partial, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+        ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 0, "got %#x.\n", state.wchar);
+
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 4, (const char **)&str_ptr, str16, str16 + 1, &str16_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"\xd808"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 3, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 0xdc00, "got %#x.\n", state.wchar);
+
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 3, (const char **)&str_ptr, str16, str16 + 2, &str16_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"\xd808"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 3, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 0xdc00, "got %#x.\n", state.wchar);
+
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str + 3, str + 4, (const char **)&str_ptr, str16, str16 + 2, &str16_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"\xdc12"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 4, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 1, "got %#x.\n", state.wchar);
+
+        strcpy(str, "\xf0\x92\x80\x92");
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 4, (const char **)&str_ptr, str16, str16 + 1, &str16_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"\xd808"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 3, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 0xdc00, "got %#x.\n", state.wchar);
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str + 3, str + 4, (const char **)&str_ptr, str16, str16 + 1, &str16_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"\xdc12"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 4, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 1, "got %#x.\n", state.wchar);
+
+        strcpy(str, "\xe0\xa1\x93");
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 3, (const char **)&str_ptr, str16, str16 + 1, &str16_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"\x0853"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 3, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 1, "got %#x.\n", state.wchar);
+
+        strcpy(str, "\xe0\xa1\x93");
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 3, (const char **)&str_ptr, str16, str16, &str16_ptr);
+        ok(ret == CODECVT_partial, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+        ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 0, "got %#x.\n", state.wchar);
+
+        strcpy(str, "\xe0\xa1\x93");
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 2, (const char **)&str_ptr, str16, str16 + 2, &str16_ptr);
+        ok(ret == CODECVT_partial, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+        ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 0, "got %#x.\n", state.wchar);
+
+        strcpy(str, "\xf0\xff\xff\xff");
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 2, (const char **)&str_ptr, str16, str16 + 4, &str16_ptr);
+        ok(ret == CODECVT_partial, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+        ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 0, "got %#x.\n", state.wchar);
+
+        strcpy(str, "\xf0\xff\xff\xff");
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 3, (const char **)&str_ptr, str16, str16 + 4, &str16_ptr);
+        ok(ret == CODECVT_error, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+        ok(str_ptr - str == 1, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 0, "got %#x.\n", state.wchar);
+
+        strcpy(str, "\xf0\x82\x80\x92");
+
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 4, (const char **)&str_ptr, str16, str16 + 2, &str16_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"\x2012"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 4, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 1, "got %#x.\n", state.wchar);
+
+        strcpy(str, "\xf0\xff\xff\xff");
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 4, (const char **)&str_ptr, str16, str16 + 4, &str16_ptr);
+        ok(ret == CODECVT_error, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+        ok(str_ptr - str == 1, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 0, "got %#x.\n", state.wchar);
+
+        strcpy(str, "\xed\xa0\x80");
+        memset(&state, 0, sizeof(state));
+        memset(str16, 0, sizeof(str16));
+        ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + 3, (const char **)&str_ptr, str16, str16 + 4, &str16_ptr);
+        ok(ret == CODECVT_ok, "got %d.\n", ret);
+        ok(str16_ptr - str16 == 1, "got %Id.\n", str16_ptr - str16);
+        ok(!wcscmp(str16, L"\xd800"), "got %s.\n", debugstr_w(str16));
+        ok(str_ptr - str == 3, "got %Id.\n", str_ptr - str);
+        ok(state.wchar == 1, "got %#x.\n", state.wchar);
+
+        for (i = 0; i < ARRAY_SIZE(tests); ++i)
+        {
+            winetest_push_context("test %u", i);
+            wcscpy(str16, tests[i].wstr);
+            wlen = wcslen(str16);
+            len = strlen(tests[i].str);
+            memset(&state, 0, sizeof(state));
+            if (test_flags[j] & generate_header)
+            {
+                ret = (int)call_func8(p_codecvt_char16_do_out, this, &state, str16, str16 + wlen, (const char16_t **)&str16_ptr, str, str + len + 3, &str_ptr);
+                ok(ret == CODECVT_ok, "got %d.\n", ret);
+                ok(str16_ptr - str16 == wlen, "got %Id, expected %u.\n", str16_ptr - str16, wlen);
+                ok(str_ptr - str == len + 3, "got %Id, expected %u.\n", str_ptr - str, len + 3);
+                memcpy(expect_str, bom_header, sizeof(bom_header));
+                strcpy(expect_str + sizeof(bom_header), tests[i].str);
+                ok(!strncmp(str, expect_str, len + 3), "got %s, expected %s.\n", debugstr_an(str, len), debugstr_an(expect_str, len + 3));
+
+                memset(&state, 0, sizeof(state));
+                ret = (int)call_func8(p_codecvt_char16_do_out, this, &state, str16, str16 + wlen, (const char16_t **)&str16_ptr, str, str + 2, &str_ptr);
+                ok(ret == CODECVT_partial, "got %d.\n", ret);
+                ok(str16_ptr - str16 == 0, "got %Id, expected %u.\n", str16_ptr - str16, 0);
+                ok(str_ptr - str == 0, "got %Id, expected %u.\n", str_ptr - str, 0);
+            }
+            else
+            {
+                ret = (int)call_func8(p_codecvt_char16_do_out, this, &state, str16, str16 + wlen, (const char16_t **)&str16_ptr, str, str + len, &str_ptr);
+                ok(ret == CODECVT_ok, "got %d.\n", ret);
+                ok(str16_ptr - str16 == wlen, "got %Id, expected %u.\n", str16_ptr - str16, wlen);
+                ok(str_ptr - str == len, "got %Id, expected %u.\n", str_ptr - str, len);
+                ok(!strncmp(str, tests[i].str, len), "got %s, expected %s.\n", debugstr_an(str, len), debugstr_an(tests[i].str, len));
+
+                ret = (int)call_func8(p_codecvt_char16_do_out, this, &state, str16, str16 + wlen, (const char16_t **)&str16_ptr, str, str + len - 1, &str_ptr);
+                if (tests[i].short_output)
+                {
+                    ok(ret == CODECVT_ok, "got %d.\n", ret);
+                    ok(str16_ptr - str16 == wlen - 1, "got %Id, expected %u.\n", str16_ptr - str16, wlen - 1);
+                    ok(str_ptr - str == len - tests[i].short_output, "got %Id, expected %u.\n", str_ptr - str, len - tests[i].short_output);
+                    ok(!strncmp(str, tests[i].str, len - 1), "got %s, expected %s.\n", debugstr_an(str, len - 1), debugstr_an(tests[i].str, len - 1));
+                }
+                else
+                {
+                    ok(ret == CODECVT_partial, "got %d.\n", ret);
+                    ok(str16_ptr - str16 == 0, "got %Id, expected %u.\n", str16_ptr - str16, 0);
+                    ok(str_ptr - str == 0, "got %Id, expected %u.\n", str_ptr - str, 0);
+                }
+            }
+            strcpy(str, tests[i].str);
+            memset(&state, 0, sizeof(state));
+
+            ret = (int)call_func8(p_codecvt_char16_do_in, this, &state, str, str + len, (const char **)&str_ptr, str16, str16 + wlen + 10, &str16_ptr);
+            if (test_flags[j] & consume_header && str_has_bom_header(str))
+            {
+                if (strlen(str) == sizeof(bom_header))
+                {
+                    ok(ret == CODECVT_partial, "got %d.\n", ret);
+                    ok(str_ptr - str == 0, "got %Id.\n", str_ptr - str);
+                    ok(str16_ptr - str16 == 0, "got %Id.\n", str16_ptr - str16);
+                }
+                else
+                {
+                    ok(ret == CODECVT_ok, "got %d.\n", ret);
+                    ok(str_ptr - str == len, "got %Id.\n", str_ptr - str);
+                    ok(str16_ptr - str16 == wlen - 1, "got %Id.\n", str16_ptr - str16);
+                    ok(!wcsncmp(str16, tests[i].wstr + 1, wlen - 1), "got %s, expected %s.\n",
+                        debugstr_wn(str16, wlen), debugstr_wn(tests[i].wstr, wlen));
+                }
+            }
+            else
+            {
+                ok(ret == CODECVT_ok, "got %d.\n", ret);
+                ok(str_ptr - str == len, "got %Id, expected %u.\n", str_ptr - str, len);
+                ok(str16_ptr - str16 == wlen, "got %Id, expected %u.\n", str16_ptr - str16, wlen);
+                ok(!wcsncmp(str16, tests[i].wstr, wlen), "got %s, expected %s.\n", debugstr_wn(str16, wlen), debugstr_wn(tests[i].wstr, wlen));
+            }
+
+            winetest_pop_context();
+        }
+        call_func1(p_codecvt_char16_dtor, this);
+        winetest_pop_context();
+    }
+}
+
+static char *get_thread_dll_path(void)
+{
+    static char path[MAX_PATH];
+    const char dll_name[] = "threaddll.dll";
+    DWORD written;
+    HANDLE file;
+    HRSRC res;
+    void *ptr;
+
+    GetTempPathA(ARRAY_SIZE(path), path);
+    strcat(path, dll_name);
+
+    file = CreateFileA(path, GENERIC_READ|GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, 0);
+    ok(file != INVALID_HANDLE_VALUE, "Failed to create file %s: %lu.\n",
+            debugstr_a(path), GetLastError());
+
+    res = FindResourceA(NULL, dll_name, "TESTDLL");
+    ok(!!res, "Failed to load resource: %lu\n", GetLastError());
+    ptr = LockResource(LoadResource(GetModuleHandleA(NULL), res));
+    WriteFile(file, ptr, SizeofResource( GetModuleHandleA(NULL), res), &written, NULL);
+    ok(written == SizeofResource(GetModuleHandleA(NULL), res), "Failed to write resource\n");
+    CloseHandle(file);
+
+    return path;
+}
+
+static void set_thead_dll_detach_event(HANDLE dll, HANDLE event)
+{
+    void (WINAPI *_set_detach_event)(HANDLE event);
+    _set_detach_event = (void*) GetProcAddress(dll, "set_detach_event");
+    ok(_set_detach_event != NULL, "Failed to get set_detach_event: %lu\n", GetLastError());
+    _set_detach_event(event);
+}
+
+static void test_thread_library_reference(void)
+{
+    _beginthreadex_start_routine_t thread_proc;
+    HANDLE detach_event;
+    _Thrd_t thread;
+    HMODULE dll;
+    DWORD ret;
+
+    struct threaddll_args args;
+
+    detach_event = CreateEventA(NULL, FALSE, FALSE, NULL);
+    ok(detach_event != NULL, "Failed to create an event: %lu\n", GetLastError());
+    args.confirm_running = CreateEventA(NULL, FALSE, FALSE, NULL);
+    ok(args.confirm_running != NULL, "Failed to create an event: %lu\n", GetLastError());
+    args.past_free = CreateEventA(NULL, FALSE, FALSE, NULL);
+    ok(args.past_free != NULL, "Failed to create an event: %lu\n", GetLastError());
+
+    dll = LoadLibraryA(get_thread_dll_path());
+    ok(!!dll, "Failed to load the test dll: %lu\n", GetLastError());
+
+    set_thead_dll_detach_event(dll, detach_event);
+
+    thread_proc = (void *)GetProcAddress(dll, "thread_proc");
+    ok(!!thread_proc, "Failed to get thread_proc: %lu\n", GetLastError());
+    p__Thrd_start(&thread, thread_proc, &args);
+
+    ret = WaitForSingleObject(args.confirm_running, 200);
+    ok(ret == WAIT_OBJECT_0, "Event was not signaled, ret: %lu, err: %lu\n", ret, GetLastError());
+
+    ret = FreeLibrary(dll);
+    ok(ret, "Failed to free the library: %lu\n", GetLastError());
+
+    ret = WaitForSingleObject(detach_event, 0);
+    ok(ret == WAIT_TIMEOUT, "Thread detach happened unexpectedly signaling an event, ret: %ld, err: %lu\n", ret, GetLastError());
+
+    ret = SetEvent(args.past_free);
+    ok(ret, "Failed to signal event: %ld\n", GetLastError());
+
+    ret = WaitForSingleObject(detach_event, 1000);
+    ok(ret == WAIT_OBJECT_0, "Detach event was not signaled, ret: %ld, err: %lu\n", ret, GetLastError());
+
+    p__Thrd_join(thread, NULL);
+
+    CloseHandle(args.past_free);
+    CloseHandle(args.confirm_running);
+    CloseHandle(detach_event);
+}
+
 START_TEST(msvcp140)
 {
     if(!init()) return;
@@ -1771,5 +2462,7 @@ START_TEST(msvcp140)
     test_Copy_file();
     test__Mtx();
     test__Fiopen();
+    test_codecvt_char16();
+    test_thread_library_reference();
     FreeLibrary(msvcp);
 }

@@ -156,7 +156,7 @@ static const struct
     },
     /* Windows 10 */
     {
-        { 10, 0, 19043 },
+        { 10, 0, 19045 },
         {0x8e0f7a12,0xbfb3,0x4fe8,{0xb9,0xa5,0x48,0xfd,0x50,0xa1,0x5a,0x9a}}
     }
 };
@@ -789,9 +789,12 @@ DWORD WINAPI GetFileVersionInfoSizeExW( DWORD flags, LPCWSTR filename, LPDWORD r
         DWORD exe_name_len;
 
         if ((exe_name_len = GetModuleFileNameW( NULL, exe_name, ARRAY_SIZE(exe_name) ))
-            && exe_name_len >= 16
-            && (!memcmp( exe_name + exe_name_len - 16, L"vcredist_x64.exe", 16 * sizeof(*exe_name) )
-            || !memcmp( exe_name + exe_name_len - 16, L"vcredist_x86.exe", 16 * sizeof(*exe_name) ))
+            && ((exe_name_len >= 16
+                && (!memcmp( exe_name + exe_name_len - 16, L"vcredist_x64.exe", 16 * sizeof(*exe_name) )
+                || !memcmp( exe_name + exe_name_len - 16, L"vcredist_x86.exe", 16 * sizeof(*exe_name) )))
+                || (exe_name_len >= 17
+                && (!memcmp( exe_name + exe_name_len - 17, L"VC_redist.x64.exe", 17 * sizeof(*exe_name) )
+                || !memcmp( exe_name + exe_name_len - 17, L"VC_redist.x86.exe", 17 * sizeof(*exe_name) ))))
             && (nt = RtlImageNtHeader( mod )) && (char *)nt - signature >= sizeof(builtin_signature)
             && !memcmp( signature, builtin_signature, sizeof(builtin_signature) ))
         {

@@ -153,14 +153,30 @@ uint32_t FAudio_AddRef(FAudio *audio)
 	return audio->refcount;
 }
 
+static void destroy_voice(FAudioVoice *voice);
+
 uint32_t FAudio_Release(FAudio *audio)
 {
 	uint32_t refcount;
+	FAudioVoice *voice;
+
 	LOG_API_ENTER(audio)
 	audio->refcount -= 1;
 	refcount = audio->refcount;
 	if (audio->refcount == 0)
 	{
+		while (audio->sources)
+		{
+			voice = (FAudioSourceVoice*) audio->sources->entry;
+			destroy_voice(voice);
+		}
+		while (audio->submixes)
+		{
+			voice = (FAudioSourceVoice*) audio->submixes->entry;
+			destroy_voice(voice);
+		}
+		if (audio->master)
+			destroy_voice(audio->master);
 		FAudio_OPERATIONSET_ClearAll(audio);
 		FAudio_StopEngine(audio);
 		audio->pFree(audio->decodeCache);
@@ -560,7 +576,6 @@ uint32_t FAudio_CreateSourceVoice(
 		audio->sourceLock,
 		audio->pMalloc
 	);
-	FAudio_AddRef(audio);
 
 #ifdef FAUDIO_DUMP_VOICES
 	FAudio_DUMPVOICE_Init(*ppSourceVoice);
@@ -670,7 +685,6 @@ uint32_t FAudio_CreateSubmixVoice(
 		audio->submixLock,
 		audio->pMalloc
 	);
-	FAudio_AddRef(audio);
 
 	LOG_API_EXIT(audio)
 	return 0;
@@ -747,7 +761,6 @@ uint32_t FAudio_CreateMasteringVoice(
 	);
 
 	/* Platform Device */
-	FAudio_AddRef(audio);
 	FAudio_PlatformInit(
 		audio,
 		audio->initFlags,
@@ -2314,21 +2327,9 @@ static uint32_t check_for_sends_to_voice(FAudioVoice *voice)
 	return ret;
 }
 
-uint32_t FAudioVoice_DestroyVoiceSafeEXT(FAudioVoice *voice)
+static void destroy_voice(FAudioVoice *voice)
 {
-	uint32_t i, ret;
-	LOG_API_ENTER(voice->audio)
-
-	if ((ret = check_for_sends_to_voice(voice)))
-	{
-		LOG_ERROR(
-			voice->audio,
-			"Voice %p is an output for other voice(s)",
-			voice
-		)
-		LOG_API_EXIT(voice->audio)
-		return ret;
-	}
+	uint32_t i;
 
 	/* TODO: Check for dependencies and remove from audio graph first! */
 	FAudio_OPERATIONSET_ClearAllForVoice(voice);
@@ -2500,9 +2501,27 @@ uint32_t FAudioVoice_DestroyVoiceSafeEXT(FAudioVoice *voice)
 		FAudio_PlatformDestroyMutex(voice->volumeLock);
 	}
 
-	LOG_API_EXIT(voice->audio)
-	FAudio_Release(voice->audio);
 	voice->audio->pFree(voice);
+}
+
+uint32_t FAudioVoice_DestroyVoiceSafeEXT(FAudioVoice *voice)
+{
+	uint32_t ret;
+
+	LOG_API_ENTER(voice->audio)
+
+	if ((ret = check_for_sends_to_voice(voice)))
+	{
+		LOG_ERROR(
+			voice->audio,
+			"Voice %p is an output for other voice(s)",
+			voice
+		)
+		LOG_API_EXIT(voice->audio)
+		return ret;
+	}
+	destroy_voice(voice);
+	LOG_API_EXIT(voice->audio)
 	return 0;
 }
 

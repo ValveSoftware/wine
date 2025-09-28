@@ -19,6 +19,7 @@
 #include <stdarg.h>
 #include <limits.h>
 #include <errno.h>
+#include <process.h>
 
 #include "msvcp90.h"
 
@@ -715,10 +716,10 @@ unsigned int __cdecl _Random_device(void)
 typedef struct
 {
     DWORD flags;
-    cs cs;
 #if _MSVCP_VER >= 140
     ULONG_PTR unknown;
 #endif
+    cs cs;
     DWORD thread_id;
     DWORD count;
 } *_Mtx_t;
@@ -739,6 +740,9 @@ void __cdecl _Mtx_init_in_situ(_Mtx_t mtx, int flags)
         FIXME("unknown flags ignored: %x\n", flags);
 
     mtx->flags = flags;
+#if _MSVCP_VER >= 140
+    mtx->unknown = 0;
+#endif
     cs_init(&mtx->cs);
     mtx->thread_id = -1;
     mtx->count = 0;
@@ -829,6 +833,9 @@ void __cdecl _Mtx_reset_owner(_Mtx_arg_t mtx)
 
 typedef struct
 {
+#if _MSVCP_VER >= 140
+    ULONG_PTR unknown;
+#endif
     cv cv;
 } *_Cnd_t;
 
@@ -844,6 +851,9 @@ typedef _Cnd_t *_Cnd_arg_t;
 
 void __cdecl _Cnd_init_in_situ(_Cnd_t cnd)
 {
+#if _MSVCP_VER >= 140
+    cnd->unknown = 0;
+#endif
     cv_init(&cnd->cv);
 }
 
@@ -1228,7 +1238,7 @@ void __cdecl _Do_call(void *this)
 typedef struct
 {
     HANDLE hnd;
-    DWORD  id;
+    unsigned int id;
 } _Thrd_t;
 
 typedef int (__cdecl *_Thrd_start_t)(void*);
@@ -1237,13 +1247,13 @@ typedef int (__cdecl *_Thrd_start_t)(void*);
 
 int __cdecl _Thrd_equal(_Thrd_t a, _Thrd_t b)
 {
-    TRACE("(%p %lu %p %lu)\n", a.hnd, a.id, b.hnd, b.id);
+    TRACE("(%p %u %p %u)\n", a.hnd, a.id, b.hnd, b.id);
     return a.id == b.id;
 }
 
 int __cdecl _Thrd_lt(_Thrd_t a, _Thrd_t b)
 {
-    TRACE("(%p %lu %p %lu)\n", a.hnd, a.id, b.hnd, b.id);
+    TRACE("(%p %u %p %u)\n", a.hnd, a.id, b.hnd, b.id);
     return a.id < b.id;
 }
 
@@ -1271,7 +1281,7 @@ static _Thrd_t thread_current(void)
     }
     ret.id  = GetCurrentThreadId();
 
-    TRACE("(%p %lu)\n", ret.hnd, ret.id);
+    TRACE("(%p %u)\n", ret.hnd, ret.id);
     return ret;
 }
 
@@ -1297,7 +1307,7 @@ ULONGLONG __cdecl _Thrd_current(void)
 
 int __cdecl _Thrd_join(_Thrd_t thr, int *code)
 {
-    TRACE("(%p %lu %p)\n", thr.hnd, thr.id, code);
+    TRACE("(%p %u %p)\n", thr.hnd, thr.id, code);
     if (WaitForSingleObject(thr.hnd, INFINITE))
         return _THRD_ERROR;
 
@@ -1308,10 +1318,11 @@ int __cdecl _Thrd_join(_Thrd_t thr, int *code)
     return 0;
 }
 
-int __cdecl _Thrd_start(_Thrd_t *thr, LPTHREAD_START_ROUTINE proc, void *arg)
+int __cdecl _Thrd_start(_Thrd_t *thr, _beginthreadex_start_routine_t proc, void *arg)
 {
     TRACE("(%p %p %p)\n", thr, proc, arg);
-    thr->hnd = CreateThread(NULL, 0, proc, arg, 0, &thr->id);
+
+    thr->hnd = (HANDLE)_beginthreadex(NULL, 0, proc, arg, 0, &thr->id);
     return thr->hnd ? 0 : _THRD_ERROR;
 }
 
@@ -1321,7 +1332,7 @@ typedef struct
     void *arg;
 } thread_proc_arg;
 
-static DWORD WINAPI thread_proc_wrapper(void *arg)
+static unsigned int WINAPI thread_proc_wrapper(void *arg)
 {
     thread_proc_arg wrapped_arg = *((thread_proc_arg*)arg);
     free(arg);
@@ -1445,7 +1456,7 @@ unsigned int __thiscall _Pad__Go(_Pad *this)
     return 0;
 }
 
-static DWORD WINAPI launch_thread_proc(void *arg)
+static unsigned int WINAPI launch_thread_proc(void *arg)
 {
     _Pad *this = arg;
     return call__Pad__Go(this);

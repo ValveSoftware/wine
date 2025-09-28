@@ -1550,6 +1550,7 @@ void process_exit_wrapper( int status )
  */
 size_t server_init_process(void)
 {
+    struct cpu_topology_override *cpu_override;
     const char *arch = getenv( "WINEARCH" );
     const char *env_socket = getenv( "WINESERVERSOCKET" );
     obj_handle_t version;
@@ -1621,8 +1622,13 @@ size_t server_init_process(void)
 
     reply_pipe = init_thread_pipe();
 
+    fill_cpu_override();
+    cpu_override = get_cpu_topology_override();
+
     SERVER_START_REQ( init_first_thread )
     {
+        if (cpu_override)
+            wine_server_add_data( req, cpu_override, sizeof(*cpu_override) );
         req->unix_pid    = getpid();
         req->unix_tid    = get_unix_tid();
         req->reply_fd    = reply_pipe;
@@ -1679,7 +1685,6 @@ size_t server_init_process(void)
  */
 void server_init_process_done(void)
 {
-    struct cpu_topology_override *cpu_override = get_cpu_topology_override();
     void *teb;
     unsigned int status;
     int suspend;
@@ -1704,8 +1709,6 @@ void server_init_process_done(void)
     /* Signal the parent process to continue */
     SERVER_START_REQ( init_process_done )
     {
-        if (cpu_override)
-            wine_server_add_data( req, cpu_override, sizeof(*cpu_override) );
         req->teb      = wine_server_client_ptr( teb );
         req->peb      = NtCurrentTeb64() ? NtCurrentTeb64()->Peb : wine_server_client_ptr( peb );
 #ifdef __i386__

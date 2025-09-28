@@ -684,15 +684,38 @@ static void get_cpuinfo( SYSTEM_CPU_INFORMATION *info )
 static void fill_performance_core_info(void);
 static BOOL sysfs_parse_bitmap(const char *filename, ULONG_PTR *mask);
 
-static void fill_cpu_override(unsigned int host_cpu_count)
+void fill_cpu_override(void)
 {
     const char *env_override = getenv("WINE_CPU_TOPOLOGY");
+    unsigned int host_cpu_count;
     BOOL smt = FALSE;
     unsigned int i;
     char *s;
 
     if (!env_override)
         return;
+
+#ifdef _SC_NPROCESSORS_ONLN
+    host_cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
+    if (host_cpu_count < 1)
+    {
+        ERR("Failed to detect the number of processors.\n");
+        return;
+    }
+#elif defined(CTL_HW) && defined(HW_NCPU)
+    int mib[2];
+    size_t len = sizeof(host_cpu_count);
+    mib[0] = CTL_HW;
+    mib[1] = HW_NCPU;
+    if (sysctl(mib, 2, &num, &len, NULL, 0) != 0)
+    {
+        ERR("Failed to detect the number of processors.\n");
+        return;
+    }
+#else
+    FIXME("Detecting the number of processors is not supported.\n");
+    return;
+#endif
 
     if (host_cpu_count > MAXIMUM_PROCESSORS)
     {
@@ -1605,8 +1628,6 @@ void init_cpu_info(void)
     num = 1;
     FIXME("Detecting the number of processors is not supported.\n");
 #endif
-
-    fill_cpu_override(num);
 
     peb->NumberOfProcessors = cpu_info.MaximumProcessors = cpu_override.mapping.cpu_count
             ? cpu_override.mapping.cpu_count : num;

@@ -509,6 +509,9 @@ static VkResult wine_vk_physical_device_init(struct wine_phys_dev *object, VkPhy
     if (have_external_memory_fd && have_external_semaphore_fd)
         ++num_properties; /* VK_KHR_win32_keyed_mutex */
 
+    ++num_properties; /* VK_WINE_openxr_device_extensions */
+    ++num_properties; /* VK_WINE_openvr_device_extensions */
+
     if (!(object->extensions = calloc(num_properties, sizeof(*object->extensions))))
     {
         ERR("Failed to allocate memory for device extensions!\n");
@@ -530,6 +533,14 @@ static VkResult wine_vk_physical_device_init(struct wine_phys_dev *object, VkPhy
         TRACE("Enabling extension '%s' for physical device %p\n", object->extensions[j].extensionName, object);
         ++j;
     }
+
+    strcpy(object->extensions[j].extensionName, "VK_WINE_openxr_device_extensions");
+    TRACE("Enabling extension '%s' for physical device %p\n", object->extensions[j].extensionName, object);
+    ++j;
+    strcpy(object->extensions[j].extensionName, "VK_WINE_openvr_device_extensions");
+    TRACE("Enabling extension '%s' for physical device %p\n", object->extensions[j].extensionName, object);
+    ++j;
+
     object->extension_count = num_properties;
     TRACE("Host supported extensions %u, Wine supported extensions %u\n", num_host_properties, num_properties);
 
@@ -667,39 +678,6 @@ static char *cc_strdup(struct conversion_context *ctx, const char *s)
     return ret;
 }
 
-static void parse_xr_extensions(struct conversion_context *ctx, const char **extra_extensions, unsigned int *extra_count)
-{
-    char *iter, *start;
-
-    iter = getenv("__WINE_OPENXR_VK_DEVICE_EXTENSIONS");
-    if (!iter) return;
-    iter = cc_strdup(ctx, iter);
-
-    TRACE("got var: %s\n", iter);
-    start = iter;
-    do
-    {
-        if(*iter == ' ')
-        {
-            *iter = 0;
-            extra_extensions[(*extra_count)++] = cc_strdup(ctx, start);
-            TRACE("added %s to list\n", extra_extensions[(*extra_count) - 1]);
-            iter++;
-            start = iter;
-        }
-        else if(*iter == 0)
-        {
-            extra_extensions[(*extra_count)++] = cc_strdup(ctx, start);
-            TRACE("added %s to list\n", extra_extensions[(*extra_count) - 1]);
-            break;
-        }
-        else
-        {
-            iter++;
-        }
-    } while (1);
-}
-
 static const char *find_extension(const char *const *extensions, uint32_t count, const char *ext)
 {
     while (count--)
@@ -710,11 +688,67 @@ static const char *find_extension(const char *const *extensions, uint32_t count,
     return NULL;
 }
 
+static void parse_vr_extensions(struct conversion_context *ctx, const char **extra_extensions, unsigned int *extra_count,
+        const char *ext_str)
+{
+    char *iter, *start;
+
+    if (!ext_str) return;
+    iter = cc_strdup(ctx, ext_str);
+
+    TRACE("got var: %s\n", iter);
+    start = iter;
+    do
+    {
+        if(*iter == ' ')
+        {
+            *iter = 0;
+            if (!find_extension(extra_extensions, *extra_count, start))
+            {
+                extra_extensions[(*extra_count)++] = cc_strdup(ctx, start);
+                TRACE("added %s to list\n", extra_extensions[(*extra_count) - 1]);
+            }
+            iter++;
+            start = iter;
+        }
+        else if(*iter == 0)
+        {
+            if (!find_extension(extra_extensions, *extra_count, start))
+            {
+                extra_extensions[(*extra_count)++] = cc_strdup(ctx, start);
+                TRACE("added %s to list\n", extra_extensions[(*extra_count) - 1]);
+            }
+            break;
+        }
+        else
+        {
+            iter++;
+        }
+    } while (1);
+}
+
+static void parse_openxr_extensions(struct conversion_context *ctx, const char **extra_extensions, unsigned int *extra_count)
+{
+    parse_vr_extensions(ctx, extra_extensions, extra_count, getenv("__WINE_OPENXR_VK_DEVICE_EXTENSIONS"));
+}
+
+static void parse_openvr_extensions(struct conversion_context *ctx, const char **extra_extensions, unsigned int *extra_count,
+        struct wine_phys_dev *phys_dev)
+{
+    VkPhysicalDeviceProperties prop;
+    char name[64];
+
+    phys_dev->obj.instance->p_vkGetPhysicalDeviceProperties(phys_dev->obj.host.physical_device, &prop);
+    sprintf( name, "VK_WINE_OPENVR_DEVICE_EXTS_PCIID_%04x_%04x", prop.vendorID, prop.deviceID );
+    parse_vr_extensions(ctx, extra_extensions, extra_count, getenv(name));
+}
+
 static VkResult wine_vk_device_convert_create_info(VkPhysicalDevice client_physical_device,
         struct conversion_context *ctx, const VkDeviceCreateInfo *src, VkDeviceCreateInfo *dst,
         struct vulkan_device *device)
 {
     static const char *wine_xr_extension_name = "VK_WINE_openxr_device_extensions";
+    static const char *wine_vr_extension_name = "VK_WINE_openvr_device_extensions";
     struct wine_phys_dev *phys_dev = wine_phys_dev_from_handle(client_physical_device);
     const char *extra_extensions[64], * const*extensions = src->ppEnabledExtensionNames;
     unsigned int i, extra_count = 0, extensions_count = src->enabledExtensionCount;
@@ -739,8 +773,14 @@ static VkResult wine_vk_device_convert_create_info(VkPhysicalDevice client_physi
 
     if (find_extension(extensions, extensions_count, wine_xr_extension_name))
     {
-        parse_xr_extensions(ctx, extra_extensions, &extra_count);
+        parse_openxr_extensions(ctx, extra_extensions, &extra_count);
         remove_extensions[remove_count++] = wine_xr_extension_name;
+    }
+
+    if (find_extension(extensions, extensions_count, wine_vr_extension_name))
+    {
+        parse_openvr_extensions(ctx, extra_extensions, &extra_count, phys_dev);
+        remove_extensions[remove_count++] = wine_vr_extension_name;
     }
 
     if (find_extension(extensions, extensions_count, "VK_KHR_external_memory_win32"))

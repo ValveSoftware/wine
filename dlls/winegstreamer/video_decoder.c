@@ -36,6 +36,8 @@
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
+extern const GUID MFVideoFormat_theora;
+
 struct subtype_info
 {
     const GUID *subtype;
@@ -53,6 +55,7 @@ static const struct subtype_info subtype_info_list[] =
     { &MFVideoFormat_UYVY,   16, MAKEFOURCC('U', 'Y', 'V', 'Y') },
     { &MFVideoFormat_YVYU,   16, MAKEFOURCC('Y', 'V', 'Y', 'U') },
     { &MFVideoFormat_NV11,   12, MAKEFOURCC('N', 'V', '1', '1') },
+    { &MFVideoFormat_P010,   24, MAKEFOURCC('P', '0', '1', '0') },
     { &MFVideoFormat_RGB8,   8,  BI_RGB },
     { &MFVideoFormat_RGB555, 16, BI_RGB },
     { &MFVideoFormat_RGB565, 16, BI_BITFIELDS },
@@ -947,9 +950,10 @@ static HRESULT WINAPI transform_ProcessOutput(IMFTransform *iface, DWORD flags, 
 {
     struct video_decoder *decoder = impl_from_IMFTransform(iface);
     UINT32 sample_size;
-    LONGLONG duration;
+    LONGLONG duration, sample_duration;
     IMFSample *sample;
     UINT64 frame_size, frame_rate;
+    bool preserve_timestamps;
     GUID subtype;
     DWORD size;
     HRESULT hr;
@@ -995,36 +999,34 @@ static HRESULT WINAPI transform_ProcessOutput(IMFTransform *iface, DWORD flags, 
     }
 
     if (SUCCEEDED(hr = wg_transform_read_mf(decoder->wg_transform, sample,
-            sample_size, &samples->dwStatus)))
+            sample_size, &samples->dwStatus, &preserve_timestamps)))
     {
-        BOOL frame_rate_given = FALSE;
-        LONGLONG time;
         wg_sample_queue_flush(decoder->wg_sample_queue, false);
 
-        if (FAILED(IMFMediaType_GetUINT64(decoder->input_type, &MF_MT_FRAME_RATE, &frame_rate)))
-            frame_rate = (UINT64)30000 << 32 | 1001;
+        if (decoder->IMediaObject_iface.lpVtbl)
+            duration = 0; /* WMV decoder doesn't output any timestamp or duration */
         else
-            frame_rate_given = TRUE;
-
-        if (frame_rate_given || FAILED(IMFSample_GetSampleDuration(sample, &duration)))
         {
-            if (!frame_rate_given)
-                WARN("Failed to get sample duration\n");
-            duration = (UINT64)10000000 * (UINT32)frame_rate / (frame_rate >> 32);
+            if (FAILED(IMFMediaType_GetUINT64(decoder->input_type, &MF_MT_FRAME_RATE, &frame_rate)))
+                frame_rate = (UINT64)30000 << 32 | 1001;
+            duration = MulDiv(10000000, (UINT32)frame_rate, frame_rate >> 32);
+        }
+
+        if (FAILED(hr = IMFMediaType_GetGUID(decoder->input_type, &MF_MT_SUBTYPE, &subtype)))
+            return hr;
+
+        if (!preserve_timestamps && !IsEqualGUID(&subtype, &MFVideoFormat_theora))
+        {
+            if (FAILED(IMFSample_SetSampleTime(sample, decoder->sample_time)))
+                WARN("Failed to set sample time\n");
             if (FAILED(IMFSample_SetSampleDuration(sample, duration)))
                 WARN("Failed to set sample duration\n");
-        }
-        if (frame_rate_given || FAILED(IMFSample_GetSampleTime(sample, &time)))
-        {
-            if (!frame_rate_given)
-                WARN("Failed to get sample time\n");
-            if(FAILED(IMFSample_SetSampleTime(sample, decoder->sample_time)))
-                WARN("Failed to set sample time\n");
             decoder->sample_time += duration;
         }
-        else
+        else if (FAILED(IMFSample_GetSampleDuration(sample, &sample_duration)) || !sample_duration)
         {
-            decoder->sample_time = time + duration;
+            if (FAILED(IMFSample_SetSampleDuration(sample, duration)))
+                WARN("Failed to set sample duration\n");
         }
     }
 
@@ -1674,6 +1676,7 @@ static HRESULT video_decoder_create_with_types(const GUID *const *input_types, U
         goto failed;
 
     decoder->wg_transform_attrs.input_queue_length = 15;
+    decoder->wg_transform_attrs.preserve_timestamps = TRUE;
 
     *out = decoder;
     TRACE("Created decoder %p\n", decoder);
@@ -1791,7 +1794,6 @@ HRESULT WINAPI winegstreamer_create_video_decoder(IMFTransform **out)
 
 extern const GUID MEDIASUBTYPE_VC1S;
 extern const GUID MEDIASUBTYPE_WMV_Unknown;
-extern const GUID MFVideoFormat_theora;
 static const GUID *const wmv_decoder_input_types[] =
 {
     &MEDIASUBTYPE_WMV1,

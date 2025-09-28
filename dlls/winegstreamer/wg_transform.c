@@ -93,6 +93,7 @@ struct wg_transform
     GstCaps *input_caps;
 
     bool draining;
+    INT64 ts_offset;
 };
 
 static struct wg_transform *get_transform(wg_transform_t trans)
@@ -126,9 +127,6 @@ static void align_video_info_planes(MFVideoInfo *video_info, gsize plane_align,
     }
 
     align->stride_align[0] = plane_align;
-    align->stride_align[1] = plane_align;
-    align->stride_align[2] = plane_align;
-    align->stride_align[3] = plane_align;
 
     gst_video_info_align(info, align);
 
@@ -910,6 +908,7 @@ NTSTATUS wg_transform_push_data(void *args)
     struct wg_transform_push_data_params *params = args;
     struct wg_transform *transform = get_transform(params->transform);
     struct wg_sample *sample = params->sample;
+    GstCaps *transform_timestamp;
     const gchar *input_mime;
     GstVideoInfo video_info;
     GstBuffer *buffer;
@@ -951,13 +950,33 @@ NTSTATUS wg_transform_push_data(void *args)
     }
 
     if (sample->flags & WG_SAMPLE_FLAG_HAS_PTS)
-        GST_BUFFER_PTS(buffer) = sample->pts * 100;
+    {
+        if (sample->pts < transform->ts_offset)
+        {
+            if (transform->ts_offset)
+                GST_FIXME("ts_offset is already set to %"GST_TIME_FORMAT", overwriting",
+                        GST_TIME_ARGS(-transform->ts_offset));
+
+            GST_TRACE("Setting ts_offset to %"GST_TIME_FORMAT, GST_TIME_ARGS(-sample->pts));
+            transform->ts_offset = sample->pts;
+        }
+
+        GST_BUFFER_PTS(buffer) = (sample->pts - transform->ts_offset) * 100;
+    }
     if (sample->flags & WG_SAMPLE_FLAG_HAS_DURATION)
         GST_BUFFER_DURATION(buffer) = sample->duration * 100;
     if (!(sample->flags & WG_SAMPLE_FLAG_SYNC_POINT))
         GST_BUFFER_FLAG_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT);
     if (sample->flags & WG_SAMPLE_FLAG_DISCONTINUITY)
         GST_BUFFER_FLAG_SET(buffer, GST_BUFFER_FLAG_DISCONT);
+
+    if (transform->attrs.preserve_timestamps && (sample->flags & WG_SAMPLE_FLAG_HAS_PTS)
+            && (transform_timestamp = gst_caps_new_empty_simple("timestamp/x-wg-transform")))
+    {
+        gst_buffer_add_reference_timestamp_meta(buffer, transform_timestamp, GST_BUFFER_PTS(buffer), GST_BUFFER_DURATION(buffer));
+        gst_caps_unref(transform_timestamp);
+    }
+
     gst_atomic_queue_push(transform->input_queue, buffer);
 
     params->result = S_OK;
@@ -1034,22 +1053,43 @@ static NTSTATUS copy_buffer(GstBuffer *buffer, struct wg_sample *sample, gsize *
 
 static void set_sample_flags_from_buffer(struct wg_sample *sample, GstBuffer *buffer, gsize total_size)
 {
-    if (GST_BUFFER_PTS_IS_VALID(buffer))
+    GstReferenceTimestampMeta *timestamps;
+    GstCaps *transform_timestamp;
+
+    transform_timestamp = gst_caps_new_empty_simple("timestamp/x-wg-transform");
+    timestamps = gst_buffer_get_reference_timestamp_meta(buffer, transform_timestamp);
+    gst_caps_unref(transform_timestamp);
+
+    if (timestamps)
     {
-        sample->flags |= WG_SAMPLE_FLAG_HAS_PTS;
-        sample->pts = GST_BUFFER_PTS(buffer) / 100;
+        /* GStreamer can overwrite our timestamps, so we use the wg-transform timestamps instead */
+        sample->flags |= WG_SAMPLE_FLAG_HAS_PTS | WG_SAMPLE_FLAG_PRESERVE_TIMESTAMPS;
+        sample->pts = timestamps->timestamp / 100;
+        if (timestamps->duration != GST_CLOCK_TIME_NONE)
+        {
+            sample->flags |= WG_SAMPLE_FLAG_HAS_DURATION;
+            sample->duration = timestamps->duration / 100;
+        }
     }
-    if (GST_BUFFER_DURATION_IS_VALID(buffer))
+    else
     {
-        GstClockTime duration = GST_BUFFER_DURATION(buffer) / 100;
-
-        duration = (duration * sample->size) / total_size;
-        GST_BUFFER_DURATION(buffer) -= duration * 100;
         if (GST_BUFFER_PTS_IS_VALID(buffer))
-            GST_BUFFER_PTS(buffer) += duration * 100;
+        {
+            sample->flags |= WG_SAMPLE_FLAG_HAS_PTS;
+            sample->pts = GST_BUFFER_PTS(buffer) / 100;
+        }
+        if (GST_BUFFER_DURATION_IS_VALID(buffer))
+        {
+            GstClockTime duration = GST_BUFFER_DURATION(buffer) / 100;
 
-        sample->flags |= WG_SAMPLE_FLAG_HAS_DURATION;
-        sample->duration = duration;
+            duration = (duration * sample->size) / total_size;
+            GST_BUFFER_DURATION(buffer) -= duration * 100;
+            if (GST_BUFFER_PTS_IS_VALID(buffer))
+                GST_BUFFER_PTS(buffer) += duration * 100;
+
+            sample->flags |= WG_SAMPLE_FLAG_HAS_DURATION;
+            sample->duration = duration;
+        }
     }
     if (!GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT))
         sample->flags |= WG_SAMPLE_FLAG_SYNC_POINT;
@@ -1075,12 +1115,38 @@ static bool sample_needs_buffer_copy(struct wg_sample *sample, GstBuffer *buffer
     return needs_copy;
 }
 
+static void fill_frame_padded_bits(GstBuffer *buffer, const GstVideoAlignment *align, const GstVideoInfo *info)
+{
+    guint i, plane, padded_height, height, stride, padding = align->padding_bottom;
+    GstVideoFrame frame;
+
+    if (!padding || !gst_video_frame_map(&frame, info, buffer, GST_MAP_WRITE)) return;
+
+    /* Windows uses the data in the last scanline for its bottom padding */
+    for (plane = 0; plane < GST_VIDEO_FRAME_N_PLANES(&frame); plane++)
+    {
+        guint8 *data = GST_VIDEO_FRAME_PLANE_DATA(&frame, plane);
+        gint comp[GST_VIDEO_MAX_COMPONENTS];
+
+        gst_video_format_info_component(frame.info.finfo, plane, comp);
+        padded_height = GST_VIDEO_FORMAT_INFO_SCALE_HEIGHT(frame.info.finfo, comp[0], info->height + padding);
+        height = GST_VIDEO_FRAME_COMP_HEIGHT(&frame, comp[0]);
+        stride = GST_VIDEO_FRAME_PLANE_STRIDE(&frame, plane);
+        data += height * stride;
+
+        for (i = 0; i < padded_height - height; i++) memcpy(data + i * stride, data - stride, stride);
+    }
+
+    gst_video_frame_unmap(&frame);
+}
+
 static NTSTATUS read_transform_output_video(struct wg_sample *sample, GstBuffer *buffer,
-        const GstVideoInfo *src_video_info, const GstVideoInfo *dst_video_info)
+        const GstVideoInfo *src_video_info, const GstVideoInfo *dst_video_info, const GstVideoAlignment *align)
 {
     gsize total_size;
     NTSTATUS status;
     bool needs_copy;
+    const char *sgi;
 
     if (!(needs_copy = sample_needs_buffer_copy(sample, buffer, &total_size)))
         status = STATUS_SUCCESS;
@@ -1093,6 +1159,9 @@ static NTSTATUS read_transform_output_video(struct wg_sample *sample, GstBuffer 
         sample->size = 0;
         return status;
     }
+
+    if ((sgi = getenv("SteamGameId")) && !strcmp(sgi, "1449280"))
+        fill_frame_padded_bits(buffer, align, dst_video_info);
 
     set_sample_flags_from_buffer(sample, buffer, total_size);
 
@@ -1252,9 +1321,13 @@ NTSTATUS wg_transform_read_data(void *args)
 
     if (!strcmp(output_mime, "video/x-raw"))
         status = read_transform_output_video(sample, output_buffer,
-                &src_video_info, &dst_video_info);
+                &src_video_info, &dst_video_info, &align);
     else
         status = read_transform_output(sample, output_buffer);
+
+    if ((sample->flags & (WG_SAMPLE_FLAG_PRESERVE_TIMESTAMPS | WG_SAMPLE_FLAG_HAS_PTS)) ==
+            (WG_SAMPLE_FLAG_PRESERVE_TIMESTAMPS | WG_SAMPLE_FLAG_HAS_PTS))
+        sample->pts += transform->ts_offset;
 
     if (status)
     {

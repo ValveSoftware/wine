@@ -1103,7 +1103,6 @@ struct obj_locator
     client_ptr_t teb;          /* TEB of new thread (in process address space) */
     client_ptr_t peb;          /* PEB of new process (in process address space) */
     client_ptr_t ldt_copy;     /* address of LDT copy (in process address space) */
-    VARARG(cpu_override,cpu_topology_override); /* Overridden CPUs to host CPUs mapping. */
 @REPLY
     int          suspend;      /* is process suspended? */
 @END
@@ -1116,6 +1115,7 @@ struct obj_locator
     int          debug_level;  /* new debug level */
     int          reply_fd;     /* fd for reply pipe */
     int          wait_fd;      /* fd for blocking calls pipe */
+    VARARG(cpu_override,cpu_topology_override); /* Overridden CPUs to host CPUs mapping. */
 @REPLY
     process_id_t pid;          /* process id of the new thread's process */
     thread_id_t  tid;          /* thread id of the new thread */
@@ -2343,6 +2343,16 @@ enum message_type
     int             prev_y;
     int             new_x;     /* new cursor position */
     int             new_y;
+@END
+
+
+/* Control generating of mouse events from pointer events. */
+@REQ(track_mouse_from_pointer)
+    user_handle_t   win;        /* window handle */
+    unsigned int    msg;        /* message code */
+    unsigned int    pointer_id; /* pointer id */
+@REPLY
+    int             cursor_pos_updated; /* cursor position updated */
 @END
 
 

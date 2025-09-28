@@ -2077,7 +2077,6 @@ static void test_simple_joystick( DWORD version )
     prop_dword.dwData = 0xdeadbeef;
     hr = IDirectInputDevice8_GetProperty( device, DIPROP_JOYSTICKID, &prop_dword.diph );
     ok( hr == DI_OK, "GetProperty DIPROP_JOYSTICKID returned %#lx\n", hr );
-    todo_wine
     ok( prop_dword.dwData == 0, "got %#lx expected 0\n", prop_dword.dwData );
 
     prop_dword.dwData = 0xdeadbeef;
@@ -5970,6 +5969,158 @@ static void test_rawinput_desktop( const char *path, BOOL input )
     DestroyWindow( hwnd );
 }
 
+struct select_default_instance_data
+{
+    IDirectInput8W *di8;
+    DIDEVICEINSTANCEW default_instance;
+    BOOL default_instance_found;
+};
+
+static BOOL CALLBACK select_default_instance( const DIDEVICEINSTANCEW *devinst, void *context )
+{
+    DIPROPGUIDANDPATH prop_guid_path =
+    {
+        .diph =
+        {
+            .dwSize = sizeof(DIPROPGUIDANDPATH),
+            .dwHeaderSize = sizeof(DIPROPHEADER),
+            .dwHow = DIPH_DEVICE,
+        },
+    };
+
+    DIPROPDWORD prop_dword =
+    {
+        .diph =
+        {
+            .dwSize = sizeof(DIPROPDWORD),
+            .dwHeaderSize = sizeof(DIPROPHEADER),
+            .dwHow = DIPH_DEVICE,
+        },
+    };
+    struct select_default_instance_data *d = context;
+    IDirectInputDevice8W *device;
+    HRESULT hr;
+
+    hr = IDirectInput8_CreateDevice( d->di8, &devinst->guidInstance, &device, NULL );
+    ok( hr == DI_OK, "got hr %#lx.\n", hr );
+    hr = IDirectInputDevice8_GetProperty( device, DIPROP_JOYSTICKID, &prop_dword.diph );
+    ok( hr == DI_OK, "got hr %#lx.\n", hr );
+    ok( prop_dword.dwData < 100, "got %lu.\n", prop_dword.dwData );
+
+    hr = IDirectInputDevice8_GetProperty( device, DIPROP_GUIDANDPATH, &prop_guid_path.diph );
+    ok( hr == DI_OK, "got hr %#lx.\n", hr );
+    trace( "%s, id %lu, inst %s, path %s.\n", debugstr_w(devinst->tszInstanceName), prop_dword.dwData,
+           debugstr_guid(&devinst->guidInstance), debugstr_w(prop_guid_path.wszPath) );
+    if (!prop_dword.dwData)
+    {
+        ok( !d->default_instance_found, "duplicate joystick with id 0.\n" );
+        d->default_instance = *devinst;
+        d->default_instance_found = TRUE;
+    }
+    IDirectInputDevice8_Release( device );
+    return DIENUM_CONTINUE;
+}
+
+static void test_joystick_id(void)
+{
+#include "psh_hid_macros.h"
+    const unsigned char report_desc[] =
+    {
+        USAGE_PAGE(1, HID_USAGE_PAGE_GENERIC),
+        USAGE(1, HID_USAGE_GENERIC_JOYSTICK),
+        COLLECTION(1, Application),
+            USAGE(1, HID_USAGE_GENERIC_JOYSTICK),
+            COLLECTION(1, Physical),
+                USAGE_PAGE(1, HID_USAGE_PAGE_BUTTON),
+                USAGE_MINIMUM(1, 1),
+                USAGE_MAXIMUM(1, 6),
+                LOGICAL_MINIMUM(1, 0),
+                LOGICAL_MAXIMUM(1, 1),
+                PHYSICAL_MINIMUM(1, 0),
+                PHYSICAL_MAXIMUM(1, 1),
+                REPORT_SIZE(1, 1),
+                REPORT_COUNT(1, 8),
+                INPUT(1, Data|Var|Abs),
+            END_COLLECTION,
+        END_COLLECTION,
+    };
+    C_ASSERT(sizeof(report_desc) < MAX_HID_DESCRIPTOR_LEN);
+#include "pop_hid_macros.h"
+    struct hid_device_desc desc =
+    {
+        .use_report_id = TRUE,
+        .caps = { .InputReportByteLength = 1 },
+    };
+    struct hid_device_desc desc2;
+
+    DIPROPDWORD prop_dword =
+    {
+        .diph =
+        {
+            .dwSize = sizeof(DIPROPDWORD),
+            .dwHeaderSize = sizeof(DIPROPHEADER),
+            .dwHow = DIPH_DEVICE,
+        },
+    };
+    struct select_default_instance_data d = { NULL };
+    IDirectInputDevice8W *device;
+    IDirectInput8W *di8;
+    HRESULT hr;
+
+    cleanup_registry_keys();
+
+    hr = DirectInput8Create( instance, DIRECTINPUT_VERSION, &IID_IDirectInput8W, (void **)&di8, NULL );
+    if (FAILED(hr))
+    {
+        win_skip( "DirectInput8Create returned %#lx.\n", hr );
+        return;
+    }
+
+    desc.report_descriptor_len = sizeof(report_desc);
+    memcpy( desc.report_descriptor_buf, report_desc, sizeof(report_desc) );
+    fill_context( desc.context, ARRAY_SIZE(desc.context) );
+
+    desc.attributes = default_attributes;
+    desc2 = desc;
+    desc2.attributes.ProductID++;
+    if (!hid_device_start( &desc, 1 )) goto done;
+    if (!hid_device_start( &desc2, 1 )) goto done;
+
+    d.di8 = di8;
+    hr = IDirectInput8_EnumDevices( di8, DI8DEVCLASS_GAMECTRL, select_default_instance, &d, DIEDFL_ALLDEVICES );
+    ok( hr == DI_OK, "got hr %#lx.\n", hr );
+
+    hr = IDirectInput8_CreateDevice( di8, &GUID_Joystick, &device, NULL );
+    if (d.default_instance_found)
+    {
+        ok( hr == DI_OK, "got %#lx.\n", hr );
+        hr = IDirectInputDevice8_GetProperty( device, DIPROP_JOYSTICKID, &prop_dword.diph );
+        ok( hr == DI_OK, "got hr %#lx.\n", hr );
+        ok( !prop_dword.dwData, "got %lu.\n", prop_dword.dwData );
+        IDirectInputDevice8_Release( device );
+    }
+    else
+    {
+        ok( hr == DIERR_DEVICENOTREG, "got %#lx.\n", hr );
+    }
+
+    hid_device_stop( &desc, 1 );
+
+    memset( &d, 0, sizeof(d) );
+    d.di8 = di8;
+    hr = IDirectInput8_EnumDevices( di8, DI8DEVCLASS_GAMECTRL, select_default_instance, &d, DIEDFL_ALLDEVICES );
+    ok( hr == DI_OK, "got hr %#lx.\n", hr );
+    ok( !d.default_instance_found, "found joystick id 0.\n" );
+    hr = IDirectInput8_CreateDevice( di8, &GUID_Joystick, &device, NULL );
+    ok( hr == DIERR_DEVICENOTREG, "got %#lx.\n", hr );
+
+done:
+    IDirectInput8_Release( di8 );
+    hid_device_stop( &desc, 1 );
+    hid_device_stop( &desc2, 1 );
+    cleanup_registry_keys();
+}
+
 START_TEST( joystick8 )
 {
     char **argv;
@@ -5981,11 +6132,11 @@ START_TEST( joystick8 )
 
     dinput_test_init();
     if (!bus_device_start()) goto done;
-
     winetest_mute_threshold = 3;
 
     if (test_device_types( 0x800 ))
     {
+        test_joystick_id();
         /* This needs to be done before doing anything involving dinput.dll
          * on Windows, or the tests will fail, dinput8.dll is fine though. */
         test_winmm_joystick();

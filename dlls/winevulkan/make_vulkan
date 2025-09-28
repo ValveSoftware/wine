@@ -64,7 +64,7 @@ from enum import Enum
 LOGGER = logging.Logger("vulkan")
 LOGGER.addHandler(logging.StreamHandler())
 
-VK_XML_VERSION = "1.4.303"
+VK_XML_VERSION = "1.4.318"
 WINE_VK_VERSION = (1, 4)
 
 # Filenames to create.
@@ -102,6 +102,7 @@ UNSUPPORTED_EXTENSIONS = [
     "VK_KHR_maintenance7", # Causes infinity recursion in struct convert code
     "VK_KHR_shared_presentable_image", # Needs WSI work.
     "VK_NV_external_memory_rdma", # Needs shared resources work.
+    "VK_NV_external_compute_queue", # Has a new dispatchable handle
 
     # Extensions for other platforms
     "VK_EXT_external_memory_dma_buf",

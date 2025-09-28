@@ -58,8 +58,12 @@ class LoadSymbolFiles(gdb.Command):
     # unload symbol file if address changed
     for k in set(libs) & set(self.libs[pid]):
       if libs[k] != self.libs[pid][k]:
-        command('remove-symbol-file "{}"'.format(k), confirm=False)
-        del self.libs[k]
+        try:
+          command('remove-symbol-file "{}"'.format(k), confirm=False)
+        except:
+          print("warn: Failed to unload symbol file {}".format(k))
+        finally:
+          del self.libs[pid][k]
 
     # load symbol file for new mappings
     for k in set(libs) - set(self.libs[pid]):

@@ -1604,7 +1604,7 @@ static void update_user_profile(void)
 
 static void update_win_version(void)
 {
-    static const WCHAR win10_buildW[] = L"19043";
+    static const WCHAR win10_buildW[] = L"19045";
     static const WCHAR win10_ntW[] = L"6.3";
 
     HKEY cv_h;

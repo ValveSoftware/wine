@@ -518,6 +518,7 @@ enum x11drv_atoms
     XATOM__NET_WM_PING,
     XATOM__NET_WM_STATE,
     XATOM__NET_WM_STATE_ABOVE,
+    XATOM__NET_WM_STATE_BELOW,
     XATOM__NET_WM_STATE_DEMANDS_ATTENTION,
     XATOM__NET_WM_STATE_FULLSCREEN,
     XATOM__NET_WM_STATE_MAXIMIZED_HORZ,
@@ -626,6 +627,7 @@ enum x11drv_net_wm_state
     KDE_NET_WM_STATE_SKIP_SWITCHER,
     NET_WM_STATE_FULLSCREEN,
     NET_WM_STATE_ABOVE,
+    NET_WM_STATE_BELOW,
     NET_WM_STATE_MAXIMIZED,
     NET_WM_STATE_SKIP_PAGER,
     NET_WM_STATE_SKIP_TASKBAR,
@@ -665,6 +667,7 @@ struct x11drv_win_data
     UINT        is_offscreen : 1; /* has been moved offscreen by the window manager */
     UINT        parent_invalid : 1; /* is the parent host window possibly invalid */
     UINT        net_wm_state_hack : 1; /* hacking around KWin sticky fullscreen windows */
+    UINT        force_below_hack : 1; /* hacking fullscreen black window which is supposed to be order after another window */
     Window      embedder;       /* window id of embedder */
     Pixmap         icon_pixmap;
     Pixmap         icon_mask;
@@ -921,12 +924,23 @@ extern NTSTATUS x11drv_tablet_info( void *arg );
 
 static inline BOOL lp_to_dp( HDC hdc, POINT *points, INT count )
 {
-    return NtGdiTransformPoints( hdc, points, points, count, NtGdiLPtoDP );
+    return NtGdiTransformPoints( hdc, points, points, count, NtGdiLPtoDPRaw );
 }
 
 static inline UINT get_palette_entries( HPALETTE palette, UINT start, UINT count, PALETTEENTRY *entries )
 {
     return NtGdiDoPalette( palette, start, count, entries, NtGdiGetPaletteEntries, TRUE );
+}
+
+static inline HRGN clone_gdi_region( HRGN rgn )
+{
+    HRGN copy;
+
+    if (!rgn) return NULL;
+
+    copy = NtGdiCreateRectRgn( 0, 0, 0, 0 );
+    NtGdiCombineRgn( copy, rgn, NULL, RGN_COPY );
+    return copy;
 }
 
 /* user helpers */

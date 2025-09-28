@@ -248,6 +248,8 @@ typedef enum convert_mode
 /* class codecvt<char16> */
 typedef struct {
     codecvt_base base;
+    unsigned int max_code;
+    codecvt_convert_mode convert_mode;
 } codecvt_char16;
 
 /* class codecvt<char32> */

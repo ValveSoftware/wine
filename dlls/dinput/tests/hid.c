@@ -719,7 +719,8 @@ void hid_device_stop( struct hid_device_desc *desc, UINT count )
                            NULL, OPEN_EXISTING, 0, NULL );
     ok( control != INVALID_HANDLE_VALUE, "CreateFile failed, error %lu\n", GetLastError() );
     ret = sync_ioctl( control, IOCTL_WINETEST_REMOVE_DEVICE, desc, sizeof(*desc), NULL, 0, 5000 );
-    ok( ret || GetLastError() == ERROR_FILE_NOT_FOUND, "IOCTL_WINETEST_REMOVE_DEVICE failed, last error %lu\n", GetLastError() );
+    ok( ret || (GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_NO_SUCH_DEVICE),
+        "IOCTL_WINETEST_REMOVE_DEVICE failed, last error %lu\n", GetLastError() );
     CloseHandle( control );
 
     if (!ret) return;

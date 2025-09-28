@@ -592,6 +592,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     }
     options[] =
     {
+        {L"Click&Fight.exe", L" --disable_direct_composition=1"},
         {L"Willful.exe", L" --disable_direct_composition=1"},
         {L"Banyu Lintar Angin - Little Storm -.exe", L" --disable_direct_composition=1"},
         {L"Super\\Super.exe", L" --disable_direct_composition=1"},
@@ -606,7 +607,6 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
         {L"Montaro\\nw.exe", L" --use-gl=swiftshader"},
         {L"Aisling and the Tavern of Elves\\nw.exe", L" --use-gl=swiftshader"},
         {L"Snares of Ruin 2\\SoR2.exe", L" --use-gl=swiftshader"},
-        {L"\\EOSOverlayRenderer-Win64-Shipping.exe", L" --use-gl=swiftshader --in-process-gpu"},
         {L"\\EpicOnlineServicesUIHelper", L" --use-angle=vulkan"},
         {L"OlympiaRising.exe", L" --use-gl=swiftshader"},
         {L"nw.exe.exe", L" --use-angle=d3d9"},

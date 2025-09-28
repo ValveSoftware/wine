@@ -82,16 +82,15 @@ static void vulkan_surface_destroy( HWND hwnd, struct x11drv_vulkan_surface *sur
     free( surface );
 }
 
-static RECT get_client_rect( HWND hwnd, BOOL raw )
+static BOOL get_client_rect( HWND hwnd, BOOL raw, RECT *rect )
 {
     UINT dpi = NtUserGetDpiForWindow( hwnd );
-    RECT rect;
 
-    NtUserGetClientRect( hwnd, &rect, dpi );
-    if (!raw) return rect;
-    rect = map_rect_virt_to_raw_for_monitor( NtUserMonitorFromWindow( hwnd, MONITOR_DEFAULTTONEAREST ), rect, dpi );
-    OffsetRect( &rect, -rect.left, -rect.top );
-    return rect;
+    if (!NtUserGetClientRect( hwnd, rect, dpi )) return FALSE;
+    if (!raw) return TRUE;
+    *rect = map_rect_virt_to_raw_for_monitor( NtUserMonitorFromWindow( hwnd, MONITOR_DEFAULTTONEAREST ), *rect, dpi );
+    OffsetRect( rect, -rect->left, -rect->top );
+    return TRUE;
 }
 
 static BOOL disable_opwr(void)
@@ -124,7 +123,13 @@ static VkResult X11DRV_vulkan_surface_create( HWND hwnd, VkInstance instance, Vk
         ERR("Failed to allocate vulkan surface for hwnd=%p\n", hwnd);
         return VK_ERROR_OUT_OF_HOST_MEMORY;
     }
-    surface->rect = get_client_rect( hwnd, enable_fshack );
+
+    if (!get_client_rect( hwnd, enable_fshack, &surface->rect ))
+    {
+        ERR( "get_client_rect failed.\n" );
+        free( surface );
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
 
     hwnd_thread_id = NtUserGetWindowThread(hwnd, &hwnd_pid);
     if (hwnd_thread_id && hwnd_pid != GetCurrentProcessId())
@@ -210,7 +215,11 @@ static void vulkan_surface_update_size( HWND hwnd, struct x11drv_vulkan_surface 
     XWindowChanges changes;
     RECT rect;
 
-    rect = get_client_rect( hwnd, enable_fshack );
+    if (!get_client_rect( hwnd, enable_fshack, &rect ))
+    {
+        WARN( "get_client_rect failed.\n" );
+        return;
+    }
     if (EqualRect( &surface->rect, &rect )) return;
 
     changes.width  = min( max( 1, rect.right ), 65535 );

@@ -202,7 +202,7 @@ int mediaconv_demuxer_open( AVFormatContext **ctx, struct stream_context *contex
             if (par->codec_id && !strcmp("h264", avcodec_get_name(par->codec_id)))
                     create_placeholder_file("h264-used");
             if (!par->codec_id) FIXME( "Ignoring unknown codec on stream %u\n", i );
-            else if (!avcodec_find_decoder( par->codec_id )) break;
+            else if (par->codec_id != AV_CODEC_ID_OPUS && !avcodec_find_decoder( par->codec_id )) break;
         }
         if (i == (*ctx)->nb_streams) return 0;
 

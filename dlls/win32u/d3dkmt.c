@@ -168,26 +168,6 @@ NTSTATUS WINAPI NtGdiDdDDICloseAdapter( const D3DKMT_CLOSEADAPTER *desc )
     return status;
 }
 
-/******************************************************************************
- *           NtGdiDdDDIOpenAdapterFromDeviceName    (win32u.@)
- */
-NTSTATUS WINAPI NtGdiDdDDIOpenAdapterFromDeviceName( D3DKMT_OPENADAPTERFROMDEVICENAME *desc )
-{
-    D3DKMT_OPENADAPTERFROMLUID desc_luid;
-    NTSTATUS status;
-
-    FIXME( "desc %p stub.\n", desc );
-
-    if (!desc || !desc->pDeviceName) return STATUS_INVALID_PARAMETER;
-
-    memset( &desc_luid, 0, sizeof(desc_luid) );
-    if ((status = NtGdiDdDDIOpenAdapterFromLuid( &desc_luid ))) return status;
-
-    desc->AdapterLuid = desc_luid.AdapterLuid;
-    desc->hAdapter = desc_luid.hAdapter;
-    return STATUS_SUCCESS;
-}
-
 static UINT get_vulkan_physical_devices( VkPhysicalDevice **devices )
 {
     UINT device_count;
@@ -653,6 +633,13 @@ BOOL get_vulkan_gpus( struct list *gpus )
         devinfo[i].properties2.pNext = &devinfo[i].id;
         pvkGetPhysicalDeviceProperties2KHR( devices[i], &devinfo[i].properties2 );
         pvkGetPhysicalDeviceMemoryProperties( devices[i], &devinfo[i].mem_properties );
+        /* Ignore Khronos vendor IDs */
+        if (devinfo[i].properties2.properties.vendorID >= 0x10000)
+        {
+            --count;
+            memmove( &devices[i], &devices[i + 1], (count - i) * sizeof(*devices) );
+            --i;
+        }
     }
     qsort( devinfo, count, sizeof(*devinfo), compare_vulkan_physical_devices );
 

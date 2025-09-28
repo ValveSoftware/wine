@@ -1883,7 +1883,7 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     ctx->uc_mcontext.gregs[REG_RIP] = (ULONG64)__wine_syscall_dispatcher_prolog_end_ptr;
 }
 
-/* syscall numbers are for Windows 10 2009 (build 19043) */
+/* syscall numbers are for Windows 10 2009 (build 19045) */
 static struct
 {
     unsigned int win_syscall_nr;
@@ -1894,7 +1894,7 @@ syscall_nr_translation[] =
 {
     {0x19, ~0u, NtQueryInformationProcess},
     {0x36, ~0u, NtQuerySystemInformation},
-    {0xf2, ~0u, NtGetContextThread},
+    {0xf3, ~0u, NtGetContextThread},
     {0x55, ~0u, NtCreateFile},
     {0x08, ~0u, NtWriteFile},
     {0x06, ~0u, NtReadFile},
@@ -3318,6 +3318,7 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "movq (%rsp),%rcx\n\t"          /* frame->rip */
                    "pushq %r11\n\t"
                    /* make sure that if trap flag is set the trap happens on the first instruction after iret */
+                   "andq $~0x4000,(%rsp)\n\t" /* make sure NT flag is not set, or iretq will fault */
                    "popfq\n\t"
                    "iretq\n"
                    /* CONTEXT_INTEGER */
@@ -3344,6 +3345,7 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "xchgq %r10,(%rsp)\n\t"
                    "pushq %r11\n\t"
                    /* make sure that if trap flag is set the trap happens on the first instruction after iret */
+                   "andq $~0x4000,(%rsp)\n\t" /* make sure NT flag is not set, or iretq will fault */
                    "popfq\n\t"
                    "iretq\n\t"
 

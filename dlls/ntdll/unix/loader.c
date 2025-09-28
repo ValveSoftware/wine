@@ -2172,6 +2172,12 @@ static void hacks_init(void)
     {
         alert_simulate_sched_quantum = !!strstr(main_argv[1], "GTA5.exe");
         alert_simulate_sched_quantum = alert_simulate_sched_quantum || !!strstr(main_argv[1], "MarySkelter2.exe");
+        alert_simulate_sched_quantum = alert_simulate_sched_quantum || !!strstr(main_argv[1], "MarySkelterFinale.exe");
+        alert_simulate_sched_quantum = alert_simulate_sched_quantum || !!strstr(main_argv[1], "Application.exe");
+        alert_simulate_sched_quantum = alert_simulate_sched_quantum || !!strstr(main_argv[1], "DeathEndReQuest2.exe");
+        alert_simulate_sched_quantum = alert_simulate_sched_quantum || !!strstr(main_argv[1], "v2r.exe");
+        alert_simulate_sched_quantum = alert_simulate_sched_quantum || !!strstr(main_argv[1], "NeptuniaVirtualStars.exe");
+        alert_simulate_sched_quantum = alert_simulate_sched_quantum || !!strstr(main_argv[1], "DragonStarVarnir.exe");
     }
     if (alert_simulate_sched_quantum)
         ERR("HACK: Simulating sched quantum in NtWaitForAlertByThreadId.\n");

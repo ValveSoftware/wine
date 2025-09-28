@@ -7,6 +7,7 @@
 #include "config.h"
 #include "unix_private.h"
 
+#ifdef HAVE_OPENCL
 static NTSTATUS wrap_clCreateBuffer( void *args )
 {
     struct clCreateBuffer_params *params = args;
@@ -564,6 +565,401 @@ static NTSTATUS wrap_clWaitForEvents( void *args )
 
     return clWaitForEvents( params->num_events, params->event_list );
 }
+#else
+static NTSTATUS wrap_clCreateBuffer( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateCommandQueue( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateImage( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateImage2D( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateImage3D( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateKernel( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateKernelsInProgram( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateProgramWithBinary( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateProgramWithBuiltInKernels( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateProgramWithSource( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateSampler( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateSubBuffer( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateSubDevices( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clCreateUserEvent( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueBarrier( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueBarrierWithWaitList( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueCopyBuffer( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueCopyBufferRect( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueCopyBufferToImage( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueCopyImage( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueCopyImageToBuffer( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueFillBuffer( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueFillImage( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueMapBuffer( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueMapImage( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueMarker( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueMarkerWithWaitList( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueMigrateMemObjects( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueNDRangeKernel( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueReadBuffer( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueReadBufferRect( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueReadImage( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueTask( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueUnmapMemObject( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueWaitForEvents( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueWriteBuffer( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueWriteBufferRect( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clEnqueueWriteImage( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clFinish( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clFlush( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetCommandQueueInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetContextInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetDeviceIDs( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetDeviceInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetEventInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetEventProfilingInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetImageInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetKernelArgInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetKernelInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetKernelWorkGroupInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetMemObjectInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetPlatformIDs( void *args )
+{
+    struct clGetPlatformIDs_params *params = args;
+
+    if (params->num_platforms) *params->num_platforms = 0;
+    return CL_SUCCESS;
+}
+
+static NTSTATUS wrap_clGetPlatformInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetProgramBuildInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetProgramInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetSamplerInfo( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clGetSupportedImageFormats( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clReleaseCommandQueue( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clReleaseContext( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clReleaseDevice( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clReleaseEvent( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clReleaseKernel( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clReleaseMemObject( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clReleaseProgram( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clReleaseSampler( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clRetainCommandQueue( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clRetainContext( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clRetainDevice( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clRetainEvent( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clRetainKernel( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clRetainMemObject( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clRetainProgram( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clRetainSampler( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clSetKernelArg( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clSetUserEventStatus( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clUnloadCompiler( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clUnloadPlatformCompiler( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+static NTSTATUS wrap_clWaitForEvents( void *args )
+{
+    return CL_INVALID_OPERATION;
+}
+
+#endif
 
 const unixlib_entry_t __wine_unix_call_funcs[] =
 {

@@ -138,6 +138,7 @@ static BOOL X11DRV_DeleteDC( PHYSDEV dev )
     X11DRV_PDEVICE *physDev = get_x11drv_dev( dev );
 
     XFreeGC( gdi_display, physDev->gc );
+    if (physDev->region) NtGdiDeleteObjectApp( physDev->region );
     free( physDev );
     return TRUE;
 }
@@ -221,6 +222,7 @@ BOOL needs_offscreen_rendering( HWND hwnd, BOOL known_child, BOOL check_gamma )
 {
     static int no_child_clipping_cached = -1;
     struct window_surface *surface;
+    DWORD layered_flags;
 
     UINT style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
     struct x11drv_win_data *data;
@@ -240,6 +242,11 @@ BOOL needs_offscreen_rendering( HWND hwnd, BOOL known_child, BOOL check_gamma )
         needs_offscreen = (style & WS_VISIBLE) && !(style & WS_MINIMIZE) && !is_window_rect_mapped( &data->rects.visible );
         release_win_data( data );
     }
+
+    if (!needs_offscreen && style & WS_EX_LAYERED && NtUserGetLayeredWindowAttributes( hwnd, NULL, NULL, &layered_flags )
+        && layered_flags & LWA_COLORKEY)
+        needs_offscreen = TRUE;
+
     if (!needs_offscreen && (surface = window_surface_get( hwnd )))
     {
         TRACE("hwnd %p, surface %p, surface->alpha_mask %#x.\n", hwnd, surface, surface->alpha_mask);

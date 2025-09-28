@@ -1068,13 +1068,42 @@ static void session_handle_start_error(struct media_session *session, HRESULT hr
     session_command_complete_with_event(session, MESessionStarted, hr, NULL);
 }
 
+static void session_reset_transforms(struct media_session *session, BOOL drop)
+{
+    struct topo_node *topo_node;
+    UINT i;
+
+    LIST_FOR_EACH_ENTRY(topo_node, &session->presentation.nodes, struct topo_node, entry)
+    {
+        if (topo_node->type != MF_TOPOLOGY_TRANSFORM_NODE)
+            continue;
+
+        for (i = 0; i < topo_node->u.transform.input_count; i++)
+        {
+            struct transform_stream *stream = &topo_node->u.transform.inputs[i];
+            stream->draining = FALSE;
+            if (drop)
+                transform_stream_drop_events(stream);
+        }
+
+        if (!drop)
+            continue;
+
+        for (i = 0; i < topo_node->u.transform.output_count; ++i)
+        {
+            struct transform_stream *stream = &topo_node->u.transform.outputs[i];
+            transform_stream_drop_events(stream);
+            stream->requests = 0;
+        }
+    }
+}
+
 static void session_start(struct media_session *session, const GUID *time_format, const PROPVARIANT *start_position)
 {
     struct media_source *source;
-    struct topo_node *topo_node;
+    BOOL unpause_seek;
     MFTIME duration;
     HRESULT hr;
-    UINT i;
 
     switch (session->state)
     {
@@ -1100,6 +1129,11 @@ static void session_start(struct media_session *session, const GUID *time_format
                 return;
             }
 
+            unpause_seek = start_position->vt == VT_I8;
+            if (unpause_seek)
+                session_flush_nodes(session);
+            session_reset_transforms(session, unpause_seek);
+
             LIST_FOR_EACH_ENTRY(source, &session->presentation.sources, struct media_source, entry)
             {
                 if (FAILED(hr = IMFMediaSource_Start(source->source, source->pd, &GUID_NULL, start_position)))
@@ -1107,18 +1141,6 @@ static void session_start(struct media_session *session, const GUID *time_format
                     WARN("Failed to start media source %p, hr %#lx.\n", source->source, hr);
                     session_handle_start_error(session, hr);
                     return;
-                }
-            }
-
-            LIST_FOR_EACH_ENTRY(topo_node, &session->presentation.nodes, struct topo_node, entry)
-            {
-                if (topo_node->type == MF_TOPOLOGY_TRANSFORM_NODE)
-                {
-                    for (i = 0; i < topo_node->u.transform.input_count; i++)
-                    {
-                        struct transform_stream *stream = &topo_node->u.transform.inputs[i];
-                        stream->draining = FALSE;
-                    }
                 }
             }
 
@@ -1148,6 +1170,8 @@ static void session_start(struct media_session *session, const GUID *time_format
                     return;
                 }
             }
+
+            session_reset_transforms(session, TRUE);
 
             session->presentation.time_format = *time_format;
             session->presentation.start_position.vt = VT_EMPTY;

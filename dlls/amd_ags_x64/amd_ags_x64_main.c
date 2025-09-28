@@ -49,8 +49,8 @@ static BOOL init_unix_lib(void)
     return unix_lib_initialized;
 }
 
-static const char driver_version[] = "23.19.02-230831a-396538C-AMD-Software-Adrenalin-Edition";
-static const char radeon_version[] = "23.10.2";
+static const char driver_version[] = "99.19.02-230831a-396538C-AMD-Software-Adrenalin-Edition";
+static const char radeon_version[] = "99.10.2";
 
 enum amd_ags_version
 {
@@ -1979,5 +1979,11 @@ __ASM_GLOBAL_FUNC( agsDriverExtensionsDX11_DestroyDevice,
 AGSReturnCode WINAPI agsDriverExtensionsDX11_SetDiskShaderCacheEnabled(AGSContext *context, int enable)
 {
     FIXME("context %p, enable %d stub.\n", context, enable);
+    return AGS_SUCCESS;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_SetMaxAsyncCompileThreadCount(AGSContext *context, unsigned int thread_count)
+{
+    FIXME("context %p, thread_count %u.\n", context, thread_count);
     return AGS_SUCCESS;
 }
