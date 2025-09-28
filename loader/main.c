@@ -62,10 +62,40 @@ int wine_main(int argc, char *argv[]) {
     return 1;
 }
 
+
+#include <sys/types.h>
+#include <sys/wait.h>
+
 int darling_main(int argc, char *argv[]) {
-    fprintf(stderr, "[Goliath] Darling subsystem not yet fully wired.\n");
-    // TODO: Call Darling Mach-O loader logic here
-    return 127;
+    // For now, exec the Mach-O loader binary from Darling as a placeholder for deep integration
+    // In a real integration, this would call the Mach-O loader logic directly
+    const char *mach_loader = "../libs/darling/src/startup/mldr/mldr";
+    char **new_argv = malloc(sizeof(char*) * (argc + 1));
+    if (!new_argv) {
+        fprintf(stderr, "goliath: out of memory\n");
+        return 1;
+    }
+    new_argv[0] = (char*)mach_loader;
+    for (int i = 1; i < argc; ++i) new_argv[i] = argv[i];
+    new_argv[argc] = NULL;
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        // Child: exec Mach-O loader
+        execv(mach_loader, new_argv);
+        perror("goliath: execv failed for Mach-O loader");
+        exit(127);
+    } else if (pid > 0) {
+        // Parent: wait for child
+        int status = 0;
+        waitpid(pid, &status, 0);
+        free(new_argv);
+        return WIFEXITED(status) ? WEXITSTATUS(status) : 127;
+    } else {
+        perror("goliath: fork failed");
+        free(new_argv);
+        return 127;
+    }
 }
 /*
  * Emulator initialisation code
