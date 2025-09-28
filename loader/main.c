@@ -1,3 +1,37 @@
+#include <sys/types.h>
+#include <sys/wait.h>
+
+// --- WSL subsystem entry point ---
+int wsl_main(int argc, char *argv[]) {
+    // For now, exec a stub WSL loader (to be replaced with real integration)
+    const char *wsl_loader = "../dlls/wsl/wsl.so";
+    char **new_argv = malloc(sizeof(char*) * (argc + 1));
+    if (!new_argv) {
+        fprintf(stderr, "goliath: out of memory\n");
+        return 1;
+    }
+    new_argv[0] = (char*)wsl_loader;
+    for (int i = 1; i < argc; ++i) new_argv[i] = argv[i];
+    new_argv[argc] = NULL;
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        // Child: exec WSL loader
+        execv(wsl_loader, new_argv);
+        perror("goliath: execv failed for WSL loader");
+        exit(127);
+    } else if (pid > 0) {
+        // Parent: wait for child
+        int status = 0;
+        waitpid(pid, &status, 0);
+        free(new_argv);
+        return WIFEXITED(status) ? WEXITSTATUS(status) : 127;
+    } else {
+        perror("goliath: fork failed");
+        free(new_argv);
+        return 127;
+    }
+}
 // --- Goliath subsystem entry points (stubs for now) ---
 
 int wine_main(int argc, char *argv[]) {
@@ -168,6 +202,7 @@ static const struct wine_preload_info preload_info[] =
     extern int wine_main(int argc, char *argv[]);
     extern int darling_main(int argc, char *argv[]);
 
+    // 1 = Windows ELF, 2 = Mach-O, 3 = Linux ELF, 0 = Unknown
     static int detect_binary_type(const char *path) {
         int fd = open(path, O_RDONLY);
         if (fd < 0) {
@@ -179,8 +214,16 @@ static const struct wine_preload_info preload_info[] =
             close(fd);
             return -1;
         }
+        lseek(fd, 0, SEEK_SET);
+        char ident[16] = {0};
+        read(fd, ident, 16);
         close(fd);
-        if (!memcmp(&magic, ELF_MAGIC, 4)) return 1; // ELF
+        // ELF: check OS ABI field
+        if (!memcmp(&magic, ELF_MAGIC, 4)) {
+            // ident[7] is OS ABI: 0 = System V, 3 = Linux, 6 = Solaris, 9 = FreeBSD
+            if (ident[7] == 3) return 3; // Linux ELF
+            else return 1; // Default to Windows ELF
+        }
         if (magic == MACHO_MAGIC_32 || magic == MACHO_MAGIC_64 ||
             magic == MACHO_CIGAM_32 || magic == MACHO_CIGAM_64) return 2; // Mach-O
         return 0; // Unknown
@@ -193,11 +236,14 @@ static const struct wine_preload_info preload_info[] =
         }
         int type = detect_binary_type(argv[1]);
         if (type == 1) {
-            // ELF: dispatch to Wine
+            // Windows ELF: dispatch to Wine
             return wine_main(argc, argv);
         } else if (type == 2) {
             // Mach-O: dispatch to Darling
             return darling_main(argc, argv);
+        } else if (type == 3) {
+            // Linux ELF: dispatch to WSL
+            return wsl_main(argc, argv);
         } else {
             fprintf(stderr, "Unknown or unsupported binary format: %s\n", argv[1]);
             return 2;
