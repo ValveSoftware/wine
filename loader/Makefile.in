@@ -2,6 +2,7 @@ SOURCES = \
 	main.c \
 	preloader.c \
 	preloader_mac.c \
+	main_unified.c \
 	wine.de.UTF-8.man.in \
 	wine.desktop \
 	wine.fr.UTF-8.man.in \
@@ -9,6 +10,9 @@ SOURCES = \
 	wine.man.in \
 	wine.pl.UTF-8.man.in \
 	wine_info.plist.in
+goliath_unified_OBJS = main_unified.o
+goliath_unified_LDFLAGS = $(WINELOADER_LDFLAGS) $(LDEXECFLAGS) $(PTHREAD_LIBS)
+PROGRAMS += goliath_unified
 
 PROGRAMS = $(WINELOADER_PROGRAMS)
 INSTALL_LIB = $(WINELOADER_PROGRAMS)

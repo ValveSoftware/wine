@@ -30,20 +30,7 @@ fi
 APP="$1"
 shift
 
-# Helper: detect file type
-filetype=$(file -b "$APP")
-
-# Dispatch logic
-if [[ "$filetype" == *"PE32"* || "$filetype" == *"MS Windows"* ]]; then
-    # Windows binary
-    exec wine "$APP" "$@"
 elif [[ "$filetype" == *"Mach-O"* ]]; then
-    # macOS binary
-    exec darling shell "$APP" "$@"
 elif [[ "$filetype" == *"ELF"* && "$APP" == *.apk ]]; then
-    # Android APK (very basic check)
-    exec atl "$APP" "$@"
-else
-    echo "[Goliath] Unknown or unsupported application type: $filetype"
-    exit 2
-fi
+# Use the unified Goliath loader
+exec "$(dirname "$0")/loader/goliath" "$APP" "$@"
