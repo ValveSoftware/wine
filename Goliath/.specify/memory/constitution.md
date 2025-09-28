@@ -1,50 +1,50 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+## Goliath Codebase Constitution
+
+**Ratified:** 2025-09-28 | **Version:** 1.0.0 | **Last Amended:** 2025-09-28
+
+### Preamble
+All contributors must ensure that any improvements or changes to this codebase:
+
+- Maintain and enhance the complexity and functionality of the software at all times.
+- Contain only real, buildable code—no stubs, pseudo-code, or placeholders are permitted under any circumstances.
+- Follow the user's specifications and the existing codebase structure with 100% accuracy.
+- Use the current workspace and the Specify system as already set up.
+
+This constitution is binding for all future development and contributions.
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Library-First
+Every feature must start as a standalone, self-contained library. Libraries must be independently testable, fully documented, and have a clear, justified purpose. Organizational-only or unused libraries are strictly prohibited.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. CLI Interface
+All libraries and modules must expose their functionality via a command-line interface (CLI). Text in/out protocol is required: input via stdin/args, output via stdout, errors via stderr. Both JSON and human-readable formats must be supported.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Test-First (NON-NEGOTIABLE)
+Test-Driven Development (TDD) is mandatory: tests must be written and user-approved before implementation. The Red-Green-Refactor cycle is strictly enforced. No code may be merged without passing tests.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Integration Testing
+Integration tests are required for all new library contracts, contract changes, inter-service communication, and shared schemas. All integration points must be covered by automated tests.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Observability & Versioning
+Structured logging is required for all components. All code must be debuggable via text I/O. Versioning must follow MAJOR.MINOR.BUILD format. Breaking changes require a migration plan and user approval.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### VI. Simplicity & Complexity
+Simplicity is valued, but justified complexity is required for core features. All complexity must be documented and reviewed. YAGNI (You Aren't Gonna Need It) principles apply except where complexity is essential for correctness or extensibility.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+## Additional Constraints
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+- Technology stack must be consistent with the existing codebase unless a migration is approved.
+- All code must be production-quality, buildable, and ready for deployment at all times.
+- Security, performance, and compliance standards must be met for all contributions.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+## Development Workflow
+
+- All code must be peer-reviewed for compliance with this constitution.
+- Code reviews must verify: complexity, buildability, test coverage, and adherence to specifications.
+- No code may be merged with stubs, pseudo-code, or incomplete implementations.
+- All features and fixes must be tracked via Specify and linked to user-approved specifications.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
-
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+This constitution supersedes all other practices. Amendments require full documentation, user approval, and a migration plan. All PRs and reviews must verify compliance with this constitution. Use the agent context and guidance files for runtime development guidance.
