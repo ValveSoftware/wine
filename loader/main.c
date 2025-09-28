@@ -1,3 +1,72 @@
+// --- Goliath subsystem entry points (stubs for now) ---
+
+int wine_main(int argc, char *argv[]) {
+    // Original Wine loader logic
+    void *handle = NULL;
+    // Use the original load_ntdll logic
+#ifdef __i386__
+#define SO_DIR "i386-unix/"
+#elif defined(__x86_64__)
+#define SO_DIR "x86_64-unix/"
+#elif defined(__arm__)
+#define SO_DIR "arm-unix/"
+#elif defined(__aarch64__)
+#define SO_DIR "aarch64-unix/"
+#else
+#define SO_DIR ""
+#endif
+    const char *self = argv[0];
+    char *path, *p;
+
+    // Try to find ntdll.so as in the original loader
+    if ((path = realpath(self, NULL))) {
+        p = strrchr(path, '/');
+        if (p) *p = 0;
+        if ((p = strstr(path, "/loader"))) *p = 0;
+        char ntdll_path[PATH_MAX];
+        snprintf(ntdll_path, sizeof(ntdll_path), "%s/dlls/ntdll/ntdll.so", path);
+        handle = dlopen(ntdll_path, RTLD_NOW);
+        if (!handle) {
+            snprintf(ntdll_path, sizeof(ntdll_path), "%s/wine/%sntdll.so", path, SO_DIR);
+            handle = dlopen(ntdll_path, RTLD_NOW);
+        }
+        free(path);
+    }
+    if (!handle && (path = getenv("WINEDLLPATH"))) {
+        path = strdup(path);
+        for (p = strtok(path, ":"); p; p = strtok(NULL, ":")) {
+            char ntdll_path[PATH_MAX];
+            snprintf(ntdll_path, sizeof(ntdll_path), "%s/%sntdll.so", p, SO_DIR);
+            handle = dlopen(ntdll_path, RTLD_NOW);
+            if (!handle) {
+                snprintf(ntdll_path, sizeof(ntdll_path), "%s/ntdll.so", p);
+                handle = dlopen(ntdll_path, RTLD_NOW);
+            }
+            if (handle) break;
+        }
+        free(path);
+    }
+    if (!handle) {
+        handle = dlopen(LIBDIR "/wine/" SO_DIR "ntdll.so", RTLD_NOW);
+    }
+    if (handle) {
+        void (*init_func)(int, char **) = dlsym(handle, "__wine_main");
+        if (init_func) {
+            init_func(argc, argv);
+            return 0;
+        }
+        fprintf(stderr, "goliath: __wine_main function not found in ntdll.so\n");
+        return 1;
+    }
+    fprintf(stderr, "goliath: could not load ntdll.so: %s\n", dlerror());
+    return 1;
+}
+
+int darling_main(int argc, char *argv[]) {
+    fprintf(stderr, "[Goliath] Darling subsystem not yet fully wired.\n");
+    // TODO: Call Darling Mach-O loader logic here
+    return 127;
+}
 /*
  * Emulator initialisation code
  *
