@@ -100,7 +100,7 @@
 @ stub ADL2_Adapter_ModeTimingOverride_Caps
 @ stub ADL2_Adapter_Modes_ReEnumerate
 @ stub ADL2_Adapter_NumberOfActivatableSources_Get
-@ stdcall ADL2_Adapter_NumberOfAdapters_Get(ptr ptr)
+@ cdecl ADL2_Adapter_NumberOfAdapters_Get(ptr ptr)
 @ stub ADL2_Adapter_ObservedClockInfo_Get
 @ stub ADL2_Adapter_PMLog_Start
 @ stub ADL2_Adapter_PMLog_Stop
@@ -432,7 +432,7 @@
 @ stub ADL2_Graphics_IsGfx9AndAbove
 @ stub ADL2_Graphics_MantleVersion_Get
 @ stub ADL2_Graphics_Platform_Get
-@ stdcall ADL2_Graphics_VersionsX2_Get(ptr ptr)
+@ cdecl ADL2_Graphics_VersionsX2_Get(ptr ptr)
 @ stub ADL2_Graphics_Versions_Get
 @ stub ADL2_Graphics_VulkanVersion_Get
 @ stub ADL2_HybridGraphicsGPU_Set
@@ -451,7 +451,7 @@
 @ stub ADL2_MMD_VideoColor_Set
 @ stub ADL2_MMD_Video_Caps
 @ stub ADL2_Main_ControlX2_Create
-@ stdcall ADL2_Main_Control_Create(ptr long ptr)
+@ cdecl ADL2_Main_Control_Create(ptr long ptr)
 @ stub ADL2_Main_Control_Destroy
 @ stub ADL2_Main_Control_GetProcAddress
 @ stub ADL2_Main_Control_IsFunctionValid
@@ -681,14 +681,14 @@
 @ stub ADL_APO_AudioDelay_Set
 @ stub ADL_AdapterLimitation_Caps
 @ stub ADL_AdapterX2_Caps
-@ stdcall ADL_Adapter_ASICFamilyType_Get(long ptr ptr)
+@ cdecl ADL_Adapter_ASICFamilyType_Get(long ptr ptr)
 @ stub ADL_Adapter_ASICInfo_Get
 @ stub ADL_Adapter_Accessibility_Get
 @ stub ADL_Adapter_Active_Get
 @ stub ADL_Adapter_Active_Set
 @ stub ADL_Adapter_Active_SetPrefer
 @ stub ADL_Adapter_AdapterInfoX2_Get
-@ stdcall ADL_Adapter_AdapterInfo_Get(ptr long)
+@ cdecl ADL_Adapter_AdapterInfo_Get(ptr long)
 @ stub ADL_Adapter_AdapterList_Disable
 @ stub ADL_Adapter_Aspects_Get
 @ stub ADL_Adapter_AudioChannelSplitConfiguration_Get
@@ -714,8 +714,8 @@
 @ stub ADL_Adapter_CrossdisplayInfo_Get
 @ stub ADL_Adapter_CrossdisplayInfo_Set
 @ stub ADL_Adapter_CrossfireX2_Get
-@ stdcall ADL_Adapter_Crossfire_Caps(long ptr ptr ptr)
-@ stdcall ADL_Adapter_Crossfire_Get(long ptr ptr)
+@ cdecl ADL_Adapter_Crossfire_Caps(long ptr ptr ptr)
+@ cdecl ADL_Adapter_Crossfire_Get(long ptr ptr)
 @ stub ADL_Adapter_Crossfire_Set
 @ stub ADL_Adapter_DefaultAudioChannelTable_Load
 @ stub ADL_Adapter_DisplayAudioEndpoint_Enable
@@ -736,14 +736,14 @@
 @ stub ADL_Adapter_LocalDisplayState_Get
 @ stub ADL_Adapter_MaxCursorSize_Get
 @ stub ADL_Adapter_MemoryInfo2_Get
-@ stdcall ADL_Adapter_MemoryInfo_Get(long ptr)
+@ cdecl ADL_Adapter_MemoryInfo_Get(long ptr)
 @ stub ADL_Adapter_MirabilisSupport_Get
 @ stub ADL_Adapter_ModeSwitch
 @ stub ADL_Adapter_ModeTimingOverride_Caps
 @ stub ADL_Adapter_Modes_ReEnumerate
 @ stub ADL_Adapter_NumberOfActivatableSources_Get
-@ stdcall ADL_Adapter_NumberOfAdapters_Get(ptr)
-@ stdcall ADL_Adapter_ObservedClockInfo_Get(long ptr ptr)
+@ cdecl ADL_Adapter_NumberOfAdapters_Get(ptr)
+@ cdecl ADL_Adapter_ObservedClockInfo_Get(long ptr ptr)
 @ stub ADL_Adapter_ObservedGameClockInfo_Get
 @ stub ADL_Adapter_Primary_Get
 @ stub ADL_Adapter_Primary_Set
@@ -844,8 +844,8 @@
 @ stub ADL_Display_DisplayContent_Cap
 @ stub ADL_Display_DisplayContent_Get
 @ stub ADL_Display_DisplayContent_Set
-@ stdcall ADL_Display_DisplayInfo_Get(long long ptr long)
-@ stdcall ADL_Display_DisplayMapConfig_Get(long ptr ptr ptr ptr long)
+@ cdecl ADL_Display_DisplayInfo_Get(long long ptr long)
+@ cdecl ADL_Display_DisplayMapConfig_Get(long ptr ptr ptr ptr long)
 @ stub ADL_Display_DisplayMapConfig_PossibleAddAndRemove
 @ stub ADL_Display_DisplayMapConfig_Set
 @ stub ADL_Display_DisplayMapConfig_Validate
@@ -969,8 +969,8 @@
 @ stub ADL_Display_WriteAndReadI2CLargePayload
 @ stub ADL_Display_WriteAndReadI2CRev_Get
 @ stub ADL_Flush_Driver_Data
-@ stdcall ADL_Graphics_Platform_Get(ptr)
-@ stdcall ADL_Graphics_Versions_Get(ptr)
+@ cdecl ADL_Graphics_Platform_Get(ptr)
+@ cdecl ADL_Graphics_Versions_Get(ptr)
 @ stub ADL_MMD_FeatureList_Get
 @ stub ADL_MMD_FeatureValuesX2_Get
 @ stub ADL_MMD_FeatureValuesX2_Set
@@ -985,8 +985,8 @@
 @ stub ADL_MMD_VideoColor_Set
 @ stub ADL_MMD_Video_Caps
 @ stub ADL_Main_ControlX2_Create
-@ stdcall ADL_Main_Control_Create(ptr long)
-@ stdcall ADL_Main_Control_Destroy()
+@ cdecl ADL_Main_Control_Create(ptr long)
+@ cdecl ADL_Main_Control_Destroy()
 @ stub ADL_Main_Control_GetProcAddress
 @ stub ADL_Main_Control_IsFunctionValid
 @ stub ADL_Main_Control_Refresh
