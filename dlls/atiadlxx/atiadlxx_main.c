@@ -236,37 +236,14 @@ int CDECL ADL_Main_Control_Destroy(void)
     return ADL2_Main_Control_Destroy(default_ctx);
 }
 
-int CDECL ADL2_Adapter_NumberOfAdapters_Get(ADL_CONTEXT_HANDLE *ptr, int *count)
-{
-    FIXME("ptr %p, count %p stub!\n", ptr, count);
-
-    *count = 0;
-
-    return ADL_OK;
-}
-
-int CDECL ADL2_Graphics_VersionsX2_Get(ADL_CONTEXT_HANDLE *ptr, ADLVersionsInfoX2 *ver)
-{
-    FIXME("ptr %p, ver %p stub!\n", ptr, ver);
-    memcpy(ver, &version2, sizeof(version2));
-    return ADL_OK;
-}
-
-int CDECL ADL_Graphics_Versions_Get(ADLVersionsInfo *ver)
-{
-    FIXME("ver %p stub!\n", ver);
-    memcpy(ver, &version, sizeof(version));
-    return ADL_OK;
-}
-
-int CDECL ADL_Adapter_NumberOfAdapters_Get(int *count)
+int CDECL ADL2_Adapter_NumberOfAdapters_Get(ADL_CONTEXT_HANDLE ctx, int *count)
 {
     IDXGIAdapter *adapter;
 
-    FIXME("count %p stub!\n", count);
+    TRACE("ctx %p, count %p.\n", ctx, count);
 
     *count = 0;
-    while (SUCCEEDED(IDXGIFactory_EnumAdapters(default_ctx->dxgi_factory, *count, &adapter)))
+    while (SUCCEEDED(IDXGIFactory_EnumAdapters(ctx->dxgi_factory, *count, &adapter)))
     {
         (*count)++;
         IUnknown_Release(adapter);
@@ -276,12 +253,33 @@ int CDECL ADL_Adapter_NumberOfAdapters_Get(int *count)
     return ADL_OK;
 }
 
-static int get_adapter_desc(int adapter_index, DXGI_ADAPTER_DESC *desc)
+int CDECL ADL2_Graphics_VersionsX2_Get(ADL_CONTEXT_HANDLE ptr, ADLVersionsInfoX2 *ver)
+{
+    TRACE("ptr %p, ver %p.\n", ptr, ver);
+    memcpy(ver, &version2, sizeof(version2));
+    return ADL_OK;
+}
+
+int CDECL ADL_Graphics_Versions_Get(ADLVersionsInfo *ver)
+{
+    TRACE("ver %p.\n", ver);
+    memcpy(ver, &version, sizeof(version));
+    return ADL_OK;
+}
+
+int CDECL ADL_Adapter_NumberOfAdapters_Get(int *count)
+{
+    TRACE("count %p.\n", count);
+
+    return ADL2_Adapter_NumberOfAdapters_Get(default_ctx, count);
+}
+
+static int get_adapter_desc(ADL_CONTEXT_HANDLE ctx, int adapter_index, DXGI_ADAPTER_DESC *desc)
 {
     IDXGIAdapter *adapter;
     HRESULT hr;
 
-    if (FAILED(IDXGIFactory_EnumAdapters(default_ctx->dxgi_factory, adapter_index, &adapter)))
+    if (FAILED(IDXGIFactory_EnumAdapters(ctx->dxgi_factory, adapter_index, &adapter)))
         return ADL_ERR;
 
     hr = IDXGIAdapter_GetDesc(adapter, desc);
@@ -299,17 +297,10 @@ static int convert_vendor_id(int id)
     return atoi(str);
 }
 
-int CDECL ADL_Adapter_AdapterInfo_Get(ADLAdapterInfo *adapters, int input_size)
+static int adapter_info_get(ADL_CONTEXT_HANDLE ctx, ADLAdapterInfo *adapters, int input_size)
 {
-    int count, i;
+    int i, count = input_size / sizeof(*adapters);
     DXGI_ADAPTER_DESC adapter_desc;
-
-    FIXME("adapters %p, input_size %d, stub!\n", adapters, input_size);
-
-    ADL_Adapter_NumberOfAdapters_Get(&count);
-
-    if (!adapters) return ADL_ERR_INVALID_PARAM;
-    if (input_size != count * sizeof(ADLAdapterInfo)) return ADL_ERR_INVALID_PARAM;
 
     memset(adapters, 0, input_size);
 
@@ -318,13 +309,36 @@ int CDECL ADL_Adapter_AdapterInfo_Get(ADLAdapterInfo *adapters, int input_size)
         adapters[i].iSize = sizeof(ADLAdapterInfo);
         adapters[i].iAdapterIndex = i;
 
-        if (get_adapter_desc(i, &adapter_desc) != ADL_OK)
+        if (get_adapter_desc(ctx, i, &adapter_desc) != ADL_OK)
             return ADL_ERR;
 
         adapters[i].iVendorID = convert_vendor_id(adapter_desc.VendorId);
     }
-
     return ADL_OK;
+}
+
+int CDECL ADL_Adapter_AdapterInfo_Get(ADLAdapterInfo *adapters, int input_size)
+{
+    int count;
+
+    FIXME("adapters %p, input_size %d, stub!\n", adapters, input_size);
+
+    ADL_Adapter_NumberOfAdapters_Get(&count);
+
+    if (!adapters) return ADL_ERR_INVALID_PARAM;
+    if (input_size != count * sizeof(ADLAdapterInfo)) return ADL_ERR_INVALID_PARAM;
+
+    return adapter_info_get(default_ctx, adapters, input_size);
+}
+
+int CDECL ADL2_Adapter_AdapterInfoX2_Get(ADL_CONTEXT_HANDLE ctx, ADLAdapterInfo **info)
+{
+    int count;
+
+    TRACE("ctx %p, info %p.\n", ctx, info);
+    ADL2_Adapter_NumberOfAdapters_Get(ctx, &count);
+    *info = ctx->malloc( count * sizeof(**info) );
+    return adapter_info_get(ctx, *info, count * sizeof(**info));
 }
 
 int CDECL ADL_Display_DisplayInfo_Get(int adapter_index, int *num_displays, ADLDisplayInfo **info, int force_detect)
@@ -387,7 +401,7 @@ int CDECL ADL_Adapter_ASICFamilyType_Get(int adapter_index, int *asic_type, int 
     if (asic_type == NULL || valids == NULL)
         return  ADL_ERR_NULL_POINTER;
 
-    if (get_adapter_desc(adapter_index, &adapter_desc) != ADL_OK)
+    if (get_adapter_desc(default_ctx, adapter_index, &adapter_desc) != ADL_OK)
         return ADL_ERR_INVALID_ADL_IDX;
 
     if (adapter_desc.VendorId != VENDOR_AMD)
@@ -444,7 +458,7 @@ int CDECL ADL_Adapter_ObservedClockInfo_Get(int adapter_index, int *core_clock, 
     FIXME("adapter %d, core_clock %p, memory_clock %p, stub!\n", adapter_index, core_clock, memory_clock);
 
     if (core_clock == NULL || memory_clock == NULL) return ADL_ERR;
-    if (get_adapter_desc(adapter_index, &adapter_desc) != ADL_OK) return ADL_ERR;
+    if (get_adapter_desc(default_ctx, adapter_index, &adapter_desc) != ADL_OK) return ADL_ERR;
     if (adapter_desc.VendorId != VENDOR_AMD) return ADL_ERR_INVALID_ADL_IDX;
 
     /* default values based on RX580 */
@@ -464,7 +478,7 @@ int CDECL ADL_Adapter_MemoryInfo_Get(int adapter_index, ADLMemoryInfo *mem_info)
     FIXME("adapter %d, mem_info %p stub!\n", adapter_index, mem_info);
 
     if (mem_info == NULL) return ADL_ERR_NULL_POINTER;
-    if (get_adapter_desc(adapter_index, &adapter_desc) != ADL_OK) return ADL_ERR_INVALID_ADL_IDX;
+    if (get_adapter_desc(default_ctx, adapter_index, &adapter_desc) != ADL_OK) return ADL_ERR_INVALID_ADL_IDX;
     if (adapter_desc.VendorId != VENDOR_AMD) return ADL_ERR;
 
     mem_info->iMemorySize = adapter_desc.DedicatedVideoMemory;
@@ -489,7 +503,7 @@ int CDECL ADL_Graphics_Platform_Get(int *platform)
 
     for (i = 0; i < count; i ++)
     {
-        if (get_adapter_desc(i, &adapter_desc) != ADL_OK)
+        if (get_adapter_desc(default_ctx, i, &adapter_desc) != ADL_OK)
             continue;
 
         if (adapter_desc.VendorId == VENDOR_AMD)
