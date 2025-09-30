@@ -1434,15 +1434,16 @@ static void window_set_net_wm_state( struct x11drv_win_data *data, UINT new_stat
 static void window_set_config( struct x11drv_win_data *data, RECT rect, BOOL above )
 {
     static const UINT fullscreen_mask = (1 << NET_WM_STATE_MAXIMIZED) | (1 << NET_WM_STATE_FULLSCREEN);
-    UINT style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE ), mask = 0, net_wm_state = -1;
+    UINT effective_net_wm_state, mask = 0, net_wm_state = -1;
     const RECT *old_rect = &data->pending_state.rect;
     BOOL old_above = data->pending_state.above;
     XWindowChanges changes;
     RECT *new_rect = &rect;
     BOOL is_maximized;
 
+    effective_net_wm_state = data->net_wm_state_serial ? data->pending_state.net_wm_state : data->current_state.net_wm_state;
     /* resizing a managed maximized window is not allowed */
-    if ((style & WS_MAXIMIZE) && data->managed)
+    if ((effective_net_wm_state & (1 << NET_WM_STATE_MAXIMIZED)) && data->managed)
     {
         new_rect->right = new_rect->left + old_rect->right - old_rect->left;
         new_rect->bottom = new_rect->top + old_rect->bottom - old_rect->top;
@@ -1473,7 +1474,7 @@ static void window_set_config( struct x11drv_win_data *data, RECT rect, BOOL abo
      * the Mutter generated sequence, while achieving the same thing and getting WM_TAKE_FOCUS event when the
      * window is mapped again.
      */
-    is_maximized = (data->net_wm_state_serial ? data->pending_state.net_wm_state : data->current_state.net_wm_state) & fullscreen_mask;
+    is_maximized = effective_net_wm_state & fullscreen_mask;
     if (X11DRV_HasWindowManager( "KWin" ) && data->managed && data->pending_state.wm_state == NormalState && is_maximized)
     {
         if (data->wm_state_serial) return; /* another WM_STATE update is pending, wait for it to complete */
