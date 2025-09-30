@@ -1,6 +1,6 @@
 EXTRADEFS = -DWINE_NO_LONG_TYPES
 MODULE = atiadlxx.dll
-IMPORTS = dxgi
+IMPORTS = user32 dxgi cfgmgr32
 
 EXTRADLLFLAGS = -mno-cygwin -Wb,--prefer-native
 
