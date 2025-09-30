@@ -2173,6 +2173,16 @@ static LRESULT handle_internal_message( HWND hwnd, UINT msg, WPARAM wparam, LPAR
         return get_scroll_bar_info( hwnd, (LONG)wparam, (SCROLLBARINFO *)lparam );
     case WM_WINE_GETSCROLLINFO:
         return get_scroll_info( hwnd, (int)wparam, (SCROLLINFO *)lparam );
+    case WM_WINE_TRACKMOUSEEVENT:
+    {
+        TRACKMOUSEEVENT info;
+
+        info.cbSize = sizeof(info);
+        info.hwndTrack = hwnd;
+        info.dwFlags = wparam;
+        info.dwHoverTime = lparam;
+        return NtUserTrackMouseEvent( &info );
+    }
     default:
         if (msg >= WM_WINE_FIRST_DRIVER_MSG && msg <= WM_WINE_LAST_DRIVER_MSG)
             return user_driver->pWindowMessage( hwnd, msg, wparam, lparam );
