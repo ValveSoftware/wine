@@ -1484,9 +1484,6 @@ static void window_set_config( struct x11drv_win_data *data, RECT rect, BOOL abo
         window_set_net_wm_state( data, net_wm_state & ~fullscreen_mask );
     }
 
-    /* Gamescope has broken _NET_WM_STATE_FULLSCREEN / _NET_WM_STATE_MAXIMIZED support, always allow resizing instead */
-    if (X11DRV_HasWindowManager( "steamcompmgr" )) style &= ~WS_MAXIMIZE;
-
     if (old_rect->right - old_rect->left != new_rect->right - new_rect->left ||
         old_rect->bottom - old_rect->top != new_rect->bottom - new_rect->top)
     {
