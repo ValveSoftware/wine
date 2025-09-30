@@ -184,13 +184,13 @@ static const ADLVersionsInfoX2 version2 = {
     "http://support.amd.com/drivers/xml/driver_09_us.xml",
 };
 
-int WINAPI ADL2_Main_Control_Create(ADL_MAIN_MALLOC_CALLBACK cb, int arg, ADL_CONTEXT_HANDLE *ptr)
+int CDECL ADL2_Main_Control_Create(ADL_MAIN_MALLOC_CALLBACK cb, int arg, ADL_CONTEXT_HANDLE *ptr)
 {
     FIXME("cb %p, arg %d, ptr %p stub!\n", cb, arg, ptr);
     return ADL_OK;
 }
 
-int WINAPI ADL_Main_Control_Create(ADL_MAIN_MALLOC_CALLBACK cb, int arg)
+int CDECL ADL_Main_Control_Create(ADL_MAIN_MALLOC_CALLBACK cb, int arg)
 {
     FIXME("cb %p, arg %d stub!\n", cb, arg);
     adl_malloc = cb;
@@ -202,7 +202,7 @@ int WINAPI ADL_Main_Control_Create(ADL_MAIN_MALLOC_CALLBACK cb, int arg)
         return ADL_ERR;
 }
 
-int WINAPI ADL_Main_Control_Destroy(void)
+int CDECL ADL_Main_Control_Destroy(void)
 {
     FIXME("stub!\n");
 
@@ -212,7 +212,7 @@ int WINAPI ADL_Main_Control_Destroy(void)
     return ADL_OK;
 }
 
-int WINAPI ADL2_Adapter_NumberOfAdapters_Get(ADL_CONTEXT_HANDLE *ptr, int *count)
+int CDECL ADL2_Adapter_NumberOfAdapters_Get(ADL_CONTEXT_HANDLE *ptr, int *count)
 {
     FIXME("ptr %p, count %p stub!\n", ptr, count);
 
@@ -221,21 +221,21 @@ int WINAPI ADL2_Adapter_NumberOfAdapters_Get(ADL_CONTEXT_HANDLE *ptr, int *count
     return ADL_OK;
 }
 
-int WINAPI ADL2_Graphics_VersionsX2_Get(ADL_CONTEXT_HANDLE *ptr, ADLVersionsInfoX2 *ver)
+int CDECL ADL2_Graphics_VersionsX2_Get(ADL_CONTEXT_HANDLE *ptr, ADLVersionsInfoX2 *ver)
 {
     FIXME("ptr %p, ver %p stub!\n", ptr, ver);
     memcpy(ver, &version2, sizeof(version2));
     return ADL_OK;
 }
 
-int WINAPI ADL_Graphics_Versions_Get(ADLVersionsInfo *ver)
+int CDECL ADL_Graphics_Versions_Get(ADLVersionsInfo *ver)
 {
     FIXME("ver %p stub!\n", ver);
     memcpy(ver, &version, sizeof(version));
     return ADL_OK;
 }
 
-int WINAPI ADL_Adapter_NumberOfAdapters_Get(int *count)
+int CDECL ADL_Adapter_NumberOfAdapters_Get(int *count)
 {
     IDXGIAdapter *adapter;
 
@@ -275,7 +275,7 @@ static int convert_vendor_id(int id)
     return atoi(str);
 }
 
-int WINAPI ADL_Adapter_AdapterInfo_Get(ADLAdapterInfo *adapters, int input_size)
+int CDECL ADL_Adapter_AdapterInfo_Get(ADLAdapterInfo *adapters, int input_size)
 {
     int count, i;
     DXGI_ADAPTER_DESC adapter_desc;
@@ -303,7 +303,7 @@ int WINAPI ADL_Adapter_AdapterInfo_Get(ADLAdapterInfo *adapters, int input_size)
     return ADL_OK;
 }
 
-int WINAPI ADL_Display_DisplayInfo_Get(int adapter_index, int *num_displays, ADLDisplayInfo **info, int force_detect)
+int CDECL ADL_Display_DisplayInfo_Get(int adapter_index, int *num_displays, ADLDisplayInfo **info, int force_detect)
 {
     IDXGIAdapter *adapter;
     IDXGIOutput *output;
@@ -342,19 +342,19 @@ int WINAPI ADL_Display_DisplayInfo_Get(int adapter_index, int *num_displays, ADL
     return ADL_OK;
 }
 
-int WINAPI ADL_Adapter_Crossfire_Caps(int adapter_index, int *preffered, int *num_comb, ADLCrossfireComb** comb)
+int CDECL ADL_Adapter_Crossfire_Caps(int adapter_index, int *preffered, int *num_comb, ADLCrossfireComb** comb)
 {
     FIXME("adapter %d, preffered %p, num_comb %p, comb %p stub!\n", adapter_index, preffered, num_comb, comb);
     return ADL_ERR;
 }
 
-int WINAPI ADL_Adapter_Crossfire_Get(int adapter_index, ADLCrossfireComb *comb, ADLCrossfireInfo *info)
+int CDECL ADL_Adapter_Crossfire_Get(int adapter_index, ADLCrossfireComb *comb, ADLCrossfireInfo *info)
 {
     FIXME("adapter %d, comb %p, info %p, stub!\n", adapter_index, comb, info);
     return ADL_ERR;
 }
 
-int WINAPI ADL_Adapter_ASICFamilyType_Get(int adapter_index, int *asic_type, int *valids)
+int CDECL ADL_Adapter_ASICFamilyType_Get(int adapter_index, int *asic_type, int *valids)
 {
     DXGI_ADAPTER_DESC adapter_desc;
 
@@ -413,7 +413,7 @@ static int get_max_clock(const char *clock, int default_value)
 
 /* documented in the "Linux Specific APIs" section, present and used on Windows */
 /* the name and documentation suggests that this returns current freqs, but it's actually max */
-int WINAPI ADL_Adapter_ObservedClockInfo_Get(int adapter_index, int *core_clock, int *memory_clock)
+int CDECL ADL_Adapter_ObservedClockInfo_Get(int adapter_index, int *core_clock, int *memory_clock)
 {
     DXGI_ADAPTER_DESC adapter_desc;
 
@@ -433,7 +433,7 @@ int WINAPI ADL_Adapter_ObservedClockInfo_Get(int adapter_index, int *core_clock,
 }
 
 /* documented in the "Linux Specific APIs" section, present and used on Windows */
-int WINAPI ADL_Adapter_MemoryInfo_Get(int adapter_index, ADLMemoryInfo *mem_info)
+int CDECL ADL_Adapter_MemoryInfo_Get(int adapter_index, ADLMemoryInfo *mem_info)
 {
     DXGI_ADAPTER_DESC adapter_desc;
 
@@ -452,7 +452,7 @@ int WINAPI ADL_Adapter_MemoryInfo_Get(int adapter_index, ADLMemoryInfo *mem_info
     return ADL_OK;
 }
 
-int WINAPI ADL_Graphics_Platform_Get(int *platform)
+int CDECL ADL_Graphics_Platform_Get(int *platform)
 {
     DXGI_ADAPTER_DESC adapter_desc;
     int count, i;
@@ -481,7 +481,7 @@ int WINAPI ADL_Graphics_Platform_Get(int *platform)
 }
 
 
-int WINAPI ADL_Display_DisplayMapConfig_Get(int adapter_index, int *display_map_count, ADLDisplayMap **display_maps,
+int CDECL ADL_Display_DisplayMapConfig_Get(int adapter_index, int *display_map_count, ADLDisplayMap **display_maps,
         int *display_target_count, ADLDisplayTarget **display_targets, int options)
 {
     FIXME("adapter_index %d, display_map_count %p, display_maps %p, "
