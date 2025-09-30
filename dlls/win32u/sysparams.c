@@ -7176,6 +7176,7 @@ static void thread_detach(void)
     cleanup_imm_thread();
     NtClose( thread_info->server_queue );
     free( thread_info->session_data );
+    free( thread_info->mouse_tracking_info );
 
     exiting_thread_id = 0;
 }
