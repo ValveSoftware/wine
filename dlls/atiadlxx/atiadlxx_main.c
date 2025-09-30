@@ -23,6 +23,7 @@
 #define ADL_ERR_INVALID_ADL_IDX          -5
 #define ADL_ERR_NOT_SUPPORTED            -8
 #define ADL_ERR_NULL_POINTER             -9
+#define ADL_ERR_INVALID_CALLBACK         -11
 
 #define ADL_DISPLAY_DISPLAYINFO_DISPLAYCONNECTED            0x00000001
 #define ADL_DISPLAY_DISPLAYINFO_DISPLAYMAPPED               0x00000002
@@ -38,8 +39,6 @@ enum ADLPlatForm
 };
 #define GRAPHICS_PLATFORM_UNKNOWN -1
 
-
-static IDXGIFactory *dxgi_factory;
 
 WINE_DEFAULT_DEBUG_CHANNEL(atiadlxx);
 
@@ -58,9 +57,15 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 }
 
 typedef void *(CALLBACK *ADL_MAIN_MALLOC_CALLBACK)(int);
-typedef void *ADL_CONTEXT_HANDLE;
+typedef struct adl_context
+{
+    ADL_MAIN_MALLOC_CALLBACK malloc;
+    IDXGIFactory *dxgi_factory;
+}
+*ADL_CONTEXT_HANDLE;
 
-ADL_MAIN_MALLOC_CALLBACK adl_malloc;
+static ADL_CONTEXT_HANDLE default_ctx;
+
 #define ADL_MAX_PATH 256
 
 typedef struct ADLVersionsInfo
@@ -184,32 +189,51 @@ static const ADLVersionsInfoX2 version2 = {
     "http://support.amd.com/drivers/xml/driver_09_us.xml",
 };
 
+int CDECL ADL2_Main_Control_Destroy(ADL_CONTEXT_HANDLE context)
+{
+    TRACE("context %p stub.\n", context);
+
+    if (!context) return ADL_ERR;
+    if (context->dxgi_factory)
+        IUnknown_Release(context->dxgi_factory);
+    if (context == default_ctx) default_ctx = NULL;
+    free(context);
+    return ADL_OK;
+}
+
 int CDECL ADL2_Main_Control_Create(ADL_MAIN_MALLOC_CALLBACK cb, int arg, ADL_CONTEXT_HANDLE *ptr)
 {
-    FIXME("cb %p, arg %d, ptr %p stub!\n", cb, arg, ptr);
+    ADL_CONTEXT_HANDLE ctx;
+
+    TRACE("cb %p, arg %d, ptr %p.\n", cb, arg, ptr);
+
+    ctx = calloc( 1, sizeof(**ptr));
+    if (FAILED(CreateDXGIFactory(&IID_IDXGIFactory, (void**)&ctx->dxgi_factory)))
+    {
+        free(ctx);
+        return ADL_ERR;
+    }
+
+    ctx->malloc = cb;
+    if (default_ctx) ADL2_Main_Control_Destroy(default_ctx);
+    default_ctx = ctx;
+    *ptr = ctx;
+    TRACE("-> %p.\n", *ptr);
     return ADL_OK;
 }
 
 int CDECL ADL_Main_Control_Create(ADL_MAIN_MALLOC_CALLBACK cb, int arg)
 {
-    FIXME("cb %p, arg %d stub!\n", cb, arg);
-    adl_malloc = cb;
+    TRACE("cb %p, arg %d stub!\n", cb, arg);
 
-
-    if (SUCCEEDED(CreateDXGIFactory(&IID_IDXGIFactory, (void**) &dxgi_factory)))
-        return ADL_OK;
-    else
-        return ADL_ERR;
+    return ADL2_Main_Control_Create(cb, arg, &default_ctx);
 }
 
 int CDECL ADL_Main_Control_Destroy(void)
 {
-    FIXME("stub!\n");
+    TRACE(".\n");
 
-    if (dxgi_factory != NULL)
-        IUnknown_Release(dxgi_factory);
-
-    return ADL_OK;
+    return ADL2_Main_Control_Destroy(default_ctx);
 }
 
 int CDECL ADL2_Adapter_NumberOfAdapters_Get(ADL_CONTEXT_HANDLE *ptr, int *count)
@@ -242,7 +266,7 @@ int CDECL ADL_Adapter_NumberOfAdapters_Get(int *count)
     FIXME("count %p stub!\n", count);
 
     *count = 0;
-    while (SUCCEEDED(IDXGIFactory_EnumAdapters(dxgi_factory, *count, &adapter)))
+    while (SUCCEEDED(IDXGIFactory_EnumAdapters(default_ctx->dxgi_factory, *count, &adapter)))
     {
         (*count)++;
         IUnknown_Release(adapter);
@@ -257,7 +281,7 @@ static int get_adapter_desc(int adapter_index, DXGI_ADAPTER_DESC *desc)
     IDXGIAdapter *adapter;
     HRESULT hr;
 
-    if (FAILED(IDXGIFactory_EnumAdapters(dxgi_factory, adapter_index, &adapter)))
+    if (FAILED(IDXGIFactory_EnumAdapters(default_ctx->dxgi_factory, adapter_index, &adapter)))
         return ADL_ERR;
 
     hr = IDXGIAdapter_GetDesc(adapter, desc);
@@ -313,7 +337,7 @@ int CDECL ADL_Display_DisplayInfo_Get(int adapter_index, int *num_displays, ADLD
 
     if (info == NULL || num_displays == NULL) return ADL_ERR_NULL_POINTER;
 
-    if (FAILED(IDXGIFactory_EnumAdapters(dxgi_factory, adapter_index, &adapter)))
+    if (FAILED(IDXGIFactory_EnumAdapters(default_ctx->dxgi_factory, adapter_index, &adapter)))
         return ADL_ERR_INVALID_PARAM;
 
     *num_displays = 0;
@@ -329,7 +353,7 @@ int CDECL ADL_Display_DisplayInfo_Get(int adapter_index, int *num_displays, ADLD
     if (*num_displays == 0)
         return ADL_OK;
 
-    *info = adl_malloc(*num_displays * sizeof(**info));
+    *info = default_ctx->malloc(*num_displays * sizeof(**info));
     memset(*info, 0, *num_displays * sizeof(**info));
 
     for (i = 0; i < *num_displays; i++)
