@@ -452,7 +452,7 @@
 @ stub ADL2_MMD_Video_Caps
 @ stub ADL2_Main_ControlX2_Create
 @ cdecl ADL2_Main_Control_Create(ptr long ptr)
-@ stub ADL2_Main_Control_Destroy
+@ cdecl ADL2_Main_Control_Destroy(ptr)
 @ stub ADL2_Main_Control_GetProcAddress
 @ stub ADL2_Main_Control_IsFunctionValid
 @ stub ADL2_Main_Control_Refresh
