@@ -17,7 +17,7 @@
 @ stub ADL2_Adapter_Active_Get
 @ stub ADL2_Adapter_Active_Set
 @ stub ADL2_Adapter_Active_SetPrefer
-@ stub ADL2_Adapter_AdapterInfoX2_Get
+@ cdecl ADL2_Adapter_AdapterInfoX2_Get(ptr ptr)
 @ stub ADL2_Adapter_AdapterInfoX3_Get
 @ stub ADL2_Adapter_AdapterInfoX4_Get
 @ stub ADL2_Adapter_AdapterInfo_Get
