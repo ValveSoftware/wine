@@ -1656,10 +1656,6 @@ __ASM_GLOBAL_FUNC( call_user_mode_callback,
                    "movq %rax,0x300(%rsp,%rsi)\n\t"
                    "movl 0xb0(%r10),%r14d\n\t" /* prev_frame->syscall_flags */
                    "movl %r14d,0xb0(%rsp)\n\t" /* frame->syscall_flags */
-                   "movq 0x78(%r10),%rax\n\t"  /* prev_frame->cs */
-                   "movq %rax,0x78(%rsp)\n\t"  /* frame->cs */
-                   "movq 0x90(%r10),%rax\n\t"  /* prev_frame->ss */
-                   "movq %rax,0x90(%rsp)\n\t"  /* frame->ss */
                    "movq %r10,0xa0(%rsp)\n\t"  /* frame->prev_frame */
                    "movq %rsp,0x328(%r8)\n\t"  /* amd64_thread_data()->syscall_frame */
                    /* switch to user stack */
