@@ -10,7 +10,7 @@
 @ stub ADL2_AdapterLimitation_Caps
 @ stub ADL2_AdapterX2_Caps
 @ stub ADL2_Adapter_AMDAndNonAMDDIsplayClone_Get
-@ stub ADL2_Adapter_ASICFamilyType_Get
+@ cdecl ADL2_Adapter_ASICFamilyType_Get(ptr long ptr ptr)
 @ stub ADL2_Adapter_ASICInfo_Get
 @ stub ADL2_Adapter_Accessibility_Get
 @ stub ADL2_Adapter_AceDefaults_Restore
@@ -49,7 +49,7 @@
 @ stub ADL2_Adapter_CrossdisplayInfo_Get
 @ stub ADL2_Adapter_CrossdisplayInfo_Set
 @ stub ADL2_Adapter_CrossfireX2_Get
-@ stub ADL2_Adapter_Crossfire_Caps
+@ cdecl ADL2_Adapter_Crossfire_Caps(ptr long ptr ptr ptr)
 @ stub ADL2_Adapter_Crossfire_Get
 @ stub ADL2_Adapter_Crossfire_Set
 @ stub ADL2_Adapter_DefaultAudioChannelTable_Load
@@ -94,14 +94,14 @@
 @ stub ADL2_Adapter_MVPU_Set
 @ stub ADL2_Adapter_MaxCursorSize_Get
 @ stub ADL2_Adapter_MemoryInfo2_Get
-@ stub ADL2_Adapter_MemoryInfo_Get
+@ cdecl ADL2_Adapter_MemoryInfo_Get(ptr long ptr)
 @ stub ADL2_Adapter_MirabilisSupport_Get
 @ stub ADL2_Adapter_ModeSwitch
 @ stub ADL2_Adapter_ModeTimingOverride_Caps
 @ stub ADL2_Adapter_Modes_ReEnumerate
 @ stub ADL2_Adapter_NumberOfActivatableSources_Get
 @ cdecl ADL2_Adapter_NumberOfAdapters_Get(ptr ptr)
-@ stub ADL2_Adapter_ObservedClockInfo_Get
+@ cdecl ADL2_Adapter_ObservedClockInfo_Get(ptr long ptr ptr)
 @ stub ADL2_Adapter_PMLog_Start
 @ stub ADL2_Adapter_PMLog_Stop
 @ stub ADL2_Adapter_PMLog_Support_Get
@@ -257,7 +257,7 @@
 @ stub ADL2_Display_DisplayContent_Cap
 @ stub ADL2_Display_DisplayContent_Get
 @ stub ADL2_Display_DisplayContent_Set
-@ stub ADL2_Display_DisplayInfo_Get
+@ cdecl ADL2_Display_DisplayInfo_Get(ptr long ptr ptr long)
 @ stub ADL2_Display_DisplayMapConfigX2_Set
 @ stub ADL2_Display_DisplayMapConfig_Get
 @ stub ADL2_Display_DisplayMapConfig_PossibleAddAndRemove
@@ -431,7 +431,7 @@
 @ stub ADL2_Graphics_IsDetachableGraphicsPlatform_Get
 @ stub ADL2_Graphics_IsGfx9AndAbove
 @ stub ADL2_Graphics_MantleVersion_Get
-@ stub ADL2_Graphics_Platform_Get
+@ cdecl ADL2_Graphics_Platform_Get(ptr ptr)
 @ cdecl ADL2_Graphics_VersionsX2_Get(ptr ptr)
 @ stub ADL2_Graphics_Versions_Get
 @ stub ADL2_Graphics_VulkanVersion_Get
