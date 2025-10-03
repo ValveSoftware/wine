@@ -14,7 +14,7 @@
 @ stub ADL2_Adapter_ASICInfo_Get
 @ stub ADL2_Adapter_Accessibility_Get
 @ stub ADL2_Adapter_AceDefaults_Restore
-@ stub ADL2_Adapter_Active_Get
+@ cdecl ADL2_Adapter_Active_Get(ptr long ptr)
 @ stub ADL2_Adapter_Active_Set
 @ stub ADL2_Adapter_Active_SetPrefer
 @ cdecl ADL2_Adapter_AdapterInfoX2_Get(ptr ptr)
