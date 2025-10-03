@@ -511,8 +511,6 @@ struct syscall_frame
 
 C_ASSERT( sizeof(struct syscall_frame) == 0x280 );
 
-#define RESTORE_FLAGS_INVALID_FPSTATE 0x00008000
-
 struct x86_thread_data
 {
     UINT               fs;            /* 1d4 TEB selector */
@@ -1891,14 +1889,12 @@ static BOOL handle_syscall_trap( ucontext_t *sigcontext, siginfo_t *siginfo )
         extern void __wine_syscall_dispatcher_prolog_end(void);
 
         EIP_sig( sigcontext ) = (ULONG)__wine_syscall_dispatcher_prolog_end;
-        frame->restore_flags = LOWORD(CONTEXT_CONTROL);
     }
     else if ((void *)EIP_sig( sigcontext ) == __wine_unix_call_dispatcher)
     {
         extern void __wine_unix_call_dispatcher_prolog_end(void);
 
         EIP_sig( sigcontext ) = (ULONG)__wine_unix_call_dispatcher_prolog_end;
-        frame->restore_flags = LOWORD(CONTEXT_CONTROL | RESTORE_FLAGS_INVALID_FPSTATE);
     }
     else if (siginfo->si_code == 4 /* TRAP_HWBKPT */ && is_inside_syscall( sigcontext ))
     {
@@ -1911,6 +1907,7 @@ static BOOL handle_syscall_trap( ucontext_t *sigcontext, siginfo_t *siginfo )
 
     frame->eip = *(ULONG *)ESP_sig( sigcontext );
     frame->eflags = EFL_sig(sigcontext);
+    frame->restore_flags = LOWORD(CONTEXT_CONTROL);
 
     ECX_sig( sigcontext ) = (ULONG)frame;
     ESP_sig( sigcontext ) += sizeof(ULONG);
@@ -2173,20 +2170,6 @@ static void usr1_handler( int signal, siginfo_t *siginfo, void *sigcontext )
             return;
         }
         context->c.ContextFlags = CONTEXT_FULL | CONTEXT_EXCEPTION_REQUEST;
-        if (frame->restore_flags & RESTORE_FLAGS_INVALID_FPSTATE)
-        {
-            /* frame FP state is not fully filled, fill in the missing state from the current Unix side context. */
-            frame->restore_flags &= ~RESTORE_FLAGS_INVALID_FPSTATE;
-            memset( &frame->xstate, 0, sizeof(frame->xstate) );
-            if (xstate_compaction_enabled)
-                frame->xstate.CompactionMask = 0x8000000000000000 | xstate_supported_features_mask;
-            if (FPUX_sig(ucontext))
-            {
-                frame->u.xsave = *FPUX_sig(ucontext);
-                frame->xstate.Mask = XSTATE_MASK_LEGACY;
-            }
-            else if (FPU_sig(ucontext)) frame->u.fsave = *FPU_sig(ucontext);
-        }
         NtGetContextThread( GetCurrentThread(), &context->c );
         if (xstate_extended_features())
         {
@@ -2852,7 +2835,7 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher_return,
  */
 __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
                    "movl %fs:0x1f8,%ecx\n\t"   /* x86_thread_data()->syscall_frame */
-                   "movw $0x8000,0x02(%ecx)\n\t"   /* frame->restore_flags <- RESTORE_FLAGS_INVALID_FPSTATE */
+                   "movw $0,0x02(%ecx)\n\t"    /* frame->restore_flags */
                    "popl 0x08(%ecx)\n\t"       /* frame->eip */
                    __ASM_CFI(".cfi_adjust_cfa_offset -4\n\t")
                    "pushfl\n\t"
@@ -2894,7 +2877,7 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
                    __ASM_CFI(".cfi_offset %edi,-20\n\t")
                    "call *(%eax,%edx,4)\n\t"
                    "leal 16(%esp),%esp\n\t"
-                   "testw $0x7fff,2(%esp)\n\t" /* frame->restore_flags */
+                   "testw $0xffff,2(%esp)\n\t" /* frame->restore_flags */
                    "jnz " __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_return") "\n\t"
                    "movl 0x08(%esp),%ecx\n\t"  /* frame->eip */
                    /* switch to user stack */
