@@ -2838,10 +2838,6 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
                    "movw $0,0x02(%ecx)\n\t"    /* frame->restore_flags */
                    "popl 0x08(%ecx)\n\t"       /* frame->eip */
                    __ASM_CFI(".cfi_adjust_cfa_offset -4\n\t")
-                   "pushfl\n\t"
-                   __ASM_CFI(".cfi_adjust_cfa_offset 4\n\t")
-                   "popl 0x04(%ecx)\n\t"       /* frame->eflags */
-                   __ASM_CFI(".cfi_adjust_cfa_offset -4\n\t")
                    __ASM_CFI_REG_IS_AT1(eip, ecx, 0x08)
                    ".globl " __ASM_NAME("__wine_unix_call_dispatcher_prolog_end") "\n"
                    __ASM_NAME("__wine_unix_call_dispatcher_prolog_end") ":\n\t"

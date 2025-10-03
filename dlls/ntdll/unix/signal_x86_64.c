@@ -3397,10 +3397,6 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
 #endif
                    "popq 0x70(%rcx)\n\t"           /* frame->rip */
                    __ASM_CFI(".cfi_adjust_cfa_offset -8\n\t")
-                   "pushfq\n\t"
-                   __ASM_CFI(".cfi_adjust_cfa_offset 8\n\t")
-                   "popq 0x80(%rcx)\n\t"           /* frame->eflags */
-                   __ASM_CFI(".cfi_adjust_cfa_offset -8\n\t")
                    __ASM_CFI_REG_IS_AT2(rip, rcx, 0xf0,0x00)
                    "movl $0,0xb4(%rcx)\n\t"        /* frame->restore_flags */
                    __ASM_LOCAL_LABEL("__wine_unix_call_dispatcher_prolog_end") ":\n\t"
