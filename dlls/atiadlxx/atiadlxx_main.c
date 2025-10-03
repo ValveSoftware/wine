@@ -658,6 +658,15 @@ int CDECL ADL2_Adapter_AdapterInfoX2_Get(ADL_CONTEXT_HANDLE ctx, ADLAdapterInfo 
     return adapter_info_get(ctx, *info, ctx->adapter_count * sizeof(**info));
 }
 
+int CDECL ADL2_Adapter_Active_Get(ADL_CONTEXT_HANDLE ctx, int adapter_index, int *status)
+{
+    TRACE("ctx %p, adapter_index %d, status %p.\n", ctx, adapter_index, status);
+
+    if (adapter_index >= ctx->adapter_count) return ADL_ERR_INVALID_ADL_IDX;
+    *status = ctx->adapters[adapter_index].active;
+    return ADL_OK;
+}
+
 int CDECL ADL2_Display_DisplayInfo_Get(ADL_CONTEXT_HANDLE ctx, int adapter_index, int *num_displays, ADLDisplayInfo **info, int force_detect)
 {
     struct gpu *gpu;
