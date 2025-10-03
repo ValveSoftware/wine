@@ -196,6 +196,89 @@ typedef struct ADLDisplayMap
 
 #define ADL_MAX_DISPLAY_NAME 256
 
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_RGB656           0x00000001
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_RGB666           0x00000002
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_RGB888           0x00000004
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_RGB101010        0x00000008
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_RGB161616        0x00000010
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_RGB_RESERVED1    0x00000020
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_RGB_RESERVED2    0x00000040
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_RGB_RESERVED3    0x00000080
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_XRGB_BIAS101010  0x00000100
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_YCBCR444_8BPCC   0x00000200
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_YCBCR444_10BPCC  0x00000400
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_YCBCR444_12BPCC  0x00000800
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_YCBCR422_8BPCC   0x00001000
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_YCBCR422_10BPCC  0x00002000
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_YCBCR422_12BPCC  0x00004000
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_YCBCR420_8BPCC   0x00008000
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_YCBCR420_10BPCC  0x00010000
+#define ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_YCBCR420_12BPCC  0x00020000
+
+#define ADL_TF_sRGB           0x0001
+#define ADL_TF_BT709          0x0002
+#define ADL_TF_PQ2084         0x0004
+#define ADL_TF_PQ2084_INTERIM 0x0008
+#define ADL_TF_LINEAR_0_1     0x0010
+#define ADL_TF_LINEAR_0_125   0x0020
+#define ADL_TF_DOLBYVISION    0x0040
+#define ADL_TF_GAMMA_22       0x0080
+
+#define ADL_CS_sRGB           0x0001
+#define ADL_CS_BT601          0x0002
+#define ADL_CS_BT709          0x0004
+#define ADL_CS_BT2020         0x0008
+#define ADL_CS_ADOBE          0x0010
+#define ADL_CS_P3             0x0020
+#define ADL_CS_scRGB_MS_REF   0x0040
+#define ADL_CS_DISPLAY_NATIVE 0x0080
+#define ADL_CS_APP_CONTROL    0x0100
+#define ADL_CS_DOLBYVISION    0x0200
+
+typedef struct ADLDDCInfo2
+{
+    int ulSize;
+    int ulSupportsDDC;
+    int ulManufacturerID;
+    int ulProductID;
+    char cDisplayName[ADL_MAX_DISPLAY_NAME];
+    int ulMaxHResolution;
+    int ulMaxVResolution;
+    int ulMaxRefresh;
+    int ulPTMCx;
+    int ulPTMCy;
+    int ulPTMRefreshRate;
+    int ulDDCInfoFlag;
+    int bPackedPixelSupported;
+    int iPanelPixelFormat;
+    int ulSerialID;
+    int ulMinLuminanceData;
+    int ulAvgLuminanceData;
+    int ulMaxLuminanceData;
+    int iSupportedTransferFunction;
+    int iSupportedColorSpace;
+    int iNativeDisplayChromaticityRedX;
+    int iNativeDisplayChromaticityRedY;
+    int iNativeDisplayChromaticityGreenX;
+    int iNativeDisplayChromaticityGreenY;
+    int iNativeDisplayChromaticityBlueX;
+    int iNativeDisplayChromaticityBlueY;
+    int iNativeDisplayChromaticityWhitePointX;
+    int iNativeDisplayChromaticityWhitePointY;
+    int iDiffuseScreenReflectance;
+    int iSpecularScreenReflectance;
+    int iSupportedHDR;
+    int iFreesyncFlags;
+    int ulMinLuminanceNoDimmingData;
+    int ulMaxBacklightMaxLuminanceData;
+    int ulMinBacklightMaxLuminanceData;
+    int ulMaxBacklightMinLuminanceData;
+    int ulMinBacklightMinLuminanceData;
+    int ulScreenWidth;
+    int ulScreenHeight;
+    int iReserved[2];
+} ADLDDCInfo2;
+
 static const ADLVersionsInfo version = {
     "99.19.02-230831a-396538C-AMD-Software-Adrenalin-Edition",
     "",
@@ -705,6 +788,55 @@ int CDECL ADL_Display_DisplayInfo_Get(int adapter_index, int *num_displays, ADLD
     TRACE(".\n");
 
     return ADL2_Display_DisplayInfo_Get(default_ctx, adapter_index, num_displays, info, force_detect);
+}
+
+static int chroma_value_conv(float v)
+{
+    return lrintf(v * 10000);
+}
+
+int CDECL ADL2_Display_DDCInfo2_Get(ADL_CONTEXT_HANDLE ctx, int adapter_index, int display_index, ADLDDCInfo2 *info)
+{
+    DXGI_OUTPUT_DESC1 *desc;
+    struct monitor *display;
+    struct gpu *gpu;
+    FIXME("ctx %p, adapter_index %d, display_index %d, info %p semi-stub.\n", ctx, adapter_index,
+            display_index, info);
+    memset(info, 0, sizeof(*info));
+    info->ulSize = sizeof(*info);
+
+    if (adapter_index >= ctx->adapter_count) return ADL_ERR_INVALID_PARAM;
+    gpu = ctx->adapters[adapter_index].gpu;
+    if (display_index >= gpu->display_count) return ADL_OK;
+    display = &gpu->displays[display_index];
+
+    desc = &display->dxgi_output_desc;
+    info->ulSupportsDDC = 1;
+    strcpy(info->cDisplayName, display->display_name);
+    info->iSupportedHDR = (desc->ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020);
+    info->iPanelPixelFormat = ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_RGB888;
+    info->iSupportedTransferFunction = ADL_TF_sRGB | ADL_TF_LINEAR_0_1;
+    info->iSupportedColorSpace = ADL_CS_sRGB;
+    if (info->iSupportedHDR)
+    {
+        TRACE("HDR is supported.\n");
+        info->iPanelPixelFormat |= ADL_DISPLAY_DDCINFO_PIXEL_FORMAT_RGB101010;
+        info->iSupportedTransferFunction |= ADL_TF_PQ2084;
+        info->iSupportedColorSpace |= ADL_CS_BT2020;
+    }
+    info->iNativeDisplayChromaticityRedX = chroma_value_conv(desc->RedPrimary[0]);
+    info->iNativeDisplayChromaticityRedY = chroma_value_conv(desc->RedPrimary[1]);
+    info->iNativeDisplayChromaticityGreenX = chroma_value_conv(desc->GreenPrimary[0]);
+    info->iNativeDisplayChromaticityGreenY = chroma_value_conv(desc->GreenPrimary[1]);
+    info->iNativeDisplayChromaticityBlueX = chroma_value_conv(desc->BluePrimary[0]);
+    info->iNativeDisplayChromaticityBlueY = chroma_value_conv(desc->BluePrimary[1]);
+    info->iNativeDisplayChromaticityWhitePointX = chroma_value_conv(desc->WhitePoint[0]);
+    info->iNativeDisplayChromaticityWhitePointY = chroma_value_conv(desc->WhitePoint[1]);
+
+    info->ulMinLuminanceData = desc->MinLuminance;
+    info->ulMaxLuminanceData = desc->MaxLuminance;
+    info->ulAvgLuminanceData = desc->MaxFullFrameLuminance;
+    return ADL_OK;
 }
 
 int CDECL ADL_Adapter_Crossfire_Caps(int adapter_index, int *preffered, int *num_comb, ADLCrossfireComb** comb)
