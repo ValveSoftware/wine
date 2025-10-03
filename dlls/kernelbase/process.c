@@ -504,12 +504,11 @@ done:
     return ret;
 }
 
-/* Returns TRUE if the product name of the app matches the parameter */
-static BOOL product_name_matches(const WCHAR *app_name, const char *match)
+static char *get_product_name( const WCHAR *app_name )
 {
     WCHAR full_path[MAX_PATH];
+    char *product_name, *ret;
     DWORD *translation;
-    char *product_name;
     char buf[100];
     void *block;
     UINT size;
@@ -519,20 +518,20 @@ static BOOL product_name_matches(const WCHAR *app_name, const char *match)
 
     size = GetFileVersionInfoSizeExW(0, full_path, NULL);
     if (!size)
-        return FALSE;
+        return NULL;
 
     block = HeapAlloc( GetProcessHeap(), 0, size );
 
     if (!GetFileVersionInfoExW(0, full_path, 0, size, block))
     {
         HeapFree( GetProcessHeap(), 0, block );
-        return FALSE;
+        return NULL;
     }
 
     if (!VerQueryValueA(block, "\\VarFileInfo\\Translation", (void **) &translation, &size) || size != 4)
     {
         HeapFree( GetProcessHeap(), 0, block );
-        return FALSE;
+        return NULL;
     }
 
     sprintf(buf, "\\StringFileInfo\\%08lx\\ProductName", MAKELONG(HIWORD(*translation), LOWORD(*translation)));
@@ -540,21 +539,18 @@ static BOOL product_name_matches(const WCHAR *app_name, const char *match)
     if (!VerQueryValueA(block, buf, (void **) &product_name, &size))
     {
         HeapFree( GetProcessHeap(), 0, block );
-        return FALSE;
+        return NULL;
     }
 
-    if (strcmp(product_name, match))
-    {
-        HeapFree( GetProcessHeap(), 0, block);
-        return FALSE;
-    }
 
+    ret = HeapAlloc( GetProcessHeap(), 0, strlen( product_name ) + 1 );
+    strcpy( ret, product_name );
     HeapFree( GetProcessHeap(), 0, block );
-    return TRUE;
+    return ret;
 }
 
 static int battleye_launcher_redirect_hack( const WCHAR *app_name, WCHAR *new_name, DWORD new_name_len,
-                                            WCHAR **orig_app_name )
+                                            WCHAR **orig_app_name, const char *product_name )
 {
     static const WCHAR belauncherW[] = L"c:\\windows\\system32\\belauncher.exe";
     unsigned int len;
@@ -566,7 +562,7 @@ static int battleye_launcher_redirect_hack( const WCHAR *app_name, WCHAR *new_na
     }
 
     /* We detect the BattlEye launcher executable through the product name property, as the executable name varies */
-    if (!product_name_matches( app_name, "BattlEye Launcher" ))
+    if (!product_name || strcmp( product_name, "BattlEye Launcher" ))
         return 0;
 
     TRACE( "Detected launch of a BattlEye Launcher, redirecting to Proton version.\n" );
@@ -643,6 +639,37 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     return NULL;
 }
 
+static void sync_env_var_to_unix( WCHAR *env, const char *name )
+{
+    UNICODE_STRING us_name, us_value;
+    WCHAR valuew[256];
+    WCHAR namew[64];
+    char value[256];
+    NTSTATUS status;
+    int len;
+
+    MultiByteToWideChar( CP_ACP, 0, name, -1, namew, ARRAY_SIZE(namew) );
+    RtlInitUnicodeString( &us_name, namew );
+    us_value.Length = 0;
+    us_value.MaximumLength = sizeof(valuew) - sizeof(WCHAR);
+    us_value.Buffer = valuew;
+
+    status = RtlQueryEnvironmentVariable_U( env, &us_name, &us_value );
+    if (status && status != STATUS_VARIABLE_NOT_FOUND)
+    {
+        ERR( "status %#lx.\n", status );
+        return;
+    }
+    if (!status)
+    {
+        len = us_value.Length / sizeof(WCHAR);
+        valuew[len] = 0;
+        WideCharToMultiByte( CP_ACP, 0, valuew, len + 1, value, sizeof(value), NULL, NULL );
+        __wine_set_unix_env( name, value );
+        TRACE( "set %s to %s.\n", debugstr_a(name), debugstr_a(value) );
+    } else __wine_set_unix_env( name, NULL );
+}
+
 /**********************************************************************
  *           CreateProcessInternalW   (kernelbase.@)
  */
@@ -659,6 +686,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
     RTL_USER_PROCESS_PARAMETERS *params = NULL;
     RTL_USER_PROCESS_INFORMATION rtl_info;
     HANDLE parent = 0, debug = 0;
+    char *product_name = NULL;
     const WCHAR *append;
     ULONG nt_flags = 0;
     USHORT machine = 0;
@@ -666,7 +694,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
 
     /* Process the AppName and/or CmdLine to get module name and path */
 
-    TRACE( "app %s cmdline %s\n", debugstr_w(app_name), debugstr_w(cmd_line) );
+    TRACE( "app %s cmdline %s, inherit %d, flags %#lx, env %p (%s)\n", debugstr_w(app_name), debugstr_w(cmd_line), inherit, flags, env, debugstr_w(env) );
 
     if (new_token) FIXME( "No support for returning created process token\n" );
 
@@ -714,7 +742,8 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
         app_name = name;
     }
 
-    if (battleye_launcher_redirect_hack( app_name, name, ARRAY_SIZE(name), &orig_app_name ))
+    product_name = get_product_name( app_name );
+    if (battleye_launcher_redirect_hack( app_name, name, ARRAY_SIZE(name), &orig_app_name, product_name ))
         app_name = name;
 
     /* Warn if unsupported features are used */
@@ -754,9 +783,18 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
 
         RtlDestroyProcessParameters( params );
 
+        if (product_name && !strcmp( product_name, "Easy Anti-Cheat Bootstrapper (EOS)" ))
+        {
+            /* EOS EAC bootstrapper will start the game process directly without using WINAPI, so env vars set on the
+             * PE side will be lost. Preserve some critical ones. */
+            sync_env_var_to_unix( new_env, "UPLAY_ARGUMENTS" );
+            sync_env_var_to_unix( new_env, "UPC_GAME_STARTER_RUNNING" );
+        }
+
         RtlInitUnicodeString( &name, L"PROTON_EAC_LAUNCHER_PROCESS" );
         RtlInitUnicodeString( &value, L"1" );
-        RtlSetEnvironmentVariable( &new_env, &name, product_name_matches(app_name, "EasyAntiCheat Launcher") ? &value : NULL );
+        RtlSetEnvironmentVariable( &new_env, &name,
+                                   product_name && !strcmp( product_name, "EasyAntiCheat Launcher" ) ? &value : NULL );
 
         if (orig_app_name)
         {
@@ -884,6 +922,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
  done:
     RtlDestroyProcessParameters( params );
     if (tidy_cmdline != cmd_line) HeapFree( GetProcessHeap(), 0, tidy_cmdline );
+    HeapFree( GetProcessHeap(), 0, product_name );
     return set_ntstatus( status );
 }
 
