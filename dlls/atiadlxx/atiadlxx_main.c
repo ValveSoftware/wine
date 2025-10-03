@@ -809,6 +809,20 @@ int CDECL ADL_Adapter_ObservedClockInfo_Get(int adapter_index, int *core_clock, 
     return ADL2_Adapter_ObservedClockInfo_Get(default_ctx, adapter_index, core_clock, memory_clock);
 }
 
+
+int CDECL ADL2_Adapter_Graphic_Core_Info_Get(ADL_CONTEXT_HANDLE context, int adapter_index, ADLGraphicCoreInfo *info)
+{
+    FIXME("context %p, adapter_index %d, info %p stub.\n", context, adapter_index, info);
+
+    memset(info, 0, sizeof(*info));
+    info->iNumPEsPerCU = 1000;
+    info->iNumCUs = 1000;
+    info->iGCGen = 100;
+    info->iNumROPs = 10000;
+    info->iNumSIMDs = 10000;
+    return ADL_OK;
+}
+
 /* documented in the "Linux Specific APIs" section, present and used on Windows */
 int CDECL ADL2_Adapter_MemoryInfo_Get(ADL_CONTEXT_HANDLE ctx, int adapter_index, ADLMemoryInfo *mem_info)
 {

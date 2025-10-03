@@ -82,7 +82,7 @@
 @ stub ADL2_Adapter_FrameMetrics_Stop
 @ stub ADL2_Adapter_Gamma_Get
 @ stub ADL2_Adapter_Gamma_Set
-@ stub ADL2_Adapter_Graphic_Core_Info_Get
+@ cdecl ADL2_Adapter_Graphic_Core_Info_Get(ptr long ptr)
 @ stub ADL2_Adapter_HBC_Caps
 @ stub ADL2_Adapter_HBM_ECC_UC_Check
 @ stub ADL2_Adapter_Headless_Get
