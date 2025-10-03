@@ -2183,18 +2183,9 @@ static void usr1_handler( int signal, siginfo_t *siginfo, void *sigcontext )
             if (FPUX_sig(ucontext))
             {
                 frame->u.xsave = *FPUX_sig(ucontext);
-                /* Clear register stack. */
-                frame->u.xsave.TagWord = 0;
-                frame->u.xsave.StatusWord = 0;
                 frame->xstate.Mask = XSTATE_MASK_LEGACY;
             }
-            else if (FPU_sig(ucontext))
-            {
-                frame->u.fsave = *FPU_sig(ucontext);
-                /* Clear register stack. */
-                frame->u.fsave.TagWord = 0xffffffff;
-                frame->u.fsave.StatusWord = 0xffff0000;
-            }
+            else if (FPU_sig(ucontext)) frame->u.fsave = *FPU_sig(ucontext);
         }
         NtGetContextThread( GetCurrentThread(), &context->c );
         if (xstate_extended_features())
