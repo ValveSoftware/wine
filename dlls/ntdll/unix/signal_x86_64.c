@@ -407,7 +407,6 @@ C_ASSERT( sizeof(struct callback_stack_layout) == 0x58 );
 static unsigned int syscall_flags;
 
 #define RESTORE_FLAGS_INSTRUMENTATION CONTEXT_i386
-#define RESTORE_FLAGS_INVALID_FPSTATE CONTEXT_ARM
 
 struct syscall_frame
 {
@@ -2286,7 +2285,6 @@ static BOOL handle_syscall_trap( ucontext_t *sigcontext, siginfo_t *siginfo )
         extern const void *__wine_syscall_dispatcher_prolog_end_ptr;
 
         RIP_sig( sigcontext ) = (ULONG64)__wine_syscall_dispatcher_prolog_end_ptr;
-        frame->restore_flags = CONTEXT_CONTROL;
     }
     else if ((void *)RIP_sig( sigcontext ) == __wine_unix_call_dispatcher)
     {
@@ -2294,7 +2292,6 @@ static BOOL handle_syscall_trap( ucontext_t *sigcontext, siginfo_t *siginfo )
 
         RIP_sig( sigcontext ) = (ULONG64)__wine_unix_call_dispatcher_prolog_end_ptr;
         R10_sig( sigcontext ) = RCX_sig( sigcontext );
-        frame->restore_flags = CONTEXT_CONTROL | RESTORE_FLAGS_INVALID_FPSTATE;
     }
     else if (siginfo->si_code == 4 /* TRAP_HWBKPT */ && is_inside_syscall( sigcontext ))
     {
@@ -2308,6 +2305,7 @@ static BOOL handle_syscall_trap( ucontext_t *sigcontext, siginfo_t *siginfo )
 
     frame->rip = *(ULONG64 *)RSP_sig( sigcontext );
     frame->eflags = EFL_sig(sigcontext);
+    frame->restore_flags = CONTEXT_CONTROL;
     if (instrumentation_callback) frame->restore_flags |= RESTORE_FLAGS_INSTRUMENTATION;
 
     RCX_sig( sigcontext ) = (ULONG64)frame;
@@ -2567,23 +2565,6 @@ static void usr1_handler( int signal, siginfo_t *siginfo, void *sigcontext )
             return;
         }
         context->c.ContextFlags = CONTEXT_FULL | CONTEXT_SEGMENTS | CONTEXT_EXCEPTION_REQUEST;
-        if (frame->restore_flags & RESTORE_FLAGS_INVALID_FPSTATE)
-        {
-            /* frame FP state is not fully filled, fill in the missing state from the current Unix side context. */
-            frame->restore_flags &= ~RESTORE_FLAGS_INVALID_FPSTATE;
-            memset( &frame->xstate, 0, sizeof(frame->xstate) );
-            if (xstate_compaction_enabled)
-                frame->xstate.CompactionMask = 0x8000000000000000 | xstate_supported_features_mask;
-            if (FPU_sig(ucontext))
-            {
-                XSAVE_FORMAT xsave;
-
-                xsave = *FPU_sig(ucontext);
-                memcpy( &xsave.XmmRegisters[6], &frame->xsave.XmmRegisters[6], 10 * sizeof(*xsave.XmmRegisters) );
-                frame->xsave = xsave;
-                frame->xstate.Mask = XSTATE_MASK_LEGACY;
-            }
-        }
         NtGetContextThread( GetCurrentThread(), &context->c );
         if (xstate_extended_features())
         {
@@ -3421,7 +3402,7 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
                    "popq 0x80(%rcx)\n\t"           /* frame->eflags */
                    __ASM_CFI(".cfi_adjust_cfa_offset -8\n\t")
                    __ASM_CFI_REG_IS_AT2(rip, rcx, 0xf0,0x00)
-                   "movl $0x200000,0xb4(%rcx)\n\t" /* frame->restore_flags <- RESTORE_FLAGS_INVALID_FPSTATE */
+                   "movl $0,0xb4(%rcx)\n\t"        /* frame->restore_flags */
                    __ASM_LOCAL_LABEL("__wine_unix_call_dispatcher_prolog_end") ":\n\t"
                    "movq %rbx,0x08(%rcx)\n\t"
                    __ASM_CFI_REG_IS_AT1(rbx, rcx, 0x08)
