@@ -249,7 +249,7 @@
 @ stub ADL2_Display_DCE_Get
 @ stub ADL2_Display_DCE_Set
 @ stub ADL2_Display_DDCBlockAccess_Get
-@ stub ADL2_Display_DDCInfo2_Get
+@ cdecl ADL2_Display_DDCInfo2_Get(ptr long long ptr)
 @ stub ADL2_Display_DDCInfo_Get
 @ stub ADL2_Display_Deflicker_Get
 @ stub ADL2_Display_Deflicker_Set
