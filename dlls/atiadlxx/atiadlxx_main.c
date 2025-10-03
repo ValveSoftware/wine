@@ -341,7 +341,7 @@ int CDECL ADL2_Adapter_AdapterInfoX2_Get(ADL_CONTEXT_HANDLE ctx, ADLAdapterInfo 
     return adapter_info_get(ctx, *info, count * sizeof(**info));
 }
 
-int CDECL ADL_Display_DisplayInfo_Get(int adapter_index, int *num_displays, ADLDisplayInfo **info, int force_detect)
+int CDECL ADL2_Display_DisplayInfo_Get(ADL_CONTEXT_HANDLE ctx, int adapter_index, int *num_displays, ADLDisplayInfo **info, int force_detect)
 {
     IDXGIAdapter *adapter;
     IDXGIOutput *output;
@@ -351,7 +351,7 @@ int CDECL ADL_Display_DisplayInfo_Get(int adapter_index, int *num_displays, ADLD
 
     if (info == NULL || num_displays == NULL) return ADL_ERR_NULL_POINTER;
 
-    if (FAILED(IDXGIFactory_EnumAdapters(default_ctx->dxgi_factory, adapter_index, &adapter)))
+    if (FAILED(IDXGIFactory_EnumAdapters(ctx->dxgi_factory, adapter_index, &adapter)))
         return ADL_ERR_INVALID_PARAM;
 
     *num_displays = 0;
@@ -367,7 +367,7 @@ int CDECL ADL_Display_DisplayInfo_Get(int adapter_index, int *num_displays, ADLD
     if (*num_displays == 0)
         return ADL_OK;
 
-    *info = default_ctx->malloc(*num_displays * sizeof(**info));
+    *info = ctx->malloc(*num_displays * sizeof(**info));
     memset(*info, 0, *num_displays * sizeof(**info));
 
     for (i = 0; i < *num_displays; i++)
@@ -380,9 +380,22 @@ int CDECL ADL_Display_DisplayInfo_Get(int adapter_index, int *num_displays, ADLD
     return ADL_OK;
 }
 
+int CDECL ADL_Display_DisplayInfo_Get(int adapter_index, int *num_displays, ADLDisplayInfo **info, int force_detect)
+{
+    TRACE(".\n");
+
+    return ADL2_Display_DisplayInfo_Get(default_ctx, adapter_index, num_displays, info, force_detect);
+}
+
 int CDECL ADL_Adapter_Crossfire_Caps(int adapter_index, int *preffered, int *num_comb, ADLCrossfireComb** comb)
 {
     FIXME("adapter %d, preffered %p, num_comb %p, comb %p stub!\n", adapter_index, preffered, num_comb, comb);
+    return ADL_ERR;
+}
+
+int CDECL ADL2_Adapter_Crossfire_Caps(ADL_CONTEXT_HANDLE context, int adapter_index, int *preffered, int *num_comb, ADLCrossfireComb** comb)
+{
+    FIXME("context %p, adapter %d, preffered %p, num_comb %p, comb %p stub!\n", context, adapter_index, preffered, num_comb, comb);
     return ADL_ERR;
 }
 
@@ -392,7 +405,7 @@ int CDECL ADL_Adapter_Crossfire_Get(int adapter_index, ADLCrossfireComb *comb, A
     return ADL_ERR;
 }
 
-int CDECL ADL_Adapter_ASICFamilyType_Get(int adapter_index, int *asic_type, int *valids)
+int CDECL ADL2_Adapter_ASICFamilyType_Get(ADL_CONTEXT_HANDLE ctx, int adapter_index, int *asic_type, int *valids)
 {
     DXGI_ADAPTER_DESC adapter_desc;
 
@@ -401,7 +414,7 @@ int CDECL ADL_Adapter_ASICFamilyType_Get(int adapter_index, int *asic_type, int 
     if (asic_type == NULL || valids == NULL)
         return  ADL_ERR_NULL_POINTER;
 
-    if (get_adapter_desc(default_ctx, adapter_index, &adapter_desc) != ADL_OK)
+    if (get_adapter_desc(ctx, adapter_index, &adapter_desc) != ADL_OK)
         return ADL_ERR_INVALID_ADL_IDX;
 
     if (adapter_desc.VendorId != VENDOR_AMD)
@@ -411,6 +424,12 @@ int CDECL ADL_Adapter_ASICFamilyType_Get(int adapter_index, int *asic_type, int 
     *valids = ADL_ASIC_MASK;
 
     return ADL_OK;
+}
+
+int CDECL ADL_Adapter_ASICFamilyType_Get(int adapter_index, int *asic_type, int *valids)
+{
+    TRACE("adapter %d, asic_type %p, valids %p.\n", adapter_index, asic_type, valids);
+    return ADL2_Adapter_ASICFamilyType_Get(default_ctx, adapter_index, asic_type, valids);
 }
 
 static int get_max_clock(const char *clock, int default_value)
@@ -451,14 +470,14 @@ static int get_max_clock(const char *clock, int default_value)
 
 /* documented in the "Linux Specific APIs" section, present and used on Windows */
 /* the name and documentation suggests that this returns current freqs, but it's actually max */
-int CDECL ADL_Adapter_ObservedClockInfo_Get(int adapter_index, int *core_clock, int *memory_clock)
+int CDECL ADL2_Adapter_ObservedClockInfo_Get(ADL_CONTEXT_HANDLE ctx, int adapter_index, int *core_clock, int *memory_clock)
 {
     DXGI_ADAPTER_DESC adapter_desc;
 
     FIXME("adapter %d, core_clock %p, memory_clock %p, stub!\n", adapter_index, core_clock, memory_clock);
 
     if (core_clock == NULL || memory_clock == NULL) return ADL_ERR;
-    if (get_adapter_desc(default_ctx, adapter_index, &adapter_desc) != ADL_OK) return ADL_ERR;
+    if (get_adapter_desc(ctx, adapter_index, &adapter_desc) != ADL_OK) return ADL_ERR;
     if (adapter_desc.VendorId != VENDOR_AMD) return ADL_ERR_INVALID_ADL_IDX;
 
     /* default values based on RX580 */
@@ -470,15 +489,22 @@ int CDECL ADL_Adapter_ObservedClockInfo_Get(int adapter_index, int *core_clock, 
     return ADL_OK;
 }
 
+int CDECL ADL_Adapter_ObservedClockInfo_Get(int adapter_index, int *core_clock, int *memory_clock)
+{
+    TRACE("adapter_index %d, core_clock %p, memory_clock %p.\n", adapter_index, core_clock, memory_clock);
+
+    return ADL2_Adapter_ObservedClockInfo_Get(default_ctx, adapter_index, core_clock, memory_clock);
+}
+
 /* documented in the "Linux Specific APIs" section, present and used on Windows */
-int CDECL ADL_Adapter_MemoryInfo_Get(int adapter_index, ADLMemoryInfo *mem_info)
+int CDECL ADL2_Adapter_MemoryInfo_Get(ADL_CONTEXT_HANDLE ctx, int adapter_index, ADLMemoryInfo *mem_info)
 {
     DXGI_ADAPTER_DESC adapter_desc;
 
     FIXME("adapter %d, mem_info %p stub!\n", adapter_index, mem_info);
 
     if (mem_info == NULL) return ADL_ERR_NULL_POINTER;
-    if (get_adapter_desc(default_ctx, adapter_index, &adapter_desc) != ADL_OK) return ADL_ERR_INVALID_ADL_IDX;
+    if (get_adapter_desc(ctx, adapter_index, &adapter_desc) != ADL_OK) return ADL_ERR_INVALID_ADL_IDX;
     if (adapter_desc.VendorId != VENDOR_AMD) return ADL_ERR;
 
     mem_info->iMemorySize = adapter_desc.DedicatedVideoMemory;
@@ -490,7 +516,14 @@ int CDECL ADL_Adapter_MemoryInfo_Get(int adapter_index, ADLMemoryInfo *mem_info)
     return ADL_OK;
 }
 
-int CDECL ADL_Graphics_Platform_Get(int *platform)
+int CDECL ADL_Adapter_MemoryInfo_Get(int adapter_index, ADLMemoryInfo *mem_info)
+{
+    TRACE("adapter_index %d, mem_info %p.\n", adapter_index, mem_info);
+
+    return ADL2_Adapter_MemoryInfo_Get(default_ctx, adapter_index, mem_info);
+}
+
+int CDECL ADL2_Graphics_Platform_Get(ADL_CONTEXT_HANDLE ctx, int *platform)
 {
     DXGI_ADAPTER_DESC adapter_desc;
     int count, i;
@@ -503,7 +536,7 @@ int CDECL ADL_Graphics_Platform_Get(int *platform)
 
     for (i = 0; i < count; i ++)
     {
-        if (get_adapter_desc(default_ctx, i, &adapter_desc) != ADL_OK)
+        if (get_adapter_desc(ctx, i, &adapter_desc) != ADL_OK)
             continue;
 
         if (adapter_desc.VendorId == VENDOR_AMD)
@@ -518,6 +551,12 @@ int CDECL ADL_Graphics_Platform_Get(int *platform)
     return ADL_OK;
 }
 
+int CDECL ADL_Graphics_Platform_Get(int *platform)
+{
+    TRACE("platform %p.\n", platform);
+
+    return ADL2_Graphics_Platform_Get(default_ctx, platform);
+}
 
 int CDECL ADL_Display_DisplayMapConfig_Get(int adapter_index, int *display_map_count, ADLDisplayMap **display_maps,
         int *display_target_count, ADLDisplayTarget **display_targets, int options)
