@@ -259,7 +259,7 @@
 @ stub ADL2_Display_DisplayContent_Set
 @ cdecl ADL2_Display_DisplayInfo_Get(ptr long ptr ptr long)
 @ stub ADL2_Display_DisplayMapConfigX2_Set
-@ stub ADL2_Display_DisplayMapConfig_Get
+@ cdecl ADL2_Display_DisplayMapConfig_Get(ptr long ptr ptr ptr ptr long)
 @ stub ADL2_Display_DisplayMapConfig_PossibleAddAndRemove
 @ stub ADL2_Display_DisplayMapConfig_Set
 @ stub ADL2_Display_DisplayMapConfig_Validate

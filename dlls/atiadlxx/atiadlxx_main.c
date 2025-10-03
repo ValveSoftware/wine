@@ -1012,13 +1012,67 @@ int CDECL ADL_Graphics_Platform_Get(int *platform)
     return ADL2_Graphics_Platform_Get(default_ctx, platform);
 }
 
+int CDECL ADL2_Display_DisplayMapConfig_Get(ADL_CONTEXT_HANDLE ctx, int adapter_index, int *display_map_count, ADLDisplayMap **display_maps,
+        int *display_target_count, ADLDisplayTarget **display_targets, int options)
+{
+    struct gpu *gpu;
+    int i;
+
+    TRACE("ctx %p, adapter_index %d, display_map_count %p, display_maps %p, "
+            "display_target_count %p, display_targets %p, options %d.\n",
+            ctx, adapter_index, display_map_count, display_maps, display_target_count,
+            display_targets, options);
+
+    if (adapter_index >= ctx->adapter_count) return ADL_ERR_INVALID_ADL_IDX;
+    gpu = ctx->adapters[adapter_index].gpu;
+    if (!gpu->display_count) return ADL_ERR_NOT_SUPPORTED;
+    *display_map_count = gpu->display_count;
+    *display_maps = ctx->malloc(*display_map_count * sizeof(**display_maps));
+    memset(*display_maps, 0, *display_map_count * sizeof(**display_maps));
+    *display_target_count = gpu->display_count;
+    *display_targets = ctx->malloc(*display_target_count * sizeof(**display_targets));
+    memset(*display_targets, 0, *display_target_count * sizeof(**display_targets));
+
+    for (i = 0; i < gpu->display_count; ++i)
+    {
+        ADLMode *m = (ADLMode *)&(*display_maps)[i].displayMode;
+        DISPLAYCONFIG_SOURCE_MODE *dc_mode = &gpu->displays[i].mode;
+
+        (*display_maps)[i].iDisplayMapIndex = gpu->displays[i].logical_adapter_index;
+        (*display_maps)[i].iNumDisplayTarget = 1;
+        (*display_maps)[i].iFirstDisplayTargetArrayIndex = i;
+        (*display_maps)[i].iDisplayMapMask = 0xf;
+        (*display_maps)[i].iDisplayMapValue = 0x4; /* ADL_DISPLAY_DISPLAYMAP_MANNER_SINGLE */
+
+        m->displayID.iDisplayLogicalAdapterIndex = gpu->displays[i].logical_adapter_index;
+        m->displayID.iDisplayLogicalIndex = i;
+        m->iAdapterIndex = gpu->displays[i].logical_adapter_index;
+        m->iXPos = dc_mode->position.x;
+        m->iYPos = dc_mode->position.y;
+        m->iXRes = dc_mode->width;
+        m->iYRes = dc_mode->height;
+        m->iColourDepth = 32;
+        m->fRefreshRate = (float)gpu->displays[i].refresh_rate.Numerator / gpu->displays[i].refresh_rate.Denominator;
+        m->iOrientation = (gpu->displays[i].rotation - 1) * 90;
+        m->iModeMask = 0xff;
+        m->iModeValue = 0x46;
+
+        (*display_targets)[i].displayID = m->displayID;
+        (*display_targets)[i].iDisplayMapIndex = i;
+        (*display_targets)[i].iDisplayTargetMask = 1;
+        (*display_targets)[i].iDisplayTargetValue = 1;
+    }
+    return ADL_OK;
+}
+
 int CDECL ADL_Display_DisplayMapConfig_Get(int adapter_index, int *display_map_count, ADLDisplayMap **display_maps,
         int *display_target_count, ADLDisplayTarget **display_targets, int options)
 {
-    FIXME("adapter_index %d, display_map_count %p, display_maps %p, "
-            "display_target_count %p, display_targets %p, options %d stub.\n",
+    TRACE("adapter_index %d, display_map_count %p, display_maps %p, "
+            "display_target_count %p, display_targets %p, options %d.\n",
             adapter_index, display_map_count, display_maps, display_target_count,
             display_targets, options);
 
-    return ADL_ERR;
+    return ADL2_Display_DisplayMapConfig_Get(default_ctx, adapter_index, display_map_count, display_maps,
+            display_target_count, display_targets, options);
 }
