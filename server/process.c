@@ -734,9 +734,12 @@ struct process *create_process( int fd, struct process *parent, unsigned int fla
     {
         obj_handle_t std_handles[3];
 
-        std_handles[0] = info->hstdin;
-        std_handles[1] = info->hstdout;
-        std_handles[2] = info->hstderr;
+        if (flags & PROCESS_CREATE_FLAGS_INHERIT_HANDLES)
+        {
+            std_handles[0] = info->hstdin;
+            std_handles[1] = info->hstdout;
+            std_handles[2] = info->hstderr;
+        }
 
         process->parent_id = parent->id;
         if (flags & PROCESS_CREATE_FLAGS_INHERIT_HANDLES)

@@ -559,10 +559,37 @@ static void master_socket_poll_event( struct fd *fd, int event )
         struct process *process;
         struct sockaddr_un dummy;
         socklen_t len = sizeof(dummy);
+        struct thread *thread = NULL;
+
         int client = accept( get_unix_fd( master_socket->fd ), (struct sockaddr *) &dummy, &len );
         if (client == -1) return;
         fcntl( client, F_SETFL, O_NONBLOCK );
-        if ((process = create_process( client, NULL, 0, NULL, NULL, NULL, 0, NULL )))
+#ifdef SO_PEERCRED
+        {
+            struct ucred ucred;
+
+            len = sizeof(ucred);
+            if (!getsockopt( client, SOL_SOCKET, SO_PEERCRED, &ucred, &len ))
+            {
+                pid_t ppid;
+                char s[256];
+                FILE *f;
+
+                sprintf( s, "/proc/%d/status", ucred.pid );
+                if ((f = fopen( s, "r" )))
+                {
+                    while (fgets( s, sizeof(s), f ))
+                    {
+                        if (sscanf( s, "PPid:%d", &ppid ) != 1) continue;
+                        thread = get_thread_from_pid( ppid );
+                        break;
+                    }
+                    fclose( f );
+                }
+            }
+        }
+#endif
+        if ((process = create_process( client, thread ? thread->process : NULL, 0, NULL, NULL, NULL, 0, NULL )))
         {
             create_thread( -1, process, NULL );
             release_object( process );
