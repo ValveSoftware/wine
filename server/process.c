@@ -655,6 +655,7 @@ struct process *create_process( int fd, struct process *parent, unsigned int fla
                                 unsigned int handle_count, struct token *token )
 {
     struct process *process;
+    struct job *job;
 
     if (!(process = alloc_object( &process_ops )))
     {
@@ -757,6 +758,22 @@ struct process *create_process( int fd, struct process *parent, unsigned int fla
         process->esync_fd = esync_create_fd( 0, 0 );
 
     set_fd_events( process->msg_fd, POLLIN );  /* start listening to events */
+
+    if (!parent) return process;
+    job = parent->job;
+    while (job)
+    {
+        if (!(job->limit_flags & JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK)
+                && !(flags & PROCESS_CREATE_FLAGS_BREAKAWAY
+                && job->limit_flags & JOB_OBJECT_LIMIT_BREAKAWAY_OK))
+        {
+            add_job_process( job, process );
+            assert( !get_error() );
+            break;
+        }
+        job = job->parent;
+    }
+
     return process;
 
  error:
@@ -1340,20 +1357,6 @@ DECL_HANDLER(new_process)
 
     process->machine = req->machine;
     process->startup_info = (struct startup_info *)grab_object( info );
-
-    job = parent->job;
-    while (job)
-    {
-        if (!(job->limit_flags & JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK)
-                && !(req->flags & PROCESS_CREATE_FLAGS_BREAKAWAY
-                && job->limit_flags & JOB_OBJECT_LIMIT_BREAKAWAY_OK))
-        {
-            add_job_process( job, process );
-            assert( !get_error() );
-            break;
-        }
-        job = job->parent;
-    }
 
     for (i = 0; i < job_handle_count; ++i)
     {
