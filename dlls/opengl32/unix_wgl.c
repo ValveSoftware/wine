@@ -585,7 +585,6 @@ static BOOL ignore_extenstions_for_get_proc_address(void)
         cached = (sgi = getenv( "SteamGameId" )) && (
                  !strcmp( sgi, "2293310" )
                  || !strcmp( sgi, "2914160" )
-                 || !strcmp( sgi, "1201700" )
                  );
     }
 
