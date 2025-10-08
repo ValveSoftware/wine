@@ -4458,7 +4458,7 @@ static enum fill_status fill_videocontroller( struct table *table, const struct 
     rec->description           = wcsdup( name );
     rec->device_id             = L"VideoController1";
     rec->driverdate            = L"20250831000000.000000-000";
-    rec->driverversion         = L"32.0.21025.1024";
+    rec->driverversion         = L"35.0.21025.1024";
     rec->installeddriver       = get_videocontroller_installeddriver( desc.VendorId );
     rec->name                  = wcsdup( name );
     rec->pnpdevice_id          = get_videocontroller_pnpdeviceid( &desc );
