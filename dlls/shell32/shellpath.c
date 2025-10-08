@@ -2090,6 +2090,15 @@ static const CSIDL_DATA CSIDL_Data[] =
         .attributes = FILE_ATTRIBUTE_READONLY,
         .flags      = KFDF_PRECREATE | KFDF_ROAMABLE,
     },
+    { /* 0x74 */
+        .id         = &FOLDERID_Screenshots,
+        .type       = CSIDL_Type_User,
+        .category   = KF_CATEGORY_PERUSER,
+        .name       = L"Screenshots",
+        .parent     = &FOLDERID_Pictures,
+        .path       = L"Screenshots",
+        .flags      = KFDF_PRECREATE | KFDF_ROAMABLE,
+    },
 };
 
 static int csidl_from_id( const KNOWNFOLDERID *id )
@@ -3137,6 +3146,11 @@ static HRESULT create_extra_folders(void)
     {
         hr = SHGetFolderPathAndSubDirW(0, CSIDL_APPDATA | CSIDL_FLAG_CREATE, NULL,
                                        SHGFP_TYPE_DEFAULT, L"Microsoft\\Windows\\AccountPictures", path);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = SHGetFolderPathAndSubDirW(0, CSIDL_MYPICTURES | CSIDL_FLAG_CREATE, NULL,
+                                       SHGFP_TYPE_DEFAULT, L"Screenshots", path);
     }
 
 
