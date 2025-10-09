@@ -300,6 +300,8 @@ static WCHAR *get_container_id(DEVICE_OBJECT *device)
     GUID *guid = &ext->container_id;
     WCHAR *dst;
 
+    /* Check if we have a bus provided container ID override. */
+    if (!IsEqualGUID(&ext->desc.bus_container_id, &GUID_NULL)) guid = &ext->desc.bus_container_id;
     if ((dst = ExAllocatePool(PagedPool, GUID_STRING_LENGTH * sizeof(WCHAR))))
     {
         swprintf(dst, GUID_STRING_LENGTH, L"{%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}",
