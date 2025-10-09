@@ -1670,6 +1670,39 @@ static NTSTATUS lnxev_device_create(struct udev_device *dev, int fd, const char 
 #endif
 }
 
+static void get_container_id_for_usb_udev_device(struct udev_device *dev, struct device_desc *desc)
+{
+    unsigned int vid, pid, version;
+    struct udev_device *parent;
+    uint8_t bus_num, dev_num;
+    uint64_t init_time;
+    const char *tmp;
+
+    init_time = 0;
+    bus_num = dev_num = 0;
+    vid = pid = version = 0;
+    if (!(parent = udev_device_get_parent_with_subsystem_devtype(dev, "usb", "usb_device")))
+    {
+        ERR("Failed to get parent device.\n");
+        return;
+    }
+
+    if ((tmp = udev_device_get_property_value(parent, "PRODUCT")))
+        sscanf(tmp, "%x/%x/%x", &vid, &pid, &version);
+    if ((tmp = udev_device_get_property_value(parent, "USEC_INITIALIZED")))
+        init_time = strtoull(tmp, NULL, 10);
+    if ((tmp = udev_device_get_property_value(parent, "BUSNUM")))
+        bus_num = strtol(tmp, NULL, 10);
+    if ((tmp = udev_device_get_property_value(parent, "DEVNUM")))
+        dev_num = strtol(tmp, NULL, 10);
+
+    desc->bus_container_id.Data1 = MAKELONG(vid, pid);
+    desc->bus_container_id.Data2 = bus_num;
+    desc->bus_container_id.Data3 = dev_num;
+    memcpy(desc->bus_container_id.Data4, &init_time, sizeof(desc->bus_container_id.Data4));
+    TRACE("Created container ID %s.\n", debugstr_guid(&desc->bus_container_id));
+}
+
 static void udev_add_device(struct udev_device *dev, int fd)
 {
     struct device_desc desc = { .input = -1 };
@@ -1695,6 +1728,8 @@ static void udev_add_device(struct udev_device *dev, int fd)
     get_device_subsystem_info(dev, "usb", "usb_device", &desc, &bus);
     if (bus == BUS_BLUETOOTH) desc.bus_type = BUS_TYPE_BLUETOOTH;
     else if (bus == BUS_USB) desc.bus_type = BUS_TYPE_USB;
+
+    if (desc.bus_type == BUS_TYPE_USB) get_container_id_for_usb_udev_device(dev, &desc);
 
     if (!(subsystem = udev_device_get_subsystem(dev)))
     {
