@@ -5338,6 +5338,9 @@ NTSYSAPI LONGLONG  WINAPI RtlLargeIntegerSubtract(LONGLONG,LONGLONG);
 NTSYSAPI NTSTATUS  WINAPI RtlLargeIntegerToChar(const ULONGLONG *,ULONG,ULONG,PCHAR);
 #endif
 
+/* Wine internal functions */
+
+NTSYSAPI NTSTATUS WINAPI __wine_set_unix_env( const char *var, const char *val );
 
 /***********************************************************************
  * Inline functions
