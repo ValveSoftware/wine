@@ -2194,7 +2194,11 @@ static void hacks_init(void)
     env_str = getenv("WINE_FSYNC_HELP_SIMULATED_PULSE");
     if (env_str)
         fsync_help_simulated_pulse = !!atoi(env_str);
-    else if (sgi) fsync_help_simulated_pulse = !strcmp(sgi, "460870") || !strcmp(sgi, "438490");
+    else if (sgi) fsync_help_simulated_pulse =
+        !strcmp(sgi, "460870")
+        || !strcmp(sgi, "1486920")
+        || !strcmp(sgi, "438490");
+
     if (fsync_help_simulated_pulse)
         ERR("HACK: fsync: helping simulated pulse event.\n");
 
