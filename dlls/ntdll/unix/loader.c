@@ -1099,6 +1099,17 @@ NTSTATUS WINAPI wine_set_unix_env( void *args )
 }
 
 
+/**********************************************************************
+ *      __wine_dbg_ftrace
+ */
+static NTSTATUS unix__wine_dbg_ftrace( void *args )
+{
+    struct wine_dbg_ftrace_params *params = args;
+
+    return __wine_dbg_ftrace( params->str, params->len, params->ctx );
+}
+
+
 static void *steamclient_srcs[128];
 static void *steamclient_tgts[128];
 static int steamclient_count;
@@ -1277,6 +1288,7 @@ static const unixlib_entry_t unix_call_funcs[] =
     unixcall_wine_spawnvp,
     system_time_precise,
     wine_set_unix_env,
+    unix__wine_dbg_ftrace,
     steamclient_setup_trampolines,
     is_pc_in_native_so,
     debugstr_pc,
@@ -1301,6 +1313,17 @@ static NTSTATUS wow64___wine_set_unix_env( void *args )
         .val = ULongToPtr( params32->val ),
     };
     return wine_set_unix_env( &params );
+}
+
+static NTSTATUS wow64___wine_dbg_ftrace( void *args )
+{
+    struct
+    {
+        ULONG str;
+        unsigned int len;
+        unsigned int ctx;
+    } const *params32 = args;
+    return __wine_dbg_ftrace( ULongToPtr( params32->str ), params32->len, params32->ctx );
 }
 
 static NTSTATUS wow64_steamclient_setup_trampolines( void *args )
@@ -1339,6 +1362,7 @@ const unixlib_entry_t unix_call_wow64_funcs[] =
     wow64_wine_spawnvp,
     system_time_precise,
     wow64___wine_set_unix_env,
+    wow64___wine_dbg_ftrace,
     wow64_steamclient_setup_trampolines,
     is_pc_in_native_so,
     wow64_debugstr_pc,
