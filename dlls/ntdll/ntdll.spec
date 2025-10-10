@@ -1746,6 +1746,7 @@
 @ extern -private __wine_unix_call_dispatcher
 @ extern -private -arch=arm64ec __wine_unix_call_dispatcher_arm64ec
 @ extern -private __wine_unixlib_handle
+@ stdcall __wine_get_unix_env(ptr ptr long)
 @ stdcall __wine_set_unix_env(ptr ptr)
 
 # Debugging
@@ -1764,4 +1765,3 @@
 # Filesystem
 @ stdcall -syscall wine_nt_to_unix_file_name(ptr ptr ptr long)
 @ stdcall -syscall wine_unix_to_nt_file_name(str ptr ptr)
-@ stdcall -syscall __wine_needs_override_large_address_aware()

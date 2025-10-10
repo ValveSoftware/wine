@@ -66,6 +66,13 @@ struct unwind_builtin_dll_params
     CONTEXT                    *context;
 };
 
+struct wine_get_unix_env_params
+{
+    const char *name;
+    char *val;
+    unsigned int buffer_len;
+};
+
 struct wine_set_unix_env_params
 {
     const char *name;
@@ -103,6 +110,7 @@ enum ntdll_unix_funcs
     unix_wine_server_handle_to_fd,
     unix_wine_spawnvp,
     unix_system_time_precise,
+    unix___wine_get_unix_env,
     unix___wine_set_unix_env,
     unix_wine_dbg_ftrace,
     unix_steamclient_setup_trampolines,

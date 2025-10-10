@@ -855,9 +855,3 @@ NTSTATUS WINAPI wow64_NtWow64GetNativeSystemInformation( UINT *args )
         return STATUS_INVALID_INFO_CLASS;
     }
 }
-
-BOOL WINAPI __wine_needs_override_large_address_aware(void);
-NTSTATUS WINAPI wow64___wine_needs_override_large_address_aware( UINT * args )
-{
-    return __wine_needs_override_large_address_aware();
-}

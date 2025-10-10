@@ -41,8 +41,21 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(globalmem);
 
+#ifndef _WIN64
+static BOOL __wine_needs_override_large_address_aware(void)
+{
+    static int needs_override = -1;
 
-extern BOOL WINAPI __wine_needs_override_large_address_aware(void);
+    if (needs_override == -1)
+    {
+        char str[16];
+
+        needs_override = __wine_get_unix_env( "WINE_LARGE_ADDRESS_AWARE", str, sizeof(str) ) /* on by default */
+                         || atoi(str) == 1;
+    }
+    return needs_override;
+}
+#endif
 
 /***********************************************************************
  *           HeapCreate   (KERNEL32.@)

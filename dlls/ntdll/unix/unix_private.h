@@ -606,6 +606,4 @@ static inline NTSTATUS map_section( HANDLE mapping, void **ptr, SIZE_T *size, UL
                                0, NULL, size, ViewShare, 0, protect );
 }
 
-BOOL WINAPI __wine_needs_override_large_address_aware(void);
-
 #endif /* __NTDLL_UNIX_PRIVATE_H */
