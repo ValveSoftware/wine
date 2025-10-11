@@ -17,11 +17,17 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "wine/test.h"
-#include "winreg.h"
+#include <stddef.h>
+#include <stdarg.h>
+
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
 #include "windef.h"
 #include "winbase.h"
+
+#include "winreg.h"
 #include "winuser.h"
+#include "winternl.h"
 #include "objbase.h"
 #include "devguid.h"
 #include "initguid.h"
@@ -32,6 +38,38 @@
 #include "ntddvdeo.h"
 #include "devfiltertypes.h"
 #include "devquery.h"
+#include "ddk/hidclass.h"
+
+#include "wine/test.h"
+
+static const char *debugstr_ok( const char *cond )
+{
+    int c, n = 0;
+    /* skip possible casts */
+    while ((c = *cond++))
+    {
+        if (c == '(') n++;
+        if (!n) break;
+        if (c == ')') n--;
+    }
+    if (!strchr( cond - 1, '(' )) return wine_dbg_sprintf( "got %s", cond - 1 );
+    return wine_dbg_sprintf( "%.*s returned", (int)strcspn( cond - 1, "( " ), cond - 1 );
+}
+
+#define ok_wcs( e, r )                                                                             \
+    do                                                                                             \
+    {                                                                                              \
+        const WCHAR *v = (r);                                                                      \
+        ok( !wcscmp( v, (e) ), "%s %s\n", debugstr_ok(#r), debugstr_w(v) );                        \
+    } while (0)
+#define ok_ex( r, op, e, t, f, ... )                                                               \
+    do                                                                                             \
+    {                                                                                              \
+        t v = (r);                                                                                 \
+        ok( v op (e), "%s " f "\n", debugstr_ok( #r ), v, ##__VA_ARGS__ );                         \
+    } while (0)
+#define ok_u4( r, op, e )   ok_ex( r, op, e, UINT, "%u" )
+#define ok_x4( r, op, e )   ok_ex( r, op, e, UINT, "%#x" )
 
 static void test_CM_MapCrToWin32Err(void)
 {
@@ -1862,6 +1900,68 @@ static void test_DevFindProperty_invalid( void )
     ok( !prop, "got prop %p\n", prop );
 }
 
+static void test_CM_Get_Class_Key_Name(void)
+{
+    GUID guid = GUID_DEVCLASS_DISPLAY;
+    WCHAR buffer[MAX_PATH];
+    CONFIGRET ret;
+    ULONG len;
+
+    len = ARRAY_SIZE(buffer);
+    ret = CM_Get_Class_Key_NameW( NULL, buffer, &len, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ok_u4( len, ==, ARRAY_SIZE(buffer) );
+
+    ret = CM_Get_Class_Key_NameW( &guid, NULL, NULL, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ok_u4( len, ==, ARRAY_SIZE(buffer) );
+
+    ret = CM_Get_Class_Key_NameW( &guid, buffer, NULL, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ok_u4( len, ==, ARRAY_SIZE(buffer) );
+
+    ret = CM_Get_Class_Key_NameW( &guid, NULL, &len, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ok_u4( len, ==, ARRAY_SIZE(buffer) );
+
+    len = 0;
+    ret = CM_Get_Class_Key_NameW( &guid, NULL, &len, 0 );
+    ok_x4( ret, ==, CR_BUFFER_SMALL );
+    ok_u4( len, ==, 39 );
+    len = 1;
+    ret = CM_Get_Class_Key_NameW( &guid, NULL, &len, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ok_u4( len, ==, 1 );
+
+    len = 2;
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Key_NameW( &guid, buffer, &len, 0 );
+    ok_x4( ret, ==, CR_BUFFER_SMALL );
+    ok_u4( len, ==, 39 );
+    ok( *buffer == 0xcdcd, "got %s\n", debugstr_wn(buffer, 2) );
+
+    len = ARRAY_SIZE(buffer);
+    ret = CM_Get_Class_Key_NameW( &guid, buffer, &len, 0 );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_u4( len, ==, 39 );
+    ok_wcs( L"{4d36e968-e325-11ce-bfc1-08002be10318}", buffer );
+
+    /* doesn't really check anything, it works with any GUID */
+    guid = GUID_DEVINTERFACE_DISPLAY_ADAPTER;
+    len = ARRAY_SIZE(buffer);
+    ret = CM_Get_Class_Key_NameW( &guid, buffer, &len, 0 );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_u4( len, ==, 39 );
+    ok_wcs( L"{5b45201d-f2f2-4f3b-85bb-30ff1f953599}", buffer );
+
+    memset( &guid, 0xcd, sizeof(guid) );
+    len = ARRAY_SIZE(buffer);
+    ret = CM_Get_Class_Key_NameW( &guid, buffer, &len, 0 );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_u4( len, ==, 39 );
+    ok_wcs( L"{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}", buffer );
+}
+
 START_TEST(cfgmgr32)
 {
     HMODULE mod = GetModuleHandleA("cfgmgr32.dll");
@@ -1874,6 +1974,7 @@ START_TEST(cfgmgr32)
     pDevFindProperty = (void *)GetProcAddress(mod, "DevFindProperty");
 
     test_CM_MapCrToWin32Err();
+    test_CM_Get_Class_Key_Name();
     test_CM_Get_Device_ID_List();
     test_CM_Register_Notification();
     test_CM_Get_Device_Interface_List();
