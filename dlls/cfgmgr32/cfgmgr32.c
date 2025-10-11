@@ -23,6 +23,14 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(setupapi);
 
+static const WCHAR *guid_string( const GUID *guid, WCHAR *buffer, UINT length )
+{
+    swprintf( buffer, length, L"{%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x}",
+              guid->Data1, guid->Data2, guid->Data3, guid->Data4[0], guid->Data4[1], guid->Data4[2],
+              guid->Data4[3], guid->Data4[4], guid->Data4[5], guid->Data4[6], guid->Data4[7] );
+    return buffer;
+}
+
 /***********************************************************************
  *           CM_MapCrToWin32Err (cfgmgr32.@)
  */
@@ -57,6 +65,56 @@ DWORD WINAPI CM_MapCrToWin32Err( CONFIGRET code, DWORD default_error )
     }
 
     return default_error;
+}
+
+/***********************************************************************
+ *           CM_Get_Class_Key_Name_ExW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Class_Key_Name_ExW( GUID *guid, WCHAR *name, ULONG *len, ULONG flags, HMACHINE machine )
+{
+    UINT capacity;
+
+    TRACE( "guid %s, name %p, len %p, flags %#lx, machine %p\n", debugstr_guid(guid), name, len, flags, machine );
+    if (machine) FIXME( "machine %p not implemented!\n", machine );
+    if (flags) FIXME( "flags %#lx not implemented!\n", flags );
+
+    if (!guid || !len) return CR_INVALID_POINTER;
+    if ((capacity = *len) && !name) return CR_INVALID_POINTER;
+
+    *len = 39;
+    if (capacity < *len) return CR_BUFFER_SMALL;
+    guid_string( guid, name, capacity );
+    return CR_SUCCESS;
+}
+
+/***********************************************************************
+ *           CM_Get_Class_Key_Name_ExA (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Class_Key_Name_ExA( GUID *class, char *nameA, ULONG *len, ULONG flags, HMACHINE machine )
+{
+    WCHAR nameW[39];
+    CONFIGRET ret;
+
+    if ((ret = CM_Get_Class_Key_Name_ExW( class, nameA ? nameW : NULL, len, flags, machine ))) return ret;
+    if (nameA) WideCharToMultiByte( CP_ACP, 0, nameW, 39, nameA, 39, NULL, NULL );
+
+    return CR_SUCCESS;
+}
+
+/***********************************************************************
+ *           CM_Get_Class_Key_NameW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Class_Key_NameW( GUID *class, WCHAR *name, ULONG *len, ULONG flags )
+{
+    return CM_Get_Class_Key_Name_ExW( class, name, len, flags, NULL );
+}
+
+/***********************************************************************
+ *           CM_Get_Class_Key_NameA (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Class_Key_NameA( GUID *class, char *name, ULONG *len, ULONG flags )
+{
+    return CM_Get_Class_Key_Name_ExA( class, name, len, flags, NULL );
 }
 
 /***********************************************************************
