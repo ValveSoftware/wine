@@ -1,14 +1,20 @@
 ## INTRODUCTION
 
-Goliath is a compatibility Layer for BlissOS (and other Operating Systems) that allows Microsoft Windows, 
-Linux, iOS, Android, MacOS and Legacy Hardware programs to run on Bliss, and is based off of 
-Proton's version of Wine, along with the WSL, ATL and Darling compatiblilty layers and a modified version of LibRetro, all built straight into the software.
+Goliath is a comprehensive compatibility layer for BlissOS (and other Operating Systems) that allows Microsoft Windows, 
+Linux, iOS, Android, MacOS and Legacy Hardware programs to run seamlessly on Bliss and other Unix-like systems. 
+It is based on Proton's version of Wine, along with enhanced WSL (Windows Subsystem for Linux), ATL (Android Translation Layer), 
+and Darling compatibility layers, plus a modified version of LibRetro, all built into a unified software platform.
+
 *Wine itself is a program which allows running Microsoft Windows programs
-(including DOS, Windows 3.x, Win32, and Win64 executables) on Unix and Unix-Like Oper.
+(including DOS, Windows 3.x, Win32, and Win64 executables) on Unix and Unix-Like systems.
 It consists of a program loader which loads and executes a Microsoft
 Windows binary, and a library (called Winelib) that implements Windows
 API calls using their Unix, X11 or Mac equivalents.  The library may also
 be used for porting Windows code into native Unix executables.*
+
+**WSL Integration**: Goliath now includes a comprehensive WSL compatibility layer that provides 
+Linux environment emulation similar to Microsoft's WSL, enabling native Linux applications to run 
+with proper path translation, environment setup, and process management.
 
 Goliath/Wine is free software, released under the GNU LGPL; see the file
 LICENSE for the details.
@@ -153,8 +159,8 @@ a bug.
 ## GETTING MORE INFORMATION (Wine)
 
 - **WWW**: A great deal of information about Wine is available from WineHQ at
-	https://www.winehq.org/ : various Wine Guides, application database,
-	bug tracking. This is probably the best starting point.
+        https://www.winehq.org/ : various Wine Guides, application database,
+        bug tracking. This is probably the best starting point.
 
 - **FAQ**: The Wine FAQ is located at https://gitlab.winehq.org/wine/wine/-/wikis/FAQ
 
@@ -163,20 +169,55 @@ a bug.
 - **Gitlab**: Wine development is hosted at https://gitlab.winehq.org
 
 - **Mailing lists**:
-	There are several mailing lists for Wine users and developers; see
-	https://gitlab.winehq.org/wine/wine/-/wikis/Forums for more
-	information.
+        There are several mailing lists for Wine users and developers; see
+        https://gitlab.winehq.org/wine/wine/-/wikis/Forums for more
+        information.
 
 - **Bugs**: Report bugs to Wine Bugzilla at https://bugs.winehq.org
-	Please search the bugzilla database to check whether your
-	problem is already known or fixed before posting a bug report.
+        Please search the bugzilla database to check whether your
+        problem is already known or fixed before posting a bug report.
 
 - **IRC**: Online help is available at channel `#WineHQ` on irc.libera.chat.
 
 
 ## Goliath Compatibility Layer
 
-Goliath unifies Wine (Windows), Darling (macOS), and ATL (Android) to run applications from all major operating systems on Linux.
+Goliath unifies Wine (Windows), Darling (macOS), WSL (Linux), and ATL (Android) to run applications from all major operating systems on Linux and other Unix-like systems.
 
-- Use `goliath-launch.sh` to run any supported application.
-- See `documentation/README-goliath.md` for details.
+### Quick Start
+
+- Use `goliath-launch.sh` to run any supported application:
+  ```bash
+  ./goliath-launch.sh myapp.exe        # Windows application
+  ./goliath-launch.sh /usr/bin/ls      # Linux application  
+  ./goliath-launch.sh myapp.app        # macOS application
+  ./goliath-launch.sh myapp.apk        # Android application
+  ```
+
+### WSL (Linux Application) Support
+
+Goliath includes comprehensive WSL support for running Linux applications:
+
+- **Automatic detection**: ELF binaries are automatically detected and routed to WSL
+- **Path translation**: Windows paths are converted to Linux paths (/mnt/c/...)
+- **Environment setup**: Proper Linux environment variables and filesystem structure
+- **Process management**: Signal handling and proper exit code management
+
+### Features
+
+- **Multi-platform support**: Windows, macOS, Linux, and Android applications
+- **Automatic detection**: File type detection and appropriate subsystem dispatch
+- **Path translation**: Cross-platform path conversion
+- **Environment integration**: Proper environment setup for each platform
+- **Unified interface**: Single entry point for all application types
+
+### Configuration
+
+WSL can be configured through environment variables:
+```bash
+export WSL_DISTRO_NAME="MyDistro"
+export WSL_ENABLE_INTEROP=1
+export WSL_ENABLE_DRIVE_MOUNTING=1
+```
+
+- See `documentation/README-goliath.md` for comprehensive documentation.

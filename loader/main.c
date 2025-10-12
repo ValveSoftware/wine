@@ -1,34 +1,62 @@
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <dlfcn.h>
 
 // --- WSL subsystem entry point ---
 int wsl_main(int argc, char *argv[]) {
-    // For now, exec a stub WSL loader (to be replaced with real integration)
-    const char *wsl_loader = "../dlls/wsl/wsl.so";
-    char **new_argv = malloc(sizeof(char*) * (argc + 1));
-    if (!new_argv) {
-        fprintf(stderr, "goliath: out of memory\n");
+    // Load the WSL library and call its main function
+    void *wsl_handle = dlopen("../dlls/wsl/libwsl.so", RTLD_NOW);
+    if (!wsl_handle) {
+        // Try alternative paths
+        wsl_handle = dlopen("./dlls/wsl/libwsl.so", RTLD_NOW);
+        if (!wsl_handle) {
+            wsl_handle = dlopen("libwsl.so", RTLD_NOW);
+        }
+    }
+    
+    if (wsl_handle) {
+        // Get the wsl_main function from the library
+        int (*wsl_main_func)(int, char**) = dlsym(wsl_handle, "wsl_main");
+        if (wsl_main_func) {
+            int result = wsl_main_func(argc, argv);
+            dlclose(wsl_handle);
+            return result;
+        } else {
+            fprintf(stderr, "goliath: wsl_main function not found in WSL library\n");
+            dlclose(wsl_handle);
+        }
+    }
+    
+    // Fallback: direct execution for basic WSL functionality
+    fprintf(stderr, "[Goliath/WSL] Using fallback WSL implementation\n");
+    
+    if (argc < 2) {
+        fprintf(stderr, "[Goliath/WSL] Usage: %s <linux-elf-binary> [args...]\n", argv[0]);
         return 1;
     }
-    new_argv[0] = (char*)wsl_loader;
-    for (int i = 1; i < argc; ++i) new_argv[i] = argv[i];
-    new_argv[argc] = NULL;
 
+    // Basic environment setup
+    setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
+    setenv("WSL_DISTRO_NAME", "GoliathWSL", 1);
+    
+    // Execute the Linux binary directly
     pid_t pid = fork();
     if (pid == 0) {
-        // Child: exec WSL loader
-        execv(wsl_loader, new_argv);
-        perror("goliath: execv failed for WSL loader");
+        // Child: exec the Linux ELF binary
+        execv(argv[1], &argv[1]);
+        perror("[Goliath/WSL] execv failed");
         exit(127);
     } else if (pid > 0) {
         // Parent: wait for child
         int status = 0;
         waitpid(pid, &status, 0);
-        free(new_argv);
         return WIFEXITED(status) ? WEXITSTATUS(status) : 127;
     } else {
-        perror("goliath: fork failed");
-        free(new_argv);
+        perror("[Goliath/WSL] fork failed");
         return 127;
     }
 }
