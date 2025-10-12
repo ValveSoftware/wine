@@ -1,21 +1,58 @@
 # Comments for autoconf: use dnl for comments, not as a macro
 AC_CONFIG_MACRO_DIR([m4])
-m4_define([WINE_VERSION], regexp(m4_include([VERSION]), [version \([-.0-9A-Za-z]+\)], [\1]))
+m4_define([GOLIATH_VERSION], regexp(m4_include([VERSION]), [version \([-.0-9A-Za-z]+\)], [\1]))
 
 # Fallback for missing macros (no-op if not found)
 m4_ifndef([AS_VAR_APPEND], [m4_define([AS_VAR_APPEND], [])])
 m4_ifndef([AS_VAR_IF], [m4_define([AS_VAR_IF], [])])
 
 AC_PREREQ([2.63b])
-AC_INIT([Wine],[WINE_VERSION],[wine-devel@winehq.org],[wine],[https://www.winehq.org])
+AC_INIT([Goliath],[GOLIATH_VERSION],[goliath-devel@example.org],[goliath],[https://github.com/goliath-project/goliath])
 AC_CONFIG_SRCDIR([server/atom.c])
 AC_CONFIG_HEADERS([include/config.h])
 AC_CONFIG_AUX_DIR([tools])
 
 libwine_version="1.0"
+libgoliath_version="1.0"
 
 AM_INIT_AUTOMAKE([foreign subdir-objects])
 LT_INIT
+
+dnl *** Goliath LibRetro Support ***
+AC_ARG_ENABLE([libretro],
+    AS_HELP_STRING([--enable-libretro], [Enable LibRetro support for legacy ROM emulation (default: yes)]),
+    [enable_libretro=$enableval],
+    [enable_libretro=yes])
+
+if test "x$enable_libretro" = "xyes"; then
+    AC_DEFINE([HAVE_LIBRETRO], [1], [Define if LibRetro support is enabled])
+    
+    dnl Check for libdl (required for dynamic loading of LibRetro cores)
+    AC_CHECK_LIB([dl], [dlopen], [], [
+        AC_MSG_ERROR([libdl is required for LibRetro support. Install libdl-dev or disable LibRetro with --disable-libretro])
+    ])
+    
+    dnl Check for common LibRetro core directories
+    AC_MSG_CHECKING([for LibRetro cores directory])
+    LIBRETRO_CORES_DIR=""
+    for dir in /usr/lib/libretro /usr/local/lib/libretro /opt/libretro/cores; do
+        if test -d "$dir"; then
+            LIBRETRO_CORES_DIR="$dir"
+            break
+        fi
+    done
+    
+    if test -n "$LIBRETRO_CORES_DIR"; then
+        AC_MSG_RESULT([$LIBRETRO_CORES_DIR])
+        AC_DEFINE_UNQUOTED([DEFAULT_LIBRETRO_CORES_DIR], ["$LIBRETRO_CORES_DIR"], [Default LibRetro cores directory])
+    else
+        AC_MSG_RESULT([not found - will use runtime detection])
+        AC_DEFINE_UNQUOTED([DEFAULT_LIBRETRO_CORES_DIR], ["/usr/lib/libretro"], [Default LibRetro cores directory])
+    fi
+fi
+
+AM_CONDITIONAL([ENABLE_LIBRETRO], [test "x$enable_libretro" = "xyes"])
+
 dnl Check for flex
 AC_CHECK_PROGS(FLEX,flex,none)
 if test "$FLEX" = "none"
@@ -177,86 +214,86 @@ m4_ifdef([AC_SYS_YEAR2038],
          [test "$ac_cv_sys_file_offset_bits" = 64 && AC_DEFINE(_TIME_BITS,64,[Define to 64 to enable 64-bit time_t])])
 
 AC_CHECK_HEADERS(\
-	CL/cl.h \
-	EGL/egl.h \
-	OpenCL/opencl.h \
-	arpa/inet.h \
-	arpa/nameser.h \
-	asm/termbits.h \
-	asm/types.h \
-	asm/user.h \
-	elf.h \
-	gettext-po.h \
-	link.h \
-	linux/cdrom.h \
-	linux/filter.h \
-	linux/futex.h \
-	linux/hdreg.h \
-	linux/hidraw.h \
-	linux/input.h \
-	linux/ioctl.h \
-	linux/major.h \
-	linux/param.h \
-	linux/seccomp.h \
-	linux/serial.h \
-	linux/types.h \
-	linux/ucdrom.h \
-	linux/wireless.h \
-	lwp.h \
-	mach-o/loader.h \
-	mach/mach.h \
-	machine/cpu.h \
-	machine/sysarch.h \
-	mntent.h \
-	netdb.h \
-	netinet/in.h \
-	netinet/in_systm.h \
-	netinet/tcp.h \
-	netinet/tcp_fsm.h \
-	pcap/pcap.h \
-	port.h \
-	pwd.h \
-	sched.h \
-	scsi/scsi.h \
-	scsi/scsi_ioctl.h \
-	scsi/sg.h \
-	sys/attr.h \
-	sys/auxv.h \
-	sys/cdio.h \
-	sys/epoll.h \
-	sys/event.h \
-	sys/eventfd.h \
-	sys/extattr.h \
-	sys/filio.h \
-	sys/ipc.h \
-	sys/link.h \
-	sys/modem.h \
-	sys/mtio.h \
-	sys/param.h \
-	sys/prctl.h \
-	sys/ptrace.h \
-	sys/queue.h \
-	sys/random.h \
-	sys/resource.h \
-	sys/scsiio.h \
-	sys/shm.h \
-	sys/signal.h \
-	sys/socketvar.h \
-	sys/sockio.h \
-	sys/statvfs.h \
-	sys/strtio.h \
-	sys/syscall.h \
-	sys/sysinfo.h \
-	sys/times.h \
-	sys/uio.h \
-	sys/user.h \
-	sys/utsname.h \
-	sys/vnode.h \
-	sys/xattr.h \
-	syscall.h \
-	utime.h \
-	valgrind/memcheck.h \
-	valgrind/valgrind.h
+        CL/cl.h \
+        EGL/egl.h \
+        OpenCL/opencl.h \
+        arpa/inet.h \
+        arpa/nameser.h \
+        asm/termbits.h \
+        asm/types.h \
+        asm/user.h \
+        elf.h \
+        gettext-po.h \
+        link.h \
+        linux/cdrom.h \
+        linux/filter.h \
+        linux/futex.h \
+        linux/hdreg.h \
+        linux/hidraw.h \
+        linux/input.h \
+        linux/ioctl.h \
+        linux/major.h \
+        linux/param.h \
+        linux/seccomp.h \
+        linux/serial.h \
+        linux/types.h \
+        linux/ucdrom.h \
+        linux/wireless.h \
+        lwp.h \
+        mach-o/loader.h \
+        mach/mach.h \
+        machine/cpu.h \
+        machine/sysarch.h \
+        mntent.h \
+        netdb.h \
+        netinet/in.h \
+        netinet/in_systm.h \
+        netinet/tcp.h \
+        netinet/tcp_fsm.h \
+        pcap/pcap.h \
+        port.h \
+        pwd.h \
+        sched.h \
+        scsi/scsi.h \
+        scsi/scsi_ioctl.h \
+        scsi/sg.h \
+        sys/attr.h \
+        sys/auxv.h \
+        sys/cdio.h \
+        sys/epoll.h \
+        sys/event.h \
+        sys/eventfd.h \
+        sys/extattr.h \
+        sys/filio.h \
+        sys/ipc.h \
+        sys/link.h \
+        sys/modem.h \
+        sys/mtio.h \
+        sys/param.h \
+        sys/prctl.h \
+        sys/ptrace.h \
+        sys/queue.h \
+        sys/random.h \
+        sys/resource.h \
+        sys/scsiio.h \
+        sys/shm.h \
+        sys/signal.h \
+        sys/socketvar.h \
+        sys/sockio.h \
+        sys/statvfs.h \
+        sys/strtio.h \
+        sys/syscall.h \
+        sys/sysinfo.h \
+        sys/times.h \
+        sys/uio.h \
+        sys/user.h \
+        sys/utsname.h \
+        sys/vnode.h \
+        sys/xattr.h \
+        syscall.h \
+        utime.h \
+        valgrind/memcheck.h \
+        valgrind/valgrind.h
 )
 AC_HEADER_MAJOR()
 
@@ -279,20 +316,20 @@ AC_CHECK_HEADERS([sys/sysctl.h],,,
 CFLAGS=$saved_sysctl_h_CFLAGS
 
 AC_CHECK_HEADERS(\
-	netinet/ip.h \
-	net/if.h \
-	net/if_arp.h \
-	net/if_dl.h \
-	net/if_types.h \
-	net/route.h \
-	netinet/if_ether.h \
-	netinet/in_pcb.h \
-	netinet/ip_icmp.h \
-	netinet/ip_var.h \
-	netinet/udp.h \
-	netinet6/ip6_var.h \
-	netipx/ipx.h \
-	sys/un.h \
+        netinet/ip.h \
+        net/if.h \
+        net/if_arp.h \
+        net/if_dl.h \
+        net/if_types.h \
+        net/route.h \
+        netinet/if_ether.h \
+        netinet/in_pcb.h \
+        netinet/ip_icmp.h \
+        netinet/ip_var.h \
+        netinet/udp.h \
+        netinet6/ip6_var.h \
+        netipx/ipx.h \
+        sys/un.h \
 ,,,[#include <sys/types.h>
      #include <sys/socket.h>
      #ifdef HAVE_SYS_SOCKETVAR_H
@@ -828,650 +865,7 @@ This is an error since --enable-archs=$wine_arch was requested.])])
     fi
     AS_VAR_SET([${wine_arch}_DEBUG],[$wine_crossdebug])
 
-    test "x$enable_werror" != xyes || WINE_TRY_PE_CFLAGS([-Werror])
-    dnl clang for PE target wants -build-id (and not --build-id as gcc/mingw or clang in unix target)
-    dnl don't bother testing flags, compilation will fail afterwards
-    test "x$enable_build_id" != xyes || AS_VAR_APPEND([${wine_arch}_LDFLAGS],[" -Wl,--build-id"])
-
-done
-
-CC=$saved_CC
-CFLAGS=$saved_CFLAGS
-CPPFLAGS=$saved_CPPFLAGS
-LDFLAGS=$saved_LDFLAGS
-
-case $HOST_ARCH in
-  arm|aarch64)
-    test "x$PE_ARCHS" != x || AC_MSG_ERROR([PE cross-compilation is required for $HOST_ARCH, please install clang/llvm-dlltool/lld, or llvm-mingw.])
-    DLLEXT="" ;;
-  *)
-    WINE_NOTICE_WITH(mingw,[test "x$PE_ARCHS" = "x"],
-                     [Suitable PE cross-compiler not found, PE files won't be built.]) ;;
-esac
-
-dnl **** External libraries ****
-
-if test "x$with_system_dllpath" != "x" -a -n "$PE_ARCHS"
-then
-    WINE_MINGW_PACKAGE_FLAGS(FAUDIO,[FAudio],[-lFAudio],
-        [WINE_CHECK_MINGW_HEADER(FAudio.h,
-            [WINE_CHECK_MINGW_LIB(FAudio,FAudio_CommitOperationSet,[:],[FAUDIO_PE_CFLAGS=""; FAUDIO_PE_LIBS=""],[$FAUDIO_PE_LIBS])],
-            [FAUDIO_PE_CFLAGS=""; FAUDIO_PE_LIBS=""])])
-    if test "x$FAUDIO_PE_LIBS" = "x"
-    then
-        WINE_NOTICE([FAudio ${notice_platform}MinGW development files not found (or too old); using bundled version.])
-    fi
-
-    WINE_MINGW_PACKAGE_FLAGS(FLUIDSYNTH,[fluidsynth],[-lfluidsynth],
-        [WINE_CHECK_MINGW_HEADER(fluidsynth.h,
-            [WINE_CHECK_MINGW_LIB(fluidsynth,new_fluid_synth,[:],[FLUIDSYNTH_PE_CFLAGS=""; FLUIDSYNTH_PE_LIBS=""],[$FLUIDSYNTH_PE_LIBS])],
-            [FLUIDSYNTH_PE_CFLAGS=""; FLUIDSYNTH_PE_LIBS=""])])
-    if test "x$FLUIDSYNTH_PE_LIBS" = "x"
-    then
-        WINE_NOTICE([Fluidsynth ${notice_platform}MinGW development files not found (or too old); using bundled version.])
-    fi
-
-    WINE_MINGW_PACKAGE_FLAGS(JPEG,[libjpeg],,
-        [WINE_CHECK_MINGW_HEADER(jpeglib.h,
-            [WINE_CHECK_MINGW_LIB(jpeg,jpeg_start_decompress,[:],[JPEG_PE_CFLAGS=""; JPEG_PE_LIBS=""],[$JPEG_PE_LIBS])],
-            [JPEG_PE_CFLAGS=""; JPEG_PE_LIBS=""],
-            [#include <stddef.h>
-             #include <stdio.h>])])
-    if test "x$JPEG_PE_LIBS" = "x"
-    then
-        WINE_NOTICE([libjpeg ${notice_platform}MinGW development files not found; using bundled version.])
-    fi
-
-    WINE_MINGW_PACKAGE_FLAGS(LCMS2,[lcms2],[-llcms2],
-        [WINE_CHECK_MINGW_HEADER(lcms2.h,
-            [WINE_CHECK_MINGW_LIB(lcms2,cmsOpenProfileFromFile,[:],[LCMS2_PE_CFLAGS=""; LCMS2_PE_LIBS=""],[$LCMS2_PE_LIBS])],
-            [LCMS2_PE_CFLAGS=""; LCMS2_PE_LIBS=""])])
-    if test "x$LCMS2_PE_LIBS" = "x"
-    then
-        WINE_NOTICE([liblcms2 ${notice_platform}MinGW development files not found; using bundled version.])
-    fi
-
-    WINE_MINGW_PACKAGE_FLAGS(MPG123,[libmpg123],[-lmpg123],
-        [WINE_CHECK_MINGW_HEADER(mpg123.h,
-            [WINE_CHECK_MINGW_LIB(mpg123,mpg123_feed,[:],[MPG123_PE_CFLAGS=""; MPG123_PE_LIBS=""],[$MPG123_PE_LIBS])],
-            [MPG123_PE_CFLAGS=""; MPG123_PE_LIBS=""])])
-    if test "x$MPG123_PE_LIBS" = "x"
-    then
-        WINE_NOTICE([libmpg123 ${notice_platform}MinGW development files not found (or too old); using bundled version.])
-    fi
-
-    WINE_MINGW_PACKAGE_FLAGS(PNG,[libpng],,
-        [WINE_CHECK_MINGW_HEADER(png.h,
-            [WINE_CHECK_MINGW_LIB(png,png_create_read_struct,[:],[PNG_PE_CFLAGS=""; PNG_PE_LIBS=""],[$PNG_PE_LIBS])],
-            [PNG_PE_CFLAGS=""; PNG_PE_LIBS=""])])
-    if test "x$PNG_PE_LIBS" = "x"
-    then
-        WINE_NOTICE([libpng ${notice_platform}MinGW development files not found; using bundled version.])
-    fi
-
-    WINE_MINGW_PACKAGE_FLAGS(TIFF,[libtiff-4],,
-        [WINE_CHECK_MINGW_HEADER(tiffio.h,
-            [WINE_CHECK_MINGW_LIB(tiff,TIFFClientOpen,[:],[TIFF_PE_CFLAGS=""; TIFF_PE_LIBS=""],[$TIFF_PE_LIBS])],
-            [TIFF_PE_CFLAGS=""; TIFF_PE_LIBS=""])])
-    if test "x$TIFF_PE_LIBS" = "x"
-    then
-        WINE_NOTICE([libtiff ${notice_platform}MinGW development files not found; using bundled version.])
-    fi
-
-    WINE_MINGW_PACKAGE_FLAGS(XML2,[libxml-2.0],[-lxml2],
-        [WINE_CHECK_MINGW_HEADER(libxml/parser.h)
-        WINE_CHECK_MINGW_HEADER(libxml/xmlsave.h)
-        WINE_CHECK_MINGW_HEADER(libxml/SAX2.h)
-        if test "$ac_cv_mingw_header_libxml_parser_h" = "yes" -a "$ac_cv_mingw_header_libxml_xmlsave_h" = "yes" -a "$ac_cv_mingw_header_libxml_SAX2_h" = "yes"
-        then
-            WINE_CHECK_MINGW_LIB(xml2,xmlFirstElementChild,[:],[XML2_PE_CFLAGS=""; XML2_PE_LIBS=""],[$XML2_PE_LIBS])
-        else
-            XML2_PE_CFLAGS=""
-            XML2_PE_LIBS=""
-        fi])
-    if test "x$XML2_PE_LIBS" = "x"
-    then
-        WINE_NOTICE([libxml2 ${notice_platform}MinGW development files not found (or too old); using bundled version.])
-    fi
-
-    WINE_MINGW_PACKAGE_FLAGS(XSLT,[libxslt],[-lxslt],
-        [WINE_CHECK_MINGW_HEADER(libxslt/pattern.h)
-        WINE_CHECK_MINGW_HEADER(libxslt/transform.h)
-        if test "$ac_cv_mingw_header_libxslt_pattern_h" = "yes" -a "$ac_cv_mingw_header_libxslt_transform_h" = "yes"
-        then
-            WINE_CHECK_MINGW_LIB(xslt,xsltCompilePattern,[:],[XSLT_PE_CFLAGS=""; XSLT_PE_LIBS=""],[$XSLT_PE_LIBS])
-        else
-            XSLT_PE_CFLAGS=""
-            XSLT_PE_LIBS=""
-        fi])
-    if test "x$XSLT_PE_LIBS" = "x"
-    then
-        WINE_NOTICE([libxslt ${notice_platform}MinGW development files not found; using bundled version.])
-    fi
-
-    WINE_MINGW_PACKAGE_FLAGS(VKD3D,[libvkd3d libvkd3d-shader],[-lvkd3d -lvkd3d-shader],
-        [WINE_CHECK_MINGW_HEADER(vkd3d.h)
-        WINE_CHECK_MINGW_HEADER(vkd3d_shader.h)
-        if test "$ac_cv_mingw_header_vkd3d_h" = "yes" -a "$ac_cv_mingw_header_vkd3d_shader_h" = "yes"
-        then
-            WINE_CHECK_MINGW_LIB(vkd3d,vkd3d_set_log_callback,[:],[:],[$VKD3D_PE_LIBS])
-            WINE_CHECK_MINGW_LIB(vkd3d-shader,vkd3d_shader_build_varying_map,[:],[:],[$VKD3D_PE_LIBS])
-            if test "$ac_cv_mingw_lib_vkd3d" = "no" -o "$ac_cv_mingw_lib_vkd3d_shader" = "no"
-            then
-                VKD3D_PE_CFLAGS=""
-                VKD3D_PE_LIBS=""
-            fi
-        else
-            VKD3D_PE_CFLAGS=""
-            VKD3D_PE_LIBS=""
-        fi])
-    if test "x$VKD3D_PE_LIBS" = "x"
-    then
-        WINE_NOTICE([libvkd3d ${notice_platform}MinGW development files not found (or too old); using bundled version.])
-    fi
-
-    WINE_MINGW_PACKAGE_FLAGS(ZLIB,[zlib],[-lz],
-        [WINE_CHECK_MINGW_HEADER(zlib.h,
-            [WINE_CHECK_MINGW_LIB(z,inflate,[:],[ZLIB_PE_CFLAGS=""; ZLIB_PE_LIBS=""],[$ZLIB_PE_LIBS])],
-            [ZLIB_PE_CFLAGS=""; ZLIB_PE_LIBS=""])])
-    if test "x$ZLIB_PE_LIBS" = "x"
-    then
-        WINE_NOTICE([zlib ${notice_platform}MinGW development files not found; using bundled version.])
-    fi
-fi
-
-WINE_EXTLIB_FLAGS(CAPSTONE, capstone, capstone, "-I\$(top_srcdir)/libs/capstone/include")
-WINE_EXTLIB_FLAGS(FAUDIO, faudio, "faudio mfplat mfreadwrite mfuuid propsys", "-I\$(top_srcdir)/libs/faudio/include")
-WINE_EXTLIB_FLAGS(FLUIDSYNTH, fluidsynth, "fluidsynth", "-I\$(top_srcdir)/libs/fluidsynth/include")
-WINE_EXTLIB_FLAGS(GSM, gsm, gsm, "-I\$(top_srcdir)/libs/gsm/inc")
-WINE_EXTLIB_FLAGS(JPEG, jpeg, jpeg, "-I\$(top_srcdir)/libs/jpeg")
-WINE_EXTLIB_FLAGS(JXR, jxr, jxr, "-I\$(top_srcdir)/libs/jxr/jxrgluelib -I\$(top_srcdir)/libs/jxr/image/sys")
-WINE_EXTLIB_FLAGS(LCMS2, lcms2, lcms2, "-I\$(top_srcdir)/libs/lcms2/include")
-WINE_EXTLIB_FLAGS(LDAP, ldap, ldap, "-I\$(top_srcdir)/libs/ldap/include")
-WINE_EXTLIB_FLAGS(MPG123, mpg123, mpg123, "-I\$(top_srcdir)/libs/mpg123/src/include")
-WINE_EXTLIB_FLAGS(MUSL, musl, musl)
-WINE_EXTLIB_FLAGS(PNG, png, "png \$(ZLIB_PE_LIBS)", "-I\$(top_srcdir)/libs/png")
-WINE_EXTLIB_FLAGS(TIFF, tiff, "tiff \$(ZLIB_PE_LIBS)", "-I\$(top_srcdir)/libs/tiff/libtiff")
-WINE_EXTLIB_FLAGS(TOMCRYPT, tomcrypt, tomcrypt, "-I\$(top_srcdir)/libs/tomcrypt/src/headers -DLTC_NO_PROTOTYPES -DLTC_SOURCE")
-WINE_EXTLIB_FLAGS(VKD3D, vkd3d, vkd3d, "-I\$(top_srcdir)/libs/vkd3d/include")
-WINE_EXTLIB_FLAGS(XML2, xml2, xml2, "-I\$(top_srcdir)/libs/xml2/include -DLIBXML_STATIC")
-WINE_EXTLIB_FLAGS(XSLT, xslt, xslt, "-I\$(top_srcdir)/libs/xslt/libxslt -I\$(top_srcdir)/libs/xslt -DLIBXSLT_STATIC")
-WINE_EXTLIB_FLAGS(ZLIB, zlib, z, "-I\$(top_srcdir)/libs/zlib -DFAR= -DZ_SOLO")
-
-dnl **** Check for pthread ****
-
-AS_VAR_IF([with_pthread],[no],[],
-          [AC_CHECK_FUNC(pthread_create,,[AC_CHECK_LIB(pthread,pthread_create,[AC_SUBST(PTHREAD_LIBS,"-lpthread")])])])
-WINE_ERROR_WITH(pthread,[test "x$ac_cv_func_pthread_create" != xyes -a "x$PTHREAD_LIBS" = x],
-[pthread ${notice_platform}development files not found.
-Wine cannot support threads without libpthread.])
-
-dnl **** Check for X11 ****
-
-AC_PATH_X
-if test "$have_x" = "yes"
-then
-    test -z "$x_includes" || AC_SUBST([X_CFLAGS],"$X_CFLAGS -I$x_includes")
-    test -z "$x_libraries" || AC_SUBST([X_LIBS],"$X_LIBS -L$x_libraries")
-
-    ac_save_CPPFLAGS="$CPPFLAGS"
-    CPPFLAGS="$CPPFLAGS $X_CFLAGS"
-
-    WINE_CHECK_SONAME(X11,XCreateWindow,,,[$X_LIBS])
-    WINE_CHECK_SONAME(Xext,XextCreateExtension,[X_LIBS="$X_LIBS -lXext"],,[$X_LIBS -lX11])
-    X_LIBS="$X_LIBS -lX11"
-
-    xlib_includes="#include <X11/Xlib.h>
-#include <X11/Xutil.h>"
-
-    dnl *** All of the following tests require X11/Xlib.h
-    AC_CHECK_HEADERS([X11/extensions/shape.h \
-                      X11/extensions/XInput.h \
-                      X11/extensions/XInput2.h \
-                      X11/extensions/XShm.h \
-                      X11/extensions/Xfixes.h \
-                      X11/extensions/Xinerama.h \
-                      X11/extensions/Xrandr.h \
-                      X11/extensions/Xrender.h \
-                      X11/extensions/xf86vmode.h \
-                      X11/extensions/xf86vmproto.h],,,
-                      [$xlib_includes])
-
-        dnl *** Check for X cursor
-        AC_CHECK_HEADER([X11/Xcursor/Xcursor.h],
-                        [WINE_CHECK_SONAME(Xcursor,XcursorImageLoadCursor,,,[$X_LIBS])],,
-                        [$xlib_includes])
-        WINE_NOTICE_WITH(xcursor,[test "x$ac_cv_lib_soname_Xcursor" = "x"],
-                         [libxcursor ${notice_platform}development files not found, the Xcursor extension won't be supported.])
-
-        dnl *** Check for X input extension
-        AC_CHECK_HEADER([X11/extensions/XInput.h],
-                        [WINE_CHECK_SONAME(Xi,XOpenDevice,,,[$X_LIBS])],,
-                        [$xlib_includes])
-        WINE_NOTICE_WITH(xinput,[test "x$ac_cv_lib_soname_Xi" = "x"],
-                         [libxi ${notice_platform}development files not found, the Xinput extension won't be supported.])
-
-        dnl *** Check for X input 2 extension
-        if test "x$ac_cv_lib_soname_Xi" != x
-        then
-            WINE_NOTICE_WITH(xinput2,[test "$ac_cv_header_X11_extensions_XInput2_h" != "yes"],
-                             [XInput2 headers not found, the XInput 2 extension won't be supported.])
-        fi
-
-        dnl *** Check for X Shm extension
-        if test "$ac_cv_header_X11_extensions_XShm_h" = "yes"
-        then
-              AC_CHECK_LIB(Xext, XShmQueryExtension,
-              AC_DEFINE(HAVE_LIBXXSHM, 1, [Define if you have the X Shm extension]),,[$X_LIBS])
-        fi
-        WINE_NOTICE_WITH(xshm,[test "$ac_cv_lib_Xext_XShmQueryExtension" != "yes"],
-                         [XShm ${notice_platform}development files not found, X Shared Memory won't be supported.])
-
-        dnl *** Check for X shape extension
-        if test "$ac_cv_header_X11_extensions_shape_h" = "yes"
-        then
-              AC_CHECK_LIB(Xext,XShapeQueryExtension,
-	      AC_DEFINE(HAVE_LIBXSHAPE, 1, [Define if you have the X Shape extension]),,[$X_LIBS])
-        fi
-        WINE_NOTICE_WITH(xshape,[test "$ac_cv_lib_Xext_XShapeQueryExtension" != "yes"],
-                         [XShape ${notice_platform}development files not found, XShape won't be supported.])
-
-        dnl *** Check for XFree86 VMODE extension
-        if test "$ac_cv_header_X11_extensions_xf86vmode_h" = "yes" -o "$ac_cv_header_X11_extensions_xf86vmproto_h" = "yes"
-        then
-            WINE_CHECK_SONAME(Xxf86vm,XF86VidModeQueryExtension,,,[$X_LIBS])
-        fi
-        WINE_NOTICE_WITH(xxf86vm,[test "x$ac_cv_lib_soname_Xxf86vm" = "x"],
-                         [libXxf86vm ${notice_platform}development files not found, XFree86 Vidmode won't be supported.])
-
-        dnl *** Check for Transform functions in Xrender
-        if test "$ac_cv_header_X11_extensions_Xrender_h" = "yes" -a "x$ac_cv_lib_soname_X11" != "x"
-        then
-            WINE_CHECK_SONAME(Xrender,XRenderQueryExtension,
-              [AC_CHECK_LIB(Xrender,XRenderSetPictureTransform,
-                [AC_DEFINE(HAVE_XRENDERSETPICTURETRANSFORM, 1,
-                 [Define if Xrender has the XRenderSetPictureTransform function])],,[$X_LIBS])
-               AC_CHECK_LIB(Xrender,XRenderCreateLinearGradient,
-                [AC_DEFINE(HAVE_XRENDERCREATELINEARGRADIENT, 1,
-                 [Define if Xrender has the XRenderCreateLinearGradient function])],,[$X_LIBS])],,[$X_LIBS])
-
-        fi
-        WINE_WARNING_WITH(xrender,[test "x$ac_cv_lib_soname_Xrender" = "x"],
-                         [libxrender ${notice_platform}development files not found, XRender won't be supported.])
-
-        dnl *** Check for X RandR extension
-        if test "$ac_cv_header_X11_extensions_Xrandr_h" = "yes" -a "x$ac_cv_lib_soname_Xrender" != "x"
-        then
-                AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <X11/Xlib.h>
-#include <X11/extensions/Xrandr.h>]], [[static typeof(XRRSetScreenConfigAndRate) * func; if (func) return 0;]])],
-                  [WINE_CHECK_SONAME(Xrandr,XRRQueryExtension,
-                    [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <X11/Xlib.h>
-#include <X11/extensions/Xrandr.h>]], [[static typeof(XRRGetProviderResources) *f; if (f) return 0;]])],
-                      [AC_DEFINE(HAVE_XRRGETPROVIDERRESOURCES, 1,
-                        [Define if Xrandr has the XRRGetProviderResources function])],
-                      [WINE_NOTICE([libxrandr ${notice_platform}development files too old, XRandR display device handler won't be supported.])])],,[$X_LIBS])])
-        fi
-        WINE_NOTICE_WITH(xrandr,[test "x$ac_cv_lib_soname_Xrandr" = "x"],
-                         [libxrandr ${notice_platform}development files not found, XRandr won't be supported.])
-
-        dnl *** Check for Xfixes extension
-        if test "$ac_cv_header_X11_extensions_Xfixes_h" = "yes"
-        then
-                AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <X11/Xlib.h>
-#include <X11/extensions/Xfixes.h>]], [[static typeof(XFixesQueryVersion) * func; if (func) return 0;]])],
-                  [WINE_CHECK_SONAME(Xfixes,XFixesQueryVersion,,,[$X_LIBS])])
-        fi
-        WINE_NOTICE_WITH(xfixes,[test "x$ac_cv_lib_soname_Xfixes" = "x"],
-                         [libxfixes ${notice_platform}development files not found, Xfixes won't be supported.])
-
-        dnl *** Check for Xinerama extension
-        if test "$ac_cv_header_X11_extensions_Xinerama_h" = "yes"
-        then
-                AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <X11/Xlib.h>
-#include <X11/extensions/Xinerama.h>]], [[static typeof(XineramaQueryScreens) * func; if (func) return 0;]])],
-                  [WINE_CHECK_SONAME(Xinerama,XineramaQueryScreens,,,[$X_LIBS])])
-        fi
-        WINE_NOTICE_WITH(xinerama,[test "x$ac_cv_lib_soname_Xinerama" = "x"],
-                         [libxinerama ${notice_platform}development files not found, multi-monitor setups won't be supported.])
-
-        dnl *** Check for X Composite extension
-        AC_CHECK_HEADER([X11/extensions/Xcomposite.h],
-                        [WINE_CHECK_SONAME(Xcomposite,XCompositeRedirectWindow,,,[$X_LIBS])],,
-                        [$xlib_includes])
-        WINE_NOTICE_WITH(xcomposite,[test "x$ac_cv_lib_soname_Xcomposite" = "x"],
-                         [libxcomposite ${notice_platform}development files not found, Xcomposite won't be supported.])
-
-        dnl *** Check for XICCallback struct
-        AC_CHECK_MEMBERS([XICCallback.callback, XEvent.xcookie],,,[$xlib_includes])
-
-    dnl *** End of X11/Xlib.h check
-
-    dnl Check for the presence of OpenGL
-    opengl_msg=""
-    if test "x$with_opengl" != "xno"
-    then
-	WINE_CHECK_SONAME(GL,glXCreateContext,
-		     [OPENGL_LIBS="-lGL"],
-                     [WINE_CHECK_SONAME(GL,glXCreateContext,
-			    [OPENGL_LIBS="-Xlinker -dylib_file -Xlinker /System/Library/Frameworks/OpenGL.framework/Versions/A/Libraries/libGL.dylib:/System/Library/Frameworks/OpenGL.framework/Versions/A/Libraries/libGL.dylib -lGL"],
-			    [if test -f /usr/X11R6/lib/libGL.a
-                            then
-	                        opengl_msg="/usr/X11R6/lib/libGL.a is present on your system.
-This probably prevents linking to OpenGL. Try deleting the file and restarting configure."
-                            else
-                                opengl_msg="No OpenGL library found on this system."
-                            fi],
-			    $X_LIBS -lm -dylib_file /System/Library/Frameworks/OpenGL.framework/Versions/A/Libraries/libGL.dylib:/System/Library/Frameworks/OpenGL.framework/Versions/A/Libraries/libGL.dylib)],
-		     $X_LIBS -lm)
-        if test "x$with_osmesa" != "xno"
-        then
-            WINE_CHECK_SONAME(OSMesa,OSMesaGetProcAddress,,,[$X_LIBS -lm])
-            WINE_NOTICE_WITH(osmesa,[test "x$ac_cv_lib_soname_OSMesa" = "x"],
-                             [libOSMesa ${notice_platform}development files not found (or too old), OpenGL rendering in bitmaps won't be supported.])
-        fi
-    fi
-    WINE_WARNING_WITH(opengl,[test -n "$opengl_msg"],[$opengl_msg
-OpenGL and Direct3D won't be supported.])
-
-    CPPFLAGS="$ac_save_CPPFLAGS"
-else
-    X_CFLAGS=""
-    X_LIBS=""
-fi
-
-if test "x$with_wayland" != "xno"
-then
-    WINE_PACKAGE_FLAGS(WAYLAND_CLIENT,[wayland-client],,,,
-        [AC_CHECK_HEADER([wayland-client.h],
-           [AC_CHECK_LIB(wayland-client,wl_display_connect,
-              [AC_PATH_PROG(WAYLAND_SCANNER,wayland-scanner,
-                            [`test -n "$PKG_CONFIG" && $PKG_CONFIG --variable=wayland_scanner wayland-scanner 2>/dev/null`])],
-              [WAYLAND_CLIENT_LIBS=""],[$WAYLAND_CLIENT_LIBS])])])
-    WINE_PACKAGE_FLAGS(XKBCOMMON,[xkbcommon],,,,
-        [AC_CHECK_HEADERS([xkbcommon/xkbcommon.h])
-         AC_CHECK_LIB(xkbcommon,xkb_context_new,[:],[XKBCOMMON_LIBS=""],[$XKBCOMMON_LIBS])])
-    WINE_PACKAGE_FLAGS(XKBREGISTRY,[xkbregistry],,,,
-        [AC_CHECK_HEADERS([xkbcommon/xkbregistry.h])
-         AC_CHECK_LIB(xkbregistry,rxkb_context_new,[:],[XKBREGISTRY_LIBS=""],[$XKBREGISTRY_LIBS])])
-    if test "x$with_opengl" != "xno"
-    then
-        WINE_PACKAGE_FLAGS(EGL,[egl],[-lEGL],,,
-            [AC_CHECK_HEADER([EGL/egl.h],
-               [WINE_CHECK_SONAME(EGL,eglGetProcAddress,,,[$EGL_LIBS])])])
-        WINE_PACKAGE_FLAGS(WAYLAND_EGL,[wayland-egl],,,,
-            [AC_CHECK_HEADER([wayland-egl.h],
-               [AC_CHECK_LIB(wayland-egl,wl_egl_window_create,
-                  [AC_DEFINE(HAVE_LIBWAYLAND_EGL, 1, [Define if we have the wayland-egl development environment])],
-                  [WAYLAND_EGL_LIBS=""],[$WAYLAND_EGL_LIBS])])])
-        if test "x$with_wayland" != "x"
-        then
-            WINE_NOTICE_WITH(opengl, [test -z "$ac_cv_lib_soname_EGL" -o "$ac_cv_lib_wayland_egl_wl_egl_window_create" != yes],
-                [EGL ${notice_platform}development files not found, the Wayland driver won't support OpenGL])
-        fi
-    fi
-fi
-WINE_NOTICE_WITH(wayland, [test -z "$WAYLAND_CLIENT_LIBS" -o -z "$WAYLAND_SCANNER" -o -z "$XKBCOMMON_LIBS" -o -z "$XKBREGISTRY_LIBS" -o "$ac_cv_header_linux_input_h" = "no"],
-                 [Wayland ${notice_platform}development files not found, the Wayland driver won't be supported.],
-                 [enable_winewayland_drv])
-
-if test "$enable_wineandroid_drv$enable_winemac_drv$enable_winewayland_drv" = "nonono"
-then
-    WINE_ERROR_WITH(x,[test "x$X_LIBS" = "x"],
-[X ${notice_platform}development files not found. Wine will be built
-without X support, which probably isn't what you want. You will need
-to install ${notice_platform}development packages of Xlib at the very least.],
-                    [enable_winex11_drv])
-else
-    WINE_NOTICE_WITH(x,[test "x$X_LIBS" = "x"],
-                     [X ${notice_platform}development files not found, the X11 driver won't be supported.],
-                     [enable_winex11_drv])
-fi
-
-dnl **** Check for libpcap ****
-if test "$ac_cv_header_pcap_pcap_h" = "yes"
-then
-    AC_CHECK_LIB(pcap,pcap_init,[AC_SUBST(PCAP_LIBS,["-lpcap"])])
-fi
-WINE_NOTICE_WITH(pcap,[test "x$ac_cv_lib_pcap_pcap_init" != xyes],
-                 [pcap ${notice_platform}development files not found, wpcap won't be supported.],
-                 [enable_wpcap])
-
-dnl **** Check for libpcsclite ****
-if test "x$with_pcsclite" != "xno"
-then
-    AC_CHECK_LIB(pcsclite,SCardEstablishContext,[AC_SUBST(PCSCLITE_LIBS,["-lpcsclite"])],
-                 [case $host_os in
-                    darwin*|macosx*) AC_SUBST(PCSCLITE_LIBS,"-framework PCSC") ;;
-                  esac])
-fi
-WINE_NOTICE_WITH(pcsclite,[test "x$PCSCLITE_LIBS" = x],
-                 [libpcsclite not found, smart cards won't be supported.],
-                 [enable_winscard])
-
-dnl **** Check for inotify ****
-if test "x$with_inotify" != "xno"
-then
-    WINE_PACKAGE_FLAGS(INOTIFY,[libinotify],,,,
-        [AC_CHECK_HEADERS([sys/inotify.h])
-         AC_CHECK_LIB(inotify,inotify_add_watch,[:],[INOTIFY_LIBS=""],[$INOTIFY_LIBS])])
-fi
-WINE_NOTICE_WITH(inotify,[test "$ac_cv_header_sys_inotify_h" != "yes"],
-                 [libinotify ${notice_platform}development files not found (or too old), filesystem change notifications won't be supported.])
-
-dnl **** Check for libdbus ****
-if test "x$with_dbus" != "xno"
-then
-    WINE_PACKAGE_FLAGS(DBUS,[dbus-1],,,,
-        [AC_CHECK_HEADER([dbus/dbus.h],
-            [WINE_CHECK_SONAME(dbus-1, dbus_connection_close,,[DBUS_CFLAGS=""],[$DBUS_LIBS])],
-            [DBUS_CFLAGS=""])])
-fi
-case $host_os in
-  darwin*|macosx*) ;;
-  *) WINE_NOTICE_WITH(dbus,[test "x$ac_cv_lib_soname_dbus_1" = "x"],
-                      [libdbus ${notice_platform}development files not found, no dynamic device support.]) ;;
-esac
-
-dnl **** Check for libgnutls ****
-if test "x$with_gnutls" != "xno"
-then
-    WINE_PACKAGE_FLAGS(GNUTLS,[gnutls],[-lgnutls],,,
-        [AC_CHECK_HEADER(gnutls/gnutls.h,
-            [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <gnutls/gnutls.h>
-#include <gnutls/crypto.h>]], [[static typeof(gnutls_mac_get_key_size) *func; if (func) return 0;]])],
-                [WINE_CHECK_SONAME(gnutls,gnutls_global_init,,[GNUTLS_CFLAGS=""],[$GNUTLS_LIBS],[[libgnutls\\(-deb0\\)\\{0,1\\}]])
-                 WINE_CHECK_LIB_FUNCS(gnutls_cipher_init,[$GNUTLS_LIBS],,
-                                      [WINE_NOTICE([libgnutls ${notice_platform}development files too old, bcrypt encryption won't be supported.])])])],
-            [GNUTLS_CFLAGS=""])])
-fi
-WINE_WARNING_WITH(gnutls,[test "x$ac_cv_lib_soname_gnutls" = "x"],
-                 [libgnutls ${notice_platform}development files not found, no schannel support.])
-
-dnl **** Check for libdrm ****
-WINE_PACKAGE_FLAGS(DRM,[libdrm],,,,
-    [AC_CHECK_HEADERS([xf86drm.h],
-        [WINE_CHECK_SONAME(drm,drmOpen,,,[$DRM_LIBS])])])
-
-WINE_PACKAGE_FLAGS(DRMAMDGPU,[libdrm_amdgpu],,,,
-    [AC_CHECK_HEADERS([amdgpu_drm.h],
-        [WINE_CHECK_SONAME(drm_amdgpu,amdgpu_query_info,,,[$DRMAMDGPU_LIBS])])])
-
-dnl **** Check for libgmp ****
-if test "x$with_gnutls" != "xno"
-then
-    WINE_PACKAGE_FLAGS(GMP,[gmp],[-lgmp],,,
-        [AC_CHECK_HEADERS([gmp.h],
-            [WINE_CHECK_SONAME(gmp,__gmpz_init,,[GMP_CFLAGS=""],[$GMP_LIBS],[[libgmp-*]])])])
-fi
-
-dnl **** Check for SANE ****
-if test "x$with_sane" != "xno"
-then
-    WINE_PACKAGE_FLAGS(SANE,[sane-backends],,[`${SANE_CONFIG:-sane-config} --cflags 2>/dev/null`],[`${SANE_CONFIG:-sane-config} --ldflags 2>/dev/null`],
-        [AC_CHECK_HEADER(sane/sane.h,
-            [AC_CHECK_LIB(sane,sane_init,[:],,[$SANE_LIBS])])])
-fi
-WINE_NOTICE_WITH(sane,[test "$ac_cv_lib_sane_sane_init" != "yes"],
-                 [libsane ${notice_platform}development files not found, scanners won't be supported.],
-                 [enable_sane_ds])
-
-dnl **** Check for libusb ****
-if test "x$with_usb" != "xno"
-then
-    WINE_PACKAGE_FLAGS(USB,[libusb-1.0],[-lusb-1.0],,,
-        [AC_CHECK_HEADER([libusb.h],
-            [AC_CHECK_LIB(usb-1.0,libusb_interrupt_event_handler,[:],[USB_LIBS=""],[$USB_LIBS])],
-            [USB_LIBS=""])])
-fi
-WINE_NOTICE_WITH(usb,[test "$ac_cv_lib_usb_1_0_libusb_interrupt_event_handler" != "yes"],
-                 [libusb-1.0 ${notice_platform}development files not found (or too old), USB devices won't be supported.],
-                 [enable_wineusb_sys])
-
-dnl **** Check for libv4l2 ****
-if test "x$with_v4l2" != "xno"
-then
-    WINE_CHECK_SONAME(v4l2,v4l2_open)
-fi
-WINE_NOTICE_WITH(v4l2,[test "x$ac_cv_lib_soname_v4l2" = "x"],
-                 [libv4l2 ${notice_platform}development files not found.])
-
-dnl **** Check for libgphoto2 ****
-if test "x$with_gphoto" != "xno"
-then
-    WINE_PACKAGE_FLAGS(GPHOTO2,[libgphoto2],[-lgphoto2],
-                       [`${GPHOTO2_CONFIG:-gphoto2-config} --cflags 2>/dev/null`],[`${GPHOTO2_CONFIG:-gphoto2-config} --libs 2>/dev/null`],
-        [AC_CHECK_HEADER(gphoto2-camera.h,
-                        [AC_CHECK_LIB(gphoto2,gp_camera_new,[:],,[$GPHOTO2_LIBS])])])
-    WINE_PACKAGE_FLAGS(GPHOTO2_PORT,[libgphoto2_port],[-lgphoto2_port],
-                       [`${GPHOTO2_PORT_CONFIG:-gphoto2-port-config} --cflags 2>/dev/null`],
-                       [`${GPHOTO2_PORT_CONFIG:-gphoto2-port-config} --libs 2>/dev/null`],
-        [AC_CHECK_HEADER(gphoto2-port.h,
-                        [AC_CHECK_LIB(gphoto2_port,gp_port_info_list_new,
-                                      [AC_DEFINE(HAVE_GPHOTO2_PORT, 1, [Define if we have the libgphoto2_port development environment])],
-                                      [GPHOTO2_PORT_LIBS=""; GPHOTO2_PORT_CFLAGS=""],
-                                      [$GPHOTO2_PORT_LIBS])],
-                        [GPHOTO2_PORT_LIBS=""; GPHOTO2_PORT_CFLAGS=""])])
-fi
-WINE_NOTICE_WITH(gphoto,[test "$ac_cv_lib_gphoto2_gp_camera_new" != "yes"],
-                 [libgphoto2 ${notice_platform}development files not found, digital cameras won't be supported.],
-                 [enable_gphoto2_ds])
-WINE_NOTICE_WITH(gphoto,[test "$ac_cv_lib_gphoto2_port_gp_port_info_list_new" != "yes"],
-                 [libgphoto2_port ${notice_platform}development files not found, digital cameras won't be auto-detected.])
-
-
-dnl **** Check for resolver library ***
-if test "$ac_cv_header_resolv_h" = "yes"
-then
-    AC_CACHE_CHECK([for resolver library], ac_cv_have_resolv,
-      [ac_save_LIBS="$LIBS"
-       for lib in '' -lresolv
-       do
-         LIBS="$lib $ac_save_LIBS"
-         AC_LINK_IFELSE([AC_LANG_PROGRAM([[#ifdef HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#endif
-#include <resolv.h>]],[[if (!(_res.options & RES_INIT)) res_init(); res_query("foo",ns_c_in,0,0,0); ns_initparse(0,0,0)]])],
-           [ac_cv_have_resolv=${lib:-"none required"}],[ac_cv_have_resolv="not found"])
-         test "x$ac_cv_have_resolv" = "xnot found" || break
-       done
-       LIBS="$ac_save_LIBS"])
-
-    case "$ac_cv_have_resolv" in
-      "not found") ;;
-      "none required")
-        AC_DEFINE(HAVE_RESOLV, 1, [Define if you have the resolver library and header]) ;;
-      *)
-        AC_DEFINE(HAVE_RESOLV, 1)
-        AC_SUBST(RESOLV_LIBS,$ac_cv_have_resolv) ;;
-    esac
-
-    if test "x$ac_cv_have_resolv" != "xnot found"
-    then
-        AC_CACHE_CHECK([for res_getservers], ac_cv_have_res_getservers,
-                       [ac_save_LIBS="$LIBS"
-                        LIBS="$RESOLV_LIBS $LIBS"
-                        AC_LINK_IFELSE([AC_LANG_PROGRAM(
-        [[#include <resolv.h>]],[[res_getservers(NULL, NULL, 0);]])],[ac_cv_have_res_getservers=yes],[ac_cv_have_res_getservers=no])
-	                 LIBS="$ac_save_LIBS"])
-        if test "$ac_cv_have_res_getservers" = "yes"
-        then
-          AC_DEFINE(HAVE_RES_GETSERVERS, 1, [Define to 1 if you have the 'res_getservers' function.])
-        fi
-    fi
-fi
-
-dnl **** Check for FreeType 2 ****
-if test "x$with_freetype" != "xno"
-then
-    WINE_PACKAGE_FLAGS(FREETYPE,[freetype2],[-lfreetype],
-                       [`(${FREETYPE_CONFIG:-freetype-config} --cflags || ${FREETYPE2_CONFIG:-freetype2-config} --cflags) 2>/dev/null`],
-                       [`(${FREETYPE_CONFIG:-freetype-config} --libs || ${FREETYPE2_CONFIG:-freetype2-config} --libs) 2>/dev/null`],
-        [AC_CHECK_HEADERS([ft2build.h])
-        if test "$ac_cv_header_ft2build_h" = "yes"
-        then
-            WINE_CHECK_SONAME(freetype,FT_Init_FreeType,
-                [AC_DEFINE(HAVE_FREETYPE, 1, [Define if FreeType 2 is installed])
-                 AC_CHECK_TYPES(FT_TrueTypeEngineType,,,[#include <ft2build.h>
-#include FT_MODULE_H])],
-                [FREETYPE_LIBS=""],[$FREETYPE_LIBS])
-        else
-            FREETYPE_CFLAGS=""
-            FREETYPE_LIBS=""
-        fi])
-fi
-WINE_ERROR_WITH(freetype,[test "x$ac_cv_lib_soname_freetype" = x],
-                [FreeType ${notice_platform}development files not found. Fonts will not be built.],
-                [enable_fonts])
-
-dnl **** Check for pthread functions ****
-WINE_CHECK_LIB_FUNCS(\
-        pthread_getthreadid_np,
-        [$PTHREAD_LIBS])
-
-dnl **** Check for gettextpo ****
-if test "x$enable_tools" != xno -a "x$with_gettextpo" = xyes
-then
-    if test "$ac_cv_header_gettext_po_h" = "yes"
-    then
-        AC_CHECK_LIB(gettextpo,po_message_msgctxt,
-                     [AC_DEFINE(HAVE_LIBGETTEXTPO,1,[Define to 1 if you have the 'gettextpo' library (-lgettextpo).])
-                      AC_SUBST(GETTEXTPO_LIBS,"-lgettextpo")])
-    fi
-    WINE_NOTICE_WITH(gettextpo,[test "x$GETTEXTPO_LIBS" = "x"],
-      [GetText ${notice_platform}development files not found (or too old), po files can't be rebuilt.])
-    WINE_NOTICE_WITH(gettextpo,[test "$srcdir" != .],
-      [Rebuilding po files is not supported for out of tree builds.])
-fi
-
-dnl **** Check for PulseAudio ****
-if test "x$with_pulse" != "xno";
-then
-    WINE_PACKAGE_FLAGS(PULSE,[libpulse],,,,
-        [AC_CHECK_HEADER([pulse/pulseaudio.h],
-            [AC_CHECK_LIB(pulse, pa_stream_is_corked,[:],[PULSE_LIBS=""],[$PULSE_LIBS])],
-            [PULSE_LIBS=""])])
-fi
-WINE_NOTICE_WITH(pulse, [test -z "$PULSE_LIBS"],
-        [libpulse ${notice_platform}development files not found or too old, Pulse won't be supported.],
-        [enable_winepulse_drv])
-
-dnl **** Check for FFmpeg ****
-if test "x$with_ffmpeg" != "xno";
-then
-    WINE_PACKAGE_FLAGS(FFMPEG,[libavutil libavformat libavcodec],,,,
-        [AC_CHECK_HEADERS([libavutil/avutil.h libavformat/avformat.h libavcodec/avcodec.h libavcodec/bsf.h])
-         if test "$ac_cv_header_libavutil_avutil_h" = "yes" -a "$ac_cv_header_libavformat_avformat_h" = "yes" -a "$ac_cv_header_libavcodec_avcodec_h" = "yes"
-         then
-            AC_CHECK_LIB(avutil,av_log_set_callback,
-              [AC_CHECK_LIB(avformat,av_find_input_format,
-                [AC_CHECK_LIB(avcodec,avcodec_get_name,
-                  [AC_DEFINE(HAVE_FFMPEG, 1, [Define to 1 if you have the FFmpeg libraries.])],
-                  [FFMPEG_LIBS=""],[$FFMPEG_LIBS])],
-                [FFMPEG_LIBS=""],[$FFMPEG_LIBS])],
-              [FFMPEG_LIBS=""],[$FFMPEG_LIBS])
-         else
-            FFMPEG_LIBS=""
-         fi])
+    test "x$enable_werror" != xyes || WINE_TRY_PE_CFLAGS  fi])
 fi
 WINE_NOTICE_WITH(ffmpeg,[test "x$FFMPEG_LIBS" = x],
         [FFmpeg ${notice_platform}development files not found.])
@@ -1913,32 +1307,32 @@ ac_save_CFLAGS="$CFLAGS"
 CFLAGS="$CFLAGS $BUILTINFLAG"
 AC_CHECK_FUNCS(\
         dladdr1 \
-	dlinfo \
-	epoll_create \
-	fstatfs \
-	futimens \
-	futimes \
-	futimesat \
-	getaddrinfo \
-	getattrlist \
-	getauxval \
-	getifaddrs \
-	getrandom \
-	kqueue \
-	pipe2 \
-	port_create \
-	posix_fadvise \
-	posix_fallocate \
-	ppoll \
-	prctl \
-	sched_getcpu \
-	sched_yield \
-	setproctitle \
-	setprogname \
-	sigprocmask \
-	sysinfo \
-	tcdrain \
-	thr_kill2
+        dlinfo \
+        epoll_create \
+        fstatfs \
+        futimens \
+        futimes \
+        futimesat \
+        getaddrinfo \
+        getattrlist \
+        getauxval \
+        getifaddrs \
+        getrandom \
+        kqueue \
+        pipe2 \
+        port_create \
+        posix_fadvise \
+        posix_fallocate \
+        ppoll \
+        prctl \
+        sched_getcpu \
+        sched_yield \
+        setproctitle \
+        setprogname \
+        sigprocmask \
+        sysinfo \
+        tcdrain \
+        thr_kill2
 )
 CFLAGS="$ac_save_CFLAGS"
 
@@ -1969,8 +1363,8 @@ dnl **** Check for types ****
 AC_CHECK_TYPES([request_sense],,,[#include <linux/cdrom.h>])
 
 AC_CACHE_CHECK([whether we can use re-entrant gethostbyname_r Linux style],
-   	wine_cv_linux_gethostbyname_r_6,
-	AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <netdb.h>]],[[
+        wine_cv_linux_gethostbyname_r_6,
+        AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <netdb.h>]],[[
     char *name=0;
     struct hostent he;
     struct hostent *result;
@@ -1983,7 +1377,7 @@ AC_CACHE_CHECK([whether we can use re-entrant gethostbyname_r Linux style],
     gethostbyname_r(name,&he,buf,bufsize,&result,&errnr);
     gethostbyaddr_r(addr, addrlen, addrtype,&he,buf,bufsize,&result,&errnr);
     ]])],[wine_cv_linux_gethostbyname_r_6=yes],[wine_cv_linux_gethostbyname_r_6=no
-	])
+        ])
    )
    if test "$wine_cv_linux_gethostbyname_r_6" = "yes"
    then
@@ -2018,17 +1412,17 @@ AC_CHECK_MEMBERS([struct mtget.mt_blksiz, struct mtget.mt_gstat, struct mtget.mt
 
 dnl Check for stat.st_blocks and ns-resolved times
 AC_CHECK_MEMBERS([
-	struct stat.st_mtim,
-	struct stat.st_mtimespec,
-	struct stat.st_ctim,
-	struct stat.st_ctimespec,
-	struct stat.st_atim,
-	struct stat.st_atimespec,
-	struct stat.st_birthtime,
-	struct stat.st_birthtim,
-	struct stat.st_birthtimespec,
-	struct stat.__st_birthtime,
-	struct stat.__st_birthtim])
+        struct stat.st_mtim,
+        struct stat.st_mtimespec,
+        struct stat.st_ctim,
+        struct stat.st_ctimespec,
+        struct stat.st_atim,
+        struct stat.st_atimespec,
+        struct stat.st_birthtime,
+        struct stat.st_birthtim,
+        struct stat.st_birthtimespec,
+        struct stat.__st_birthtime,
+        struct stat.__st_birthtim])
 
 dnl Check for sin6_scope_id
 AC_CHECK_MEMBERS([struct sockaddr_in6.sin6_scope_id],,,
@@ -2333,817 +1727,7 @@ WINE_CONFIG_MAKEFILE(dlls/cryptdll)
 WINE_CONFIG_MAKEFILE(dlls/cryptext)
 WINE_CONFIG_MAKEFILE(dlls/cryptnet)
 WINE_CONFIG_MAKEFILE(dlls/cryptnet/tests)
-WINE_CONFIG_MAKEFILE(dlls/cryptowinrt)
-WINE_CONFIG_MAKEFILE(dlls/cryptowinrt/tests)
-WINE_CONFIG_MAKEFILE(dlls/cryptsp)
-WINE_CONFIG_MAKEFILE(dlls/cryptui)
-WINE_CONFIG_MAKEFILE(dlls/cryptui/tests)
-WINE_CONFIG_MAKEFILE(dlls/ctapi32)
-WINE_CONFIG_MAKEFILE(dlls/ctl3d.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/ctl3d32)
-WINE_CONFIG_MAKEFILE(dlls/ctl3dv2.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/d2d1)
-WINE_CONFIG_MAKEFILE(dlls/d2d1/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3d10)
-WINE_CONFIG_MAKEFILE(dlls/d3d10/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3d10_1)
-WINE_CONFIG_MAKEFILE(dlls/d3d10_1/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3d10core)
-WINE_CONFIG_MAKEFILE(dlls/d3d10core/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3d11)
-WINE_CONFIG_MAKEFILE(dlls/d3d11/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3d12)
-WINE_CONFIG_MAKEFILE(dlls/d3d12/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3d12core)
-WINE_CONFIG_MAKEFILE(dlls/d3d8)
-WINE_CONFIG_MAKEFILE(dlls/d3d8/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3d8thk)
-WINE_CONFIG_MAKEFILE(dlls/d3d9)
-WINE_CONFIG_MAKEFILE(dlls/d3d9/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_33)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_34)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_35)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_36)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_37)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_38)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_39)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_40)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_41)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_42)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_43)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_43/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_46)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_46/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_47)
-WINE_CONFIG_MAKEFILE(dlls/d3dcompiler_47/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dim)
-WINE_CONFIG_MAKEFILE(dlls/d3dim700)
-WINE_CONFIG_MAKEFILE(dlls/d3drm)
-WINE_CONFIG_MAKEFILE(dlls/d3drm/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_33)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_34)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_34/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_35)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_35/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_36)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_36/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_37)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_37/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_38)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_38/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_39)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_39/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_40)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_40/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_41)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_41/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_42)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_42/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_43)
-WINE_CONFIG_MAKEFILE(dlls/d3dx10_43/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx11_42)
-WINE_CONFIG_MAKEFILE(dlls/d3dx11_42/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx11_43)
-WINE_CONFIG_MAKEFILE(dlls/d3dx11_43/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_24)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_25)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_26)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_27)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_28)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_29)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_30)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_31)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_32)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_33)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_34)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_35)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_36)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_36/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_37)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_38)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_39)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_40)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_41)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_42)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_43)
-WINE_CONFIG_MAKEFILE(dlls/d3dx9_43/tests)
-WINE_CONFIG_MAKEFILE(dlls/d3dxof)
-WINE_CONFIG_MAKEFILE(dlls/d3dxof/tests)
-WINE_CONFIG_MAKEFILE(dlls/dataexchange)
-WINE_CONFIG_MAKEFILE(dlls/dataexchange/tests)
-WINE_CONFIG_MAKEFILE(dlls/davclnt)
-WINE_CONFIG_MAKEFILE(dlls/dbgeng)
-WINE_CONFIG_MAKEFILE(dlls/dbgeng/tests)
-WINE_CONFIG_MAKEFILE(dlls/dbghelp)
-WINE_CONFIG_MAKEFILE(dlls/dbghelp/tests)
-WINE_CONFIG_MAKEFILE(dlls/dciman32)
-WINE_CONFIG_MAKEFILE(dlls/dcomp)
-WINE_CONFIG_MAKEFILE(dlls/ddeml.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/ddraw)
-WINE_CONFIG_MAKEFILE(dlls/ddraw/tests)
-WINE_CONFIG_MAKEFILE(dlls/ddrawex)
-WINE_CONFIG_MAKEFILE(dlls/ddrawex/tests)
-WINE_CONFIG_MAKEFILE(dlls/desk.cpl)
-WINE_CONFIG_MAKEFILE(dlls/devenum)
-WINE_CONFIG_MAKEFILE(dlls/devenum/tests)
-WINE_CONFIG_MAKEFILE(dlls/dhcpcsvc)
-WINE_CONFIG_MAKEFILE(dlls/dhcpcsvc/tests)
-WINE_CONFIG_MAKEFILE(dlls/dhcpcsvc6)
-WINE_CONFIG_MAKEFILE(dlls/dhtmled.ocx)
-WINE_CONFIG_MAKEFILE(dlls/diasymreader)
-WINE_CONFIG_MAKEFILE(dlls/difxapi)
-WINE_CONFIG_MAKEFILE(dlls/dinput)
-WINE_CONFIG_MAKEFILE(dlls/dinput/tests)
-WINE_CONFIG_MAKEFILE(dlls/dinput8)
-WINE_CONFIG_MAKEFILE(dlls/directmanipulation)
-WINE_CONFIG_MAKEFILE(dlls/directmanipulation/tests)
-WINE_CONFIG_MAKEFILE(dlls/dispdib.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/dispex)
-WINE_CONFIG_MAKEFILE(dlls/dispex/tests)
-WINE_CONFIG_MAKEFILE(dlls/display.drv16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/dmband)
-WINE_CONFIG_MAKEFILE(dlls/dmband/tests)
-WINE_CONFIG_MAKEFILE(dlls/dmcompos)
-WINE_CONFIG_MAKEFILE(dlls/dmcompos/tests)
-WINE_CONFIG_MAKEFILE(dlls/dmime)
-WINE_CONFIG_MAKEFILE(dlls/dmime/tests)
-WINE_CONFIG_MAKEFILE(dlls/dmloader)
-WINE_CONFIG_MAKEFILE(dlls/dmloader/tests)
-WINE_CONFIG_MAKEFILE(dlls/dmscript)
-WINE_CONFIG_MAKEFILE(dlls/dmscript/tests)
-WINE_CONFIG_MAKEFILE(dlls/dmstyle)
-WINE_CONFIG_MAKEFILE(dlls/dmstyle/tests)
-WINE_CONFIG_MAKEFILE(dlls/dmsynth)
-WINE_CONFIG_MAKEFILE(dlls/dmsynth/tests)
-WINE_CONFIG_MAKEFILE(dlls/dmusic)
-WINE_CONFIG_MAKEFILE(dlls/dmusic/tests)
-WINE_CONFIG_MAKEFILE(dlls/dmusic32)
-WINE_CONFIG_MAKEFILE(dlls/dnsapi)
-WINE_CONFIG_MAKEFILE(dlls/dnsapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/dplay)
-WINE_CONFIG_MAKEFILE(dlls/dplayx)
-WINE_CONFIG_MAKEFILE(dlls/dplayx/tests)
-WINE_CONFIG_MAKEFILE(dlls/dpnaddr)
-WINE_CONFIG_MAKEFILE(dlls/dpnet)
-WINE_CONFIG_MAKEFILE(dlls/dpnet/tests)
-WINE_CONFIG_MAKEFILE(dlls/dpnhpast)
-WINE_CONFIG_MAKEFILE(dlls/dpnhupnp)
-WINE_CONFIG_MAKEFILE(dlls/dpnlobby)
-WINE_CONFIG_MAKEFILE(dlls/dpvoice)
-WINE_CONFIG_MAKEFILE(dlls/dpvoice/tests)
-WINE_CONFIG_MAKEFILE(dlls/dpwsockx)
-WINE_CONFIG_MAKEFILE(dlls/drmclien)
-WINE_CONFIG_MAKEFILE(dlls/dsdmo)
-WINE_CONFIG_MAKEFILE(dlls/dsdmo/tests)
-WINE_CONFIG_MAKEFILE(dlls/dsound)
-WINE_CONFIG_MAKEFILE(dlls/dsound/tests)
-WINE_CONFIG_MAKEFILE(dlls/dsquery)
-WINE_CONFIG_MAKEFILE(dlls/dssenh)
-WINE_CONFIG_MAKEFILE(dlls/dssenh/tests)
-WINE_CONFIG_MAKEFILE(dlls/dsuiext)
-WINE_CONFIG_MAKEFILE(dlls/dswave)
-WINE_CONFIG_MAKEFILE(dlls/dswave/tests)
-WINE_CONFIG_MAKEFILE(dlls/dwmapi)
-WINE_CONFIG_MAKEFILE(dlls/dwmapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/dwrite)
-WINE_CONFIG_MAKEFILE(dlls/dwrite/tests)
-WINE_CONFIG_MAKEFILE(dlls/dx8vb)
-WINE_CONFIG_MAKEFILE(dlls/dxcore)
-WINE_CONFIG_MAKEFILE(dlls/dxdiagn)
-WINE_CONFIG_MAKEFILE(dlls/dxdiagn/tests)
-WINE_CONFIG_MAKEFILE(dlls/dxgi)
-WINE_CONFIG_MAKEFILE(dlls/dxgi/tests)
-WINE_CONFIG_MAKEFILE(dlls/dxtrans)
-WINE_CONFIG_MAKEFILE(dlls/dxva2)
-WINE_CONFIG_MAKEFILE(dlls/dxva2/tests)
-WINE_CONFIG_MAKEFILE(dlls/esent)
-WINE_CONFIG_MAKEFILE(dlls/evr)
-WINE_CONFIG_MAKEFILE(dlls/evr/tests)
-WINE_CONFIG_MAKEFILE(dlls/explorerframe)
-WINE_CONFIG_MAKEFILE(dlls/explorerframe/tests)
-WINE_CONFIG_MAKEFILE(dlls/faultrep)
-WINE_CONFIG_MAKEFILE(dlls/faultrep/tests)
-WINE_CONFIG_MAKEFILE(dlls/feclient)
-WINE_CONFIG_MAKEFILE(dlls/fltlib)
-WINE_CONFIG_MAKEFILE(dlls/fltmgr.sys)
-WINE_CONFIG_MAKEFILE(dlls/fntcache)
-WINE_CONFIG_MAKEFILE(dlls/fontsub)
-WINE_CONFIG_MAKEFILE(dlls/fusion)
-WINE_CONFIG_MAKEFILE(dlls/fusion/tests)
-WINE_CONFIG_MAKEFILE(dlls/fwpuclnt)
-WINE_CONFIG_MAKEFILE(dlls/gameux)
-WINE_CONFIG_MAKEFILE(dlls/gameux/tests)
-WINE_CONFIG_MAKEFILE(dlls/gamingtcui)
-WINE_CONFIG_MAKEFILE(dlls/gdi.exe16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/gdi32)
-WINE_CONFIG_MAKEFILE(dlls/gdi32/tests)
-WINE_CONFIG_MAKEFILE(dlls/gdiplus)
-WINE_CONFIG_MAKEFILE(dlls/gdiplus/tests)
-WINE_CONFIG_MAKEFILE(dlls/geolocation)
-WINE_CONFIG_MAKEFILE(dlls/geolocation/tests)
-WINE_CONFIG_MAKEFILE(dlls/glu32)
-WINE_CONFIG_MAKEFILE(dlls/glu32/tests)
-WINE_CONFIG_MAKEFILE(dlls/gphoto2.ds)
-WINE_CONFIG_MAKEFILE(dlls/gpkcsp)
-WINE_CONFIG_MAKEFILE(dlls/graphicscapture)
-WINE_CONFIG_MAKEFILE(dlls/graphicscapture/tests)
-WINE_CONFIG_MAKEFILE(dlls/hal)
-WINE_CONFIG_MAKEFILE(dlls/hhctrl.ocx)
-WINE_CONFIG_MAKEFILE(dlls/hid)
-WINE_CONFIG_MAKEFILE(dlls/hid/tests)
-WINE_CONFIG_MAKEFILE(dlls/hidclass.sys)
-WINE_CONFIG_MAKEFILE(dlls/hidparse.sys)
-WINE_CONFIG_MAKEFILE(dlls/hlink)
-WINE_CONFIG_MAKEFILE(dlls/hlink/tests)
-WINE_CONFIG_MAKEFILE(dlls/hnetcfg)
-WINE_CONFIG_MAKEFILE(dlls/hnetcfg/tests)
-WINE_CONFIG_MAKEFILE(dlls/hrtfapo)
-WINE_CONFIG_MAKEFILE(dlls/http.sys)
-WINE_CONFIG_MAKEFILE(dlls/httpapi)
-WINE_CONFIG_MAKEFILE(dlls/httpapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/hvsimanagementapi)
-WINE_CONFIG_MAKEFILE(dlls/hvsimanagementapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/ia2comproxy)
-WINE_CONFIG_MAKEFILE(dlls/iccvid)
-WINE_CONFIG_MAKEFILE(dlls/icmp)
-WINE_CONFIG_MAKEFILE(dlls/icmui)
-WINE_CONFIG_MAKEFILE(dlls/icmui/tests)
-WINE_CONFIG_MAKEFILE(dlls/icu)
-WINE_CONFIG_MAKEFILE(dlls/ieframe)
-WINE_CONFIG_MAKEFILE(dlls/ieframe/tests)
-WINE_CONFIG_MAKEFILE(dlls/ieproxy)
-WINE_CONFIG_MAKEFILE(dlls/iertutil)
-WINE_CONFIG_MAKEFILE(dlls/iertutil/tests)
-WINE_CONFIG_MAKEFILE(dlls/ifsmgr.vxd,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/imaadp32.acm)
-WINE_CONFIG_MAKEFILE(dlls/imagehlp)
-WINE_CONFIG_MAKEFILE(dlls/imagehlp/tests)
-WINE_CONFIG_MAKEFILE(dlls/imm.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/imm32)
-WINE_CONFIG_MAKEFILE(dlls/imm32/tests)
-WINE_CONFIG_MAKEFILE(dlls/inetcomm)
-WINE_CONFIG_MAKEFILE(dlls/inetcomm/tests)
-WINE_CONFIG_MAKEFILE(dlls/inetcpl.cpl)
-WINE_CONFIG_MAKEFILE(dlls/inetmib1)
-WINE_CONFIG_MAKEFILE(dlls/inetmib1/tests)
-WINE_CONFIG_MAKEFILE(dlls/infosoft)
-WINE_CONFIG_MAKEFILE(dlls/infosoft/tests)
-WINE_CONFIG_MAKEFILE(dlls/initpki)
-WINE_CONFIG_MAKEFILE(dlls/inkobj)
-WINE_CONFIG_MAKEFILE(dlls/inseng)
-WINE_CONFIG_MAKEFILE(dlls/iphlpapi)
-WINE_CONFIG_MAKEFILE(dlls/iphlpapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/iprop)
-WINE_CONFIG_MAKEFILE(dlls/irprops.cpl)
-WINE_CONFIG_MAKEFILE(dlls/itircl)
-WINE_CONFIG_MAKEFILE(dlls/itss)
-WINE_CONFIG_MAKEFILE(dlls/itss/tests)
-WINE_CONFIG_MAKEFILE(dlls/joy.cpl)
-WINE_CONFIG_MAKEFILE(dlls/jscript)
-WINE_CONFIG_MAKEFILE(dlls/jscript/tests)
-WINE_CONFIG_MAKEFILE(dlls/jsproxy)
-WINE_CONFIG_MAKEFILE(dlls/jsproxy/tests)
-WINE_CONFIG_MAKEFILE(dlls/kerberos)
-WINE_CONFIG_MAKEFILE(dlls/kernel32)
-WINE_CONFIG_MAKEFILE(dlls/kernel32/tests)
-WINE_CONFIG_MAKEFILE(dlls/kernelbase)
-WINE_CONFIG_MAKEFILE(dlls/kernelbase/tests)
-WINE_CONFIG_MAKEFILE(dlls/keyboard.drv16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/krnl386.exe16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/ksecdd.sys)
-WINE_CONFIG_MAKEFILE(dlls/ksproxy.ax)
-WINE_CONFIG_MAKEFILE(dlls/ksuser)
-WINE_CONFIG_MAKEFILE(dlls/ktmw32)
-WINE_CONFIG_MAKEFILE(dlls/l3codeca.acm)
-WINE_CONFIG_MAKEFILE(dlls/l3codecx.ax)
-WINE_CONFIG_MAKEFILE(dlls/light.msstyles)
-WINE_CONFIG_MAKEFILE(dlls/loadperf)
-WINE_CONFIG_MAKEFILE(dlls/localspl)
-WINE_CONFIG_MAKEFILE(dlls/localspl/tests)
-WINE_CONFIG_MAKEFILE(dlls/localui)
-WINE_CONFIG_MAKEFILE(dlls/localui/tests)
-WINE_CONFIG_MAKEFILE(dlls/lz32)
-WINE_CONFIG_MAKEFILE(dlls/lz32/tests)
-WINE_CONFIG_MAKEFILE(dlls/lzexpand.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/magnification)
-WINE_CONFIG_MAKEFILE(dlls/mapi32)
-WINE_CONFIG_MAKEFILE(dlls/mapi32/tests)
-WINE_CONFIG_MAKEFILE(dlls/mapistub)
-WINE_CONFIG_MAKEFILE(dlls/mciavi32)
-WINE_CONFIG_MAKEFILE(dlls/mcicda)
-WINE_CONFIG_MAKEFILE(dlls/mciqtz32)
-WINE_CONFIG_MAKEFILE(dlls/mciseq)
-WINE_CONFIG_MAKEFILE(dlls/mciwave)
-WINE_CONFIG_MAKEFILE(dlls/mf)
-WINE_CONFIG_MAKEFILE(dlls/mf/tests)
-WINE_CONFIG_MAKEFILE(dlls/mf3216)
-WINE_CONFIG_MAKEFILE(dlls/mfasfsrcsnk)
-WINE_CONFIG_MAKEFILE(dlls/mferror)
-WINE_CONFIG_MAKEFILE(dlls/mfh264enc)
-WINE_CONFIG_MAKEFILE(dlls/mfmediaengine)
-WINE_CONFIG_MAKEFILE(dlls/mfmediaengine/tests)
-WINE_CONFIG_MAKEFILE(dlls/mfmp4srcsnk)
-WINE_CONFIG_MAKEFILE(dlls/mfplat)
-WINE_CONFIG_MAKEFILE(dlls/mfplat/tests)
-WINE_CONFIG_MAKEFILE(dlls/mfplay)
-WINE_CONFIG_MAKEFILE(dlls/mfplay/tests)
-WINE_CONFIG_MAKEFILE(dlls/mfreadwrite)
-WINE_CONFIG_MAKEFILE(dlls/mfreadwrite/tests)
-WINE_CONFIG_MAKEFILE(dlls/mfsrcsnk)
-WINE_CONFIG_MAKEFILE(dlls/mfsrcsnk/tests)
-WINE_CONFIG_MAKEFILE(dlls/mgmtapi)
-WINE_CONFIG_MAKEFILE(dlls/midimap)
-WINE_CONFIG_MAKEFILE(dlls/mlang)
-WINE_CONFIG_MAKEFILE(dlls/mlang/tests)
-WINE_CONFIG_MAKEFILE(dlls/mmcndmgr)
-WINE_CONFIG_MAKEFILE(dlls/mmcndmgr/tests)
-WINE_CONFIG_MAKEFILE(dlls/mmdevapi)
-WINE_CONFIG_MAKEFILE(dlls/mmdevapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/mmdevldr.vxd,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/mmsystem.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/monodebg.vxd,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/mouhid.sys)
-WINE_CONFIG_MAKEFILE(dlls/mountmgr.sys)
-WINE_CONFIG_MAKEFILE(dlls/mouse.drv16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/mp3dmod)
-WINE_CONFIG_MAKEFILE(dlls/mp3dmod/tests)
-WINE_CONFIG_MAKEFILE(dlls/mpr)
-WINE_CONFIG_MAKEFILE(dlls/mpr/tests)
-WINE_CONFIG_MAKEFILE(dlls/mprapi)
-WINE_CONFIG_MAKEFILE(dlls/msacm.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/msacm32.drv)
-WINE_CONFIG_MAKEFILE(dlls/msacm32)
-WINE_CONFIG_MAKEFILE(dlls/msacm32/tests)
-WINE_CONFIG_MAKEFILE(dlls/msado15)
-WINE_CONFIG_MAKEFILE(dlls/msado15/tests)
-WINE_CONFIG_MAKEFILE(dlls/msadp32.acm)
-WINE_CONFIG_MAKEFILE(dlls/msasn1)
-WINE_CONFIG_MAKEFILE(dlls/msasn1/tests)
-WINE_CONFIG_MAKEFILE(dlls/msauddecmft)
-WINE_CONFIG_MAKEFILE(dlls/mscat32)
-WINE_CONFIG_MAKEFILE(dlls/mscms)
-WINE_CONFIG_MAKEFILE(dlls/mscms/tests)
-WINE_CONFIG_MAKEFILE(dlls/mscoree)
-WINE_CONFIG_MAKEFILE(dlls/mscoree/tests)
-WINE_CONFIG_MAKEFILE(dlls/mscorwks)
-WINE_CONFIG_MAKEFILE(dlls/msctf)
-WINE_CONFIG_MAKEFILE(dlls/msctf/tests)
-WINE_CONFIG_MAKEFILE(dlls/msctfmonitor)
-WINE_CONFIG_MAKEFILE(dlls/msctfp)
-WINE_CONFIG_MAKEFILE(dlls/msdaps)
-WINE_CONFIG_MAKEFILE(dlls/msdasql)
-WINE_CONFIG_MAKEFILE(dlls/msdasql/tests)
-WINE_CONFIG_MAKEFILE(dlls/msdelta)
-WINE_CONFIG_MAKEFILE(dlls/msdmo)
-WINE_CONFIG_MAKEFILE(dlls/msdmo/tests)
-WINE_CONFIG_MAKEFILE(dlls/msdrm)
-WINE_CONFIG_MAKEFILE(dlls/msftedit)
-WINE_CONFIG_MAKEFILE(dlls/msftedit/tests)
-WINE_CONFIG_MAKEFILE(dlls/msg711.acm)
-WINE_CONFIG_MAKEFILE(dlls/msgsm32.acm)
-WINE_CONFIG_MAKEFILE(dlls/mshtml.tlb)
-WINE_CONFIG_MAKEFILE(dlls/mshtml)
-WINE_CONFIG_MAKEFILE(dlls/mshtml/tests)
-WINE_CONFIG_MAKEFILE(dlls/msi)
-WINE_CONFIG_MAKEFILE(dlls/msi/tests)
-WINE_CONFIG_MAKEFILE(dlls/msident)
-WINE_CONFIG_MAKEFILE(dlls/msimg32)
-WINE_CONFIG_MAKEFILE(dlls/msimsg)
-WINE_CONFIG_MAKEFILE(dlls/msimtf)
-WINE_CONFIG_MAKEFILE(dlls/msisip)
-WINE_CONFIG_MAKEFILE(dlls/msisys.ocx)
-WINE_CONFIG_MAKEFILE(dlls/msls31)
-WINE_CONFIG_MAKEFILE(dlls/msmpeg2vdec)
-WINE_CONFIG_MAKEFILE(dlls/msnet32)
-WINE_CONFIG_MAKEFILE(dlls/mspatcha)
-WINE_CONFIG_MAKEFILE(dlls/mspatcha/tests)
-WINE_CONFIG_MAKEFILE(dlls/msports)
-WINE_CONFIG_MAKEFILE(dlls/msrle32)
-WINE_CONFIG_MAKEFILE(dlls/msrle32/tests)
-WINE_CONFIG_MAKEFILE(dlls/msscript.ocx)
-WINE_CONFIG_MAKEFILE(dlls/msscript.ocx/tests)
-WINE_CONFIG_MAKEFILE(dlls/mssign32)
-WINE_CONFIG_MAKEFILE(dlls/mssip32)
-WINE_CONFIG_MAKEFILE(dlls/mstask)
-WINE_CONFIG_MAKEFILE(dlls/mstask/tests)
-WINE_CONFIG_MAKEFILE(dlls/msttsengine)
-WINE_CONFIG_MAKEFILE(dlls/msv1_0)
-WINE_CONFIG_MAKEFILE(dlls/msvcirt)
-WINE_CONFIG_MAKEFILE(dlls/msvcirt/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcm80)
-WINE_CONFIG_MAKEFILE(dlls/msvcm90)
-WINE_CONFIG_MAKEFILE(dlls/msvcp100)
-WINE_CONFIG_MAKEFILE(dlls/msvcp100/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcp110)
-WINE_CONFIG_MAKEFILE(dlls/msvcp110/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcp120)
-WINE_CONFIG_MAKEFILE(dlls/msvcp120/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcp120_app)
-WINE_CONFIG_MAKEFILE(dlls/msvcp140)
-WINE_CONFIG_MAKEFILE(dlls/msvcp140/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcp140_1)
-WINE_CONFIG_MAKEFILE(dlls/msvcp140_1/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcp140_2)
-WINE_CONFIG_MAKEFILE(dlls/msvcp140_2/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcp140_atomic_wait)
-WINE_CONFIG_MAKEFILE(dlls/msvcp140_atomic_wait/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcp140_codecvt_ids)
-WINE_CONFIG_MAKEFILE(dlls/msvcp60)
-WINE_CONFIG_MAKEFILE(dlls/msvcp60/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcp70)
-WINE_CONFIG_MAKEFILE(dlls/msvcp71)
-WINE_CONFIG_MAKEFILE(dlls/msvcp80)
-WINE_CONFIG_MAKEFILE(dlls/msvcp90)
-WINE_CONFIG_MAKEFILE(dlls/msvcp90/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcp_win)
-WINE_CONFIG_MAKEFILE(dlls/msvcr100)
-WINE_CONFIG_MAKEFILE(dlls/msvcr100/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcr110)
-WINE_CONFIG_MAKEFILE(dlls/msvcr110/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcr120)
-WINE_CONFIG_MAKEFILE(dlls/msvcr120/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcr120_app)
-WINE_CONFIG_MAKEFILE(dlls/msvcr70)
-WINE_CONFIG_MAKEFILE(dlls/msvcr70/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcr71)
-WINE_CONFIG_MAKEFILE(dlls/msvcr71/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcr80)
-WINE_CONFIG_MAKEFILE(dlls/msvcr80/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcr90)
-WINE_CONFIG_MAKEFILE(dlls/msvcr90/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcrt)
-WINE_CONFIG_MAKEFILE(dlls/msvcrt/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvcrt20)
-WINE_CONFIG_MAKEFILE(dlls/msvcrt40)
-WINE_CONFIG_MAKEFILE(dlls/msvcrtd)
-WINE_CONFIG_MAKEFILE(dlls/msvcrtd/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvfw32)
-WINE_CONFIG_MAKEFILE(dlls/msvfw32/tests)
-WINE_CONFIG_MAKEFILE(dlls/msvidc32)
-WINE_CONFIG_MAKEFILE(dlls/msvideo.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/msvdsp)
-WINE_CONFIG_MAKEFILE(dlls/msvproc)
-WINE_CONFIG_MAKEFILE(dlls/mswsock)
-WINE_CONFIG_MAKEFILE(dlls/msxml)
-WINE_CONFIG_MAKEFILE(dlls/msxml2)
-WINE_CONFIG_MAKEFILE(dlls/msxml3)
-WINE_CONFIG_MAKEFILE(dlls/msxml3/tests)
-WINE_CONFIG_MAKEFILE(dlls/msxml4)
-WINE_CONFIG_MAKEFILE(dlls/msxml4/tests)
-WINE_CONFIG_MAKEFILE(dlls/msxml6)
-WINE_CONFIG_MAKEFILE(dlls/msxml6/tests)
-WINE_CONFIG_MAKEFILE(dlls/mtxdm)
-WINE_CONFIG_MAKEFILE(dlls/ncrypt)
-WINE_CONFIG_MAKEFILE(dlls/ncrypt/tests)
-WINE_CONFIG_MAKEFILE(dlls/nddeapi)
-WINE_CONFIG_MAKEFILE(dlls/ndis.sys)
-WINE_CONFIG_MAKEFILE(dlls/ndis.sys/tests)
-WINE_CONFIG_MAKEFILE(dlls/netapi32)
-WINE_CONFIG_MAKEFILE(dlls/netapi32/tests)
-WINE_CONFIG_MAKEFILE(dlls/netcfgx)
-WINE_CONFIG_MAKEFILE(dlls/netcfgx/tests)
-WINE_CONFIG_MAKEFILE(dlls/netio.sys)
-WINE_CONFIG_MAKEFILE(dlls/netprofm)
-WINE_CONFIG_MAKEFILE(dlls/netprofm/tests)
-WINE_CONFIG_MAKEFILE(dlls/netutils)
-WINE_CONFIG_MAKEFILE(dlls/newdev)
-WINE_CONFIG_MAKEFILE(dlls/ninput)
-WINE_CONFIG_MAKEFILE(dlls/ninput/tests)
-WINE_CONFIG_MAKEFILE(dlls/normaliz)
-WINE_CONFIG_MAKEFILE(dlls/npmshtml)
-WINE_CONFIG_MAKEFILE(dlls/npptools)
-WINE_CONFIG_MAKEFILE(dlls/nsi)
-WINE_CONFIG_MAKEFILE(dlls/nsi/tests)
-WINE_CONFIG_MAKEFILE(dlls/nsiproxy.sys)
-WINE_CONFIG_MAKEFILE(dlls/ntdll)
-WINE_CONFIG_MAKEFILE(dlls/ntdll/tests)
-WINE_CONFIG_MAKEFILE(dlls/ntdsapi)
-WINE_CONFIG_MAKEFILE(dlls/ntdsapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/ntoskrnl.exe)
-WINE_CONFIG_MAKEFILE(dlls/ntoskrnl.exe/tests)
-WINE_CONFIG_MAKEFILE(dlls/ntprint)
-WINE_CONFIG_MAKEFILE(dlls/ntprint/tests)
-WINE_CONFIG_MAKEFILE(dlls/nvcuda)
-WINE_CONFIG_MAKEFILE(dlls/objsel)
-WINE_CONFIG_MAKEFILE(dlls/odbc32)
-WINE_CONFIG_MAKEFILE(dlls/odbc32/tests)
-WINE_CONFIG_MAKEFILE(dlls/odbcbcp)
-WINE_CONFIG_MAKEFILE(dlls/odbccp32)
-WINE_CONFIG_MAKEFILE(dlls/odbccp32/tests)
-WINE_CONFIG_MAKEFILE(dlls/odbccu32)
-WINE_CONFIG_MAKEFILE(dlls/ole2.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/ole2conv.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/ole2disp.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/ole2nls.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/ole2prox.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/ole2thk.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/ole32)
-WINE_CONFIG_MAKEFILE(dlls/ole32/tests)
-WINE_CONFIG_MAKEFILE(dlls/oleacc)
-WINE_CONFIG_MAKEFILE(dlls/oleacc/tests)
-WINE_CONFIG_MAKEFILE(dlls/oleaut32)
-WINE_CONFIG_MAKEFILE(dlls/oleaut32/tests)
-WINE_CONFIG_MAKEFILE(dlls/olecli.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/olecli32)
-WINE_CONFIG_MAKEFILE(dlls/oledb32)
-WINE_CONFIG_MAKEFILE(dlls/oledb32/tests)
-WINE_CONFIG_MAKEFILE(dlls/oledlg)
-WINE_CONFIG_MAKEFILE(dlls/oledlg/tests)
-WINE_CONFIG_MAKEFILE(dlls/olepro32)
-WINE_CONFIG_MAKEFILE(dlls/olesvr.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/olesvr32)
-WINE_CONFIG_MAKEFILE(dlls/olethk32)
-WINE_CONFIG_MAKEFILE(dlls/opcservices)
-WINE_CONFIG_MAKEFILE(dlls/opcservices/tests)
-WINE_CONFIG_MAKEFILE(dlls/opencl)
-WINE_CONFIG_MAKEFILE(dlls/opengl32)
-WINE_CONFIG_MAKEFILE(dlls/opengl32/tests)
-WINE_CONFIG_MAKEFILE(dlls/packager)
-WINE_CONFIG_MAKEFILE(dlls/packager/tests)
-WINE_CONFIG_MAKEFILE(dlls/pdh)
-WINE_CONFIG_MAKEFILE(dlls/pdh/tests)
-WINE_CONFIG_MAKEFILE(dlls/photometadatahandler)
-WINE_CONFIG_MAKEFILE(dlls/pidgen)
-WINE_CONFIG_MAKEFILE(dlls/powrprof)
-WINE_CONFIG_MAKEFILE(dlls/printui)
-WINE_CONFIG_MAKEFILE(dlls/prntvpt)
-WINE_CONFIG_MAKEFILE(dlls/prntvpt/tests)
-WINE_CONFIG_MAKEFILE(dlls/profapi)
-WINE_CONFIG_MAKEFILE(dlls/propsys)
-WINE_CONFIG_MAKEFILE(dlls/propsys/tests)
-WINE_CONFIG_MAKEFILE(dlls/protontts)
-WINE_CONFIG_MAKEFILE(dlls/psapi)
-WINE_CONFIG_MAKEFILE(dlls/psapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/pstorec)
-WINE_CONFIG_MAKEFILE(dlls/pstorec/tests)
-WINE_CONFIG_MAKEFILE(dlls/pwrshplugin)
-WINE_CONFIG_MAKEFILE(dlls/qasf)
-WINE_CONFIG_MAKEFILE(dlls/qasf/tests)
-WINE_CONFIG_MAKEFILE(dlls/qcap)
-WINE_CONFIG_MAKEFILE(dlls/qcap/tests)
-WINE_CONFIG_MAKEFILE(dlls/qdvd)
-WINE_CONFIG_MAKEFILE(dlls/qdvd/tests)
-WINE_CONFIG_MAKEFILE(dlls/qedit)
-WINE_CONFIG_MAKEFILE(dlls/qedit/tests)
-WINE_CONFIG_MAKEFILE(dlls/qmgr)
-WINE_CONFIG_MAKEFILE(dlls/qmgr/tests)
-WINE_CONFIG_MAKEFILE(dlls/qmgrprxy)
-WINE_CONFIG_MAKEFILE(dlls/quartz)
-WINE_CONFIG_MAKEFILE(dlls/quartz/tests)
-WINE_CONFIG_MAKEFILE(dlls/query)
-WINE_CONFIG_MAKEFILE(dlls/qwave)
-WINE_CONFIG_MAKEFILE(dlls/qwave/tests)
-WINE_CONFIG_MAKEFILE(dlls/rasapi16.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/rasapi32)
-WINE_CONFIG_MAKEFILE(dlls/rasapi32/tests)
-WINE_CONFIG_MAKEFILE(dlls/rasdlg)
-WINE_CONFIG_MAKEFILE(dlls/regapi)
-WINE_CONFIG_MAKEFILE(dlls/resampledmo)
-WINE_CONFIG_MAKEFILE(dlls/resutils)
-WINE_CONFIG_MAKEFILE(dlls/riched20)
-WINE_CONFIG_MAKEFILE(dlls/riched20/tests)
-WINE_CONFIG_MAKEFILE(dlls/riched32)
-WINE_CONFIG_MAKEFILE(dlls/riched32/tests)
-WINE_CONFIG_MAKEFILE(dlls/rometadata)
-WINE_CONFIG_MAKEFILE(dlls/rometadata/tests)
-WINE_CONFIG_MAKEFILE(dlls/rpcrt4)
-WINE_CONFIG_MAKEFILE(dlls/rpcrt4/tests)
-WINE_CONFIG_MAKEFILE(dlls/rsabase)
-WINE_CONFIG_MAKEFILE(dlls/rsaenh)
-WINE_CONFIG_MAKEFILE(dlls/rsaenh/tests)
-WINE_CONFIG_MAKEFILE(dlls/rstrtmgr)
-WINE_CONFIG_MAKEFILE(dlls/rtutils)
-WINE_CONFIG_MAKEFILE(dlls/rtworkq)
-WINE_CONFIG_MAKEFILE(dlls/rtworkq/tests)
-WINE_CONFIG_MAKEFILE(dlls/samlib)
-WINE_CONFIG_MAKEFILE(dlls/sane.ds)
-WINE_CONFIG_MAKEFILE(dlls/sapi)
-WINE_CONFIG_MAKEFILE(dlls/sapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/sas)
-WINE_CONFIG_MAKEFILE(dlls/scarddlg)
-WINE_CONFIG_MAKEFILE(dlls/scardsvr)
-WINE_CONFIG_MAKEFILE(dlls/sccbase)
-WINE_CONFIG_MAKEFILE(dlls/schannel)
-WINE_CONFIG_MAKEFILE(dlls/schannel/tests)
-WINE_CONFIG_MAKEFILE(dlls/schedsvc)
-WINE_CONFIG_MAKEFILE(dlls/schedsvc/tests)
-WINE_CONFIG_MAKEFILE(dlls/scrobj)
-WINE_CONFIG_MAKEFILE(dlls/scrobj/tests)
-WINE_CONFIG_MAKEFILE(dlls/scrrun)
-WINE_CONFIG_MAKEFILE(dlls/scrrun/tests)
-WINE_CONFIG_MAKEFILE(dlls/scsiport.sys)
-WINE_CONFIG_MAKEFILE(dlls/sechost)
-WINE_CONFIG_MAKEFILE(dlls/secur32)
-WINE_CONFIG_MAKEFILE(dlls/secur32/tests)
-WINE_CONFIG_MAKEFILE(dlls/security)
-WINE_CONFIG_MAKEFILE(dlls/sensapi)
-WINE_CONFIG_MAKEFILE(dlls/serialui)
-WINE_CONFIG_MAKEFILE(dlls/serialui/tests)
-WINE_CONFIG_MAKEFILE(dlls/setupapi)
-WINE_CONFIG_MAKEFILE(dlls/setupapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/setupx.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/sfc)
-WINE_CONFIG_MAKEFILE(dlls/sfc_os)
-WINE_CONFIG_MAKEFILE(dlls/sharedgpures.sys)
-WINE_CONFIG_MAKEFILE(dlls/shcore)
-WINE_CONFIG_MAKEFILE(dlls/shcore/tests)
-WINE_CONFIG_MAKEFILE(dlls/shdoclc)
-WINE_CONFIG_MAKEFILE(dlls/shdocvw)
-WINE_CONFIG_MAKEFILE(dlls/shdocvw/tests)
-WINE_CONFIG_MAKEFILE(dlls/shell.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/shell32)
-WINE_CONFIG_MAKEFILE(dlls/shell32/tests)
-WINE_CONFIG_MAKEFILE(dlls/shfolder)
-WINE_CONFIG_MAKEFILE(dlls/shlwapi)
-WINE_CONFIG_MAKEFILE(dlls/shlwapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/slbcsp)
-WINE_CONFIG_MAKEFILE(dlls/slc)
-WINE_CONFIG_MAKEFILE(dlls/slc/tests)
-WINE_CONFIG_MAKEFILE(dlls/snmpapi)
-WINE_CONFIG_MAKEFILE(dlls/snmpapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/softpub)
-WINE_CONFIG_MAKEFILE(dlls/sound.drv16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/spoolss)
-WINE_CONFIG_MAKEFILE(dlls/spoolss/tests)
-WINE_CONFIG_MAKEFILE(dlls/sppc)
-WINE_CONFIG_MAKEFILE(dlls/srclient)
-WINE_CONFIG_MAKEFILE(dlls/srvcli)
-WINE_CONFIG_MAKEFILE(dlls/srvsvc)
-WINE_CONFIG_MAKEFILE(dlls/sspicli)
-WINE_CONFIG_MAKEFILE(dlls/stdole2.tlb)
-WINE_CONFIG_MAKEFILE(dlls/stdole32.tlb)
-WINE_CONFIG_MAKEFILE(dlls/sti)
-WINE_CONFIG_MAKEFILE(dlls/sti/tests)
-WINE_CONFIG_MAKEFILE(dlls/storage.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/stress.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/strmdll)
-WINE_CONFIG_MAKEFILE(dlls/svrapi)
-WINE_CONFIG_MAKEFILE(dlls/sxs)
-WINE_CONFIG_MAKEFILE(dlls/sxs/tests)
-WINE_CONFIG_MAKEFILE(dlls/system.drv16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/t2embed)
-WINE_CONFIG_MAKEFILE(dlls/t2embed/tests)
-WINE_CONFIG_MAKEFILE(dlls/tapi32)
-WINE_CONFIG_MAKEFILE(dlls/tapi32/tests)
-WINE_CONFIG_MAKEFILE(dlls/taskschd)
-WINE_CONFIG_MAKEFILE(dlls/taskschd/tests)
-WINE_CONFIG_MAKEFILE(dlls/tbs)
-WINE_CONFIG_MAKEFILE(dlls/tdh)
-WINE_CONFIG_MAKEFILE(dlls/tdi.sys)
-WINE_CONFIG_MAKEFILE(dlls/threadpoolwinrt)
-WINE_CONFIG_MAKEFILE(dlls/threadpoolwinrt/tests)
-WINE_CONFIG_MAKEFILE(dlls/toolhelp.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/traffic)
-WINE_CONFIG_MAKEFILE(dlls/twain.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/twain_32)
-WINE_CONFIG_MAKEFILE(dlls/twain_32/tests)
-WINE_CONFIG_MAKEFILE(dlls/twinapi.appcore)
-WINE_CONFIG_MAKEFILE(dlls/twinapi.appcore/tests)
-WINE_CONFIG_MAKEFILE(dlls/typelib.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/tzres)
-WINE_CONFIG_MAKEFILE(dlls/ucrtbase)
-WINE_CONFIG_MAKEFILE(dlls/ucrtbase/tests)
-WINE_CONFIG_MAKEFILE(dlls/uianimation)
-WINE_CONFIG_MAKEFILE(dlls/uianimation/tests)
-WINE_CONFIG_MAKEFILE(dlls/uiautomationcore)
-WINE_CONFIG_MAKEFILE(dlls/uiautomationcore/tests)
-WINE_CONFIG_MAKEFILE(dlls/uiribbon)
-WINE_CONFIG_MAKEFILE(dlls/unicows)
-WINE_CONFIG_MAKEFILE(dlls/updspapi)
-WINE_CONFIG_MAKEFILE(dlls/url)
-WINE_CONFIG_MAKEFILE(dlls/urlmon)
-WINE_CONFIG_MAKEFILE(dlls/urlmon/tests)
-WINE_CONFIG_MAKEFILE(dlls/usbd.sys)
-WINE_CONFIG_MAKEFILE(dlls/user.exe16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/user32)
-WINE_CONFIG_MAKEFILE(dlls/user32/tests)
-WINE_CONFIG_MAKEFILE(dlls/userenv)
-WINE_CONFIG_MAKEFILE(dlls/userenv/tests)
-WINE_CONFIG_MAKEFILE(dlls/usp10)
-WINE_CONFIG_MAKEFILE(dlls/usp10/tests)
-WINE_CONFIG_MAKEFILE(dlls/utildll)
-WINE_CONFIG_MAKEFILE(dlls/uxtheme)
-WINE_CONFIG_MAKEFILE(dlls/uxtheme/tests)
-WINE_CONFIG_MAKEFILE(dlls/vbscript)
-WINE_CONFIG_MAKEFILE(dlls/vbscript/tests)
-WINE_CONFIG_MAKEFILE(dlls/vcomp)
-WINE_CONFIG_MAKEFILE(dlls/vcomp/tests)
-WINE_CONFIG_MAKEFILE(dlls/vcomp100)
-WINE_CONFIG_MAKEFILE(dlls/vcomp110)
-WINE_CONFIG_MAKEFILE(dlls/vcomp110/tests)
-WINE_CONFIG_MAKEFILE(dlls/vcomp120)
-WINE_CONFIG_MAKEFILE(dlls/vcomp140)
-WINE_CONFIG_MAKEFILE(dlls/vcomp90)
-WINE_CONFIG_MAKEFILE(dlls/vcruntime140)
-WINE_CONFIG_MAKEFILE(dlls/vcruntime140_1)
-WINE_CONFIG_MAKEFILE(dlls/vdhcp.vxd,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/vdmdbg)
-WINE_CONFIG_MAKEFILE(dlls/ver.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/version)
-WINE_CONFIG_MAKEFILE(dlls/version/tests)
-WINE_CONFIG_MAKEFILE(dlls/vga)
-WINE_CONFIG_MAKEFILE(dlls/vidreszr)
-WINE_CONFIG_MAKEFILE(dlls/virtdisk)
-WINE_CONFIG_MAKEFILE(dlls/virtdisk/tests)
-WINE_CONFIG_MAKEFILE(dlls/vmm.vxd,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/vnbt.vxd,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/vnetbios.vxd,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/vssapi)
-WINE_CONFIG_MAKEFILE(dlls/vtdapi.vxd,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/vulkan-1)
-WINE_CONFIG_MAKEFILE(dlls/vulkan-1/tests)
-WINE_CONFIG_MAKEFILE(dlls/vwin32.vxd,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/w32skrnl,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/w32sys.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/wbemdisp)
-WINE_CONFIG_MAKEFILE(dlls/wbemdisp/tests)
-WINE_CONFIG_MAKEFILE(dlls/wbemprox)
-WINE_CONFIG_MAKEFILE(dlls/wbemprox/tests)
-WINE_CONFIG_MAKEFILE(dlls/wdscore)
-WINE_CONFIG_MAKEFILE(dlls/webservices)
-WINE_CONFIG_MAKEFILE(dlls/webservices/tests)
-WINE_CONFIG_MAKEFILE(dlls/websocket)
-WINE_CONFIG_MAKEFILE(dlls/wer)
-WINE_CONFIG_MAKEFILE(dlls/wer/tests)
-WINE_CONFIG_MAKEFILE(dlls/wevtapi)
-WINE_CONFIG_MAKEFILE(dlls/wevtapi/tests)
-WINE_CONFIG_MAKEFILE(dlls/wevtsvc)
-WINE_CONFIG_MAKEFILE(dlls/wiaservc)
-WINE_CONFIG_MAKEFILE(dlls/wiaservc/tests)
-WINE_CONFIG_MAKEFILE(dlls/wimgapi)
-WINE_CONFIG_MAKEFILE(dlls/win32s16.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/win32u)
-WINE_CONFIG_MAKEFILE(dlls/win32u/tests)
-WINE_CONFIG_MAKEFILE(dlls/win87em.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/winaspi.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/windebug.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/windows.applicationmodel)
-WINE_CONFIG_MAKEFILE(dlls/windows.applicationmodel/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.devices.bluetooth)
-WINE_CONFIG_MAKEFILE(dlls/windows.devices.bluetooth/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.devices.enumeration)
-WINE_CONFIG_MAKEFILE(dlls/windows.devices.enumeration/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.devices.usb)
-WINE_CONFIG_MAKEFILE(dlls/windows.devices.usb/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.gaming.input)
-WINE_CONFIG_MAKEFILE(dlls/windows.gaming.input/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.gaming.ui.gamebar)
-WINE_CONFIG_MAKEFILE(dlls/windows.gaming.ui.gamebar/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.globalization)
-WINE_CONFIG_MAKEFILE(dlls/windows.globalization/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.media.devices)
-WINE_CONFIG_MAKEFILE(dlls/windows.media.devices/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.media.mediacontrol)
-WINE_CONFIG_MAKEFILE(dlls/windows.media.mediacontrol/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.media.speech)
-WINE_CONFIG_MAKEFILE(dlls/windows.media.speech/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.media)
-WINE_CONFIG_MAKEFILE(dlls/windows.media/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.networking.connectivity)
-WINE_CONFIG_MAKEFILE(dlls/windows.networking.connectivity/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.networking.hostname)
-WINE_CONFIG_MAKEFILE(dlls/windows.networking.hostname/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.networking)
-WINE_CONFIG_MAKEFILE(dlls/windows.perception.stub)
-WINE_CONFIG_MAKEFILE(dlls/windows.perception.stub/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.security.authentication.onlineid)
-WINE_CONFIG_MAKEFILE(dlls/windows.security.authentication.onlineid/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.security.credentials.ui.userconsentverifier)
-WINE_CONFIG_MAKEFILE(dlls/windows.security.credentials.ui.userconsentverifier/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.storage.applicationdata)
-WINE_CONFIG_MAKEFILE(dlls/windows.storage.applicationdata/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.system.profile.systemmanufacturers)
-WINE_CONFIG_MAKEFILE(dlls/windows.system.profile.systemmanufacturers/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.ui)
-WINE_CONFIG_MAKEFILE(dlls/windows.ui/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.web)
-WINE_CONFIG_MAKEFILE(dlls/windows.web/tests)
-WINE_CONFIG_MAKEFILE(dlls/windowscodecs)
-WINE_CONFIG_MAKEFILE(dlls/windowscodecs/tests)
-WINE_CONFIG_MAKEFILE(dlls/windowscodecsext)
-WINE_CONFIG_MAKEFILE(dlls/windowscodecsext/tests)
-WINE_CONFIG_MAKEFILE(dlls/winealsa.drv)
-WINE_CONFIG_MAKEFILE(dlls/wineandroid.drv)
-WINE_CONFIG_MAKEFILE(dlls/winebth.sys)
-WINE_CONFIG_MAKEFILE(dlls/winebus.sys)
-WINE_CONFIG_MAKEFILE(dlls/winecoreaudio.drv)
-WINE_CONFIG_MAKEFILE(dlls/winecrt0)
-WINE_CONFIG_MAKEFILE(dlls/wined3d)
-WINE_CONFIG_MAKEFILE(dlls/winedmo)
-WINE_CONFIG_MAKEFILE(dlls/winegstreamer)
-WINE_CONFIG_MAKEFILE(dlls/winehid.sys)
-WINE_CONFIG_MAKEFILE(dlls/winemac.drv)
-WINE_CONFIG_MAKEFILE(dlls/winemapi)
-WINE_CONFIG_MAKEFILE(dlls/wineoss.drv)
-WINE_CONFIG_MAKEFILE(dlls/wineps.drv)
-WINE_CONFIG_MAKEFILE(dlls/wineps16.drv16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/winepulse.drv)
-WINE_CONFIG_MAKEFILE(dlls/wineusb.sys)
-WINE_CONFIG_MAKEFILE(dlls/winevulkan)
-WINE_CONFIG_MAKEFILE(dlls/winewayland.drv)
-WINE_CONFIG_MAKEFILE(dlls/winex11.drv)
-WINE_CONFIG_MAKEFILE(dlls/winexinput.sys)
-WINE_CONFIG_MAKEFILE(dlls/wing.dll16,enable_win16)
+WINE_CONFIG_MAKEFILFIG_MAKEFILE(dlls/wing.dll16,enable_win16)
 WINE_CONFIG_MAKEFILE(dlls/wing32)
 WINE_CONFIG_MAKEFILE(dlls/wing32/tests)
 WINE_CONFIG_MAKEFILE(dlls/winhttp)
@@ -3494,24 +2078,24 @@ dnl Rules for re-running configure
 
 WINE_APPEND_RULE(
 [all: wine
-	@echo \"Wine build complete.\"
+        @echo \"Wine build complete.\"
 Makefile: config.status
-	@./config.status Makefile
+        @./config.status Makefile
 config.status: ${wine_srcdir}configure
-	@./config.status --recheck
+        @./config.status --recheck
 include/config.h: include/stamp-h
 include/stamp-h: ${wine_srcdir}include/config.h.in config.status
-	@./config.status include/config.h include/stamp-h])
+        @./config.status include/config.h include/stamp-h])
 
 if test "x$enable_maintainer_mode" = xyes
 then
     WINE_APPEND_RULE(
 [configure: configure.ac aclocal.m4
-	autoconf --warnings=all
+        autoconf --warnings=all
 include/config.h.in: include/stamp-h.in
 include/stamp-h.in: configure.ac aclocal.m4
-	autoheader --warnings=all
-	@echo timestamp > \$[@]])
+        autoheader --warnings=all
+        @echo timestamp > \$[@]])
 fi
 
 dnl Rules for wineloader
@@ -3527,13 +2111,13 @@ then
     WINE_APPEND_RULE(
 [all: loader/wine64 loader/wine64-preloader $with_wine64/loader/wine $with_wine64/loader/wine-preloader
 loader/wine64 loader/wine64-preloader:
-	rm -f \$[@] && \$(LN_S) $reldir$with_wine64/\$[@] \$[@]
+        rm -f \$[@] && \$(LN_S) $reldir$with_wine64/\$[@] \$[@]
 $with_wine64/loader/wine:
-	rm -f \$[@] && \$(LN_S) $ac_pwd/loader/wine \$[@]
+        rm -f \$[@] && \$(LN_S) $ac_pwd/loader/wine \$[@]
 $with_wine64/loader/wine-preloader:
-	rm -f \$[@] && \$(LN_S) $ac_pwd/loader/wine-preloader \$[@]
+        rm -f \$[@] && \$(LN_S) $ac_pwd/loader/wine-preloader \$[@]
 clean::
-	rm -f loader/wine64 loader/wine64-preloader $with_wine64/loader/wine $with_wine64/loader/wine-preloader])
+        rm -f loader/wine64 loader/wine64-preloader $with_wine64/loader/wine $with_wine64/loader/wine-preloader])
 else
     TOP_INSTALL_DEV="$TOP_INSTALL_DEV include"
     TOP_INSTALL_LIB="$TOP_INSTALL_LIB \
@@ -3564,33 +2148,33 @@ dnl Rules for cleaning
 
 WINE_APPEND_RULE(
 [distclean:: clean
-	rm -rf autom4te.cache
+        rm -rf autom4te.cache
 maintainer-clean::
-	rm -f configure include/config.h.in])
+        rm -f configure include/config.h.in])
 
 dnl Rules for generated source files
 
 WINE_APPEND_RULE(
 [dlls/ntdll/unix/version.c: dummy
-	@version=\`(GIT_DIR=${wine_srcdir}.git git describe HEAD 2>/dev/null || echo \"wine-\$(PACKAGE_VERSION)\") | sed -n -e '\$\$s/\(.*\)/const char wine_build[[]] = \"\\1\";/p'\` && (echo \$\$version | cmp -s - \$[@]) || echo \$\$version >\$[@] || (rm -f \$[@] && exit 1)
+        @version=\`(GIT_DIR=${wine_srcdir}.git git describe HEAD 2>/dev/null || echo \"wine-\$(PACKAGE_VERSION)\") | sed -n -e '\$\$s/\(.*\)/const char wine_build[[]] = \"\\1\";/p'\` && (echo \$\$version | cmp -s - \$[@]) || echo \$\$version >\$[@] || (rm -f \$[@] && exit 1)
 programs/winetest/build.rc: dummy
-	@build=\"STRINGTABLE { 1 \\\"\`GIT_DIR=${wine_srcdir}.git git rev-parse HEAD 2>/dev/null\`\\\" }\" && (echo \$\$build | cmp -s - \$[@]) || echo \$\$build >\$[@] || (rm -f \$[@] && exit 1)
+        @build=\"STRINGTABLE { 1 \\\"\`GIT_DIR=${wine_srcdir}.git git rev-parse HEAD 2>/dev/null\`\\\" }\" && (echo \$\$build | cmp -s - \$[@]) || echo \$\$build >\$[@] || (rm -f \$[@] && exit 1)
 programs/winetest/build.nfo:
-	@-\$(CC) -v 2>\$[@]
+        @-\$(CC) -v 2>\$[@]
 dlls/wineandroid.drv/wine-debug.apk: dlls/wineandroid.drv/build.gradle ${wine_srcdir}dlls/wineandroid.drv/AndroidManifest.xml ${wine_srcdir}dlls/wineandroid.drv/WineActivity.java ${wine_srcdir}dlls/wineandroid.drv/wine.svg
-	cd dlls/wineandroid.drv && gradle -q -Psrcdir=$srcdir assembleDebug
-	mv dlls/wineandroid.drv/build/outputs/apk/wine-debug.apk \$[@]])
+        cd dlls/wineandroid.drv && gradle -q -Psrcdir=$srcdir assembleDebug
+        mv dlls/wineandroid.drv/build/outputs/apk/wine-debug.apk \$[@]])
 
 dnl Misc rules
 
 AC_SUBST(TAGSFLAGS,["--langmap='c:+.idl.l.rh,make:(Make*.in)'"])
 WINE_APPEND_RULE(
 [TAGS etags:
-	rm -f TAGS
-	(test -d .git && git ls-files || find -L $srcdir -name '*.[[ch]]' -print) | xargs etags -a \$(TAGSFLAGS)
+        rm -f TAGS
+        (test -d .git && git ls-files || find -L $srcdir -name '*.[[ch]]' -print) | xargs etags -a \$(TAGSFLAGS)
 tags ctags:
-	rm -f tags
-	(test -d .git && git ls-files || find -L $srcdir -name '*.[[ch]]' -print) | xargs ctags -a \$(TAGSFLAGS)
+        rm -f tags
+        (test -d .git && git ls-files || find -L $srcdir -name '*.[[ch]]' -print) | xargs ctags -a \$(TAGSFLAGS)
 dummy:
 .PHONY: dummy])
 
