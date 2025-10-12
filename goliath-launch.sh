@@ -6,6 +6,10 @@
 #
 # - Place this script at the project root.
 # - Ensure Wine, Darling, ATL, and LibRetro cores are installed and available.
+# This is a meta-launcher and integration point for Wine (Windows), Darling (macOS), ATL (Android), and ipasim (iOS).
+#
+# - Place this script at the project root.
+# - Ensure Wine, Darling, ATL, and ipasim are installed and available in PATH.
 # - Usage: ./goliath-launch.sh <application> [args...]
 #
 # This script will auto-detect the application type and dispatch to the correct subsystem.
@@ -20,168 +24,101 @@ set -e
 
 usage() {
     echo "Usage: $0 <application> [args...]"
-    echo "  Runs Windows, macOS, Android, or Legacy ROM applications using the appropriate compatibility layer."
+    echo "  Runs Windows, macOS, Android, or iOS applications using the appropriate compatibility layer."
     echo ""
-    echo "Supported file types:"
-    echo "  - Windows executables (.exe, .msi, .bat)"
-    echo "  - macOS applications (.app, .dmg, Mach-O binaries)"
-    echo "  - Android packages (.apk)"
-    echo "  - Legacy ROMs (.nes, .snes, .smc, .md, .gen, .gb, .gbc, .gba, .n64, .z64, etc.)"
-    echo ""
-    echo "Environment variables:"
-    echo "  GOLIATH_CORES_PATH - Path to LibRetro cores directory"
-    echo "  GOLIATH_WINE_PATH  - Path to Wine installation"
-    echo "  GOLIATH_DEBUG      - Enable debug output (1=enabled)"
+    echo "Supported application types:"
+    echo "  - Windows executables (.exe, .msi) -> Wine"
+    echo "  - macOS applications (.app, Mach-O binaries) -> Darling"
+    echo "  - Android packages (.apk) -> ATL"
+    echo "  - iOS applications (.ipa) -> ipasim"
     exit 1
 }
 
-debug_log() {
-    if [[ "${GOLIATH_DEBUG:-0}" == "1" ]]; then
-        echo "[DEBUG] $*" >&2
+check_dependency() {
+    local cmd="$1"
+    local name="$2"
+    if ! command -v "$cmd" &> /dev/null; then
+        echo "Error: $name is not installed or not in PATH."
+        echo "Please install $name and ensure it's available in your PATH."
+        exit 1
     fi
 }
 
-detect_file_type() {
-    local file="$1"
+detect_and_run() {
+    local app="$1"
+    shift
     
-    if [[ ! -f "$file" ]]; then
-        echo "ERROR: File not found: $file" >&2
-        return 1
+    # Check if file exists
+    if [ ! -e "$app" ]; then
+        echo "Error: File '$app' does not exist."
+        exit 1
     fi
     
-    # Get file extension
-    local ext="${file##*.}"
-    ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+    # Get file type information
+    local filetype
+    filetype=$(file "$app" 2>/dev/null || echo "unknown")
     
-    debug_log "File: $file, Extension: $ext"
-    
-    # Check for ROM files first (by extension)
-    case "$ext" in
-        nes|unf|unif|fds)
-            echo "rom_nes"
-            return 0
+    # Detect application type and dispatch to appropriate subsystem
+    case "$app" in
+        *.ipa)
+            echo "Detected iOS application: $app"
+            check_dependency "ipasim" "ipasim"
+            echo "Launching with ipasim..."
+            exec ipasim "$app" "$@"
             ;;
-        smc|sfc|fig)
-            echo "rom_snes"
-            return 0
+        *.apk)
+            echo "Detected Android application: $app"
+            check_dependency "atl" "ATL (Android Translation Layer)"
+            echo "Launching with ATL..."
+            exec atl "$app" "$@"
             ;;
-        md|gen|bin|smd)
-            # Check if it's a Genesis ROM by looking for SEGA signature
-            if command -v hexdump >/dev/null 2>&1; then
-                local header=$(hexdump -C "$file" | head -20 | grep -i "sega")
-                if [[ -n "$header" ]]; then
-                    echo "rom_genesis"
-                    return 0
-                fi
+        *.app|*.app/)
+            echo "Detected macOS application: $app"
+            check_dependency "darling" "Darling"
+            echo "Launching with Darling..."
+            exec darling shell "$app" "$@"
+            ;;
+        *.exe|*.msi)
+            echo "Detected Windows application: $app"
+            check_dependency "wine" "Wine"
+            echo "Launching with Wine..."
+            exec wine "$app" "$@"
+            ;;
+        *)
+            # Use file command output for more sophisticated detection
+            if [[ "$filetype" == *"Mach-O"* ]]; then
+                echo "Detected macOS binary (Mach-O): $app"
+                check_dependency "darling" "Darling"
+                echo "Launching with Darling..."
+                exec darling shell "$app" "$@"
+            elif [[ "$filetype" == *"PE32"* ]] || [[ "$filetype" == *"MS-DOS"* ]]; then
+                echo "Detected Windows executable: $app"
+                check_dependency "wine" "Wine"
+                echo "Launching with Wine..."
+                exec wine "$app" "$@"
+            elif [[ "$filetype" == *"ELF"* ]]; then
+                echo "Detected ELF binary: $app"
+                echo "Note: ELF binaries may be Linux native applications."
+                echo "Attempting to run natively..."
+                exec "$app" "$@"
+            else
+                echo "Error: Unable to detect application type for '$app'"
+                echo "File type: $filetype"
+                echo ""
+                echo "Supported formats:"
+                echo "  - iOS: .ipa files"
+                echo "  - Android: .apk files"
+                echo "  - macOS: .app bundles, Mach-O binaries"
+                echo "  - Windows: .exe, .msi files, PE32 binaries"
+                exit 1
             fi
-            # Could also be a generic binary, check further
-            ;;
-        gb)
-            echo "rom_gameboy"
-            return 0
-            ;;
-        gbc)
-            echo "rom_gameboy_color"
-            return 0
-            ;;
-        gba)
-            echo "rom_gameboy_advance"
-            return 0
-            ;;
-        n64|v64|z64)
-            echo "rom_n64"
-            return 0
-            ;;
-        sms)
-            echo "rom_master_system"
-            return 0
-            ;;
-        gg)
-            echo "rom_game_gear"
-            return 0
-            ;;
-        a26)
-            echo "rom_atari_2600"
-            return 0
-            ;;
-        a78)
-            echo "rom_atari_7800"
-            return 0
-            ;;
-        lnx)
-            echo "rom_lynx"
-            return 0
-            ;;
-        apk)
-            echo "android"
-            return 0
-            ;;
-        exe|msi|bat|com)
-            echo "windows"
-            return 0
-            ;;
-        app|dmg)
-            echo "macos"
-            return 0
             ;;
     esac
-    
-    # Use file command to detect binary type
-    if command -v file >/dev/null 2>&1; then
-        local filetype=$(file "$file")
-        debug_log "File type: $filetype"
-        
-        if [[ "$filetype" == *"Mach-O"* ]]; then
-            echo "macos"
-            return 0
-        elif [[ "$filetype" == *"ELF"* ]]; then
-            # Could be a Linux binary or Windows binary in ELF format
-            if [[ "$filetype" == *"Windows"* ]] || [[ "$ext" == "exe" ]]; then
-                echo "windows"
-            else
-                echo "linux"
-            fi
-            return 0
-        elif [[ "$filetype" == *"PE32"* ]] || [[ "$filetype" == *"MS-DOS"* ]]; then
-            echo "windows"
-            return 0
-        fi
-    fi
-    
-    # If we can't determine the type, try the unified loader
-    echo "unknown"
-    return 0
 }
 
-run_windows_app() {
-    local app="$1"
-    shift
-    
-    debug_log "Running Windows application: $app"
-    
-    # Check if Wine is available
-    if ! command -v wine >/dev/null 2>&1; then
-        echo "ERROR: Wine not found. Please install Wine to run Windows applications." >&2
-        return 1
-    fi
-    
-    exec wine "$app" "$@"
-}
-
-run_macos_app() {
-    local app="$1"
-    shift
-    
-    debug_log "Running macOS application: $app"
-    
-    # Check if Darling is available
-    if ! command -v darling >/dev/null 2>&1; then
-        echo "ERROR: Darling not found. Please install Darling to run macOS applications." >&2
-        return 1
-    fi
-    
-    exec darling shell "$app" "$@"
-}
+if [ $# -lt 1 ]; then
+    usage
+fi
 
 run_android_app() {
     local app="$1"
