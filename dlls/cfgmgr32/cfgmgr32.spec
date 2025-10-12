@@ -48,10 +48,10 @@
 @ stub CM_Enable_DevNode_Ex
 @ stdcall CM_Enumerate_Classes(long ptr long)
 @ stdcall CM_Enumerate_Classes_Ex(long ptr long ptr)
-@ stub CM_Enumerate_EnumeratorsA
-@ stub CM_Enumerate_EnumeratorsW
-@ stub CM_Enumerate_Enumerators_ExA
-@ stub CM_Enumerate_Enumerators_ExW
+@ stdcall CM_Enumerate_EnumeratorsA(long ptr ptr long)
+@ stdcall CM_Enumerate_EnumeratorsW(long ptr ptr long)
+@ stdcall CM_Enumerate_Enumerators_ExA(long ptr ptr long ptr)
+@ stdcall CM_Enumerate_Enumerators_ExW(long ptr ptr long ptr)
 @ stub CM_Find_Range
 @ stub CM_First_Range
 @ stub CM_Free_Log_Conf

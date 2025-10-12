@@ -41,6 +41,7 @@ static const WCHAR *guid_string( const GUID *guid, WCHAR *buffer, UINT length )
 
 static const WCHAR control_classW[]  = L"System\\CurrentControlSet\\Control\\Class\\";
 static const WCHAR device_classesW[] = L"System\\CurrentControlSet\\Control\\DeviceClasses\\";
+static const WCHAR enum_rootW[]      = L"System\\CurrentControlSet\\Enum\\";
 
 static struct key_cache
 {
@@ -52,6 +53,7 @@ static struct key_cache
 {
     { HKEY_LOCAL_MACHINE, control_classW, ARRAY_SIZE(control_classW) - 1, (HKEY)-1 },
     { HKEY_LOCAL_MACHINE, device_classesW, ARRAY_SIZE(device_classesW) - 1, (HKEY)-1 },
+    { HKEY_LOCAL_MACHINE, enum_rootW, ARRAY_SIZE(enum_rootW) - 1, (HKEY)-1 },
 };
 
 static HKEY cache_root_key( HKEY root, const WCHAR *key, const WCHAR **path )
@@ -170,6 +172,65 @@ CONFIGRET WINAPI CM_Enumerate_Classes_Ex( ULONG index, GUID *class, ULONG flags,
 CONFIGRET WINAPI CM_Enumerate_Classes( ULONG index, GUID *class, ULONG flags )
 {
     return CM_Enumerate_Classes_Ex( index, class, flags, NULL );
+}
+
+/***********************************************************************
+ *           CM_Enumerate_Enumerators_ExW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Enumerate_Enumerators_ExW( ULONG index, WCHAR *buffer, ULONG *len, ULONG flags, HMACHINE machine )
+{
+    LSTATUS err;
+    HKEY root;
+
+    TRACE( "index %lu, buffer %p, len %p, flags %#lx, machine %p\n", index, buffer, len, flags, machine );
+    if (machine) FIXME( "machine %p not implemented!\n", machine );
+
+    if (!buffer || !len) return CR_INVALID_POINTER;
+    if (!*len && buffer) return CR_INVALID_DATA;
+    if (flags) return CR_INVALID_FLAG;
+
+    root = cache_root_key( HKEY_LOCAL_MACHINE, enum_rootW, NULL );
+    if (root == (HKEY)-1) return CR_NO_SUCH_REGISTRY_KEY;
+
+    if (!(err = RegEnumKeyExW( root, index, buffer, len, NULL, NULL, NULL, NULL ))) *len += 1;
+    return map_error( err );
+}
+
+/***********************************************************************
+ *           CM_Enumerate_Enumerators_ExA (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Enumerate_Enumerators_ExA( ULONG index, char *bufferA, ULONG *lenA, ULONG flags, HMACHINE machine )
+{
+    WCHAR bufferW[MAX_PATH];
+    DWORD lenW = ARRAY_SIZE(bufferW), maxA;
+    CONFIGRET ret;
+
+    TRACE( "index %lu, bufferA %p, lenA %p, flags %#lx, machine %p\n", index, bufferA, lenA, flags, machine );
+
+    if (!bufferA || !lenA) return CR_INVALID_POINTER;
+    if (!(maxA = *lenA) && bufferA) return CR_INVALID_DATA;
+
+    if ((ret = CM_Enumerate_Enumerators_ExW( index, bufferW, &lenW, flags, NULL ))) return ret;
+    if ((*lenA = WideCharToMultiByte( CP_ACP, 0, bufferW, lenW, NULL, 0, NULL, NULL )) > maxA || !bufferA) return CR_BUFFER_SMALL;
+    WideCharToMultiByte( CP_ACP, 0, bufferW, lenW, bufferA, maxA, NULL, NULL );
+
+    return CR_SUCCESS;
+}
+
+/***********************************************************************
+ *           CM_Enumerate_EnumeratorsW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Enumerate_EnumeratorsW( ULONG index, WCHAR *buffer, ULONG *len, ULONG flags )
+{
+    return CM_Enumerate_Enumerators_ExW( index, buffer, len, flags, NULL );
+}
+
+/***********************************************************************
+ *           CM_Enumerate_EnumeratorsA (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Enumerate_EnumeratorsA( ULONG index, char *buffer, ULONG *len, ULONG flags )
+{
+    return CM_Enumerate_Enumerators_ExA( index, buffer, len, flags, NULL );
 }
 
 /***********************************************************************
