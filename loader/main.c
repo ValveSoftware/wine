@@ -99,37 +99,130 @@ int wine_main(int argc, char *argv[]) {
 
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <dlfcn.h>
+
+/* Darling integration functions */
+static const char* find_darling_executable() {
+    /* Try to find Darling in common installation paths */
+    static const char* darling_paths[] = {
+        "/usr/local/bin/darling",
+        "/usr/bin/darling",
+        "/opt/darling/bin/darling",
+        NULL
+    };
+    
+    for (int i = 0; darling_paths[i]; i++) {
+        if (access(darling_paths[i], X_OK) == 0) {
+            return darling_paths[i];
+        }
+    }
+    return NULL;
+}
+
+static const char* find_darling_mldr() {
+    /* Try to find Darling's Mach-O loader in common paths */
+    static const char* mldr_paths[] = {
+        "/usr/local/libexec/darling/usr/lib/darling/mldr",
+        "/usr/libexec/darling/usr/lib/darling/mldr",
+        "/opt/darling/libexec/darling/usr/lib/darling/mldr",
+        "../libs/darling/src/startup/mldr/mldr",  /* Build directory fallback */
+        NULL
+    };
+    
+    for (int i = 0; mldr_paths[i]; i++) {
+        if (access(mldr_paths[i], X_OK) == 0) {
+            return mldr_paths[i];
+        }
+    }
+    return NULL;
+}
 
 int darling_main(int argc, char *argv[]) {
-    // For now, exec the Mach-O loader binary from Darling as a placeholder for deep integration
-    // In a real integration, this would call the Mach-O loader logic directly
-    const char *mach_loader = "../libs/darling/src/startup/mldr/mldr";
-    char **new_argv = malloc(sizeof(char*) * (argc + 1));
-    if (!new_argv) {
-        fprintf(stderr, "goliath: out of memory\n");
+    if (argc < 2) {
+        fprintf(stderr, "goliath: darling_main requires at least one argument\n");
         return 1;
     }
-    new_argv[0] = (char*)mach_loader;
-    for (int i = 1; i < argc; ++i) new_argv[i] = argv[i];
-    new_argv[argc] = NULL;
 
-    pid_t pid = fork();
-    if (pid == 0) {
-        // Child: exec Mach-O loader
-        execv(mach_loader, new_argv);
-        perror("goliath: execv failed for Mach-O loader");
-        exit(127);
-    } else if (pid > 0) {
-        // Parent: wait for child
-        int status = 0;
-        waitpid(pid, &status, 0);
-        free(new_argv);
-        return WIFEXITED(status) ? WEXITSTATUS(status) : 127;
-    } else {
-        perror("goliath: fork failed");
-        free(new_argv);
-        return 127;
+    const char *app_path = argv[1];
+    
+    /* First, try to use system Darling if available */
+    const char *darling_exec = find_darling_executable();
+    if (darling_exec) {
+        fprintf(stderr, "goliath: launching macOS application via system Darling: %s\n", app_path);
+        
+        /* Build command: darling shell <app> [args...] */
+        char **new_argv = malloc(sizeof(char*) * (argc + 2));
+        if (!new_argv) {
+            fprintf(stderr, "goliath: out of memory\n");
+            return 1;
+        }
+        
+        new_argv[0] = (char*)darling_exec;
+        new_argv[1] = "shell";
+        for (int i = 1; i < argc; i++) {
+            new_argv[i + 1] = argv[i];
+        }
+        new_argv[argc + 1] = NULL;
+        
+        pid_t pid = fork();
+        if (pid == 0) {
+            /* Child: exec Darling */
+            execv(darling_exec, new_argv);
+            perror("goliath: execv failed for Darling");
+            exit(127);
+        } else if (pid > 0) {
+            /* Parent: wait for child */
+            int status = 0;
+            waitpid(pid, &status, 0);
+            free(new_argv);
+            return WIFEXITED(status) ? WEXITSTATUS(status) : 127;
+        } else {
+            perror("goliath: fork failed");
+            free(new_argv);
+            return 127;
+        }
     }
+    
+    /* Fallback: try to use Darling's mldr directly */
+    const char *mach_loader = find_darling_mldr();
+    if (mach_loader) {
+        fprintf(stderr, "goliath: launching macOS application via Darling mldr: %s\n", app_path);
+        
+        char **new_argv = malloc(sizeof(char*) * (argc + 1));
+        if (!new_argv) {
+            fprintf(stderr, "goliath: out of memory\n");
+            return 1;
+        }
+        
+        new_argv[0] = (char*)mach_loader;
+        for (int i = 1; i < argc; i++) {
+            new_argv[i] = argv[i];
+        }
+        new_argv[argc] = NULL;
+        
+        pid_t pid = fork();
+        if (pid == 0) {
+            /* Child: exec Mach-O loader */
+            execv(mach_loader, new_argv);
+            perror("goliath: execv failed for Mach-O loader");
+            exit(127);
+        } else if (pid > 0) {
+            /* Parent: wait for child */
+            int status = 0;
+            waitpid(pid, &status, 0);
+            free(new_argv);
+            return WIFEXITED(status) ? WEXITSTATUS(status) : 127;
+        } else {
+            perror("goliath: fork failed");
+            free(new_argv);
+            return 127;
+        }
+    }
+    
+    /* No Darling installation found */
+    fprintf(stderr, "goliath: Darling not found. Please install Darling to run macOS applications.\n");
+    fprintf(stderr, "goliath: Visit https://github.com/darlinghq/darling for installation instructions.\n");
+    return 127;
 }
 /*
  * Emulator initialisation code
