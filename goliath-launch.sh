@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Goliath Unified Compatibility Layer
 #
+# This is a meta-launcher and integration point for Wine (Windows), Darling (macOS), 
+# ATL (Android), and LibRetro (Legacy ROMs).
+#
+# - Place this script at the project root.
+# - Ensure Wine, Darling, ATL, and LibRetro cores are installed and available.
 # This is a meta-launcher and integration point for Wine (Windows), Darling (macOS), ATL (Android), and ipasim (iOS).
 #
 # - Place this script at the project root.
@@ -12,7 +17,7 @@
 # For more details, see documentation/README-goliath.md
 
 # Goliath Unified Application Launcher
-# This script dispatches to Wine, Darling, ATL, or ipasim based on the application type.
+# This script dispatches to Wine, Darling, ATL, or LibRetro based on the application type.
 # Copyright 2025 Goliath Project
 
 set -e
@@ -115,8 +120,108 @@ if [ $# -lt 1 ]; then
     usage
 fi
 
-APP="$1"
-shift
+run_android_app() {
+    local app="$1"
+    shift
+    
+    debug_log "Running Android application: $app"
+    
+    # Check if ATL is available
+    if ! command -v atl >/dev/null 2>&1; then
+        echo "ERROR: ATL (Android Translation Layer) not found." >&2
+        echo "Please install ATL to run Android applications." >&2
+        return 1
+    fi
+    
+    exec atl "$app" "$@"
+}
 
-# Main execution
-detect_and_run "$APP" "$@"
+run_rom_file() {
+    local rom="$1"
+    shift
+    
+    debug_log "Running ROM file: $rom"
+    
+    # Use the unified loader which has LibRetro integration
+    local loader="$(dirname "$0")/loader/goliath"
+    
+    if [[ ! -x "$loader" ]]; then
+        # Try to build the loader if it doesn't exist
+        echo "Goliath unified loader not found. Attempting to build..." >&2
+        if [[ -f "$(dirname "$0")/Makefile" ]]; then
+            make -C "$(dirname "$0")" loader/goliath
+        fi
+        
+        if [[ ! -x "$loader" ]]; then
+            echo "ERROR: Goliath unified loader not available." >&2
+            echo "Please build the project first: make" >&2
+            return 1
+        fi
+    fi
+    
+    exec "$loader" "$rom" "$@"
+}
+
+run_linux_app() {
+    local app="$1"
+    shift
+    
+    debug_log "Running Linux application: $app"
+    
+    # For Linux binaries, just execute directly
+    exec "$app" "$@"
+}
+
+main() {
+    if [[ $# -lt 1 ]]; then
+        usage
+    fi
+    
+    local app="$1"
+    shift
+    
+    # Make path absolute if relative
+    if [[ "$app" != /* ]]; then
+        app="$(pwd)/$app"
+    fi
+    
+    debug_log "Goliath launcher starting..."
+    debug_log "Target application: $app"
+    debug_log "Arguments: $*"
+    
+    # Detect file type
+    local file_type
+    file_type=$(detect_file_type "$app")
+    
+    debug_log "Detected file type: $file_type"
+    
+    case "$file_type" in
+        windows)
+            run_windows_app "$app" "$@"
+            ;;
+        macos)
+            run_macos_app "$app" "$@"
+            ;;
+        android)
+            run_android_app "$app" "$@"
+            ;;
+        linux)
+            run_linux_app "$app" "$@"
+            ;;
+        rom_*)
+            run_rom_file "$app" "$@"
+            ;;
+        unknown)
+            echo "WARNING: Unknown file type, trying unified loader..." >&2
+            run_rom_file "$app" "$@"  # The unified loader can handle unknown types
+            ;;
+        *)
+            echo "ERROR: Unsupported file type: $file_type" >&2
+            echo "File: $app" >&2
+            usage
+            ;;
+    esac
+}
+
+# Run main function with all arguments
+main "$@"
