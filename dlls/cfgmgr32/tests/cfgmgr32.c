@@ -607,6 +607,83 @@ static void test_CM_Get_Device_Interface_Property_setupapi(void)
     ok(ret == CR_NO_SUCH_DEVICE_INTERFACE || broken(ret == CR_INVALID_DATA) /* w7 */, "got %#lx.\n", ret);
 }
 
+static void test_CM_Get_Device_Interface_Property_Keys(void)
+{
+    DEVPROPKEY buffer[128];
+    DEVINSTID_W iface;
+    CONFIGRET ret;
+    WCHAR *tmp;
+    ULONG size;
+    GUID guid;
+
+    guid = GUID_DEVINTERFACE_HID;
+    ret = CM_Get_Device_Interface_List_SizeW( &size, &guid, NULL, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_SUCCESS );
+    iface = malloc( size * sizeof(*iface) );
+    ok_ptr( iface, !=, NULL );
+    ret = CM_Get_Device_Interface_ListW( &guid, NULL, iface, size, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_SUCCESS );
+
+    size = sizeof(buffer);
+    ret = CM_Get_Device_Interface_Property_KeysW( NULL, buffer, &size, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ok_u4( size, ==, sizeof(buffer) );
+    size = sizeof(buffer);
+    ret = CM_Get_Device_Interface_Property_KeysW( L"qqq", buffer, &size, 0 );
+    ok_x4( ret, ==, CR_INVALID_DATA );
+    ok_u4( size, ==, 0 );
+    size = sizeof(buffer);
+    ret = CM_Get_Device_Interface_Property_KeysW( iface, NULL, NULL, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    size = sizeof(buffer);
+    ret = CM_Get_Device_Interface_Property_KeysW( iface, buffer, NULL, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    size = sizeof(buffer);
+    ret = CM_Get_Device_Interface_Property_KeysW( iface, NULL, &size, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ok_u4( size, ==, sizeof(buffer) );
+    size = 0;
+    ret = CM_Get_Device_Interface_Property_KeysW( iface, NULL, &size, 0 );
+    ok_x4( ret, ==, CR_BUFFER_SMALL );
+    todo_wine ok( size == 10 || broken(size == 11), "got %#lx\n", size );
+    size = sizeof(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Device_Interface_Property_KeysW( iface, buffer, &size, 0 );
+    ok_x4( ret, ==, CR_SUCCESS );
+    todo_wine ok( size == 10 || broken(size == 11), "got %#lx\n", size );
+    ok( !memcmp( buffer + 0, &DEVPKEY_DeviceInterface_Enabled, sizeof(*buffer) ), "got {%s,%#lx}\n", debugstr_guid( &buffer[0].fmtid ), buffer[0].pid );
+    ok( !memcmp( buffer + 1, &DEVPKEY_Device_InstanceId, sizeof(*buffer) ), "got {%s,%#lx}\n", debugstr_guid( &buffer[1].fmtid ), buffer[1].pid );
+    ok( !memcmp( buffer + 2, &DEVPKEY_DeviceInterface_ClassGuid, sizeof(*buffer) ), "got {%s,%#lx}\n", debugstr_guid( &buffer[2].fmtid ), buffer[2].pid );
+    todo_wine ok( !memcmp( buffer + 3, &DEVPKEY_Device_ContainerId, sizeof(*buffer) ), "got {%s,%#lx}\n", debugstr_guid( &buffer[3].fmtid ), buffer[3].pid );
+
+    tmp = wcsrchr( iface, '{' );
+    tmp[1] = '6';
+    size = sizeof(buffer);
+    ret = CM_Get_Device_Interface_Property_KeysW( iface, buffer, &size, 0 );
+    ok_x4( ret, ==, CR_NO_SUCH_DEVICE_INTERFACE );
+    tmp[1] = '5';
+
+    tmp[0] = '.';
+    size = sizeof(buffer);
+    ret = CM_Get_Device_Interface_Property_KeysW( iface, buffer, &size, 0 );
+    ok_x4( ret, ==, CR_INVALID_DATA );
+    tmp[0] = '{';
+
+    tmp[-1] = 0;
+    size = sizeof(buffer);
+    ret = CM_Get_Device_Interface_Property_KeysW( iface, buffer, &size, 0 );
+    ok_x4( ret, ==, CR_INVALID_DATA );
+    tmp[-1] = '#';
+
+    tmp[-2]++;
+    size = sizeof(buffer);
+    ret = CM_Get_Device_Interface_Property_KeysW( iface, buffer, &size, 0 );
+    ok_x4( ret, ==, CR_NO_SUCH_DEVICE_INTERFACE );
+    tmp[-2]--;
+
+    free( iface );
+}
+
 static void test_CM_Get_Device_Interface_PropertyW(void)
 {
     WCHAR expect[MAX_PATH];
@@ -2821,10 +2898,11 @@ START_TEST(cfgmgr32)
     test_CM_Get_Device_Interface_List_Size();
     test_CM_Get_Device_Interface_List();
     test_CM_Open_Device_Interface_Key();
+    test_CM_Get_Device_Interface_Property_Keys();
     test_CM_Get_Device_Interface_PropertyW();
+    test_CM_Get_Device_Interface_Property_setupapi();
     test_CM_Get_Device_ID_List();
     test_CM_Register_Notification();
-    test_CM_Get_Device_Interface_Property_setupapi();
     test_DevGetObjects();
     test_DevCreateObjectQuery();
     test_DevGetObjectProperties_invalid();

@@ -476,6 +476,58 @@ static LSTATUS get_device_interface_property( const struct device_interface *ifa
     return err;
 }
 
+static LSTATUS enum_device_interface_property_keys( HKEY hkey, const struct device_interface *iface, DEVPROPKEY *buffer, ULONG *size )
+{
+    ULONG capacity = *size, count = 0;
+    LSTATUS err = ERROR_SUCCESS;
+    WCHAR path[MAX_PATH];
+    HKEY props_key;
+
+    if (capacity < ++count || !buffer) err = ERROR_MORE_DATA;
+    else buffer[count - 1] = DEVPKEY_DeviceInterface_Enabled;
+    if (capacity < ++count || !buffer) err = ERROR_MORE_DATA;
+    else buffer[count - 1] = DEVPKEY_Device_InstanceId;
+    if (capacity < ++count || !buffer) err = ERROR_MORE_DATA;
+    else buffer[count - 1] = DEVPKEY_DeviceInterface_ClassGuid;
+
+    for (UINT i = 0; i < ARRAY_SIZE(device_interface_properties); i++)
+    {
+        const struct property_desc *desc = device_interface_properties + i;
+        if (desc->name && !RegQueryValueExW( hkey, desc->name, NULL, NULL, NULL, NULL ))
+        {
+            if (capacity < ++count || !buffer) err = ERROR_MORE_DATA;
+            else buffer[count - 1] = *desc->key;
+        }
+    }
+
+    swprintf( path, ARRAY_SIZE(path), L"%s\\Properties", iface->refstr );
+    if (!open_key( hkey, path, KEY_ENUMERATE_SUB_KEYS, TRUE, &props_key ))
+    {
+        WCHAR name[MAX_PATH];
+        for (ULONG i = 0, len = ARRAY_SIZE(name); !RegEnumValueW( props_key, i, name, &len, 0, NULL, NULL, NULL ); i++, len = ARRAY_SIZE(name))
+        {
+            if (capacity < ++count || !buffer) err = ERROR_MORE_DATA;
+            else err = propkey_from_string( name, buffer + count - 1 );
+        }
+        RegCloseKey( props_key );
+    }
+
+    *size = count;
+    return err;
+}
+
+static LSTATUS get_device_interface_property_keys( const struct device_interface *iface, DEVPROPKEY *buffer, ULONG *size )
+{
+    LSTATUS err;
+    HKEY hkey;
+
+    if ((err = open_device_interface_key( iface, KEY_ALL_ACCESS, TRUE, &hkey ))) return err;
+    err = enum_device_interface_property_keys( hkey, iface, buffer, size );
+    RegCloseKey( hkey );
+
+    return err;
+}
+
 static CONFIGRET map_error( LSTATUS err )
 {
     switch (err)
@@ -993,4 +1045,38 @@ CONFIGRET WINAPI CM_Get_Device_Interface_Property_ExW( const WCHAR *name, const 
 CONFIGRET WINAPI CM_Get_Device_Interface_PropertyW( const WCHAR *iface, const DEVPROPKEY *key, DEVPROPTYPE *type, BYTE *buffer, ULONG *size, ULONG flags )
 {
     return CM_Get_Device_Interface_Property_ExW( iface, key, type, buffer, size, flags, NULL );
+}
+
+/***********************************************************************
+ *           CM_Get_Device_Interface_Property_Keys_ExW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Device_Interface_Property_Keys_ExW( const WCHAR *name, DEVPROPKEY *buffer, ULONG *size, ULONG flags, HMACHINE machine )
+{
+    struct device_interface iface;
+    LSTATUS err;
+
+    TRACE( "name %s, buffer %p, size %p, flags %#lx\n", debugstr_w(name), buffer, size, flags);
+    if (machine) FIXME( "machine %p not implemented!\n", machine );
+    if (flags) FIXME( "flags %#lx not implemented!\n", flags );
+
+    if (!name || !size) return CR_INVALID_POINTER;
+    if (*size && !buffer) return CR_INVALID_POINTER;
+    if (init_device_interface( &iface, name ))
+    {
+        *size = 0;
+        return CR_INVALID_DATA;
+    }
+
+    err = get_device_interface_property_keys( &iface, buffer, size );
+    if (err && err != ERROR_MORE_DATA) *size = 0;
+    if (err == ERROR_FILE_NOT_FOUND) return CR_NO_SUCH_DEVICE_INTERFACE;
+    return map_error( err );
+}
+
+/***********************************************************************
+ *           CM_Get_Device_Interface_Property_KeysW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Device_Interface_Property_KeysW( const WCHAR *iface, DEVPROPKEY *keys, ULONG *count, ULONG flags )
+{
+    return CM_Get_Device_Interface_Property_Keys_ExW( iface, keys, count, flags, NULL );
 }
