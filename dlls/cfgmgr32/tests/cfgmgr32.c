@@ -1932,6 +1932,53 @@ static void test_CM_Enumerate_Classes(void)
     ok_x4( ret, ==, CR_NO_SUCH_VALUE );
 }
 
+static void test_CM_Enumerate_Enumerators(void)
+{
+    WCHAR buffer[MAX_PATH], upper[MAX_PATH];
+    CONFIGRET ret;
+    ULONG len;
+
+    len = 0;
+    ret = CM_Enumerate_EnumeratorsW( 0, NULL, &len, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ok_x4( len, ==, 0 );
+    len = 1;
+    ret = CM_Enumerate_EnumeratorsW( 0, NULL, &len, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ok_x4( len, ==, 1 );
+    ret = CM_Enumerate_EnumeratorsW( 0, buffer, NULL, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    len = 0;
+    ret = CM_Enumerate_EnumeratorsW( 0, buffer, &len, 0 );
+    ok_x4( ret, ==, CR_INVALID_DATA );
+    ok_x4( len, ==, 0 );
+
+    for (UINT flag = 1; flag; flag <<= 1)
+    {
+        winetest_push_context( "%#x", flag );
+        len = ARRAY_SIZE(buffer);
+        ret = CM_Enumerate_EnumeratorsW( 0, buffer, &len, flag );
+        ok_x4( ret, ==, CR_INVALID_FLAG );
+        winetest_pop_context();
+    }
+
+    len = ARRAY_SIZE(buffer);
+    ret = CM_Enumerate_EnumeratorsW( -1, buffer, &len, 0 );
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+    ok_x4( len, ==, ARRAY_SIZE(buffer) );
+
+    memset( buffer, 0xcd, sizeof(buffer) );
+    for (ULONG i = 0, len = ARRAY_SIZE(buffer); !(ret = CM_Enumerate_EnumeratorsW( i, buffer, &len, 0 )); i++, len = ARRAY_SIZE(buffer))
+    {
+        wcscpy( upper, buffer );
+        wcsupr( upper );
+        ok_wcs( upper, buffer );
+        if (!memcmp( buffer, L"HID\0\xcdcd", 5 )) break;
+        memset( buffer, 0xcd, sizeof(buffer) );
+    }
+    ok_x4( ret, ==, CR_SUCCESS );
+}
+
 static void test_CM_Get_Class_Key_Name(void)
 {
     GUID guid = GUID_DEVCLASS_DISPLAY;
@@ -2079,6 +2126,7 @@ START_TEST(cfgmgr32)
 
     test_CM_MapCrToWin32Err();
     test_CM_Enumerate_Classes();
+    test_CM_Enumerate_Enumerators();
     test_CM_Get_Class_Key_Name();
     test_CM_Open_Class_Key();
     test_CM_Get_Device_ID_List();
