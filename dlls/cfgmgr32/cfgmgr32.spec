@@ -122,8 +122,8 @@
 @ stdcall CM_Get_Device_Interface_List_Size_ExW(ptr ptr wstr long ptr)
 @ stdcall CM_Get_Device_Interface_PropertyW(wstr ptr ptr ptr ptr long)
 @ stdcall CM_Get_Device_Interface_Property_ExW(wstr ptr ptr ptr ptr long ptr)
-@ stub CM_Get_Device_Interface_Property_KeysW
-@ stub CM_Get_Device_Interface_Property_Keys_ExW
+@ stdcall CM_Get_Device_Interface_Property_KeysW(wstr ptr ptr long)
+@ stdcall CM_Get_Device_Interface_Property_Keys_ExW(wstr ptr ptr long ptr)
 @ stub CM_Get_First_Log_Conf
 @ stub CM_Get_First_Log_Conf_Ex
 @ stub CM_Get_Global_State
