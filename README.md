@@ -2,7 +2,7 @@
 
 Goliath is a compatibility Layer for BlissOS (and other Operating Systems) that allows Microsoft Windows, 
 Linux, iOS, Android, MacOS and Legacy Hardware programs to run on Bliss, and is based off of 
-Proton's version of Wine, along with the WSL, ATL and Darling compatiblilty layers and a modified version of LibRetro, all built straight into the software.
+Proton's version of Wine, along with the WSL, ATL, Darling compatibility layers, ipasim iOS emulator, and a modified version of LibRetro, all built straight into the software.
 *Wine itself is a program which allows running Microsoft Windows programs
 (including DOS, Windows 3.x, Win32, and Win64 executables) on Unix and Unix-Like Oper.
 It consists of a program loader which loads and executes a Microsoft
@@ -145,6 +145,16 @@ wine ~/.wine/drive_c/windows/notepad.exe  (using Unix filename syntax)
 wine notepad.exe readme.txt          (calling program with parameters)
 ```
 
+For running iOS applications with Goliath:
+
+```
+./goliath-launch.sh MyApp.ipa        (run iOS application via ipasim)
+
+./goliath-launch.sh /path/to/app.ipa (using full path to iOS app)
+
+./goliath-launch.sh MyApp.ipa --arg   (calling iOS app with parameters)
+```
+
 Goliath is not perfect, so some programs may crash. If that happens you
 will get a crash log that you should attach to your report when filing
 a bug.
@@ -153,8 +163,8 @@ a bug.
 ## GETTING MORE INFORMATION (Wine)
 
 - **WWW**: A great deal of information about Wine is available from WineHQ at
-	https://www.winehq.org/ : various Wine Guides, application database,
-	bug tracking. This is probably the best starting point.
+        https://www.winehq.org/ : various Wine Guides, application database,
+        bug tracking. This is probably the best starting point.
 
 - **FAQ**: The Wine FAQ is located at https://gitlab.winehq.org/wine/wine/-/wikis/FAQ
 
@@ -163,20 +173,44 @@ a bug.
 - **Gitlab**: Wine development is hosted at https://gitlab.winehq.org
 
 - **Mailing lists**:
-	There are several mailing lists for Wine users and developers; see
-	https://gitlab.winehq.org/wine/wine/-/wikis/Forums for more
-	information.
+        There are several mailing lists for Wine users and developers; see
+        https://gitlab.winehq.org/wine/wine/-/wikis/Forums for more
+        information.
 
 - **Bugs**: Report bugs to Wine Bugzilla at https://bugs.winehq.org
-	Please search the bugzilla database to check whether your
-	problem is already known or fixed before posting a bug report.
+        Please search the bugzilla database to check whether your
+        problem is already known or fixed before posting a bug report.
 
 - **IRC**: Online help is available at channel `#WineHQ` on irc.libera.chat.
 
 
 ## Goliath Compatibility Layer
 
-Goliath unifies Wine (Windows), Darling (macOS), and ATL (Android) to run applications from all major operating systems on Linux.
+Goliath unifies Wine (Windows), Darling (macOS), ATL (Android), and ipasim (iOS) to run applications from all major operating systems on Linux.
+
+### Supported Platforms
+
+- **Windows**: .exe, .msi files and PE32 binaries via Wine
+- **macOS**: .app bundles and Mach-O binaries via Darling  
+- **Android**: .apk packages via ATL (Android Translation Layer)
+- **iOS**: .ipa applications via ipasim emulator
+
+### Usage
 
 - Use `goliath-launch.sh` to run any supported application.
-- See `documentation/README-goliath.md` for details.
+- The launcher automatically detects the application type and uses the appropriate compatibility layer.
+- See `documentation/README-goliath.md` for detailed information.
+
+### iOS Application Support
+
+iOS applications are run using [ipasim](https://github.com/ipasimulator/ipasim), which is an emulator rather than a compatibility tool. This approach provides better compatibility and reliability for complex iOS applications.
+
+**Prerequisites:**
+1. Install ipasim from https://github.com/ipasimulator/ipasim
+2. Ensure `ipasim` is available in your PATH
+3. Have iOS application files (.ipa) ready to run
+
+**Example:**
+```bash
+./goliath-launch.sh MyiOSApp.ipa
+```
