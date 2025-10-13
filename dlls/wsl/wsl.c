@@ -197,19 +197,22 @@ int wsl_main(int argc, char *argv[]) {
 
     printf("[Goliath/WSL] Launching Linux application: %s\n", binary_path);
 
-    // Prepare arguments for exec
-    char **new_argv = malloc(sizeof(char*) * argc);
+    // Prepare arguments for exec: replace argv[0] with binary_path and shift the rest
+    int child_argc = argc - 1; // exclude the loader's argv[0]
+    char **new_argv = (char **)malloc(sizeof(char*) * (child_argc + 1)); // +1 for NULL
     if (!new_argv) {
         fprintf(stderr, "[Goliath/WSL] Out of memory\n");
         free(binary_path);
         return 1;
     }
 
-    new_argv[0] = binary_path;
-    for (int i = 2; i < argc; i++) {
-        new_argv[i-1] = argv[i];
+    new_argv[0] = binary_path; // the binary to exec
+    // Copy original args starting from argv[2] into new_argv[1..]
+    int dst = 1;
+    for (int i = 2; i < argc; i++, dst++) {
+        new_argv[dst] = argv[i];
     }
-    new_argv[argc-1] = NULL;
+    new_argv[dst] = NULL;
 
     // Fork and execute the Linux binary
     pid_t pid = fork();
