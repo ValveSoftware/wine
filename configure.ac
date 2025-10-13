@@ -865,9 +865,44 @@ This is an error since --enable-archs=$wine_arch was requested.])])
     fi
     AS_VAR_SET([${wine_arch}_DEBUG],[$wine_crossdebug])
 
-    test "x$enable_werror" != xyes || WINE_TRnet)
+    test "x$enable_werror" != xyes || WINE_TRY_PE_CFLAGS([-Werror])
+    dnl clang for PE target wants -build-id (and not --build-id as gcc/mingw or clang in unix target)
+    dnl don't bother testing flags, compilation will fail afterwards
+    test "x$enable_build_id" != xyes || AS_VAR_APPEND([${wine_arch}_LDFLAGS],[" -Wl,--build-id"])
+done
+
+CC=$saved_CC
+CFLAGS=$saved_CFLAGS
+CPPFLAGS=$saved_CPPFLAGS
+LDFLAGS=$saved_LDFLAGS
+
+case $HOST_ARCH in
+  arm|aarch64)
+    test "x$PE_ARCHS" != x || AC_MSG_ERROR([PE cross-compilation is required for $HOST_ARCH, please install clang/llvm-dlltool/lld, or llvm-mingw.])
+    DLLEXT="" ;;
+  *)
+    WINE_NOTICE_WITH(mingw,[test "x$PE_ARCHS" = "x"],
+                     [Suitable PE cross-compiler not found, PE files won't be built.]) ;;
+esac
+
+dnl **** External libraries ****
+
+if test "x$with_system_dllpath" != "x" -a -n "$PE_ARCHS"
+then
+    WINE_MINGW_PACKAGE_FLAGS(FAUDIO,[FAudio],[-lFAudio],
+        [WINE_CHECK_MINGW_HEADER(FAudio.h,
+            [WINE_CHECK_MINGW_LIB(FAudio,FAudio_CommitOperationSet,[:],[FAUDIO_PE_CFLAGS=""; FAUDIO_PE_LIBS=""],[$FAUDIO_PE_LIBS])],
+            [FAUDIO_PE_CFLAGS=""; FAUDIO_PE_LIBS=""])])
+    if test "x$FAUDIO_PE_LIBS" = "x"
+    then
+        WINE_NOTICE([FAudio ${notice_platform}MinGW development files not found (or too old); using bundled version.])
+    fi
+
+    WINE_MINGW_PACKAGE_FLAGS(FLUIDSYNTH,[fluidsynth],[-lfluidsynth],
+        [WINE_CHECK_MINGW_HEADER(fluidsynth.h,
+            [WINE_CHECK_MINGW_LIB(fluidsynth,new_fluid_synth,[:],FIG_MAKEFILE(dlls/wmiutils/tests)
 WINE_CONFIG_MAKEFILE(dlls/cryptnet/tests)
-WINE_CONFIG_MAKEFILFIG_MAKEFILE(dlls/wing.dll16,enable_win16)
+WINE_CONFIG_MAKEFILE(dlls/wing.dll16,enable_win16)
 WINE_CONFIG_MAKEFILE(dlls/wing32)
 WINE_CONFIG_MAKEFILE(dlls/wing32/tests)
 WINE_CONFIG_MAKEFILE(dlls/winhttp)
