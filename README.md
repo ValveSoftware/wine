@@ -4,11 +4,15 @@ Goliath is a compatibility Layer for BlissOS (and other Operating Systems) that 
 Linux, iOS, Android, MacOS and Legacy Hardware programs to run on Bliss, and is based off of 
 Proton's version of Wine, along with the WSL, ATL, Darling compatibility layers, ipasim iOS emulator, and a modified version of LibRetro, all built straight into the software.
 *Wine itself is a program which allows running Microsoft Windows programs
-(including DOS, Windows 3.x, Win32, and Win64 executables) on Unix and Unix-Like Oper.
+(including DOS, Windows 3.x, Win32, and Win64 executables) on Unix and Unix-Like systems.
 It consists of a program loader which loads and executes a Microsoft
 Windows binary, and a library (called Winelib) that implements Windows
 API calls using their Unix, X11 or Mac equivalents.  The library may also
 be used for porting Windows code into native Unix executables.*
+
+**WSL Integration**: Goliath now includes a comprehensive WSL compatibility layer that provides 
+Linux environment emulation similar to Microsoft's WSL, enabling native Linux applications to run 
+with proper path translation, environment setup, and process management.
 
 Goliath/Wine is free software, released under the GNU LGPL; see the file
 LICENSE for the details.
@@ -186,31 +190,42 @@ a bug.
 
 ## Goliath Compatibility Layer
 
-Goliath unifies Wine (Windows), Darling (macOS), ATL (Android), and ipasim (iOS) to run applications from all major operating systems on Linux.
+Goliath unifies Wine (Windows), Darling (macOS), WSL (Linux), and ATL (Android) to run applications from all major operating systems on Linux and other Unix-like systems.
 
-### Supported Platforms
+### Quick Start
 
-- **Windows**: .exe, .msi files and PE32 binaries via Wine
-- **macOS**: .app bundles and Mach-O binaries via Darling  
-- **Android**: .apk packages via ATL (Android Translation Layer)
-- **iOS**: .ipa applications via ipasim emulator
+- Use `goliath-launch.sh` to run any supported application:
+  ```bash
+  ./goliath-launch.sh myapp.exe        # Windows application
+  ./goliath-launch.sh /usr/bin/ls      # Linux application  
+  ./goliath-launch.sh myapp.app        # macOS application
+  ./goliath-launch.sh myapp.apk        # Android application
+  ```
 
-### Usage
+### WSL (Linux Application) Support
 
-- Use `goliath-launch.sh` to run any supported application.
-- The launcher automatically detects the application type and uses the appropriate compatibility layer.
-- See `documentation/README-goliath.md` for detailed information.
+Goliath includes comprehensive WSL support for running Linux applications:
 
-### iOS Application Support
+- **Automatic detection**: ELF binaries are automatically detected and routed to WSL
+- **Path translation**: Windows paths are converted to Linux paths (/mnt/c/...)
+- **Environment setup**: Proper Linux environment variables and filesystem structure
+- **Process management**: Signal handling and proper exit code management
 
-iOS applications are run using [ipasim](https://github.com/ipasimulator/ipasim), which is an emulator rather than a compatibility tool. This approach provides better compatibility and reliability for complex iOS applications.
+### Features
 
-**Prerequisites:**
-1. Install ipasim from https://github.com/ipasimulator/ipasim
-2. Ensure `ipasim` is available in your PATH
-3. Have iOS application files (.ipa) ready to run
+- **Multi-platform support**: Windows, macOS, Linux, and Android applications
+- **Automatic detection**: File type detection and appropriate subsystem dispatch
+- **Path translation**: Cross-platform path conversion
+- **Environment integration**: Proper environment setup for each platform
+- **Unified interface**: Single entry point for all application types
 
-**Example:**
+### Configuration
+
+WSL can be configured through environment variables:
 ```bash
-./goliath-launch.sh MyiOSApp.ipa
+export WSL_DISTRO_NAME="MyDistro"
+export WSL_ENABLE_INTEROP=1
+export WSL_ENABLE_DRIVE_MOUNTING=1
 ```
+
+- See `documentation/README-goliath.md` for comprehensive documentation.
