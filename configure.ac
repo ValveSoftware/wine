@@ -1,28 +1,65 @@
 # Comments for autoconf: use dnl for comments, not as a macro
 AC_CONFIG_MACRO_DIR([m4])
-m4_define([WINE_VERSION], regexp(m4_include([VERSION]), [version \([-.0-9A-Za-z]+\)], [\1]))
+m4_define([GOLIATH_VERSION], regexp(m4_include([VERSION]), [version \([-.0-9A-Za-z]+\)], [\1]))
 
 # Fallback for missing macros (no-op if not found)
 m4_ifndef([AS_VAR_APPEND], [m4_define([AS_VAR_APPEND], [])])
 m4_ifndef([AS_VAR_IF], [m4_define([AS_VAR_IF], [])])
 
 AC_PREREQ([2.63b])
-AC_INIT([Wine],[WINE_VERSION],[wine-devel@winehq.org],[wine],[https://www.winehq.org])
+AC_INIT([Goliath],[GOLIATH_VERSION],[goliath-devel@example.org],[goliath],[https://github.com/goliath-project/goliath])
 AC_CONFIG_SRCDIR([server/atom.c])
 AC_CONFIG_HEADERS([include/config.h])
 AC_CONFIG_AUX_DIR([tools])
 
 libwine_version="1.0"
+libgoliath_version="1.0"
 
 AM_INIT_AUTOMAKE([foreign subdir-objects])
 LT_INIT
+
+dnl *** Goliath LibRetro Support ***
+AC_ARG_ENABLE([libretro],
+    AS_HELP_STRING([--enable-libretro], [Enable LibRetro support for legacy ROM emulation (default: yes)]),
+    [enable_libretro=$enableval],
+    [enable_libretro=yes])
+
+if test "x$enable_libretro" = "xyes"; then
+    AC_DEFINE([HAVE_LIBRETRO], [1], [Define if LibRetro support is enabled])
+    
+    dnl Check for libdl (required for dynamic loading of LibRetro cores)
+    AC_CHECK_LIB([dl], [dlopen], [], [
+        AC_MSG_ERROR([libdl is required for LibRetro support. Install libdl-dev or disable LibRetro with --disable-libretro])
+    ])
+    
+    dnl Check for common LibRetro core directories
+    AC_MSG_CHECKING([for LibRetro cores directory])
+    LIBRETRO_CORES_DIR=""
+    for dir in /usr/lib/libretro /usr/local/lib/libretro /opt/libretro/cores; do
+        if test -d "$dir"; then
+            LIBRETRO_CORES_DIR="$dir"
+            break
+        fi
+    done
+    
+    if test -n "$LIBRETRO_CORES_DIR"; then
+        AC_MSG_RESULT([$LIBRETRO_CORES_DIR])
+        AC_DEFINE_UNQUOTED([DEFAULT_LIBRETRO_CORES_DIR], ["$LIBRETRO_CORES_DIR"], [Default LibRetro cores directory])
+    else
+        AC_MSG_RESULT([not found - will use runtime detection])
+        AC_DEFINE_UNQUOTED([DEFAULT_LIBRETRO_CORES_DIR], ["/usr/lib/libretro"], [Default LibRetro cores directory])
+    fi
+fi
+
+AM_CONDITIONAL([ENABLE_LIBRETRO], [test "x$enable_libretro" = "xyes"])
+
 dnl Check for flex
 AC_CHECK_PROGS(FLEX,flex,none)
 if test "$FLEX" = "none"
 then
   AC_MSG_ERROR([no suitable flex found. Please install the 'flex' package.])
 fi
-AC_CACHE_CHECK([whether flex is recent enough],wine_cv_recent_flex,
+AC_CACHE_CHECK([whether flex is recent enough],goliath_cv_recent_flex,
     [cat >conftest.l <<EOF
 %top{
 #include "prediluvian.h"
@@ -31,11 +68,11 @@ AC_CACHE_CHECK([whether flex is recent enough],wine_cv_recent_flex,
 EOF
     if $FLEX -t conftest.l >/dev/null 2>&AS_MESSAGE_LOG_FD
     then
-      wine_cv_recent_flex=yes
+      goliath_cv_recent_flex=yes
     else
-      wine_cv_recent_flex=no
+      goliath_cv_recent_flex=no
     fi])
-test $wine_cv_recent_flex != no || AC_MSG_ERROR([Your flex version is too old. Please install flex version 2.5.33 or newer.])
+test $goliath_cv_recent_flex != no || AC_MSG_ERROR([Your flex version is too old. Please install flex version 2.5.33 or newer.])
 
 dnl Check for bison
 AC_CHECK_PROGS(BISON,bison,none)
@@ -832,7 +869,6 @@ This is an error since --enable-archs=$wine_arch was requested.])])
     dnl clang for PE target wants -build-id (and not --build-id as gcc/mingw or clang in unix target)
     dnl don't bother testing flags, compilation will fail afterwards
     test "x$enable_build_id" != xyes || AS_VAR_APPEND([${wine_arch}_LDFLAGS],[" -Wl,--build-id"])
-
 done
 
 CC=$saved_CC
@@ -865,6 +901,46 @@ then
     WINE_MINGW_PACKAGE_FLAGS(FLUIDSYNTH,[fluidsynth],[-lfluidsynth],
         [WINE_CHECK_MINGW_HEADER(fluidsynth.h,
             [WINE_CHECK_MINGW_LIB(fluidsynth,new_fluid_synth,[:],FIG_MAKEFILE(dlls/wmiutils/tests)
+WINE_CONFIG_MAKEFILE(dlls/cryptnet/tests)
+WINE_CONFIG_MAKEFILE(dlls/wing.dll16,enable_win16)
+WINE_CONFIG_MAKEFILE(dlls/wing32)
+WINE_CONFIG_MAKEFILE(dlls/wing32/tests)
+WINE_CONFIG_MAKEFILE(dlls/winhttp)
+WINE_CONFIG_MAKEFILE(dlls/winhttp/tests)
+WINE_CONFIG_MAKEFILE(dlls/wininet)
+WINE_CONFIG_MAKEFILE(dlls/wininet/tests)
+WINE_CONFIG_MAKEFILE(dlls/winmm)
+WINE_CONFIG_MAKEFILE(dlls/winmm/tests)
+WINE_CONFIG_MAKEFILE(dlls/winnls.dll16,enable_win16)
+WINE_CONFIG_MAKEFILE(dlls/winnls32)
+WINE_CONFIG_MAKEFILE(dlls/winprint)
+WINE_CONFIG_MAKEFILE(dlls/winscard)
+WINE_CONFIG_MAKEFILE(dlls/winscard/tests)
+WINE_CONFIG_MAKEFILE(dlls/winsock.dll16,enable_win16)
+WINE_CONFIG_MAKEFILE(dlls/winspool.drv)
+WINE_CONFIG_MAKEFILE(dlls/winspool.drv/tests)
+WINE_CONFIG_MAKEFILE(dlls/winsta)
+WINE_CONFIG_MAKEFILE(dlls/wintab.dll16,enable_win16)
+WINE_CONFIG_MAKEFILE(dlls/wintab32)
+WINE_CONFIG_MAKEFILE(dlls/wintab32/tests)
+WINE_CONFIG_MAKEFILE(dlls/wintrust)
+WINE_CONFIG_MAKEFILE(dlls/wintrust/tests)
+WINE_CONFIG_MAKEFILE(dlls/wintypes)
+WINE_CONFIG_MAKEFILE(dlls/wintypes/tests)
+WINE_CONFIG_MAKEFILE(dlls/winusb)
+WINE_CONFIG_MAKEFILE(dlls/wlanapi)
+WINE_CONFIG_MAKEFILE(dlls/wlanapi/tests)
+WINE_CONFIG_MAKEFILE(dlls/wlanui)
+WINE_CONFIG_MAKEFILE(dlls/wldap32)
+WINE_CONFIG_MAKEFILE(dlls/wldap32/tests)
+WINE_CONFIG_MAKEFILE(dlls/wldp)
+WINE_CONFIG_MAKEFILE(dlls/wldp/tests)
+WINE_CONFIG_MAKEFILE(dlls/wmadmod)
+WINE_CONFIG_MAKEFILE(dlls/wmasf)
+WINE_CONFIG_MAKEFILE(dlls/wmi)
+WINE_CONFIG_MAKEFILE(dlls/wmilib.sys)
+WINE_CONFIG_MAKEFILE(dlls/wmiutils)
+WINE_CONFIG_MAKEFILE(dlls/wmiutils/tests)
 WINE_CONFIG_MAKEFILE(dlls/wmp)
 WINE_CONFIG_MAKEFILE(dlls/wmp/tests)
 WINE_CONFIG_MAKEFILE(dlls/wmphoto)

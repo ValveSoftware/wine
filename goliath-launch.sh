@@ -56,64 +56,56 @@ fi
 APP="$1"
 shift
 
-# Check if the application exists
-if [ ! -e "$APP" ]; then
+# Check if file exists
+if [ ! -f "$APP" ] && [ ! -d "$APP" ]; then
     log_error "Application not found: $APP"
     exit 1
 fi
 
-# Function to detect application type
+# Detect file type using file command and magic numbers
 detect_app_type() {
-    local app_path="$1"
+    local app="$1"
     
-    # Check if it's a macOS application bundle
-    if [ -d "$app_path" ] && [[ "$app_path" == *.app ]]; then
+    # Check if it's a macOS application bundle first
+    if [ -d "$app" ] && [[ "$app" == *.app ]]; then
         echo "macos_bundle"
         return 0
     fi
     
-    # Check file extension first for quick detection
-    case "${app_path,,}" in
-        *.exe|*.msi|*.dll)
-            echo "windows"
-            return 0
-            ;;
-        *.app)
-            echo "macos_bundle"
-            return 0
-            ;;
-        *.apk)
-            echo "android"
-            return 0
-            ;;
-    esac
-    
-    # Use file command for binary detection
+    # Get file type information
+    local filetype
     if command -v file >/dev/null 2>&1; then
-        local filetype
-        filetype=$(file -b "$app_path" 2>/dev/null)
-        
-        if [[ "$filetype" == *"PE32"* ]] || [[ "$filetype" == *"MS-DOS"* ]]; then
-            echo "windows"
-            return 0
-        elif [[ "$filetype" == *"Mach-O"* ]]; then
-            echo "macos"
-            return 0
-        elif [[ "$filetype" == *"ELF"* ]]; then
-            # Could be Linux binary or Android native library
-            if [[ "$app_path" == *.apk ]]; then
-                echo "android"
-            else
-                echo "linux"
-            fi
-            return 0
-        fi
+        filetype=$(file "$app" 2>/dev/null)
+    fi
+    
+    # Check for Windows PE executables
+    if [[ "$filetype" == *"PE32"* ]] || [[ "$filetype" == *"MS-DOS"* ]] || [[ "$app" == *.exe ]] || [[ "$app" == *.msi ]]; then
+        echo "windows"
+        return 0
+    fi
+    
+    # Check for macOS Mach-O binaries
+    if [[ "$filetype" == *"Mach-O"* ]] || [[ "$app" == *.app ]] || [[ "$app" == *.dmg ]]; then
+        echo "macos"
+        return 0
+    fi
+    
+    # Check for Android APK files
+    if [[ "$filetype" == *"Zip archive"* && "$app" == *.apk ]] || [[ "$app" == *.apk ]]; then
+        echo "android"
+        return 0
+    fi
+    
+    # Check for Linux ELF binaries
+    if [[ "$filetype" == *"ELF"* ]]; then
+        echo "linux"
+        return 0
     fi
     
     # Fallback: try to detect by magic numbers
-    if [ -f "$app_path" ] && [ -r "$app_path" ]; then
+    if [ -f "$app" ] && [ -r "$app" ]; then
         local magic
-        magic=$(hexdump -C "$app_path" 2>/dev/null | head -1 | cut -d' ' -f2-5 | tr -d ' ')
+        magic=$(hexdump -C "$app" 2>/dev/null | head -1 | cut -d' ' -f2-5 | tr -d ' ')
         
         case "$magic" in
             4d5a*|5a4d*)  # MZ header (Windows PE)
@@ -198,7 +190,7 @@ launch_with_layer() {
 if [ -d "$APP" ] && [[ "$APP" == *.app ]]; then
     # Find the executable inside the bundle
     if [ -f "$APP/Contents/MacOS/"* ]; then
-        BUNDLE_EXEC=$(find "$APP/Contents/MacOS" -type f -executable | head -1)
+        BUNDLE_EXEC=$(find "$APP/Contents/MacOS" -type f -executable -print -quit 2>/dev/null | head -1)
         if [ -n "$BUNDLE_EXEC" ]; then
             log_info "Found macOS application bundle: $APP"
             log_info "Executable: $BUNDLE_EXEC"
@@ -262,7 +254,7 @@ case "$APP_TYPE" in
         log_error "Unable to determine application type for: $APP"
         log_error "Supported formats: Windows PE, macOS Mach-O, Android APK"
         log_error "Use GOLIATH_FORCE environment variable to override detection"
-        exit 1
+        usage
         ;;
     *)
         log_error "Unsupported application type: $APP_TYPE"

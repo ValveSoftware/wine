@@ -1,0 +1,118 @@
+# Goliath WSL Configuration File
+# This file configures the WSL (Windows Subsystem for Linux) compatibility layer
+
+[wsl]
+# Distribution name (appears in WSL_DISTRO_NAME environment variable)
+distro_name = GoliathWSL
+
+# Default user for WSL environment
+# If not specified, uses current system user
+default_user = 
+
+# Home directory for WSL environment
+# If not specified, uses current user's home directory
+home_dir = 
+
+# Root directory for WSL filesystem
+root_dir = /
+
+# Enable Windows interoperability features
+enable_interop = true
+
+# Enable automatic Windows drive mounting (/mnt/c, /mnt/d, etc.)
+enable_drive_mounting = true
+
+# Default shell for WSL environment
+default_shell = /bin/bash
+
+[environment]
+# Environment variables to set in WSL environment
+# These will be set automatically when launching Linux applications
+
+# Language and locale settings
+LANG = C.UTF-8
+LC_ALL = C.UTF-8
+
+# Terminal settings
+TERM = xterm-256color
+
+# Default PATH for Linux applications
+PATH = /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+[paths]
+# Path translation settings
+
+# Enable automatic path conversion (Windows -> Linux)
+enable_path_conversion = true
+
+# Windows drive mount point prefix
+drive_mount_prefix = /mnt
+
+# Convert backslashes to forward slashes
+convert_backslashes = true
+
+[process]
+# Process management settings
+
+# Enable signal forwarding from host to WSL processes
+enable_signal_forwarding = true
+
+# Timeout for process startup (seconds)
+startup_timeout = 30
+
+# Enable process cleanup on exit
+enable_cleanup = true
+
+[filesystem]
+# Filesystem settings
+
+# Create standard Linux directories if they don't exist
+create_standard_dirs = true
+
+# Standard directories to create
+standard_dirs = /tmp,/var,/var/tmp,/var/log,/run,/dev,/proc,/sys
+
+# Directory permissions (octal)
+dir_permissions = 0755
+
+[logging]
+# Logging configuration
+
+# Enable WSL logging
+enable_logging = false
+
+# Log file path (relative to user's home directory)
+log_file = .local/share/goliath/wsl.log
+
+# Log level: debug, info, warn, error
+log_level = info
+
+# Enable verbose output
+verbose = false
+
+[security]
+# Security settings
+
+# Enable namespace isolation (requires root privileges)
+enable_namespaces = false
+
+# Enable user namespace mapping
+enable_user_namespaces = false
+
+# Restrict file system access to user's home directory
+restrict_filesystem = false
+
+[compatibility]
+# Compatibility settings
+
+# Enable Linux syscall translation (experimental)
+enable_syscall_translation = false
+
+# Enable Linux signal handling
+enable_linux_signals = true
+
+# Enable Linux process model emulation
+enable_process_emulation = true
+
+# WSL version to emulate (1 or 2)
+wsl_version = 2
