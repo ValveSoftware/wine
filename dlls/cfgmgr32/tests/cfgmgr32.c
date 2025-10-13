@@ -2481,6 +2481,52 @@ static void test_CM_Open_Device_Interface_Key(void)
     }
 }
 
+static void test_CM_Get_Class_Property_Keys(void)
+{
+    GUID guid = GUID_DEVCLASS_HIDCLASS;
+    DEVPROPKEY buffer[64];
+    CONFIGRET ret;
+    ULONG len;
+
+    ret = CM_Get_Class_Property_Keys( &guid, buffer, NULL, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ret = CM_Get_Class_Property_Keys( NULL, buffer, &len, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    len = 1;
+    ret = CM_Get_Class_Property_Keys( &guid, NULL, &len, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+
+    len = 0;
+    ret = CM_Get_Class_Property_Keys( &guid, NULL, &len, 0 );
+    ok_x4( ret, ==, CR_BUFFER_SMALL );
+    todo_wine ok( len == 9 || broken(len == 10), "got len %lu\n", len );
+    len = 0;
+    ret = CM_Get_Class_Property_Keys( &guid, buffer, &len, 0 );
+    ok_x4( ret, ==, CR_BUFFER_SMALL );
+    todo_wine ok( len == 9 || broken(len == 10), "got len %lu\n", len );
+
+    memset( &guid, 0xcd, sizeof(guid) );
+    len = ARRAY_SIZE(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Property_Keys( &guid, buffer, &len, 0 );
+    ok_x4( ret, ==, CR_NO_SUCH_REGISTRY_KEY );
+    ok_u4( len, ==, 0 );
+
+    guid = GUID_DEVCLASS_HIDCLASS;
+    len = ARRAY_SIZE(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Property_Keys( &guid, buffer, &len, 0 );
+    ok_x4( ret, ==, CR_SUCCESS );
+    todo_wine ok( len == 9 || broken(len == 10), "got len %lu\n", len );
+
+    ok( !memcmp( buffer + 0, &DEVPKEY_DeviceClass_ClassName, sizeof(*buffer) ), "got %s\n", debugstr_DEVPROPKEY( buffer + 0 ) );
+    ok( !memcmp( buffer + 1, &DEVPKEY_DeviceClass_Name, sizeof(*buffer) ), "got %s\n", debugstr_DEVPROPKEY( buffer + 1 ) );
+    todo_wine ok( !memcmp( buffer + 2, &DEVPKEY_DeviceClass_Security, sizeof(*buffer) ), "got %s\n", debugstr_DEVPROPKEY( buffer + 2 ) );
+    todo_wine ok( !memcmp( buffer + 3, &DEVPKEY_DeviceClass_NoInstallClass, sizeof(*buffer) ), "got %s\n", debugstr_DEVPROPKEY( buffer + 3 ) );
+    todo_wine ok( !memcmp( buffer + 4, &DEVPKEY_DeviceClass_IconPath, sizeof(*buffer) ), "got %s\n", debugstr_DEVPROPKEY( buffer + 4 ) );
+    if (len == 9) todo_wine ok( !memcmp( buffer + 5, &DEVPKEY_NAME, sizeof(*buffer) ), "got %s\n", debugstr_DEVPROPKEY( buffer + 5 ) );
+}
+
 START_TEST(cfgmgr32)
 {
     HMODULE mod = GetModuleHandleA("cfgmgr32.dll");
@@ -2499,6 +2545,7 @@ START_TEST(cfgmgr32)
     test_CM_Open_Class_Key();
     test_CM_Get_Class_Registry_Property();
     test_CM_Get_Class_Property();
+    test_CM_Get_Class_Property_Keys();
     test_CM_Open_Device_Interface_Key();
     test_CM_Get_Device_ID_List();
     test_CM_Register_Notification();

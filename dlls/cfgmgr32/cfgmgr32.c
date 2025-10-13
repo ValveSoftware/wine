@@ -39,6 +39,17 @@ static const WCHAR *guid_string( const GUID *guid, WCHAR *buffer, UINT length )
     return buffer;
 }
 
+static LSTATUS propkey_from_string( const WCHAR *str, DEVPROPKEY *key )
+{
+    const WCHAR *pid;
+    LSTATUS err;
+
+    if (!(pid = wcsrchr( str, '\\' ))) return ERROR_INVALID_DATA;
+    if ((err = guid_from_string( str, &key->fmtid ))) return err;
+    if (swscanf( pid + 1, L"%04X", &key->pid ) != 1) return ERROR_INVALID_DATA;
+    return ERROR_SUCCESS;
+}
+
 static const WCHAR *propkey_string( const DEVPROPKEY *key, const WCHAR *prefix, WCHAR *buffer, UINT length )
 {
     swprintf( buffer, length, L"%s{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}\\%04X", prefix,
@@ -238,6 +249,51 @@ static LSTATUS get_class_property( const GUID *class, struct property *prop )
     }
 
     if (err && err != ERROR_MORE_DATA) *prop->size = 0;
+    return err;
+}
+
+static LSTATUS enum_class_property_keys( HKEY hkey, DEVPROPKEY *buffer, ULONG *size )
+{
+    ULONG capacity = *size, count = 0;
+    LSTATUS err = ERROR_SUCCESS;
+    HKEY props_key;
+
+    for (UINT i = 0; i < ARRAY_SIZE(class_properties); i++)
+    {
+        const struct property_desc *desc = class_properties + i;
+        if (desc->name && !RegQueryValueExW( hkey, desc->name, NULL, NULL, NULL, NULL ))
+        {
+            if (capacity < ++count || !buffer) err = ERROR_MORE_DATA;
+            else buffer[count - 1] = *desc->key;
+        }
+    }
+
+    if (!open_key( hkey, L"Properties", KEY_ENUMERATE_SUB_KEYS, TRUE, &props_key ))
+    {
+        WCHAR name[MAX_PATH];
+        for (ULONG i = 0, len = ARRAY_SIZE(name); !RegEnumValueW( props_key, i, name, &len, 0, NULL, NULL, NULL ); i++, len = ARRAY_SIZE(name))
+        {
+            if (capacity < ++count || !buffer) err = ERROR_MORE_DATA;
+            else err = propkey_from_string( name, buffer + count - 1 );
+        }
+        RegCloseKey( props_key );
+    }
+
+    *size = count;
+    return err;
+}
+
+static LSTATUS get_class_property_keys( const GUID *class, DEVPROPKEY *buffer, ULONG *size )
+{
+    WCHAR path[39];
+    LSTATUS err;
+    HKEY hkey;
+
+    guid_string( class, path, ARRAY_SIZE(path) );
+    if ((err = open_class_key( HKEY_LOCAL_MACHINE, path, KEY_ALL_ACCESS, TRUE, &hkey ))) return err;
+    err = enum_class_property_keys( hkey, buffer, size );
+    RegCloseKey( hkey );
+
     return err;
 }
 
@@ -574,6 +630,34 @@ CONFIGRET WINAPI CM_Get_Class_Property_ExW( const GUID *class, const DEVPROPKEY 
 CONFIGRET WINAPI CM_Get_Class_PropertyW( const GUID *class, const DEVPROPKEY *key, DEVPROPTYPE *type, BYTE *buffer, ULONG *size, ULONG flags )
 {
     return CM_Get_Class_Property_ExW( class, key, type, buffer, size, flags, NULL );
+}
+
+/***********************************************************************
+ *           CM_Get_Class_Property_Keys_Ex (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Class_Property_Keys_Ex( const GUID *class, DEVPROPKEY *keys, ULONG *count, ULONG flags, HMACHINE machine )
+{
+    LSTATUS err;
+
+    TRACE( "class %s, keys %p, size %p, flags %#lx, machine %p\n", debugstr_guid(class), keys, count, flags, machine );
+    if (machine) FIXME( "machine %p not implemented!\n", machine );
+    if (flags) FIXME( "flags %#lx not implemented!\n", flags );
+
+    if (!class) return CR_INVALID_POINTER;
+    if (!count) return CR_INVALID_POINTER;
+    if (*count && !keys) return CR_INVALID_POINTER;
+
+    err = get_class_property_keys( class, keys, count );
+    if (err && err != ERROR_MORE_DATA) *count = 0;
+    return map_error( err );
+}
+
+/***********************************************************************
+ *           CM_Get_Class_Property_Keys (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Class_Property_Keys( const GUID *class, DEVPROPKEY *keys, ULONG *count, ULONG flags )
+{
+    return CM_Get_Class_Property_Keys_Ex( class, keys, count, flags, NULL );
 }
 
 /***********************************************************************
