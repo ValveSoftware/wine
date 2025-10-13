@@ -96,6 +96,94 @@ static LSTATUS open_device_classes_key( HKEY root, const WCHAR *key, REGSAM acce
     return open_key( root, path, access, open, hkey );
 }
 
+struct property
+{
+    BOOL ansi;
+    DEVPROPKEY key;
+    DEVPROPTYPE *type;
+    DWORD *reg_type;
+    void *buffer;
+    DWORD *size;
+};
+
+static LSTATUS init_registry_property( struct property *prop, const DEVPROPKEY *base, UINT property, DWORD *type, void *buffer, DWORD *size, BOOL ansi )
+{
+    if (!(prop->size = size)) return ERROR_INVALID_USER_BUFFER;
+    if (!(prop->buffer = buffer) && (*prop->size)) return ERROR_INVALID_USER_BUFFER;
+    prop->type = NULL;
+    prop->ansi = ansi;
+    memcpy( &prop->key, base, sizeof(prop->key) );
+    prop->key.pid = property + 1;
+    prop->reg_type = type;
+    return ERROR_SUCCESS;
+}
+
+static LSTATUS query_named_property( HKEY hkey, const WCHAR *nameW, DEVPROPTYPE type, struct property *prop )
+{
+    LSTATUS err;
+
+    if (!prop->ansi) err = RegQueryValueExW( hkey, nameW, NULL, prop->reg_type, prop->buffer, prop->size );
+    else
+    {
+        char nameA[MAX_PATH];
+        if (nameW) WideCharToMultiByte( CP_ACP, 0, nameW, -1, nameA, sizeof(nameA), NULL, NULL );
+        err = RegQueryValueExA( hkey, nameW ? nameA : NULL, NULL, prop->reg_type, prop->buffer, prop->size );
+    }
+
+    if (!err && !prop->buffer) err = ERROR_MORE_DATA;
+    if ((!err || err == ERROR_MORE_DATA) && prop->type) *prop->type = type;
+    if (err == ERROR_FILE_NOT_FOUND) return ERROR_NOT_FOUND;
+    return err;
+}
+
+struct property_desc
+{
+    const DEVPROPKEY *key;
+    DEVPROPTYPE       type;
+    const WCHAR      *name;
+};
+
+static const struct property_desc class_properties[] =
+{
+    /* ansi-compatible CM_CRP properties */
+    { &DEVPKEY_DeviceClass_UpperFilters,       DEVPROP_TYPE_STRING,                     L"UpperFilters" },
+    { &DEVPKEY_DeviceClass_LowerFilters,       DEVPROP_TYPE_STRING,                     L"LowerFilters" },
+    { &DEVPKEY_DeviceClass_Security,           DEVPROP_TYPE_SECURITY_DESCRIPTOR,        L"Security" },
+    { &DEVPKEY_DeviceClass_SecuritySDS,        DEVPROP_TYPE_SECURITY_DESCRIPTOR_STRING, L"SecuritySDS" },
+    { &DEVPKEY_DeviceClass_DevType,            DEVPROP_TYPE_UINT32,                     L"DevType" },
+    { &DEVPKEY_DeviceClass_Exclusive,          DEVPROP_TYPE_BOOLEAN,                    L"Exclusive" },
+    { &DEVPKEY_DeviceClass_Characteristics,    DEVPROP_TYPE_INT32,                      L"Characteristics" },
+};
+
+static LSTATUS query_class_property( HKEY hkey, struct property *prop )
+{
+    for (UINT i = 0; i < ARRAY_SIZE(class_properties); i++)
+    {
+        const struct property_desc *desc = class_properties + i;
+        if (memcmp( desc->key, &prop->key, sizeof(prop->key) )) continue;
+        return query_named_property( hkey, desc->name, desc->type, prop );
+    }
+
+    return ERROR_UNKNOWN_PROPERTY;
+}
+
+static LSTATUS get_class_property( const GUID *class, struct property *prop )
+{
+    WCHAR path[39];
+    LSTATUS err;
+    HKEY hkey;
+
+    guid_string( class, path, ARRAY_SIZE(path) );
+    if (!(err = open_class_key( HKEY_LOCAL_MACHINE, path, KEY_QUERY_VALUE, TRUE, &hkey )))
+    {
+        err = query_class_property( hkey, prop );
+        RegCloseKey( hkey );
+    }
+
+    if (err && err != ERROR_MORE_DATA) *prop->size = 0;
+    return err;
+}
+
 struct device_interface
 {
     GUID class_guid;
@@ -131,9 +219,13 @@ static CONFIGRET map_error( LSTATUS err )
 {
     switch (err)
     {
+    case ERROR_INVALID_USER_BUFFER:               return CR_INVALID_POINTER;
     case ERROR_FILE_NOT_FOUND:                    return CR_NO_SUCH_REGISTRY_KEY;
+    case ERROR_MORE_DATA:                         return CR_BUFFER_SMALL;
     case ERROR_NO_MORE_ITEMS:                     return CR_NO_SUCH_VALUE;
+    case ERROR_NOT_FOUND:                         return CR_NO_SUCH_VALUE;
     case ERROR_SUCCESS:                           return CR_SUCCESS;
+    case ERROR_UNKNOWN_PROPERTY:                  return CR_INVALID_PROPERTY;
     default: WARN( "unmapped error %lu\n", err ); return CR_FAILURE;
     }
 }
@@ -363,6 +455,42 @@ CONFIGRET WINAPI CM_Open_Class_KeyW( GUID *class, const WCHAR *name, REGSAM acce
 CONFIGRET WINAPI CM_Open_Class_KeyA( GUID *class, const char *name, REGSAM access, REGDISPOSITION disposition, HKEY *hkey, ULONG flags )
 {
     return CM_Open_Class_Key_ExA( class, name, access, disposition, hkey, flags, NULL );
+}
+
+/***********************************************************************
+ *           CM_Get_Class_Registry_PropertyW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Class_Registry_PropertyW( GUID *class, ULONG property, ULONG *type, void *buffer, ULONG *len, ULONG flags, HMACHINE machine )
+{
+    struct property prop;
+    LSTATUS err;
+
+    TRACE( "class %s, property %#lx, type %p, buffer %p, len %p, flags %#lx, machine %p\n", debugstr_guid(class), property, type, buffer, len, flags, machine );
+    if (machine) FIXME( "machine %p not implemented!\n", machine );
+    if (flags) FIXME( "flags %#lx not implemented!\n", flags );
+
+    if (!class) return CR_INVALID_POINTER;
+    if ((err = init_registry_property( &prop, &DEVPKEY_DeviceClass_UpperFilters, property, type, buffer, len, FALSE ))) return map_error( err );
+
+    return map_error( get_class_property( class, &prop ) );
+}
+
+/***********************************************************************
+ *           CM_Get_Class_Registry_PropertyA (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Class_Registry_PropertyA( GUID *class, ULONG property, ULONG *type, void *buffer, ULONG *len, ULONG flags, HMACHINE machine )
+{
+    struct property prop;
+    LSTATUS err;
+
+    TRACE( "class %s, property %#lx, type %p, buffer %p, len %p, flags %#lx, machine %p\n", debugstr_guid(class), property, type, buffer, len, flags, machine );
+    if (machine) FIXME( "machine %p not implemented!\n", machine );
+    if (flags) FIXME( "flags %#lx not implemented!\n", flags );
+
+    if (!class) return CR_INVALID_POINTER;
+    if ((err = init_registry_property( &prop, &DEVPKEY_DeviceClass_UpperFilters, property, type, buffer, len, TRUE ))) return map_error( err );
+
+    return map_error( get_class_property( class, &prop ) );
 }
 
 /***********************************************************************
