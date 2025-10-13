@@ -1,15 +1,6 @@
 # Goliath Unified Compatibility Layer
 
-Goliath is a comprehensive meta-compatibility layer that unifies Wine (Windows), Darling (macOS), WSL (Linux), and ATL (Android) to run applications from all major operating systems on Linux and other Unix-like systems.
-
-## Overview
-
-Goliath provides a single entry point for running applications from different operating systems:
-
-- **Windows applications**: Dispatched to Wine compatibility layer
-- **macOS applications**: Dispatched to Darling compatibility layer  
-- **Linux applications**: Dispatched to WSL (Windows Subsystem for Linux) compatibility layer
-- **Android APKs**: Dispatched to ATL (Android Translation Layer)
+Goliath is a meta-compatibility layer that unifies Wine (Windows), Darling (macOS), ATL (Android), and ipasim (iOS) to run applications from all major operating systems on Linux.
 
 ## Usage
 
@@ -154,92 +145,45 @@ Each subsystem provides proper environment setup:
 ### Process Management
 
 Goliath provides unified process management:
+- The launcher will auto-detect the application type and dispatch to the correct subsystem.
+- Ensure `wine`, `darling`, `atl`, and `ipasim` are installed and available in your `PATH`.
 
 - Signal forwarding between host and guest processes
 - Proper exit code handling
 - Resource cleanup on termination
 
-## Configuration Files
+- **Windows apps**: Dispatched to Wine
+- **macOS apps**: Dispatched to Darling
+- **Android APKs**: Dispatched to ATL
+- **iOS apps**: Dispatched to ipasim
 
-### WSL Configuration
+## Running iOS Applications
 
-Create `~/.config/goliath/wsl.conf`:
+The best way to run iOS applications is with [ipasim](https://github.com/ipasimulator/ipasim), which is an emulator rather than a compatibility tool.
 
-```ini
-[wsl]
-distro_name = GoliathWSL
-default_user = myuser
-enable_interop = true
-enable_drive_mounting = true
-default_shell = /bin/bash
+### Prerequisites for iOS Support
 
-[environment]
-LANG = en_US.UTF-8
-TERM = xterm-256color
-```
+1. Install ipasim from https://github.com/ipasimulator/ipasim
+2. Ensure `ipasim` is available in your `PATH`
+3. Have iOS application files (.ipa) ready to run
 
-### Global Configuration
-
-Create `~/.config/goliath/goliath.conf`:
-
-```ini
-[general]
-auto_detect = true
-verbose = false
-log_file = ~/.local/share/goliath/goliath.log
-
-[wine]
-prefix = ~/.wine
-debug = warn+all
-
-[darling]
-prefix = ~/.darling
-
-[wsl]
-config_file = ~/.config/goliath/wsl.conf
-
-[atl]
-data_dir = ~/.local/share/atl
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Application not detected**: Check file permissions and format
-2. **WSL path issues**: Verify path conversion with `wsl_convert_path()`
-3. **Environment problems**: Check environment variable setup
-4. **Permission errors**: Ensure proper file system permissions
-
-### Debug Mode
-
-Enable verbose logging:
+### Example Usage
 
 ```bash
-export GOLIATH_DEBUG=1
-./goliath-launch.sh myapp
+# Run an iOS application
+./goliath-launch.sh MyApp.ipa
+
+# Run with additional arguments
+./goliath-launch.sh MyApp.ipa --some-argument
 ```
 
-### Log Files
-
-Check log files for detailed information:
-
-- `~/.local/share/goliath/goliath.log`: General Goliath logs
-- `~/.local/share/goliath/wsl.log`: WSL-specific logs
-- `~/.wine/system.reg`: Wine registry and logs
+The launcher will automatically detect `.ipa` files and dispatch them to ipasim for execution.
 
 ## Integration Notes
 
-### Pseudo-merge Architecture
-
-Goliath uses a pseudo-merge architecture where each subsystem is kept separate but unified through:
-
-- Common launcher interface
-- Shared configuration system
-- Unified logging and error handling
-- Cross-platform path translation
-
-### Extending Goliath
+- This is a pseudo-merge: each subsystem is kept separate, but the launcher provides a unified entry point.
+- You can add more sophisticated detection or configuration as needed.
+- ipasim provides iOS application emulation rather than translation, making it more reliable for complex iOS applications.
 
 To add support for additional operating systems:
 

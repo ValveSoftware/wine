@@ -1,18 +1,22 @@
 SUBDIRS = \
-	tools \
-	dlls \
-	dlls/darling_coreaudio \
-	dlls/darling_sandbox \
-	dlls/wsl \
-	programs \
-	libs \
-	loader \
-	server \
-	fonts \
-	include \
-	documentation \
-	libs/atl_android \
-	libs/darling
+        tools \
+        dlls \
+        dlls/darling_coreaudio \
+        dlls/darling_sandbox \
+        dlls/wsl \
+        programs \
+        libs \
+        loader \
+        server \
+        fonts \
+        include \
+        documentation \
+        libs/atl_android \
+        libs/darling
+
+if ENABLE_LIBRETRO
+SUBDIRS += libretro
+endif
 
 EXTRA_DIST = goliath-launch.sh
 
