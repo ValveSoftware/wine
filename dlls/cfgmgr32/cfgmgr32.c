@@ -34,8 +34,40 @@ static const WCHAR *guid_string( const GUID *guid, WCHAR *buffer, UINT length )
 static const WCHAR control_classW[]  = L"System\\CurrentControlSet\\Control\\Class\\";
 static const WCHAR device_classesW[] = L"System\\CurrentControlSet\\Control\\DeviceClasses\\";
 
+static struct key_cache
+{
+    HKEY root;
+    const WCHAR *prefix;
+    UINT prefix_len;
+    HKEY hkey;
+} cache[] =
+{
+    { HKEY_LOCAL_MACHINE, control_classW, ARRAY_SIZE(control_classW) - 1, (HKEY)-1 },
+    { HKEY_LOCAL_MACHINE, device_classesW, ARRAY_SIZE(device_classesW) - 1, (HKEY)-1 },
+};
+
+static HKEY cache_root_key( HKEY root, const WCHAR *key, const WCHAR **path )
+{
+    HKEY hkey;
+
+    for (struct key_cache *entry = cache; entry < cache + ARRAY_SIZE(cache); entry++)
+    {
+        if (entry->root != root) continue;
+        if (wcsnicmp( key, entry->prefix, entry->prefix_len )) continue;
+        if (path) *path = key + entry->prefix_len;
+
+        if (entry->hkey != (HKEY)-1 || RegOpenKeyExW( root, entry->prefix, 0, KEY_ALL_ACCESS, &hkey )) return entry->hkey;
+        if (InterlockedCompareExchangePointer( (void *)&entry->hkey, hkey, (HKEY)-1 ) != (HKEY)-1) RegCloseKey( hkey );
+        return entry->hkey;
+    }
+
+    if (path) *path = key;
+    return root;
+}
+
 static LSTATUS open_key( HKEY root, const WCHAR *key, REGSAM access, BOOL open, HKEY *hkey )
 {
+    if ((root = cache_root_key( root, key, &key )) == (HKEY)-1) return ERROR_FILE_NOT_FOUND;
     if (open) return RegOpenKeyExW( root, key, 0, access, hkey );
     return RegCreateKeyExW( root, key, 0, NULL, 0, access, NULL, hkey, NULL );
 }
