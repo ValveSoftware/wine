@@ -62,7 +62,7 @@ if [ ! -f "$APP" ] && [ ! -d "$APP" ]; then
     exit 1
 fi
 
-# Detect file type using file command and magic numbers
+# Enhanced application type detection
 detect_app_type() {
     local app="$1"
     
@@ -78,21 +78,26 @@ detect_app_type() {
         filetype=$(file "$app" 2>/dev/null)
     fi
     
+    local extension="${app##*.}"
+    
+    # Android APK detection with verification
+    if [[ "$extension" == "apk" ]] || [[ "$filetype" == *"Zip archive"* && "$app" == *.apk ]]; then
+        # Verify it's actually an APK by checking for AndroidManifest.xml
+        if command -v unzip >/dev/null 2>&1 && unzip -l "$app" 2>/dev/null | grep -q "AndroidManifest.xml"; then
+            echo "android"
+            return 0
+        fi
+    fi
+    
     # Check for Windows PE executables
-    if [[ "$filetype" == *"PE32"* ]] || [[ "$filetype" == *"MS-DOS"* ]] || [[ "$app" == *.exe ]] || [[ "$app" == *.msi ]]; then
+    if [[ "$filetype" == *"PE32"* ]] || [[ "$filetype" == *"MS-DOS"* ]] || [[ "$extension" == "exe" ]] || [[ "$extension" == "msi" ]]; then
         echo "windows"
         return 0
     fi
     
     # Check for macOS Mach-O binaries
-    if [[ "$filetype" == *"Mach-O"* ]] || [[ "$app" == *.app ]] || [[ "$app" == *.dmg ]]; then
+    if [[ "$filetype" == *"Mach-O"* ]] || [[ "$app" == *.dmg ]]; then
         echo "macos"
-        return 0
-    fi
-    
-    # Check for Android APK files
-    if [[ "$filetype" == *"Zip archive"* && "$app" == *.apk ]] || [[ "$app" == *.apk ]]; then
-        echo "android"
         return 0
     fi
     
@@ -133,7 +138,8 @@ check_compatibility_layer() {
     
     case "$layer" in
         wine)
-            command -v wine >/dev/null 2>&1
+            # Check for built-in Goliath wine first, then system wine
+            [ -x "$(dirname "$0")/wine" ] || command -v wine >/dev/null 2>&1
             ;;
         darling)
             command -v darling >/dev/null 2>&1 || [ -x "$(dirname "$0")/loader/goliath" ]
@@ -156,7 +162,15 @@ launch_with_layer() {
     case "$layer" in
         wine)
             log_info "Launching Windows application with Wine: $app_path"
-            exec wine "$app_path" "$@"
+            # Try to use the built Goliath wine first, then system wine
+            if [ -x "$(dirname "$0")/wine" ]; then
+                exec "$(dirname "$0")/wine" "$app_path" "$@"
+            elif command -v wine >/dev/null 2>&1; then
+                exec wine "$app_path" "$@"
+            else
+                log_error "Wine not found. Please build Goliath or install Wine."
+                exit 1
+            fi
             ;;
         darling)
             log_info "Launching macOS application with Darling: $app_path"
@@ -166,7 +180,8 @@ launch_with_layer() {
             elif command -v darling >/dev/null 2>&1; then
                 exec darling shell "$app_path" "$@"
             else
-                log_error "Darling not found. Please install Darling or build Goliath with Darling support."
+                log_error "Darling not found. Please install Darling from: https://github.com/darlinghq/darling"
+                log_error "or build Goliath with Darling support."
                 exit 1
             fi
             ;;
@@ -175,7 +190,8 @@ launch_with_layer() {
             if command -v atl >/dev/null 2>&1; then
                 exec atl "$app_path" "$@"
             else
-                log_error "ATL (Android Translation Layer) not found."
+                log_error "ATL (Android Translation Layer) not found in PATH"
+                log_error "Please install ATL from: https://gitlab.com/android_translation_layer/android_translation_layer"
                 exit 1
             fi
             ;;
@@ -226,7 +242,7 @@ case "$APP_TYPE" in
         if check_compatibility_layer wine; then
             launch_with_layer wine "$APP" "$@"
         else
-            log_error "Wine not found. Please install Wine to run Windows applications."
+            log_error "Wine not found. Please build Goliath or install Wine to run Windows applications."
             exit 1
         fi
         ;;

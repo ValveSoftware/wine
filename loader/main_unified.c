@@ -1,5 +1,5 @@
 /*
- * Goliath Unified Loader: Dispatches to ELF (Wine), Mach-O (Darling), or ROM (LibRetro) loader
+ * Goliath Unified Loader: Dispatches to ELF (Wine), Mach-O (Darling), APK (ATL), or ROM (LibRetro) loader
  *
  * Copyright 2025 Goliath Project
  *
@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <errno.h>
+#include <sys/wait.h>
 #include "../libretro/rom_detection.h"
 #include "../libretro/libretro_api.h"
 
@@ -21,6 +22,8 @@
 #define MACHO_MAGIC_64 0xfeedfacf
 #define MACHO_CIGAM_32 0xcefaedfe
 #define MACHO_CIGAM_64 0xcffaedfe
+#define ZIP_MAGIC 0x04034b50  /* ZIP local file header signature */
+#define APK_BUFFER_SIZE 1024
 
 /* Binary types */
 typedef enum {
@@ -33,7 +36,50 @@ typedef enum {
 
 extern int wine_main(int argc, char *argv[]);
 extern int darling_main(int argc, char *argv[]);
-extern int atl_main(int argc, char *argv[]);
+
+/* ATL integration function */
+static int atl_main(int argc, char *argv[]) {
+    /* For now, we'll exec the atl command directly */
+    /* In a more integrated approach, this could link to ATL libraries */
+    char **new_argv = malloc((argc + 1) * sizeof(char*));
+    if (!new_argv) {
+        perror("malloc");
+        return 1;
+    }
+    
+    new_argv[0] = "atl";
+    for (int i = 1; i < argc; i++) {
+        new_argv[i] = argv[i];
+    }
+    new_argv[argc] = NULL;
+    
+    execvp("atl", new_argv);
+    
+    /* If we get here, exec failed */
+    perror("Failed to execute ATL");
+    free(new_argv);
+    return 1;
+}
+
+/* Check if file is an Android APK */
+static int is_apk_file(const char *path) {
+    /* Simple check: APK files are ZIP archives with .apk extension */
+    const char *ext = strrchr(path, '.');
+    if (!ext || strcasecmp(ext, ".apk") != 0) return 0;
+    
+    /* Verify it's a ZIP file by checking magic number */
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) return 0;
+    
+    uint32_t magic = 0;
+    if (read(fd, &magic, sizeof(magic)) != sizeof(magic)) {
+        close(fd);
+        return 0;
+    }
+    close(fd);
+    
+    return (magic == ZIP_MAGIC || magic == (ZIP_MAGIC >> 24 | ZIP_MAGIC << 24));
+}
 
 static binary_type_t detect_binary_type(const char *path) {
     /* First check if it's a ROM file */
@@ -42,8 +88,7 @@ static binary_type_t detect_binary_type(const char *path) {
     }
     
     /* Check for APK files */
-    const char *ext = strrchr(path, '.');
-    if (ext && strcasecmp(ext, ".apk") == 0) {
+    if (is_apk_file(path)) {
         return BINARY_TYPE_APK;
     }
     
@@ -162,7 +207,7 @@ int main(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <binary|rom|apk> [args...]\n", argv[0]);
         fprintf(stderr, "Goliath Unified Compatibility Layer\n");
-        fprintf(stderr, "Supports: Windows (ELF), macOS (Mach-O), Android (APK), Legacy ROMs\n");
+        fprintf(stderr, "Supports: Windows (ELF/Wine), macOS (Mach-O/Darling), Android (APK/ATL), Legacy ROMs (LibRetro)\n");
         return 1;
     }
     
@@ -194,4 +239,6 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "  - Legacy ROMs (.nes, .snes, .md, .gb, .gba, .n64, etc.)\n");
             return 2;
     }
+    
+    return 0;
 }

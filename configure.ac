@@ -900,7 +900,28 @@ then
 
     WINE_MINGW_PACKAGE_FLAGS(FLUIDSYNTH,[fluidsynth],[-lfluidsynth],
         [WINE_CHECK_MINGW_HEADER(fluidsynth.h,
-            [WINE_CHECK_MINGW_LIB(fluidsynth,new_fluid_synth,[:],FIG_MAKEFILE(dlls/wmiutils/tests)
+            [WINE_CHECK_MINGW_LIB(fluidsynth,new_fluid_synth,[:],[FLUIDSYNTH_CFLAGS=""; FLUIDSYNTH_LIBS="-lfluidsynth"],[$FLUIDSYNTH_LIBS])],
+            [FLUIDSYNTH_CFLAGS=""; FLUIDSYNTH_LIBS=""])])
+    if test "x$FLUIDSYNTH_LIBS" = "x"
+    then
+        WINE_NOTICE([FluidSynth MinGW development files not found; using bundled version.])
+    fi
+fi
+
+dnl **** Check for ALSA 1.x ****
+AC_SUBST(ALSA_LIBS,"")
+if test "x$with_alsa" != "xno"
+then
+    AC_CHECK_LIB(asound,snd_pcm_hw_params_get_access_mask,
+        [ALSA_LIBS="-lasound"
+         AC_DEFINE(HAVE_ALSA,1,[Define if you have ALSA 1.x])],
+        [],
+        [-lm])
+    AC_SUBST(ALSA_CFLAGS,"")
+fi
+
+WINE_CONFIG_MAKEFILE(dlls/wmiutils)
+WINE_CONFIG_MAKEFILE(dlls/wmiutils/tests)
 WINE_CONFIG_MAKEFILE(dlls/cryptnet/tests)
 WINE_CONFIG_MAKEFILE(dlls/wing.dll16,enable_win16)
 WINE_CONFIG_MAKEFILE(dlls/wing32)
@@ -939,8 +960,6 @@ WINE_CONFIG_MAKEFILE(dlls/wmadmod)
 WINE_CONFIG_MAKEFILE(dlls/wmasf)
 WINE_CONFIG_MAKEFILE(dlls/wmi)
 WINE_CONFIG_MAKEFILE(dlls/wmilib.sys)
-WINE_CONFIG_MAKEFILE(dlls/wmiutils)
-WINE_CONFIG_MAKEFILE(dlls/wmiutils/tests)
 WINE_CONFIG_MAKEFILE(dlls/wmp)
 WINE_CONFIG_MAKEFILE(dlls/wmp/tests)
 WINE_CONFIG_MAKEFILE(dlls/wmphoto)
@@ -1364,7 +1383,7 @@ fi
 WINE_PRINT_MESSAGES
 
 AS_ECHO("
-$as_me: Finished.  Do '${MAKE-make}' to compile Wine.
+$as_me: Finished.  Do '${MAKE-make}' to compile Goliath.
 ") >&AS_MESSAGE_FD
 
 dnl Local Variables:
