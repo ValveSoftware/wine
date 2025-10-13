@@ -2,35 +2,42 @@
 # Goliath Unified Compatibility Layer
 #
 # This is a meta-launcher and integration point for Wine (Windows), Darling (macOS), 
-# ATL (Android), and LibRetro (Legacy ROMs).
+# ATL (Android), ipasim (iOS), and LibRetro (Legacy ROMs).
 #
 # - Place this script at the project root.
-# - Ensure Wine, Darling, ATL, and LibRetro cores are installed and available.
-# This is a meta-launcher and integration point for Wine (Windows), Darling (macOS), ATL (Android), and ipasim (iOS).
-#
-# - Place this script at the project root.
-# - Ensure Wine, Darling, ATL, and ipasim are installed and available in PATH.
+# - Ensure Wine, Darling, ATL, ipasim, and LibRetro cores are installed and available.
 # - Usage: ./goliath-launch.sh <application> [args...]
 #
 # This script will auto-detect the application type and dispatch to the correct subsystem.
 #
 # For more details, see documentation/README-goliath.md
-
-# Goliath Unified Application Launcher
-# This script dispatches to Wine, Darling, ATL, or LibRetro based on the application type.
+#
 # Copyright 2025 Goliath Project
 
 set -e
 
+# Enable debug mode if GOLIATH_DEBUG is set
+DEBUG=${GOLIATH_DEBUG:-0}
+
+debug_log() {
+    if [[ "$DEBUG" == "1" ]]; then
+        echo "[DEBUG] $*" >&2
+    fi
+}
+
 usage() {
     echo "Usage: $0 <application> [args...]"
-    echo "  Runs Windows, macOS, Android, or iOS applications using the appropriate compatibility layer."
+    echo "  Runs Windows, macOS, Android, iOS, or ROM applications using the appropriate compatibility layer."
     echo ""
     echo "Supported application types:"
     echo "  - Windows executables (.exe, .msi) -> Wine"
     echo "  - macOS applications (.app, Mach-O binaries) -> Darling"
     echo "  - Android packages (.apk) -> ATL"
     echo "  - iOS applications (.ipa) -> ipasim"
+    echo "  - ROM files (various formats) -> LibRetro"
+    echo ""
+    echo "Environment variables:"
+    echo "  GOLIATH_DEBUG=1    Enable debug output"
     exit 1
 }
 
@@ -44,98 +51,131 @@ check_dependency() {
     fi
 }
 
-detect_and_run() {
+# Detect file type based on extension and file magic
+detect_file_type() {
     local app="$1"
-    shift
     
     # Check if file exists
-    if [ ! -e "$app" ]; then
-        echo "Error: File '$app' does not exist."
-        exit 1
+    if [[ ! -e "$app" ]]; then
+        echo "unknown"
+        return
     fi
     
     # Get file type information
     local filetype
     filetype=$(file "$app" 2>/dev/null || echo "unknown")
     
-    # Detect application type and dispatch to appropriate subsystem
+    # Check by extension first
     case "$app" in
         *.ipa)
-            echo "Detected iOS application: $app"
-            check_dependency "ipasim" "ipasim"
-            echo "Launching with ipasim..."
-            exec ipasim "$app" "$@"
+            echo "ios"
+            return
             ;;
         *.apk)
-            echo "Detected Android application: $app"
-            check_dependency "atl" "ATL (Android Translation Layer)"
-            echo "Launching with ATL..."
-            exec atl "$app" "$@"
+            echo "android"
+            return
             ;;
         *.app|*.app/)
-            echo "Detected macOS application: $app"
-            check_dependency "darling" "Darling"
-            echo "Launching with Darling..."
-            exec darling shell "$app" "$@"
+            echo "macos"
+            return
             ;;
         *.exe|*.msi)
-            echo "Detected Windows application: $app"
-            check_dependency "wine" "Wine"
-            echo "Launching with Wine..."
-            exec wine "$app" "$@"
+            echo "windows"
+            return
             ;;
-        *)
-            # Use file command output for more sophisticated detection
-            if [[ "$filetype" == *"Mach-O"* ]]; then
-                echo "Detected macOS binary (Mach-O): $app"
-                check_dependency "darling" "Darling"
-                echo "Launching with Darling..."
-                exec darling shell "$app" "$@"
-            elif [[ "$filetype" == *"PE32"* ]] || [[ "$filetype" == *"MS-DOS"* ]]; then
-                echo "Detected Windows executable: $app"
-                check_dependency "wine" "Wine"
-                echo "Launching with Wine..."
-                exec wine "$app" "$@"
-            elif [[ "$filetype" == *"ELF"* ]]; then
-                echo "Detected ELF binary: $app"
-                echo "Note: ELF binaries may be Linux native applications."
-                echo "Attempting to run natively..."
-                exec "$app" "$@"
-            else
-                echo "Error: Unable to detect application type for '$app'"
-                echo "File type: $filetype"
-                echo ""
-                echo "Supported formats:"
-                echo "  - iOS: .ipa files"
-                echo "  - Android: .apk files"
-                echo "  - macOS: .app bundles, Mach-O binaries"
-                echo "  - Windows: .exe, .msi files, PE32 binaries"
-                exit 1
-            fi
+        *.nes|*.smc|*.sfc|*.gb|*.gbc|*.gba|*.md|*.gen|*.32x|*.gg|*.ms|*.pce|*.ngp|*.ngc|*.ws|*.wsc|*.vb|*.rom|*.bin)
+            echo "rom_$(get_rom_type "$app")"
+            return
             ;;
+    esac
+    
+    # Use file command output for more sophisticated detection
+    if [[ "$filetype" == *"Mach-O"* ]]; then
+        echo "macos"
+    elif [[ "$filetype" == *"PE32"* ]] || [[ "$filetype" == *"MS-DOS"* ]]; then
+        echo "windows"
+    elif [[ "$filetype" == *"ELF"* ]]; then
+        echo "linux"
+    else
+        # Try to detect ROM files by content
+        local rom_type
+        rom_type=$(get_rom_type "$app")
+        if [[ "$rom_type" != "unknown" ]]; then
+            echo "rom_$rom_type"
+        else
+            echo "unknown"
+        fi
+    fi
+}
+
+# Detect ROM type for LibRetro
+get_rom_type() {
+    local rom="$1"
+    local ext="${rom##*.}"
+    
+    case "${ext,,}" in
+        nes) echo "nes" ;;
+        smc|sfc) echo "snes" ;;
+        gb) echo "gameboy" ;;
+        gbc) echo "gameboy_color" ;;
+        gba) echo "gameboy_advance" ;;
+        md|gen) echo "genesis" ;;
+        32x) echo "sega32x" ;;
+        gg) echo "gamegear" ;;
+        ms) echo "mastersystem" ;;
+        pce) echo "pcengine" ;;
+        ngp|ngc) echo "neogeo_pocket" ;;
+        ws|wsc) echo "wonderswan" ;;
+        vb) echo "virtualboy" ;;
+        *) echo "unknown" ;;
     esac
 }
 
-if [ $# -lt 1 ]; then
-    usage
-fi
+# Run Windows applications via Wine
+run_windows_app() {
+    local app="$1"
+    shift
+    
+    debug_log "Running Windows application: $app"
+    check_dependency "wine" "Wine"
+    echo "Launching with Wine..."
+    exec wine "$app" "$@"
+}
 
+# Run macOS applications via Darling
+run_macos_app() {
+    local app="$1"
+    shift
+    
+    debug_log "Running macOS application: $app"
+    check_dependency "darling" "Darling"
+    echo "Launching with Darling..."
+    exec darling shell "$app" "$@"
+}
+
+# Run Android applications via ATL
 run_android_app() {
     local app="$1"
     shift
     
     debug_log "Running Android application: $app"
-    
-    # Check if ATL is available
-    if ! command -v atl >/dev/null 2>&1; then
-        echo "ERROR: ATL (Android Translation Layer) not found." >&2
-        echo "Please install ATL to run Android applications." >&2
-        return 1
-    fi
-    
+    check_dependency "atl" "ATL (Android Translation Layer)"
+    echo "Launching with ATL..."
     exec atl "$app" "$@"
 }
 
+# Run iOS applications via ipasim
+run_ios_app() {
+    local app="$1"
+    shift
+    
+    debug_log "Running iOS application: $app"
+    check_dependency "ipasim" "ipasim"
+    echo "Launching with ipasim..."
+    exec ipasim "$app" "$@"
+}
+
+# Run ROM files via LibRetro
 run_rom_file() {
     local rom="$1"
     shift
@@ -162,16 +202,17 @@ run_rom_file() {
     exec "$loader" "$rom" "$@"
 }
 
+# Run Linux native applications
 run_linux_app() {
     local app="$1"
     shift
     
     debug_log "Running Linux application: $app"
-    
-    # For Linux binaries, just execute directly
+    echo "Running native Linux application..."
     exec "$app" "$@"
 }
 
+# Main function - unified entry point
 main() {
     if [[ $# -lt 1 ]]; then
         usage
@@ -179,6 +220,12 @@ main() {
     
     local app="$1"
     shift
+    
+    # Check if file exists
+    if [[ ! -e "$app" ]]; then
+        echo "Error: File '$app' does not exist." >&2
+        exit 1
+    fi
     
     # Make path absolute if relative
     if [[ "$app" != /* ]]; then
@@ -205,6 +252,9 @@ main() {
         android)
             run_android_app "$app" "$@"
             ;;
+        ios)
+            run_ios_app "$app" "$@"
+            ;;
         linux)
             run_linux_app "$app" "$@"
             ;;
@@ -212,8 +262,18 @@ main() {
             run_rom_file "$app" "$@"
             ;;
         unknown)
-            echo "WARNING: Unknown file type, trying unified loader..." >&2
-            run_rom_file "$app" "$@"  # The unified loader can handle unknown types
+            echo "ERROR: Unable to detect application type for '$app'" >&2
+            local filetype
+            filetype=$(file "$app" 2>/dev/null || echo "unknown")
+            echo "File type: $filetype" >&2
+            echo "" >&2
+            echo "Supported formats:" >&2
+            echo "  - iOS: .ipa files" >&2
+            echo "  - Android: .apk files" >&2
+            echo "  - macOS: .app bundles, Mach-O binaries" >&2
+            echo "  - Windows: .exe, .msi files, PE32 binaries" >&2
+            echo "  - ROMs: .nes, .smc, .gb, .gba, .md, etc." >&2
+            exit 1
             ;;
         *)
             echo "ERROR: Unsupported file type: $file_type" >&2
