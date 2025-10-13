@@ -14,7 +14,8 @@
 #
 # Copyright 2025 Goliath Project
 
-set -e
+set -o pipefail
+trap 'echo "ERROR: Goliath launcher failed at line ${LINENO}." >&2; exit 1' ERR
 
 # Enable debug mode if GOLIATH_DEBUG is set
 DEBUG=${GOLIATH_DEBUG:-0}
