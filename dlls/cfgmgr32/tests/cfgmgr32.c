@@ -76,6 +76,7 @@ static const char *debugstr_ok( const char *cond )
     } while (0)
 #define ok_u4( r, op, e )   ok_ex( r, op, e, UINT, "%u" )
 #define ok_x4( r, op, e )   ok_ex( r, op, e, UINT, "%#x" )
+#define ok_ptr( r, op, e )   ok_ex( r, op, e, void *, "%p" )
 
 static const WCHAR *guid_string( const GUID *guid, WCHAR *buffer, UINT length )
 {
@@ -470,7 +471,7 @@ static void check_device_path_casing(const WCHAR *original_path)
     free(path);
 }
 
-static void test_CM_Get_Device_Interface_List(void)
+static void test_CM_Get_Device_Interface_PropertyW(void)
 {
     BYTE iface_detail_buffer[sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W) + 256 * sizeof(WCHAR)];
     SP_DEVICE_INTERFACE_DATA iface = {sizeof(iface)};
@@ -2441,6 +2442,186 @@ static void test_CM_Get_Class_Property(void)
     ok_x4( ret, ==, CR_NO_SUCH_VALUE );
 }
 
+static void test_CM_Get_Device_Interface_List_Size(void)
+{
+    GUID guid = GUID_DEVINTERFACE_HID;
+    ULONG size_all, size_present, size;
+    CONFIGRET ret;
+
+    ret = CM_Get_Device_Interface_List_SizeW( NULL, &guid, NULL, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ret = CM_Get_Device_Interface_List_SizeW( &size, NULL, NULL, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_FAILURE );
+    for (UINT flag = 2; flag; flag <<= 1)
+    {
+        winetest_push_context( "%#x", flag );
+        ret = CM_Get_Device_Interface_List_SizeW( &size, &guid, NULL, flag );
+        ok_x4( ret, ==, CR_INVALID_FLAG );
+        winetest_pop_context();
+    }
+    size = 0xdeadbeef;
+    ret = CM_Get_Device_Interface_List_SizeW( &size, &guid, (WCHAR *)L"INVALID", CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES );
+    todo_wine ok_x4( ret, ==, CR_INVALID_DEVNODE );
+    todo_wine ok_u4( size, ==, 0 );
+    ret = CM_Get_Device_Interface_List_SizeW( &size, &guid, (WCHAR *)L"\\\\?\\", CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES );
+    todo_wine ok_x4( ret, ==, CR_INVALID_DEVNODE );
+
+    size_present = 0;
+    ret = CM_Get_Device_Interface_List_SizeW( &size_present, &guid, NULL, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_u4( size_present, >, 0 );
+    size_all = 0;
+    ret = CM_Get_Device_Interface_List_SizeW( &size_all, &guid, NULL, CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_u4( size_all, >, 0 );
+
+    size = 0;
+    ret = CM_Get_Device_Interface_List_SizeW( &size, &guid, (WCHAR *)L"", CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok( size == size_all || broken(size == 1), "got size %lu\n", size );
+
+
+    size = 0;
+    ret = CM_Get_Device_Interface_List_SizeA( &size, &guid, NULL, CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_u4( size, ==, size_all );
+    size = 0;
+    ret = CM_Get_Device_Interface_List_SizeA( &size, &guid, NULL, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_u4( size, ==, size_present );
+}
+
+static void test_CM_Get_Device_Interface_List(void)
+{
+    GUID guid = GUID_DEVINTERFACE_HID;
+    WCHAR *tmp, *tmp2, *buffer, *bufferW, instance[MAX_PATH];
+    CONFIGRET ret;
+    char *bufferA;
+    ULONG size;
+
+    size = 0;
+    ret = CM_Get_Device_Interface_List_SizeW( &size, &guid, NULL, CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_u4( size, >, 0 );
+
+    buffer = malloc( size * sizeof(*buffer) );
+    ok_ptr( buffer, !=, NULL );
+
+
+    ret = CM_Get_Device_Interface_ListW( &guid, NULL, NULL, 0, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ret = CM_Get_Device_Interface_ListW( NULL, NULL, buffer, size, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_FAILURE );
+    for (UINT flag = 2; flag; flag <<= 1)
+    {
+        winetest_push_context( "%#x", flag );
+        ret = CM_Get_Device_Interface_ListW( &guid, NULL, buffer, size, flag );
+        ok_x4( ret, ==, CR_INVALID_FLAG );
+        winetest_pop_context();
+    }
+    ret = CM_Get_Device_Interface_ListW( &guid, (WCHAR *)L"INVALID", buffer, size, CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES );
+    todo_wine ok_x4( ret, ==, CR_INVALID_DEVNODE );
+    ret = CM_Get_Device_Interface_ListW( &guid, (WCHAR *)L"\\\\?\\", buffer, size, CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES );
+    todo_wine ok_x4( ret, ==, CR_INVALID_DEVNODE );
+
+
+    ret = CM_Get_Device_Interface_ListW( &guid, NULL, buffer, size, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok( !wcsncmp( buffer, L"\\\\?\\HID#", 8 ), "got %s\n", debugstr_wn( buffer, size ) );
+    for (tmp = buffer; *tmp; tmp = tmp + wcslen( tmp ) + 1)
+    {
+        WCHAR sep, substr[MAX_PATH], upper[MAX_PATH];
+        UINT pos;
+
+        ok( !wcsncmp( tmp, L"\\\\?\\HID#", 8 ), "got %s\n", debugstr_wn( buffer, size ) );
+
+        /* \\\\?\\HID#XXXX# uppercase prefix */
+        wcscpy( substr, tmp );
+        pos = wcschr( substr + 8, '#' ) - substr;
+        sep = substr[pos];
+        substr[pos] = 0;
+        wcscpy( upper, substr );
+        wcsupr( upper );
+        ok_wcs( upper, substr );
+        substr[pos] = sep;
+
+        /* lower case instance, refstr and guid suffix */
+        wcscpy( substr, wcschr( substr + 25, '#' ) );
+        wcscpy( upper, substr );
+        wcslwr( upper );
+        flaky_wine ok_wcs( upper, substr );
+    }
+    ok( tmp > buffer, "got %s\n", debugstr_wn( buffer, size ) );
+
+
+    bufferA = malloc( size * sizeof(*bufferA) );
+    ok_ptr( bufferA, !=, NULL );
+    ret = CM_Get_Device_Interface_ListA( &guid, NULL, bufferA, size, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_SUCCESS );
+
+    bufferW = malloc( size * sizeof(*bufferW) );
+    ok_ptr( bufferW, !=, NULL );
+    memset( bufferW, 0xcc, size * sizeof(*bufferW) );
+    MultiByteToWideChar( CP_ACP, 0, bufferA, size, bufferW, size );
+    for (tmp = buffer, tmp2 = bufferW; *tmp && *tmp2; tmp = tmp + wcslen( tmp ) + 1, tmp2 = tmp2 + wcslen( tmp2 ) + 1)
+        ok( !wcscmp( tmp, tmp2 ), "got %s, %s.\n", debugstr_wn( bufferW, size ), debugstr_wn( buffer, size ) );
+    ok( !*tmp, "got %s, %s.\n", debugstr_wn( bufferW, size ), debugstr_wn( buffer, size ) );
+    ok( !*tmp2, "got %s, %s.\n", debugstr_wn( bufferW, size ), debugstr_wn( buffer, size ) );
+
+
+    free( bufferA );
+    free( bufferW );
+
+
+    wcscpy( instance, buffer + 4 );
+    *wcsrchr( instance, '#' ) = 0;
+    while ((tmp = wcschr( instance, '#' ))) *tmp = '\\';
+    ret = CM_Get_Device_Interface_ListW( &guid, instance, buffer, size, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok( !wcsncmp( buffer, L"\\\\?\\", 4 ), "got %s\n", debugstr_wn( buffer, size ) );
+    ok( !wcscmp( buffer + wcslen( buffer ) + 1, L"" ), "got %s\n", debugstr_wn( buffer, size ) );
+
+
+    free( buffer );
+
+
+    guid = GUID_DEVINTERFACE_DISPLAY_ADAPTER;
+
+    size = 0;
+    ret = CM_Get_Device_Interface_List_SizeW( &size, &guid, NULL, CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_u4( size, >, 0 );
+
+    buffer = malloc( size * sizeof(*buffer) );
+    ok_ptr( buffer, !=, NULL );
+
+    ret = CM_Get_Device_Interface_ListW( &guid, NULL, buffer, size, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok( !wcsncmp( buffer, L"\\\\?\\", 4 ), "got %s\n", debugstr_wn( buffer, size ) );
+    for (tmp = buffer; *tmp; tmp = tmp + wcslen( tmp ) + 1)
+    {
+        WCHAR *sep, substr[MAX_PATH], upper[MAX_PATH];
+        ok( !wcsncmp( tmp, L"\\\\?\\", 4 ), "got %s\n", debugstr_wn( buffer, size ) );
+
+        /* upper case enumerator prefix */
+        wcscpy( substr, tmp );
+        if ((sep = wcschr( substr, '#' ))) *sep = 0;
+        wcscpy( upper, substr );
+        wcsupr( upper );
+        ok_wcs( upper, substr );
+        *sep = '#';
+
+        /* lower case instance, refstr and guid suffix */
+        wcscpy( substr, wcschr( sep + 1, '#' ) );
+        wcscpy( upper, substr );
+        wcslwr( upper );
+        ok_wcs( upper, substr );
+    }
+    ok( tmp > buffer, "got %s\n", debugstr_wn( buffer, size ) );
+
+    free( buffer );
+}
+
 static void test_CM_Open_Device_Interface_Key(void)
 {
     WCHAR iface[4096], name[MAX_PATH], expect[MAX_PATH], buffer[39], *refstr;
@@ -2546,10 +2727,12 @@ START_TEST(cfgmgr32)
     test_CM_Get_Class_Registry_Property();
     test_CM_Get_Class_Property();
     test_CM_Get_Class_Property_Keys();
+    test_CM_Get_Device_Interface_List_Size();
+    test_CM_Get_Device_Interface_List();
     test_CM_Open_Device_Interface_Key();
     test_CM_Get_Device_ID_List();
     test_CM_Register_Notification();
-    test_CM_Get_Device_Interface_List();
+    test_CM_Get_Device_Interface_PropertyW();
     test_DevGetObjects();
     test_DevCreateObjectQuery();
     test_DevGetObjectProperties_invalid();
