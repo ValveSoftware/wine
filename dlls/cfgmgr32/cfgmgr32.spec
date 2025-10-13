@@ -112,14 +112,14 @@
 @ stdcall CM_Get_Device_Interface_AliasW(wstr ptr ptr ptr long) setupapi.CM_Get_Device_Interface_AliasW
 @ stub CM_Get_Device_Interface_Alias_ExA
 @ stub CM_Get_Device_Interface_Alias_ExW
-@ stdcall CM_Get_Device_Interface_ListA(ptr ptr ptr long long) setupapi.CM_Get_Device_Interface_ListA
-@ stdcall CM_Get_Device_Interface_ListW(ptr ptr ptr long long) setupapi.CM_Get_Device_Interface_ListW
-@ stdcall CM_Get_Device_Interface_List_ExA(ptr ptr ptr long long ptr) setupapi.CM_Get_Device_Interface_List_ExA
-@ stdcall CM_Get_Device_Interface_List_ExW(ptr ptr ptr long long ptr) setupapi.CM_Get_Device_Interface_List_ExW
-@ stdcall CM_Get_Device_Interface_List_SizeA(ptr ptr str long) setupapi.CM_Get_Device_Interface_List_SizeA
-@ stdcall CM_Get_Device_Interface_List_SizeW(ptr ptr wstr long) setupapi.CM_Get_Device_Interface_List_SizeW
-@ stdcall CM_Get_Device_Interface_List_Size_ExA(ptr ptr str long ptr) setupapi.CM_Get_Device_Interface_List_Size_ExA
-@ stdcall CM_Get_Device_Interface_List_Size_ExW(ptr ptr wstr long ptr) setupapi.CM_Get_Device_Interface_List_Size_ExW
+@ stdcall CM_Get_Device_Interface_ListA(ptr ptr ptr long long)
+@ stdcall CM_Get_Device_Interface_ListW(ptr ptr ptr long long)
+@ stdcall CM_Get_Device_Interface_List_ExA(ptr ptr ptr long long ptr)
+@ stdcall CM_Get_Device_Interface_List_ExW(ptr ptr ptr long long ptr)
+@ stdcall CM_Get_Device_Interface_List_SizeA(ptr ptr str long)
+@ stdcall CM_Get_Device_Interface_List_SizeW(ptr ptr wstr long)
+@ stdcall CM_Get_Device_Interface_List_Size_ExA(ptr ptr str long ptr)
+@ stdcall CM_Get_Device_Interface_List_Size_ExW(ptr ptr wstr long ptr)
 @ stdcall CM_Get_Device_Interface_PropertyW(wstr ptr ptr ptr ptr long)
 @ stub CM_Get_Device_Interface_Property_ExW
 @ stub CM_Get_Device_Interface_Property_KeysW
