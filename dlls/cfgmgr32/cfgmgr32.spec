@@ -74,8 +74,8 @@
 @ stub CM_Get_Class_Name_ExW
 @ stdcall CM_Get_Class_PropertyW(ptr ptr ptr ptr long long)
 @ stdcall CM_Get_Class_Property_ExW(ptr ptr ptr ptr long long ptr)
-@ stdcall CM_Get_Class_Property_Keys(ptr ptr ptr long) setupapi.CM_Get_Class_Property_Keys
-@ stdcall CM_Get_Class_Property_Keys_Ex(ptr ptr ptr long ptr) setupapi.CM_Get_Class_Property_Keys_Ex
+@ stdcall CM_Get_Class_Property_Keys(ptr ptr ptr long)
+@ stdcall CM_Get_Class_Property_Keys_Ex(ptr ptr ptr long ptr)
 @ stdcall CM_Get_Class_Registry_PropertyA(ptr long ptr ptr long long ptr)
 @ stdcall CM_Get_Class_Registry_PropertyW(ptr long ptr ptr long long ptr)
 @ stub CM_Get_Depth
