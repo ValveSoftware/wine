@@ -182,10 +182,10 @@
 @ stdcall CM_Open_Class_Key_ExW(ptr wstr long long ptr long ptr)
 @ stdcall CM_Open_DevNode_Key(long long long long ptr long) setupapi.CM_Open_DevNode_Key
 @ stub CM_Open_DevNode_Key_Ex
-@ stub CM_Open_Device_Interface_KeyA
-@ stub CM_Open_Device_Interface_KeyW
-@ stub CM_Open_Device_Interface_Key_ExA
-@ stub CM_Open_Device_Interface_Key_ExW
+@ stdcall CM_Open_Device_Interface_KeyA(str long long ptr long)
+@ stdcall CM_Open_Device_Interface_KeyW(wstr long long ptr long)
+@ stdcall CM_Open_Device_Interface_Key_ExA(str long long ptr long ptr)
+@ stdcall CM_Open_Device_Interface_Key_ExW(wstr long long ptr long ptr)
 @ stub CM_Query_And_Remove_SubTreeA
 @ stub CM_Query_And_Remove_SubTreeW
 @ stub CM_Query_And_Remove_SubTree_ExA

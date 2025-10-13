@@ -71,6 +71,14 @@ static const char *debugstr_ok( const char *cond )
 #define ok_u4( r, op, e )   ok_ex( r, op, e, UINT, "%u" )
 #define ok_x4( r, op, e )   ok_ex( r, op, e, UINT, "%#x" )
 
+static const WCHAR *guid_string( const GUID *guid, WCHAR *buffer, UINT length )
+{
+    swprintf( buffer, length, L"{%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x}",
+              guid->Data1, guid->Data2, guid->Data3, guid->Data4[0], guid->Data4[1], guid->Data4[2],
+              guid->Data4[3], guid->Data4[4], guid->Data4[5], guid->Data4[6], guid->Data4[7] );
+    return buffer;
+}
+
 static void test_CM_MapCrToWin32Err(void)
 {
     unsigned int i;
@@ -2113,6 +2121,46 @@ static void test_CM_Open_Class_Key(void)
     ok_x4( ret, ==, ERROR_SUCCESS );
 }
 
+static void test_CM_Open_Device_Interface_Key(void)
+{
+    WCHAR iface[4096], name[MAX_PATH], expect[MAX_PATH], buffer[39], *refstr;
+    CONFIGRET ret;
+    HKEY hkey;
+    GUID guid;
+
+    guid = GUID_DEVINTERFACE_HID;
+    ret = CM_Get_Device_Interface_ListW( &guid, NULL, iface, ARRAY_SIZE(iface), CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    ok_x4( ret, ==, CR_SUCCESS );
+
+    wcscpy( name, iface + 4 );
+    if ((refstr = wcschr( name, '\\' ))) *refstr++ = 0;
+    else refstr = (WCHAR *)L"";
+    swprintf( expect, ARRAY_SIZE(expect), L"\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Control\\DeviceClasses\\%s\\##?#%s\\#%s\\Device Parameters",
+              guid_string( &guid, buffer, ARRAY_SIZE(buffer) ), name, refstr );
+
+    ret = CM_Open_Device_Interface_KeyW( NULL, KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ret = CM_Open_Device_Interface_KeyW( L"DISPLAY_ADAPTER", KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, 0 );
+    ok_x4( ret, ==, CR_INVALID_DATA );
+    ret = CM_Open_Device_Interface_KeyW( L"\\\\?\\WINETEST#WINETEST#0123456#{5b45201d-f2f2-4f3b-85bb-30ff1f953599}", KEY_QUERY_VALUE, RegDisposition_OpenAlways, &hkey, 0 );
+    ok_x4( ret, ==, CR_NO_SUCH_DEVICE_INTERFACE );
+
+    ret = CM_Open_Device_Interface_KeyW( iface, KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, 0 );
+    if (ret == CR_NO_SUCH_REGISTRY_KEY) ret = CM_Open_Device_Interface_KeyW( iface, KEY_QUERY_VALUE, RegDisposition_OpenAlways, &hkey, 0 );
+    ok_x4( ret, ==, CR_SUCCESS );
+    check_object_name( hkey, expect );
+    RegCloseKey( hkey );
+    if (ret == CR_NO_SUCH_REGISTRY_KEY) RegDeleteKeyW( HKEY_LOCAL_MACHINE, expect + wcslen( L"\\REGISTRY\\MACHINE\\" ) );
+
+    for (UINT flag = 1; flag; flag <<= 1)
+    {
+        winetest_push_context( "%#x", flag );
+        ret = CM_Open_Device_Interface_KeyW( iface, KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, flag );
+        ok_x4( ret, ==, CR_INVALID_FLAG );
+        winetest_pop_context();
+    }
+}
+
 START_TEST(cfgmgr32)
 {
     HMODULE mod = GetModuleHandleA("cfgmgr32.dll");
@@ -2129,6 +2177,7 @@ START_TEST(cfgmgr32)
     test_CM_Enumerate_Enumerators();
     test_CM_Get_Class_Key_Name();
     test_CM_Open_Class_Key();
+    test_CM_Open_Device_Interface_Key();
     test_CM_Get_Device_ID_List();
     test_CM_Register_Notification();
     test_CM_Get_Device_Interface_List();

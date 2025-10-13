@@ -96,6 +96,37 @@ static LSTATUS open_device_classes_key( HKEY root, const WCHAR *key, REGSAM acce
     return open_key( root, path, access, open, hkey );
 }
 
+struct device_interface
+{
+    GUID class_guid;
+    WCHAR class[39];
+    WCHAR name[MAX_PATH];
+    WCHAR refstr[MAX_PATH];
+};
+
+static LSTATUS init_device_interface( struct device_interface *iface, const WCHAR *name )
+{
+    WCHAR *tmp;
+    UINT len;
+
+    if (wcsncmp( name, L"\\\\?\\", 4 )) return ERROR_FILE_NOT_FOUND;
+    len = swprintf( iface->name, MAX_PATH, L"##?#%s", name + 4 );
+
+    if ((tmp = wcschr( iface->name, '\\' ))) *tmp++ = 0;
+    else tmp = iface->name + len;
+    swprintf( iface->refstr, MAX_PATH, L"#%s", tmp );
+
+    if (!(tmp = wcsrchr( iface->name, '#' ))) return ERROR_FILE_NOT_FOUND;
+    return guid_from_string( wcscpy( iface->class, tmp + 1 ), &iface->class_guid );
+}
+
+static LSTATUS open_device_interface_key( const struct device_interface *iface, REGSAM access, BOOL open, HKEY *hkey )
+{
+    WCHAR path[MAX_PATH];
+    swprintf( path, ARRAY_SIZE(path), L"%s\\%s", iface->class, iface->name );
+    return open_device_classes_key( HKEY_LOCAL_MACHINE, path, access, open, hkey );
+}
+
 static CONFIGRET map_error( LSTATUS err )
 {
     switch (err)
@@ -332,6 +363,62 @@ CONFIGRET WINAPI CM_Open_Class_KeyW( GUID *class, const WCHAR *name, REGSAM acce
 CONFIGRET WINAPI CM_Open_Class_KeyA( GUID *class, const char *name, REGSAM access, REGDISPOSITION disposition, HKEY *hkey, ULONG flags )
 {
     return CM_Open_Class_Key_ExA( class, name, access, disposition, hkey, flags, NULL );
+}
+
+/***********************************************************************
+ *           CM_Open_Device_Interface_Key_ExW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Open_Device_Interface_Key_ExW( const WCHAR *name, REGSAM access, REGDISPOSITION disposition, HKEY *hkey, ULONG flags, HMACHINE machine )
+{
+    BOOL open = disposition == RegDisposition_OpenExisting;
+    struct device_interface iface;
+    WCHAR path[MAX_PATH];
+    HKEY iface_key;
+    LSTATUS err;
+
+    TRACE( "name %s, access %#lx, disposition %#lx, hkey %p, flags %#lx\n", debugstr_w(name), access, disposition, hkey, flags );
+    if (machine) FIXME( "machine %p not implemented!\n", machine );
+
+    if (!name) return CR_INVALID_POINTER;
+    if (init_device_interface( &iface, name )) return CR_INVALID_DATA;
+    if (!hkey) return CR_INVALID_POINTER;
+    if (flags) return CR_INVALID_FLAG;
+
+    if (open_device_interface_key( &iface, KEY_ALL_ACCESS, TRUE, &iface_key )) return CR_NO_SUCH_DEVICE_INTERFACE;
+    swprintf( path, ARRAY_SIZE(path), L"%s\\Device Parameters", iface.refstr );
+    err = open_key( iface_key, path, access, open, hkey );
+    RegCloseKey( iface_key );
+
+    return map_error( err );
+}
+
+/***********************************************************************
+ *           CM_Open_Device_Interface_Key_ExA (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Open_Device_Interface_Key_ExA( const char *ifaceA, REGSAM access, REGDISPOSITION disposition, HKEY *hkey, ULONG flags, HMACHINE machine )
+{
+    WCHAR ifaceW[MAX_PATH];
+
+    TRACE( "ifaceA %s, access %#lx, disposition %#lx, hkey %p, flags %#lx\n", debugstr_a(ifaceA), access, disposition, hkey, flags );
+
+    if (ifaceA) MultiByteToWideChar( CP_ACP, 0, ifaceA, -1, ifaceW, ARRAY_SIZE(ifaceW) );
+    return CM_Open_Device_Interface_Key_ExW( ifaceA ? ifaceW : NULL, access, disposition, hkey, flags, machine );
+}
+
+/***********************************************************************
+ *           CM_Open_Device_Interface_KeyW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Open_Device_Interface_KeyW( const WCHAR *iface, REGSAM access, REGDISPOSITION disposition, HKEY *hkey, ULONG flags )
+{
+    return CM_Open_Device_Interface_Key_ExW( iface, access, disposition, hkey, flags, NULL );
+}
+
+/***********************************************************************
+ *           CM_Open_Device_Interface_KeyA (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Open_Device_Interface_KeyA( const char *iface, REGSAM access, REGDISPOSITION disposition, HKEY *hkey, ULONG flags )
+{
+    return CM_Open_Device_Interface_Key_ExA( iface, access, disposition, hkey, flags, NULL );
 }
 
 /***********************************************************************
