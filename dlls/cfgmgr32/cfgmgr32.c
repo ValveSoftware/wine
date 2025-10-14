@@ -23,6 +23,14 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(setupapi);
 
+static LSTATUS guid_from_string( const WCHAR *str, GUID *guid )
+{
+    UNICODE_STRING guid_str;
+    RtlInitUnicodeString( &guid_str, str );
+    if (RtlGUIDFromString( &guid_str, guid )) return ERROR_INVALID_DATA;
+    return ERROR_SUCCESS;
+}
+
 static const WCHAR *guid_string( const GUID *guid, WCHAR *buffer, UINT length )
 {
     swprintf( buffer, length, L"{%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x}",
@@ -91,6 +99,7 @@ static CONFIGRET map_error( LSTATUS err )
     switch (err)
     {
     case ERROR_FILE_NOT_FOUND:                    return CR_NO_SUCH_REGISTRY_KEY;
+    case ERROR_NO_MORE_ITEMS:                     return CR_NO_SUCH_VALUE;
     case ERROR_SUCCESS:                           return CR_SUCCESS;
     default: WARN( "unmapped error %lu\n", err ); return CR_FAILURE;
     }
@@ -130,6 +139,37 @@ DWORD WINAPI CM_MapCrToWin32Err( CONFIGRET code, DWORD default_error )
     }
 
     return default_error;
+}
+
+/***********************************************************************
+ *           CM_Enumerate_Classes_Ex (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Enumerate_Classes_Ex( ULONG index, GUID *class, ULONG flags, HMACHINE machine )
+{
+    WCHAR buffer[39];
+    LSTATUS err;
+    HKEY root;
+
+    TRACE( "index %lu, class %s, flags %#lx, machine %p\n", index, debugstr_guid(class), flags, machine );
+    if (machine) FIXME( "machine %p not implemented!\n", machine );
+
+    if (!class) return CR_INVALID_POINTER;
+    if (flags & ~CM_ENUMERATE_CLASSES_BITS) return CR_INVALID_FLAG;
+
+    if (flags == CM_ENUMERATE_CLASSES_INSTALLER) root = cache_root_key( HKEY_LOCAL_MACHINE, control_classW, NULL );
+    else root = cache_root_key( HKEY_LOCAL_MACHINE, device_classesW, NULL );
+    if (root == (HKEY)-1) return CR_NO_SUCH_REGISTRY_KEY;
+
+    if ((err = RegEnumKeyW( root, index, buffer, ARRAY_SIZE(buffer) ))) return map_error( err );
+    return map_error( guid_from_string( buffer, class ) );
+}
+
+/***********************************************************************
+ *           CM_Enumerate_Classes (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Enumerate_Classes( ULONG index, GUID *class, ULONG flags )
+{
+    return CM_Enumerate_Classes_Ex( index, class, flags, NULL );
 }
 
 /***********************************************************************
