@@ -31,6 +31,39 @@ static const WCHAR *guid_string( const GUID *guid, WCHAR *buffer, UINT length )
     return buffer;
 }
 
+static const WCHAR control_classW[]  = L"System\\CurrentControlSet\\Control\\Class\\";
+static const WCHAR device_classesW[] = L"System\\CurrentControlSet\\Control\\DeviceClasses\\";
+
+static LSTATUS open_key( HKEY root, const WCHAR *key, REGSAM access, BOOL open, HKEY *hkey )
+{
+    if (open) return RegOpenKeyExW( root, key, 0, access, hkey );
+    return RegCreateKeyExW( root, key, 0, NULL, 0, access, NULL, hkey, NULL );
+}
+
+static LSTATUS open_class_key( HKEY root, const WCHAR *key, REGSAM access, BOOL open, HKEY *hkey )
+{
+    WCHAR path[MAX_PATH];
+    swprintf( path, ARRAY_SIZE(path), L"%s%s", control_classW, key );
+    return open_key( root, path, access, open, hkey );
+}
+
+static LSTATUS open_device_classes_key( HKEY root, const WCHAR *key, REGSAM access, BOOL open, HKEY *hkey )
+{
+    WCHAR path[MAX_PATH];
+    swprintf( path, ARRAY_SIZE(path), L"%s%s", device_classesW, key );
+    return open_key( root, path, access, open, hkey );
+}
+
+static CONFIGRET map_error( LSTATUS err )
+{
+    switch (err)
+    {
+    case ERROR_FILE_NOT_FOUND:                    return CR_NO_SUCH_REGISTRY_KEY;
+    case ERROR_SUCCESS:                           return CR_SUCCESS;
+    default: WARN( "unmapped error %lu\n", err ); return CR_FAILURE;
+    }
+}
+
 /***********************************************************************
  *           CM_MapCrToWin32Err (cfgmgr32.@)
  */
@@ -115,6 +148,57 @@ CONFIGRET WINAPI CM_Get_Class_Key_NameW( GUID *class, WCHAR *name, ULONG *len, U
 CONFIGRET WINAPI CM_Get_Class_Key_NameA( GUID *class, char *name, ULONG *len, ULONG flags )
 {
     return CM_Get_Class_Key_Name_ExA( class, name, len, flags, NULL );
+}
+
+/***********************************************************************
+ *           CM_Open_Class_Key_ExW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Open_Class_Key_ExW( GUID *class, const WCHAR *name, REGSAM access, REGDISPOSITION disposition, HKEY *hkey, ULONG flags, HMACHINE machine )
+{
+    BOOL open = disposition == RegDisposition_OpenExisting;
+    WCHAR buffer[39];
+
+    TRACE( "class %s, name %s, access %#lx, disposition %#lx, hkey %p, flags %#lx\n", debugstr_guid(class), debugstr_w(name), access, disposition, hkey, flags );
+    if (machine) FIXME( "machine %p not implemented!\n", machine );
+
+    if (name) return CR_INVALID_DATA;
+    if (!hkey) return CR_INVALID_POINTER;
+    if (flags & ~CM_OPEN_CLASS_KEY_BITS) return CR_INVALID_FLAG;
+
+    if (!class) *buffer = 0;
+    else guid_string( class, buffer, ARRAY_SIZE(buffer) );
+
+    if (flags == CM_OPEN_CLASS_KEY_INSTALLER) return map_error( open_class_key( HKEY_LOCAL_MACHINE, buffer, access, open, hkey ) );
+    return map_error( open_device_classes_key( HKEY_LOCAL_MACHINE, buffer, access, open, hkey ) );
+}
+
+/***********************************************************************
+ *           CM_Open_Class_Key_ExA (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Open_Class_Key_ExA( GUID *class, const char *nameA, REGSAM access, REGDISPOSITION disposition, HKEY *hkey, ULONG flags, HMACHINE machine )
+{
+    WCHAR nameW[MAX_PATH];
+
+    TRACE( "guid %s, nameA %s, access %#lx, disposition %#lx, hkey %p, flags %#lx\n", debugstr_guid(class), debugstr_a(nameA), access, disposition, hkey, flags );
+
+    if (nameA) MultiByteToWideChar( CP_ACP, 0, nameA, -1, nameW, ARRAY_SIZE(nameW) );
+    return CM_Open_Class_Key_ExW( class, nameA ? nameW : NULL, access, disposition, hkey, flags, machine );
+}
+
+/***********************************************************************
+ *           CM_Open_Class_KeyW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Open_Class_KeyW( GUID *class, const WCHAR *name, REGSAM access, REGDISPOSITION disposition, HKEY *hkey, ULONG flags )
+{
+    return CM_Open_Class_Key_ExW( class, name, access, disposition, hkey, flags, NULL );
+}
+
+/***********************************************************************
+ *           CM_Open_Class_KeyA (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Open_Class_KeyA( GUID *class, const char *name, REGSAM access, REGDISPOSITION disposition, HKEY *hkey, ULONG flags )
+{
+    return CM_Open_Class_Key_ExA( class, name, access, disposition, hkey, flags, NULL );
 }
 
 /***********************************************************************

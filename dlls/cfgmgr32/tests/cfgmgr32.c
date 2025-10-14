@@ -1962,6 +1962,78 @@ static void test_CM_Get_Class_Key_Name(void)
     ok_wcs( L"{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}", buffer );
 }
 
+static BOOL compare_unicode_string( const UNICODE_STRING *string, const WCHAR *expect )
+{
+    return string->Length == wcslen( expect ) * sizeof(WCHAR) &&
+           !wcsnicmp( string->Buffer, expect, string->Length / sizeof(WCHAR) );
+}
+
+#define check_object_name( a, b ) _check_object_name( __LINE__, a, b )
+static void _check_object_name( unsigned line, HANDLE handle, const WCHAR *expected_name )
+{
+    char buffer[1024];
+    UNICODE_STRING *str = (UNICODE_STRING *)buffer, expect;
+    ULONG len = 0;
+    NTSTATUS status;
+
+    RtlInitUnicodeString( &expect, expected_name );
+
+    memset( buffer, 0, sizeof(buffer) );
+    status = NtQueryObject( handle, ObjectNameInformation, buffer, sizeof(buffer), &len );
+    ok_(__FILE__, line)( status == STATUS_SUCCESS, "NtQueryObject failed %lx\n", status );
+    ok_(__FILE__, line)( len >= sizeof(OBJECT_NAME_INFORMATION) + str->Length, "unexpected len %lu\n", len );
+    ok_(__FILE__, line)( compare_unicode_string( str, expected_name ), "got %s, expected %s\n",
+                         debugstr_w(str->Buffer), debugstr_w(expected_name) );
+}
+
+static void test_CM_Open_Class_Key(void)
+{
+    CONFIGRET ret;
+    GUID guid;
+    HKEY hkey;
+
+    ret = CM_Open_Class_KeyW( NULL, NULL, KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, CM_OPEN_CLASS_KEY_INSTALLER );
+    ok_x4( ret, ==, CR_SUCCESS );
+    check_object_name( hkey, L"\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Control\\Class" );
+    RegCloseKey( hkey );
+
+    ret = CM_Open_Class_KeyW( NULL, NULL, KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, CM_OPEN_CLASS_KEY_INTERFACE );
+    ok_x4( ret, ==, CR_SUCCESS );
+    check_object_name( hkey, L"\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Control\\DeviceClasses" );
+    RegCloseKey( hkey );
+
+    guid = GUID_DEVCLASS_DISPLAY;
+    ret = CM_Open_Class_KeyW( &guid, NULL, KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, CM_OPEN_CLASS_KEY_INSTALLER );
+    ok_x4( ret, ==, CR_SUCCESS );
+    check_object_name( hkey, L"\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}" );
+    RegCloseKey( hkey );
+
+    guid = GUID_DEVINTERFACE_DISPLAY_ADAPTER;
+    ret = CM_Open_Class_KeyW( &guid, NULL, KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, CM_OPEN_CLASS_KEY_INTERFACE );
+    ok_x4( ret, ==, CR_SUCCESS );
+    check_object_name( hkey, L"\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Control\\DeviceClasses\\{5b45201d-f2f2-4f3b-85bb-30ff1f953599}" );
+    RegCloseKey( hkey );
+
+    memset( &guid, 0xcd, sizeof(guid) );
+    ret = CM_Open_Class_KeyW( &guid, NULL, KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, CM_OPEN_CLASS_KEY_INSTALLER );
+    ok_x4( ret, ==, CR_NO_SUCH_REGISTRY_KEY );
+    ret = CM_Open_Class_KeyW( &guid, NULL, KEY_QUERY_VALUE, RegDisposition_OpenAlways, &hkey, CM_OPEN_CLASS_KEY_INSTALLER );
+    ok_x4( ret, ==, CR_SUCCESS );
+    check_object_name( hkey, L"\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Control\\Class\\{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}" );
+    RegCloseKey( hkey );
+    ret = RegDeleteKeyW( HKEY_LOCAL_MACHINE, L"SYSTEM\\ControlSet001\\Control\\Class\\{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}" );
+    ok_x4( ret, ==, ERROR_SUCCESS );
+
+    ret = CM_Open_Class_KeyW( &guid, NULL, KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, CM_OPEN_CLASS_KEY_INTERFACE );
+    ok_x4( ret, ==, CR_NO_SUCH_REGISTRY_KEY );
+    ret = CM_Open_Class_KeyW( &guid, NULL, KEY_QUERY_VALUE, RegDisposition_OpenAlways, &hkey, CM_OPEN_CLASS_KEY_INTERFACE );
+    ok_x4( ret, ==, CR_SUCCESS );
+    check_object_name( hkey, L"\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Control\\DeviceClasses\\{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}" );
+    RegCloseKey( hkey );
+    ret = RegDeleteKeyW( HKEY_LOCAL_MACHINE, L"SYSTEM\\ControlSet001\\Control\\DeviceClasses\\{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}" );
+    ok_x4( ret, ==, ERROR_SUCCESS );
+}
+
 START_TEST(cfgmgr32)
 {
     HMODULE mod = GetModuleHandleA("cfgmgr32.dll");
@@ -1975,6 +2047,7 @@ START_TEST(cfgmgr32)
 
     test_CM_MapCrToWin32Err();
     test_CM_Get_Class_Key_Name();
+    test_CM_Open_Class_Key();
     test_CM_Get_Device_ID_List();
     test_CM_Register_Notification();
     test_CM_Get_Device_Interface_List();
