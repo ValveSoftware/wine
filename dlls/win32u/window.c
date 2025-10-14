@@ -5646,6 +5646,20 @@ static void map_dpi_create_struct( CREATESTRUCTW *cs, UINT dpi_to )
     cs->cy = rect.bottom - rect.top;
 }
 
+int disable_gamescope_max_size_hack(void)
+{
+    static int cached = -1;
+
+    if (cached == -1)
+    {
+        const char *s = getenv( "WINE_DISABLE_GAMESCOPE_MAX_SIZE_HACK" );
+
+        cached = s && *s != '0';
+    }
+
+    return cached;
+}
+
 /***********************************************************************
  *           NtUserCreateWindowEx (win32u.@)
  */
@@ -5838,7 +5852,7 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
         /* HACK: This code changes the window's size to fit the display. However,
          * some games (Bayonetta, Dragon's Dogma) will then have the incorrect
          * render size. So just let windows be too big to fit the display. */
-        if (!user_driver->pHasWindowManager( "steamcompmgr" ))
+        if (disable_gamescope_max_size_hack() || !user_driver->pHasWindowManager( "steamcompmgr" ))
         {
             cx = min( cx, info.ptMaxTrackSize.x );
             cy = min( cy, info.ptMaxTrackSize.y );
