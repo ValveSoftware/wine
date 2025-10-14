@@ -407,4 +407,6 @@ static inline BOOL intersect_rect( RECT *dst, const RECT *src1, const RECT *src2
     return !IsRectEmpty( dst );
 }
 
+int disable_gamescope_max_size_hack(void);
+
 #endif /* __WINE_WIN32U_PRIVATE */

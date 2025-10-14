@@ -497,7 +497,7 @@ static LONG handle_window_pos_changing( HWND hwnd, WINDOWPOS *winpos )
         /* HACK: This code changes the window's size to fit the display. However,
          * some games (Bayonetta, Dragon's Dogma) will then have the incorrect
          * render size. So just let windows be too big to fit the display. */
-        if (!user_driver->pHasWindowManager( "steamcompmgr" ))
+        if (disable_gamescope_max_size_hack() || !user_driver->pHasWindowManager( "steamcompmgr" ))
         {
             winpos->cx = min( winpos->cx, info.ptMaxTrackSize.x );
             winpos->cy = min( winpos->cy, info.ptMaxTrackSize.y );
