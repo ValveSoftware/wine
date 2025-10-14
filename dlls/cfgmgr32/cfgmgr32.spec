@@ -46,8 +46,8 @@
 @ stub CM_Duplicate_PowerScheme
 @ stub CM_Enable_DevNode
 @ stub CM_Enable_DevNode_Ex
-@ stdcall CM_Enumerate_Classes(long ptr long) setupapi.CM_Enumerate_Classes
-@ stub CM_Enumerate_Classes_Ex
+@ stdcall CM_Enumerate_Classes(long ptr long)
+@ stdcall CM_Enumerate_Classes_Ex(long ptr long ptr)
 @ stub CM_Enumerate_EnumeratorsA
 @ stub CM_Enumerate_EnumeratorsW
 @ stub CM_Enumerate_Enumerators_ExA

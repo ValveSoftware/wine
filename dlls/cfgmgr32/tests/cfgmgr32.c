@@ -1900,6 +1900,38 @@ static void test_DevFindProperty_invalid( void )
     ok( !prop, "got prop %p\n", prop );
 }
 
+static void test_CM_Enumerate_Classes(void)
+{
+    CONFIGRET ret;
+    GUID guid;
+
+    ret = CM_Enumerate_Classes( 0, NULL, 0 );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    for (UINT flag = 2; flag; flag <<= 1)
+    {
+        winetest_push_context( "%#x", flag );
+        ret = CM_Enumerate_Classes( 0, &guid, flag );
+        ok_x4( ret, ==, CR_INVALID_FLAG );
+        winetest_pop_context();
+    }
+    ret = CM_Enumerate_Classes( -1, &guid, 0 );
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+
+    for (UINT i = 0; !(ret = CM_Enumerate_Classes( i, &guid, CM_ENUMERATE_CLASSES_INSTALLER )); i++)
+        if (IsEqualGUID( &guid, &GUID_DEVINTERFACE_HID )) break;
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+    for (UINT i = 0; !(ret = CM_Enumerate_Classes( i, &guid, CM_ENUMERATE_CLASSES_INSTALLER )); i++)
+        if (IsEqualGUID( &guid, &GUID_DEVCLASS_HIDCLASS )) break;
+    ok_x4( ret, ==, CR_SUCCESS );
+
+    for (UINT i = 0; !(ret = CM_Enumerate_Classes( i, &guid, CM_ENUMERATE_CLASSES_INTERFACE )); i++)
+        if (IsEqualGUID( &guid, &GUID_DEVINTERFACE_HID )) break;
+    ok_x4( ret, ==, CR_SUCCESS );
+    for (UINT i = 0; !(ret = CM_Enumerate_Classes( i, &guid, CM_ENUMERATE_CLASSES_INTERFACE )); i++)
+        if (IsEqualGUID( &guid, &GUID_DEVCLASS_HIDCLASS )) break;
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+}
+
 static void test_CM_Get_Class_Key_Name(void)
 {
     GUID guid = GUID_DEVCLASS_DISPLAY;
@@ -2046,6 +2078,7 @@ START_TEST(cfgmgr32)
     pDevFindProperty = (void *)GetProcAddress(mod, "DevFindProperty");
 
     test_CM_MapCrToWin32Err();
+    test_CM_Enumerate_Classes();
     test_CM_Get_Class_Key_Name();
     test_CM_Open_Class_Key();
     test_CM_Get_Device_ID_List();
