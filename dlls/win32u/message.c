@@ -2590,7 +2590,14 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
             /* WM_POINTERUP is only sent once all the buttons are up. */
             message = pointer_button_flags ? WM_POINTERUPDATE : WM_POINTERUP;
             break;
-        /* WM_MOUSEWHEEL doesn't result in pointer message. */
+        case WM_MOUSEWHEEL:
+            message = WM_POINTERWHEEL;
+            flags = HIWORD( msg->wParam );
+            break;
+        case WM_MOUSEHWHEEL:
+            message = WM_POINTERHWHEEL;
+            flags = HIWORD( msg->wParam );
+            break;
         }
 
         if (message) send_message( msg->hwnd, message, MAKELONG( 1, flags ), MAKELONG( msg->pt.x, msg->pt.y ) );
