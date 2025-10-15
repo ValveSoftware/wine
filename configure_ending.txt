@@ -1,0 +1,10 @@
+AS_ECHO("
+$as_me: Finished.  Do '${MAKE-make}' to compile Goliath.
+") >&AS_MESSAGE_FD
+
+dnl Local Variables:
+dnl comment-start: "dnl "
+dnl comment-end: ""
+dnl comment-start-skip: "\\bdnl\\b\\s *"
+dnl compile-command: "autoreconf --warnings=all"
+dnl End:
