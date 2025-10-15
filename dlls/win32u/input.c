@@ -2624,9 +2624,9 @@ BOOL WINAPI NtUserEnableMouseInPointerForThread( void )
  */
 BOOL WINAPI NtUserIsMouseInPointerEnabled(void)
 {
-    FIXME( "stub!\n" );
-    RtlSetLastWin32Error( ERROR_CALL_NOT_IMPLEMENTED );
-    return FALSE;
+    TRACE( "-> %d.\n", enable_mouse_in_pointer );
+
+    return enable_mouse_in_pointer;
 }
 
 void update_mouse_state_from_pointer( HWND hwnd, UINT msg, unsigned int pointer_id )
