@@ -2558,14 +2558,7 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
         case WM_XBUTTONUP:
             message = WM_POINTERUP;
             break;
-        case WM_MOUSEWHEEL:
-            message = WM_POINTERWHEEL;
-            flags = HIWORD( msg->wParam );
-            break;
-        case WM_MOUSEHWHEEL:
-            message = WM_POINTERHWHEEL;
-            flags = HIWORD( msg->wParam );
-            break;
+        /* WM_MOUSEWHEEL doesn't result in pointer message. */
         }
 
         if (message) send_message( msg->hwnd, message, MAKELONG( 1, flags ), MAKELONG( msg->pt.x, msg->pt.y ) );
