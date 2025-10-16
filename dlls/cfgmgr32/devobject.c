@@ -352,7 +352,7 @@ static BOOL devprop_filters_validate( const DEVPROP_FILTER_EXPRESSION *filters, 
 }
 
 static HRESULT dev_object_iface_get_props( DEV_OBJECT *obj, HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface_data,
-                                           ULONG props_len, const DEVPROPCOMPKEY *props, BOOL all_props, BOOL sort )
+                                           ULONG props_len, const DEVPROPCOMPKEY *props, BOOL all_props )
 {
     DEVPROPKEY *all_keys = NULL;
     DWORD keys_len = 0, i = 0;
@@ -434,8 +434,6 @@ done:
         obj->cPropertyCount = 0;
         obj->pProperties = NULL;
     }
-    else if (sort) /* Sort properties by DEVPROPCOMPKEY for faster filter evaluation. */
-        qsort( (DEVPROPERTY *)obj->pProperties, obj->cPropertyCount, sizeof( *obj->pProperties ), devproperty_compare );
     return hr;
 }
 
@@ -550,11 +548,15 @@ static HRESULT enum_dev_objects( DEV_OBJECT_TYPE type, ULONG props_len, const DE
             /* If we're also filtering objects, get all properties for this object. Once the filters have been
              * evaluated, free properties that have not been requested, and set cPropertyCount to props_len.  */
             if (filters)
-                hr = dev_object_iface_get_props( &obj, set, &iface, 0, NULL, TRUE, TRUE );
+                hr = dev_object_iface_get_props( &obj, set, &iface, 0, NULL, TRUE );
             else
-                hr = dev_object_iface_get_props( &obj, set, &iface, props_len, props, all_props, FALSE );
+                hr = dev_object_iface_get_props( &obj, set, &iface, props_len, props, all_props );
+
             if (SUCCEEDED( hr ))
             {
+                /* Sort properties by DEVPROPCOMPKEY for faster filter evaluation. */
+                if (filters) qsort( (DEVPROPERTY *)obj.pProperties, obj.cPropertyCount, sizeof(*obj.pProperties), devproperty_compare );
+
                 /* By default, the evaluation is performed by AND-ing all individual filter expressions. */
                 hr = devprop_filter_matches_object( &obj, DEVPROP_OPERATOR_AND_OPEN, filters, filters_end );
                 /* Shrink pProperties to only the desired ones, unless DevQueryFlagAllProperties is set. */
@@ -1183,7 +1185,7 @@ HRESULT WINAPI DevGetObjectPropertiesEx( DEV_OBJECT_TYPE type, const WCHAR *id, 
             return HRESULT_FROM_WIN32(err == ERROR_NO_SUCH_DEVICE_INTERFACE ? ERROR_FILE_NOT_FOUND : err);
         }
 
-        hr = dev_object_iface_get_props( &obj, set, &iface, props_len, props, !!(flags & DevQueryFlagAllProperties), FALSE );
+        hr = dev_object_iface_get_props( &obj, set, &iface, props_len, props, !!(flags & DevQueryFlagAllProperties) );
         *buf = obj.pProperties;
         *buf_len = obj.cPropertyCount;
         SetupDiDestroyDeviceInfoList( set );
