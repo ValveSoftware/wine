@@ -701,7 +701,7 @@ static void test_DevGetObjectProperties( DEV_OBJECT_TYPE type, const WCHAR *id, 
     buf = NULL;
     hr = pDevGetObjectProperties( type, id, DevQueryFlagNone, 1, &dummy_propcompkey, &buf_len, &buf );
     ok( hr == S_OK, "got hr %#lx\n", hr );
-    ok( !!buf, "got buf %p", buf );
+    ok( !!buf, "got buf %p\n", buf );
     ok( buf_len == 1, "got buf_len %lu\n", buf_len );
     if (buf)
     {
@@ -1648,7 +1648,7 @@ static void test_DevGetObjects( void )
 
                 ok( IsEqualDevPropKey( obj->pProperties[0].CompKey.Key, DEVPKEY_dummy ), "got property %s != %s\n",
                     debugstr_DEVPROPKEY( &obj->pProperties[0].CompKey.Key ), debugstr_DEVPROPKEY( &DEVPKEY_dummy ) );
-                ok( obj->pProperties[0].Type == DEVPROP_TYPE_EMPTY, "got Type %#lx != %#x", obj->pProperties[0].Type,
+                ok( obj->pProperties[0].Type == DEVPROP_TYPE_EMPTY, "got Type %#lx != %#x\n", obj->pProperties[0].Type,
                     DEVPROP_TYPE_EMPTY );
                 found_prop = pDevFindProperty( &DEVPKEY_dummy, DEVPROP_STORE_SYSTEM, NULL, obj->cPropertyCount, obj->pProperties );
                 ok( found_prop == &obj->pProperties[0], "got found_prop %p != %p\n", found_prop, &obj->pProperties[0] );
@@ -1701,7 +1701,7 @@ static void WINAPI query_result_callback( HDEVQUERY query, void *user_data, cons
     {
         const DEV_OBJECT *obj = &action_data->Data.DeviceObject;
         winetest_push_context( "device %s", debugstr_w( obj->pszObjectId ) );
-        ok_( __FILE__, data->line )( obj->ObjectType == data->exp_type, "got DeviceObject.ObjectType %d != %d",
+        ok_( __FILE__, data->line )( obj->ObjectType == data->exp_type, "got DeviceObject.ObjectType %d != %d\n",
                                      obj->ObjectType, data->exp_type );
         test_dev_object_iface_props( data->line, &action_data->Data.DeviceObject, data->exp_props, data->props_len );
         winetest_pop_context();
