@@ -49,3 +49,13 @@ static inline const char *debugstr_DEVPROPCOMPKEY( const DEVPROPCOMPKEY *key )
     return wine_dbg_sprintf( "{%s, %d, %s}", debugstr_DEVPROPKEY( &key->Key ), key->Store,
                              debugstr_w( key->LocaleName ) );
 }
+
+struct property
+{
+    BOOL ansi;
+    DEVPROPKEY key;
+    DEVPROPTYPE *type;
+    DWORD *reg_type;
+    void *buffer;
+    DWORD *size;
+};
