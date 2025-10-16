@@ -332,6 +332,17 @@ static BOOL devprop_filters_validate( const DEVPROP_FILTER_EXPRESSION *filters, 
     return TRUE;
 }
 
+static HRESULT dev_get_device_interface_property( HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface_data, struct property *prop )
+{
+    if (SetupDiGetDeviceInterfacePropertyW( set, iface_data, &prop->key, prop->type, NULL, 0, prop->size, 0 )) return S_OK;
+    if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) return S_OK;
+
+    if (!(prop->buffer = malloc( *prop->size ))) return E_OUTOFMEMORY;
+    if (SetupDiGetDeviceInterfacePropertyW( set, iface_data, &prop->key, prop->type, prop->buffer, *prop->size, prop->size, 0 )) return S_OK;
+    free( prop->buffer );
+    return HRESULT_FROM_WIN32( GetLastError() );
+}
+
 static HRESULT get_property_compare_keys( const DEVPROPKEY *keys, ULONG keys_len, const DEVPROPCOMPKEY **comp_keys, ULONG *comp_keys_len )
 {
     if (!(*comp_keys_len = keys_len)) return S_OK;
@@ -361,38 +372,23 @@ static HRESULT dev_object_iface_get_props( HDEVINFO set, SP_DEVICE_INTERFACE_DAT
                                            DEVPROPERTY *properties, ULONG *properties_len )
 {
     HRESULT hr = S_OK;
-    DWORD i = 0;
+    DWORD i;
 
     for (i = 0; i < keys_len; i++)
     {
-        const DEVPROPKEY *key = &keys[i].Key;
-        DWORD req = 0, size;
+        DWORD size = 0;
         DEVPROPTYPE type;
-        BYTE *buf;
+        struct property prop =
+        {
+            .key = keys[i].Key,
+            .type = &type,
+            .size = &size,
+        };
 
-        if (SetupDiGetDeviceInterfacePropertyW( set, iface_data, key, &type, NULL, 0, &req, 0 )
-            || GetLastError() != ERROR_INSUFFICIENT_BUFFER)
-        {
-            devproperty_init( properties + i, key, DEVPROP_TYPE_EMPTY, 0, NULL );
-            continue;
-        }
-
-        size = req;
-        if (!(buf = calloc( 1, size )))
-        {
-            hr = E_OUTOFMEMORY;
-            goto done;
-        }
-        if (!SetupDiGetDeviceInterfacePropertyW( set, iface_data, key, &type, buf, size, &req, 0 ))
-        {
-            hr = HRESULT_FROM_WIN32( GetLastError() );
-            free( buf );
-            goto done;
-        }
-        devproperty_init( properties + i, key, type, size, buf );
+        if (FAILED(hr = dev_get_device_interface_property( set, iface_data, &prop ))) break;
+        devproperty_init( properties + i, &prop.key, *prop.type, *prop.size, prop.buffer );
     }
 
-done:
     *properties_len = i;
     return hr;
 }

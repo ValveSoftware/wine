@@ -120,16 +120,6 @@ static LSTATUS open_device_classes_key( HKEY root, const WCHAR *key, REGSAM acce
     return open_key( root, path, access, open, hkey );
 }
 
-struct property
-{
-    BOOL ansi;
-    DEVPROPKEY key;
-    DEVPROPTYPE *type;
-    DWORD *reg_type;
-    void *buffer;
-    DWORD *size;
-};
-
 static LSTATUS init_property( struct property *prop, const DEVPROPKEY *key, DEVPROPTYPE *type, void *buffer, DWORD *size )
 {
     if (!key) return ERROR_INVALID_PARAMETER;
