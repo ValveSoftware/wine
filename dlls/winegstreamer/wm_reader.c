@@ -575,6 +575,7 @@ static HRESULT WINAPI stream_props_GetMediaType(IWMMediaProps *iface, WM_MEDIA_T
     }
     if (format->major_type == WG_MAJOR_TYPE_VIDEO && sgi && (0
         || !strcmp(sgi, "2515070")
+        || !strcmp(sgi, "3625380")
     ))
     {
         codec_format = config->stream->format;
@@ -587,6 +588,7 @@ static HRESULT WINAPI stream_props_GetMediaType(IWMMediaProps *iface, WM_MEDIA_T
         || !strcmp(sgi, "802870")
         || !strcmp(sgi, "1230140")
         || !strcmp(sgi, "2515070")
+        || !strcmp(sgi, "3625380")
     ))
     {
         codec_format = config->stream->format;
@@ -1526,6 +1528,7 @@ static HRESULT init_stream(struct wm_reader *reader)
         || !strcmp(sgi, "1097880")
         || !strcmp(sgi, "1230140")
         || !strcmp(sgi, "2515070")
+        || !strcmp(sgi, "3625380")
     ))
     enable_opengl = FALSE;
 }
@@ -1668,6 +1671,7 @@ static HRESULT reinit_stream(struct wm_reader *reader, bool read_compressed)
         || !strcmp(sgi, "1097880")
         || !strcmp(sgi, "1230140")
         || !strcmp(sgi, "2515070")
+        || !strcmp(sgi, "3625380")
     ))
     enable_opengl = FALSE;
 }
@@ -2647,6 +2651,7 @@ static HRESULT WINAPI reader_SetReadStreamSamples(IWMSyncReader2 *iface, WORD st
             || !strcmp(sgi, "1097880")
             || !strcmp(sgi, "1230140")
             || !strcmp(sgi, "2515070")
+            || !strcmp(sgi, "3625380")
             ))
             compressed = FALSE;
     }

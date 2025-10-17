@@ -1271,6 +1271,7 @@ static HRESULT WINAPI media_object_SetInputType(IMediaObject *iface, DWORD index
         || !strcmp(sgi, "1097880")
         || !strcmp(sgi, "1230140")
         || !strcmp(sgi, "2515070")
+        || !strcmp(sgi, "3625380")
     ))
     {
         VIDEOINFOHEADER *vih = (VIDEOINFOHEADER *)decoder->dmo_input_type.pbFormat;
