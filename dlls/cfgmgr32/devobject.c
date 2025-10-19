@@ -408,38 +408,33 @@ done:
 
 typedef HRESULT (*enum_device_object_cb)( DEV_OBJECT object, void *context );
 
-static void dev_object_remove_unwanted_props( DEV_OBJECT *obj, ULONG keys_len, const DEVPROPCOMPKEY *keys_wanted )
+static UINT select_property( const DEVPROPCOMPKEY *key, DEVPROPERTY *props, DEVPROPERTY *select_end, DEVPROPERTY *props_end )
 {
-    DEVPROPERTY *props = (DEVPROPERTY *)obj->pProperties;
-    ULONG i = 0, j;
-
-    if (!keys_len)
+    for (DEVPROPERTY *prop = select_end; prop < props_end; prop++)
     {
-        DevFreeObjectProperties( obj->cPropertyCount, obj->pProperties );
-        obj->cPropertyCount = 0;
-        obj->pProperties = NULL;
+        if (IsEqualDevPropCompKey( prop->CompKey, *key ))
+        {
+            DEVPROPERTY tmp = *select_end;
+            *select_end = *prop;
+            *prop = tmp;
+            return 1;
+        }
     }
+    return 0;
+}
 
-    while (i < obj->cPropertyCount)
+static void select_properties( const DEVPROPCOMPKEY *keys, ULONG keys_len, DEVPROPERTY **props, ULONG *props_len )
+{
+    DEVPROPERTY *select_end = *props, *props_end = *props + *props_len;
+
+    for (UINT i = 0; i < keys_len; i++) select_end += select_property( keys + i, *props, select_end, props_end );
+    *props_len = select_end - *props;
+
+    while (select_end < props_end) free( (select_end++)->Buffer );
+    if (!*props_len)
     {
-        BOOL found = FALSE;
-
-        for (j = 0; j < keys_len; j++)
-        {
-            if (IsEqualDevPropCompKey( props[i].CompKey, keys_wanted[j] ))
-            {
-                found = TRUE;
-                break;
-            }
-        }
-        if (!found)
-        {
-            free( obj->pProperties[i].Buffer );
-            props[i] = props[obj->cPropertyCount - 1];
-            obj->cPropertyCount--;
-        }
-        else
-            i++;
+        free( *props );
+        *props = NULL;
     }
 }
 
@@ -533,9 +528,11 @@ static HRESULT enum_dev_objects( DEV_OBJECT_TYPE type, const DEVPROPCOMPKEY *pro
 
                 /* By default, the evaluation is performed by AND-ing all individual filter expressions. */
                 hr = devprop_filter_matches_object( &obj, DEVPROP_OPERATOR_AND_OPEN, filters, filters_end );
-                /* Shrink pProperties to only the desired ones, unless DevQueryFlagAllProperties is set. */
-                if (!all_props)
-                    dev_object_remove_unwanted_props( &obj, props_len, props );
+
+                /* Shrink properties to only the desired ones, unless DevQueryFlagAllProperties is set. */
+                if (!all_props) select_properties( props, props_len, &properties, &obj.cPropertyCount );
+                obj.pProperties = properties;
+
                 if (hr == S_OK)
                     hr = callback( obj, data );
                 else
