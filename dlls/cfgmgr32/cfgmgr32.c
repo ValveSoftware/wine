@@ -187,6 +187,20 @@ static LSTATUS query_named_property( HKEY hkey, const WCHAR *nameW, DEVPROPTYPE 
     return err;
 }
 
+static LSTATUS return_property( struct property *prop, DEVPROPTYPE type, const void *buffer, UINT size )
+{
+    LSTATUS err = *prop->size >= size ? ERROR_SUCCESS : ERROR_MORE_DATA;
+    if (!err && prop->buffer) memcpy( prop->buffer, buffer, size );
+    *prop->size = size;
+    *prop->type = type;
+    return err;
+}
+
+static LSTATUS return_property_bool( struct property *prop, DEVPROP_BOOLEAN value )
+{
+    return return_property( prop, DEVPROP_TYPE_BOOLEAN, &value, sizeof(value) );
+}
+
 typedef LSTATUS (*enum_objects_cb)( HKEY hkey, const void *object, const WCHAR *path, UINT path_len, void *context );
 
 static LSTATUS enum_objects_size( HKEY hkey, const void *object, const WCHAR *path, UINT path_len, void *context )
@@ -415,6 +429,50 @@ static LSTATUS enum_device_interface_list( GUID *class, DEVINSTID_W instance_id,
     RegCloseKey( class_key );
 
     if (!err) callback( NULL, NULL, L"", 1, context );
+    return err;
+}
+
+static const struct property_desc device_interface_properties[] =
+{
+    { &DEVPKEY_Device_ContainerId,                          DEVPROP_TYPE_GUID },
+    { &DEVPKEY_DeviceInterface_FriendlyName,                DEVPROP_TYPE_STRING,        L"FriendlyName" },
+};
+
+static LSTATUS query_device_interface_property( HKEY hkey, const struct device_interface *iface, struct property *prop )
+{
+    WCHAR prefix[MAX_PATH];
+
+    if (!memcmp( &DEVPKEY_DeviceInterface_Enabled, &prop->key, sizeof(prop->key) ))
+        return return_property_bool( prop, device_interface_enabled( hkey, iface ) );
+    if (!memcmp( &DEVPKEY_Device_InstanceId, &prop->key, sizeof(prop->key) ))
+        return query_named_property( hkey, L"DeviceInstance", DEVPROP_TYPE_STRING, prop );
+    if (!memcmp( &DEVPKEY_DeviceInterface_ClassGuid, &prop->key, sizeof(prop->key) ))
+        return return_property( prop, DEVPROP_TYPE_GUID, &iface->class_guid, sizeof(iface->class_guid) );
+
+    swprintf( prefix, ARRAY_SIZE(prefix), L"%s\\Properties\\", iface->refstr );
+    for (UINT i = 0; i < ARRAY_SIZE(device_interface_properties); i++)
+    {
+        const struct property_desc *desc = device_interface_properties + i;
+        if (memcmp( desc->key, &prop->key, sizeof(prop->key) )) continue;
+        if (!desc->name) return query_property( hkey, prefix, desc->type, prop );
+        return query_named_property( hkey, desc->name, desc->type, prop );
+    }
+
+    return query_property( hkey, prefix, DEVPROP_TYPE_EMPTY, prop );
+}
+
+static LSTATUS get_device_interface_property( const struct device_interface *iface, struct property *prop )
+{
+    LSTATUS err;
+    HKEY hkey;
+
+    if (!(err = open_device_interface_key( iface, KEY_QUERY_VALUE, TRUE, &hkey )))
+    {
+        err = query_device_interface_property( hkey, iface, prop );
+        RegCloseKey( hkey );
+    }
+
+    if (err && err != ERROR_MORE_DATA) *prop->size = 0;
     return err;
 }
 
@@ -909,47 +967,30 @@ CONFIGRET WINAPI CM_Open_Device_Interface_KeyA( const char *iface, REGSAM access
 }
 
 /***********************************************************************
- *           CM_Get_Device_Interface_PropertyW (cfgmgr32.@)
+ *           CM_Get_Device_Interface_Property_ExW (cfgmgr32.@)
  */
-CONFIGRET WINAPI CM_Get_Device_Interface_PropertyW( LPCWSTR device_interface, const DEVPROPKEY *property_key,
-                                                    DEVPROPTYPE *property_type, BYTE *property_buffer,
-                                                    ULONG *property_buffer_size, ULONG flags )
+CONFIGRET WINAPI CM_Get_Device_Interface_Property_ExW( const WCHAR *name, const DEVPROPKEY *key, DEVPROPTYPE *type,
+                                                       BYTE *buffer, ULONG *size, ULONG flags, HMACHINE machine )
 {
-    SP_DEVICE_INTERFACE_DATA iface = {sizeof(iface)};
-    HDEVINFO set;
-    DWORD err;
-    BOOL ret;
+    struct device_interface iface;
+    struct property prop;
+    LSTATUS err;
 
-    TRACE( "%s %p %p %p %p %ld.\n", debugstr_w(device_interface), property_key, property_type, property_buffer,
-           property_buffer_size, flags);
+    TRACE( "name %s, key %p, type %p, buffer %p, size %p, flags %#lx\n", debugstr_w(name), key, type, buffer, size, flags);
+    if (machine) FIXME( "machine %p not implemented!\n", machine );
 
-    if (!property_key) return CR_FAILURE;
-    if (!device_interface || !property_type || !property_buffer_size) return CR_INVALID_POINTER;
-    if (*property_buffer_size && !property_buffer) return CR_INVALID_POINTER;
+    if (!name) return CR_INVALID_POINTER;
+    if (init_device_interface( &iface, name )) return CR_NO_SUCH_DEVICE_INTERFACE;
+    if ((err = init_property( &prop, key, type, buffer, size ))) return map_error( err );
     if (flags) return CR_INVALID_FLAG;
 
-    set = SetupDiCreateDeviceInfoListExW( NULL, NULL, NULL, NULL );
-    if (set == INVALID_HANDLE_VALUE) return CR_OUT_OF_MEMORY;
-    if (!SetupDiOpenDeviceInterfaceW( set, device_interface, 0, &iface ))
-    {
-        SetupDiDestroyDeviceInfoList( set );
-        TRACE( "No interface %s, err %lu.\n", debugstr_w( device_interface ), GetLastError());
-        return CR_NO_SUCH_DEVICE_INTERFACE;
-    }
+    return map_error( get_device_interface_property( &iface, &prop ) );
+}
 
-    ret = SetupDiGetDeviceInterfacePropertyW( set, &iface, property_key, property_type, property_buffer,
-                                              *property_buffer_size, property_buffer_size, 0 );
-    err = ret ? 0 : GetLastError();
-    SetupDiDestroyDeviceInfoList( set );
-    switch (err)
-    {
-    case ERROR_SUCCESS:
-        return CR_SUCCESS;
-    case ERROR_INSUFFICIENT_BUFFER:
-        return CR_BUFFER_SMALL;
-    case ERROR_NOT_FOUND:
-        return CR_NO_SUCH_VALUE;
-    default:
-        return CR_FAILURE;
-    }
+/***********************************************************************
+ *           CM_Get_Device_Interface_PropertyW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Device_Interface_PropertyW( const WCHAR *iface, const DEVPROPKEY *key, DEVPROPTYPE *type, BYTE *buffer, ULONG *size, ULONG flags )
+{
+    return CM_Get_Device_Interface_Property_ExW( iface, key, type, buffer, size, flags, NULL );
 }

@@ -121,7 +121,7 @@
 @ stdcall CM_Get_Device_Interface_List_Size_ExA(ptr ptr str long ptr)
 @ stdcall CM_Get_Device_Interface_List_Size_ExW(ptr ptr wstr long ptr)
 @ stdcall CM_Get_Device_Interface_PropertyW(wstr ptr ptr ptr ptr long)
-@ stub CM_Get_Device_Interface_Property_ExW
+@ stdcall CM_Get_Device_Interface_Property_ExW(wstr ptr ptr ptr ptr long ptr)
 @ stub CM_Get_Device_Interface_Property_KeysW
 @ stub CM_Get_Device_Interface_Property_Keys_ExW
 @ stub CM_Get_First_Log_Conf
