@@ -33,13 +33,6 @@ static void devproperty_init( DEVPROPERTY *property, const DEVPROPKEY *key, DEVP
     property->Buffer = buf;
 }
 
-static const char *debugstr_DEV_OBJECT( const DEV_OBJECT *obj )
-{
-    if (!obj) return "(null)";
-    return wine_dbg_sprintf( "{%d, %s, %lu, %p}", obj->ObjectType, debugstr_w( obj->pszObjectId ), obj->cPropertyCount,
-                             obj->pProperties );
-}
-
 static int devproperty_compare( const void *p1, const void *p2 )
 {
     const DEVPROPCOMPKEY *key1 = &((DEVPROPERTY *)p1)->CompKey;
@@ -78,14 +71,14 @@ static const char *debugstr_DEVPROP_FILTER_EXPRESSION( const DEVPROP_FILTER_EXPR
 }
 
 /* Evaluate a filter expression containing comparison operator. */
-static HRESULT devprop_filter_eval_compare( const DEV_OBJECT *obj, const DEVPROP_FILTER_EXPRESSION *filter )
+static HRESULT devprop_filter_eval_compare( const DEVPROPERTY *props, UINT props_len, const DEVPROP_FILTER_EXPRESSION *filter )
 {
     const DEVPROPERTY *cmp_prop = &filter->Property;
     DEVPROP_OPERATOR op = filter->Operator;
     const DEVPROPERTY *prop = NULL;
     BOOL ret = FALSE;
 
-    TRACE( "(%s, %s)\n", debugstr_DEV_OBJECT( obj ), debugstr_DEVPROP_FILTER_EXPRESSION( filter ) );
+    TRACE( "(%p, %u, %s)\n", props, props_len, debugstr_DEVPROP_FILTER_EXPRESSION( filter ) );
 
     if ((op & DEVPROP_OPERATOR_MASK_MODIFIER) & ~(DEVPROP_OPERATOR_MODIFIER_NOT | DEVPROP_OPERATOR_MODIFIER_IGNORE_CASE))
         return E_INVALIDARG;
@@ -93,8 +86,7 @@ static HRESULT devprop_filter_eval_compare( const DEV_OBJECT *obj, const DEVPROP
     switch (filter->Operator & DEVPROP_OPERATOR_MASK_EVAL)
     {
     case DEVPROP_OPERATOR_EXISTS:
-        prop = bsearch( &filter->Property.CompKey, obj->pProperties, obj->cPropertyCount, sizeof( *obj->pProperties ),
-                        devproperty_compare );
+        prop = bsearch( &filter->Property.CompKey, props, props_len, sizeof(*props), devproperty_compare );
         ret = prop && prop->Type != DEVPROP_TYPE_EMPTY;
         break;
     case DEVPROP_OPERATOR_EQUALS:
@@ -105,8 +97,7 @@ static HRESULT devprop_filter_eval_compare( const DEV_OBJECT *obj, const DEVPROP
     {
         int cmp = 0;
 
-        prop = bsearch( &filter->Property.CompKey, obj->pProperties, obj->cPropertyCount, sizeof( *obj->pProperties ),
-                        devproperty_compare );
+        prop = bsearch( &filter->Property.CompKey, props, props_len, sizeof(*props), devproperty_compare );
         if (prop && cmp_prop->Type == prop->Type && cmp_prop->BufferSize == prop->BufferSize)
         {
             switch (prop->Type)
@@ -159,12 +150,12 @@ static const DEVPROP_FILTER_EXPRESSION *find_closing_filter( const DEVPROP_FILTE
 }
 
 /* Return S_OK if the specified filter expressions match the object, S_FALSE if it doesn't. */
-static HRESULT devprop_filter_matches_object( const DEV_OBJECT *obj, DEVPROP_OPERATOR op_outer_logical, const DEVPROP_FILTER_EXPRESSION *filters,
-                                              const DEVPROP_FILTER_EXPRESSION *end )
+static HRESULT devprop_filter_matches_properties( const DEVPROPERTY *props, UINT props_len, DEVPROP_OPERATOR op_outer_logical,
+                                                  const DEVPROP_FILTER_EXPRESSION *filters, const DEVPROP_FILTER_EXPRESSION *end )
 {
     HRESULT hr = S_OK;
 
-    TRACE( "(%s, %#x, %p, %p)\n", debugstr_DEV_OBJECT( obj ), op_outer_logical, filters, end );
+    TRACE( "(%p, %u, %#x, %p, %p)\n", props, props_len, op_outer_logical, filters, end );
 
     for (const DEVPROP_FILTER_EXPRESSION *filter = filters; filter < end; filter++)
     {
@@ -182,12 +173,12 @@ static HRESULT devprop_filter_matches_object( const DEV_OBJECT *obj, DEVPROP_OPE
         else if (op & DEVPROP_OPERATOR_MASK_LOGICAL)
         {
             const DEVPROP_FILTER_EXPRESSION *closing = find_closing_filter( filter, end );
-            hr = devprop_filter_matches_object( obj, op & DEVPROP_OPERATOR_MASK_LOGICAL, filter + 1, closing );
+            hr = devprop_filter_matches_properties( props, props_len, op & DEVPROP_OPERATOR_MASK_LOGICAL, filter + 1, closing );
             filter = closing;
         }
         else if (op & DEVPROP_OPERATOR_MASK_EVAL)
         {
-            hr = devprop_filter_eval_compare( obj, filter );
+            hr = devprop_filter_eval_compare( props, props_len, filter );
         }
         if (FAILED( hr )) break;
 
@@ -406,7 +397,7 @@ done:
     return hr;
 }
 
-typedef HRESULT (*enum_device_object_cb)( DEV_OBJECT object, void *context );
+typedef HRESULT (*enum_device_object_cb)( DEV_OBJECT_TYPE type, const WCHAR *id, ULONG *props_len, DEVPROPERTY **props, void *context );
 
 static UINT select_property( const DEVPROPCOMPKEY *key, DEVPROPERTY *props, DEVPROPERTY *select_end, DEVPROPERTY *props_end )
 {
@@ -502,42 +493,35 @@ static HRESULT enum_dev_objects( DEV_OBJECT_TYPE type, const DEVPROPCOMPKEY *pro
 
         for (j = 0; SUCCEEDED( hr ) && SetupDiEnumDeviceInterfaces( set, NULL, &iface_class, j, &iface ); j++)
         {
+            ULONG keys_len = props_len, properties_len = 0;
             const DEVPROPCOMPKEY *keys = props;
             DEVPROPERTY *properties = NULL;
-            ULONG keys_len = props_len;
-            DEV_OBJECT obj = {0};
 
             detail->cbSize = sizeof( *detail );
             if (!SetupDiGetDeviceInterfaceDetailW( set, &iface, detail, sizeof( buffer ), NULL, NULL )) continue;
-
-            obj.ObjectType = type;
-            obj.pszObjectId = detail->DevicePath;
 
             /* If we're also filtering objects, get all properties for this object. Once the filters have been
              * evaluated, free properties that have not been requested, and set cPropertyCount to props_len.  */
             if ((all_props || filters) && FAILED(hr = dev_get_device_interface_property_keys( set, &iface, &keys, &keys_len ))) break;
 
-            if ((obj.cPropertyCount = keys_len) && !(properties = calloc( keys_len, sizeof(*properties) ))) hr = E_OUTOFMEMORY;
-            else hr = dev_object_iface_get_props( set, &iface, keys, keys_len, properties, &obj.cPropertyCount );
-            obj.pProperties = properties;
+            if (keys_len && !(properties = calloc( keys_len, sizeof(*properties) ))) hr = E_OUTOFMEMORY;
+            else hr = dev_object_iface_get_props( set, &iface, keys, keys_len, properties, &properties_len );
 
             if (SUCCEEDED( hr ))
             {
                 /* Sort properties by DEVPROPCOMPKEY for faster filter evaluation. */
-                if (filters) qsort( properties, obj.cPropertyCount, sizeof(*properties), devproperty_compare );
+                if (filters) qsort( properties, properties_len, sizeof(*properties), devproperty_compare );
 
                 /* By default, the evaluation is performed by AND-ing all individual filter expressions. */
-                hr = devprop_filter_matches_object( &obj, DEVPROP_OPERATOR_AND_OPEN, filters, filters_end );
+                hr = devprop_filter_matches_properties( properties, properties_len, DEVPROP_OPERATOR_AND_OPEN, filters, filters_end );
 
                 /* Shrink properties to only the desired ones, unless DevQueryFlagAllProperties is set. */
-                if (!all_props) select_properties( props, props_len, &properties, &obj.cPropertyCount );
-                obj.pProperties = properties;
+                if (!all_props) select_properties( props, props_len, &properties, &properties_len );
 
-                if (hr == S_OK)
-                    hr = callback( obj, data );
-                else
-                    DevFreeObjectProperties( obj.cPropertyCount, obj.pProperties );
+                if (hr == S_OK) hr = callback( type, detail->DevicePath, &properties_len, &properties, data );
             }
+
+            DevFreeObjectProperties( properties_len, properties );
 
             if (keys != props) free( (void *)keys );
         }
@@ -555,24 +539,23 @@ struct objects_list
     ULONG len;
 };
 
-static HRESULT dev_objects_append( DEV_OBJECT obj, void *data )
+static HRESULT dev_objects_append( DEV_OBJECT_TYPE type, const WCHAR *id, ULONG *props_len, DEVPROPERTY **props, void *data )
 {
-    struct objects_list *objects = data;
-    WCHAR *id;
-    DEV_OBJECT *tmp;
+    struct objects_list *list = data;
+    DEV_OBJECT *tmp, *obj;
 
-    if (!(id = wcsdup( obj.pszObjectId )))
-        return E_OUTOFMEMORY;
-    if (!(tmp = realloc( objects->objects, (objects->len + 1) * sizeof( obj ) )))
-    {
-        free( id );
-        return E_OUTOFMEMORY;
-    }
+    if (!(tmp = realloc( list->objects, (list->len + 1) * sizeof(*list->objects) ))) return E_OUTOFMEMORY;
+    list->objects = tmp;
 
-    objects->objects = tmp;
-    tmp = &tmp[objects->len++];
-    *tmp = obj;
-    tmp->pszObjectId = id;
+    obj = list->objects + list->len;
+    if (!(obj->pszObjectId = wcsdup( id ))) return E_OUTOFMEMORY;
+    obj->ObjectType = type;
+    obj->cPropertyCount = *props_len;
+    obj->pProperties = *props;
+    *props_len = 0;
+    *props = NULL;
+    list->len++;
+
     return S_OK;
 }
 
@@ -664,25 +647,33 @@ struct device_query_context
     HCMNOTIFICATION notify;
 };
 
-static HRESULT device_query_context_add_object( DEV_OBJECT obj, void *data )
+static HRESULT device_query_context_add_object( DEV_OBJECT_TYPE type, const WCHAR *id, ULONG *props_len, DEVPROPERTY **props, void *data )
 {
-    DEV_QUERY_RESULT_ACTION_DATA action_data = {0};
+    DEV_QUERY_RESULT_ACTION_DATA action_data =
+    {
+        .Action = DevQueryResultAdd,
+        .Data.DeviceObject =
+        {
+            .ObjectType = type,
+            .pszObjectId = id,
+            .cPropertyCount = *props_len,
+            .pProperties = *props,
+        },
+    };
     struct device_query_context *ctx = data;
     struct device_iface_path *iface_entry = NULL;
     HRESULT hr = S_OK;
 
-    TRACE( "(%s, %p)\n", debugstr_w( obj.pszObjectId ), data );
+    TRACE( "(%s, %p)\n", debugstr_w( id ), data );
 
-    action_data.Action = DevQueryResultAdd;
-    action_data.Data.DeviceObject = obj;
     ctx->callback( (HDEVQUERY)ctx, ctx->user_data, &action_data );
 
     EnterCriticalSection( &ctx->cs );
     if (ctx->state == DevQueryStateClosed)
         hr = E_CHANGED_STATE;
-    else if (obj.ObjectType == DevObjectTypeDeviceInterface || obj.ObjectType == DevObjectTypeDeviceInterfaceDisplay)
+    else if (type == DevObjectTypeDeviceInterface || type == DevObjectTypeDeviceInterfaceDisplay)
     {
-        if (!(iface_entry = calloc( 1, sizeof( *iface_entry ) )) || !(iface_entry->path = wcsdup( obj.pszObjectId )))
+        if (!(iface_entry = calloc( 1, sizeof( *iface_entry ) )) || !(iface_entry->path = wcsdup( id )))
         {
             if (iface_entry) free( iface_entry->path );
             free( iface_entry );
@@ -696,7 +687,6 @@ static HRESULT device_query_context_add_object( DEV_OBJECT obj, void *data )
     }
     LeaveCriticalSection( &ctx->cs );
 
-    DevFreeObjectProperties( obj.cPropertyCount, obj.pProperties );
     return hr;
 }
 
@@ -1147,9 +1137,9 @@ HRESULT WINAPI DevGetObjectPropertiesEx( DEV_OBJECT_TYPE type, const WCHAR *id, 
     case DevObjectTypeDeviceInterfaceDisplay:
     {
         SP_DEVICE_INTERFACE_DATA iface = {.cbSize = sizeof( iface )};
+        ULONG properties_len = 0, keys_len = props_len;
         const DEVPROPCOMPKEY *keys = props;
-        ULONG keys_len = props_len;
-        DEV_OBJECT obj = {0};
+        DEVPROPERTY *properties = NULL;
         HDEVINFO set;
 
         set = SetupDiCreateDeviceInfoListExW( NULL, NULL, NULL, NULL );
@@ -1164,14 +1154,12 @@ HRESULT WINAPI DevGetObjectPropertiesEx( DEV_OBJECT_TYPE type, const WCHAR *id, 
         if (all_props) hr = dev_get_device_interface_property_keys( set, &iface, &keys, &keys_len );
         if (SUCCEEDED(hr))
         {
-            DEVPROPERTY *properties = NULL;
-            if ((obj.cPropertyCount = keys_len) && !(properties = calloc( keys_len, sizeof(*properties) ))) hr = E_OUTOFMEMORY;
-            else hr = dev_object_iface_get_props( set, &iface, keys, keys_len, properties, &obj.cPropertyCount );
-            obj.pProperties = properties;
+            if ((properties_len = keys_len) && !(properties = calloc( keys_len, sizeof(*properties) ))) hr = E_OUTOFMEMORY;
+            else hr = dev_object_iface_get_props( set, &iface, keys, keys_len, properties, &properties_len );
         }
 
-        *buf = obj.pProperties;
-        *buf_len = obj.cPropertyCount;
+        *buf = properties;
+        *buf_len = properties_len;
 
         if (keys != props) free( (void *)keys );
         SetupDiDestroyDeviceInfoList( set );
