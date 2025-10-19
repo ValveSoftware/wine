@@ -22,25 +22,15 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(setupapi);
 
-static BOOL dev_properties_append( DEVPROPERTY **properties, ULONG *props_len, const DEVPROPKEY *key, DEVPROPTYPE type,
-                                   ULONG buf_size, void *buf )
+static void devproperty_init( DEVPROPERTY *property, const DEVPROPKEY *key, DEVPROPTYPE type,
+                              ULONG buf_size, void *buf )
 {
-    DEVPROPERTY *tmp;
-
-    if (!(tmp = realloc( *properties, (*props_len + 1) * sizeof( **properties ))))
-        return FALSE;
-    *properties = tmp;
-
-    tmp = &tmp[*props_len];
-    tmp->CompKey.Key = *key;
-    tmp->CompKey.Store = DEVPROP_STORE_SYSTEM;
-    tmp->CompKey.LocaleName = NULL;
-    tmp->Type = type;
-    tmp->BufferSize = buf_size;
-    tmp->Buffer = buf;
-
-    *props_len += 1;
-    return TRUE;
+    property->CompKey.Key = *key;
+    property->CompKey.Store = DEVPROP_STORE_SYSTEM;
+    property->CompKey.LocaleName = NULL;
+    property->Type = type;
+    property->BufferSize = buf_size;
+    property->Buffer = buf;
 }
 
 static const char *debugstr_DEV_OBJECT( const DEV_OBJECT *obj )
@@ -376,14 +366,11 @@ static HRESULT dev_get_device_interface_property_keys( HDEVINFO set, SP_DEVICE_I
     return hr;
 }
 
-static HRESULT dev_object_iface_get_props( DEV_OBJECT *obj, HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface_data,
-                                           const DEVPROPCOMPKEY *keys, ULONG keys_len )
+static HRESULT dev_object_iface_get_props( HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface_data, const DEVPROPCOMPKEY *keys, ULONG keys_len,
+                                           DEVPROPERTY *properties, ULONG *properties_len )
 {
     HRESULT hr = S_OK;
     DWORD i = 0;
-
-    obj->cPropertyCount = 0;
-    obj->pProperties = NULL;
 
     for (i = 0; i < keys_len; i++)
     {
@@ -395,12 +382,7 @@ static HRESULT dev_object_iface_get_props( DEV_OBJECT *obj, HDEVINFO set, SP_DEV
         if (SetupDiGetDeviceInterfacePropertyW( set, iface_data, key, &type, NULL, 0, &req, 0 )
             || GetLastError() != ERROR_INSUFFICIENT_BUFFER)
         {
-            if (!dev_properties_append( (DEVPROPERTY **)&obj->pProperties, &obj->cPropertyCount, key,
-                                        DEVPROP_TYPE_EMPTY, 0, NULL ))
-            {
-                hr = E_OUTOFMEMORY;
-                goto done;
-            }
+            devproperty_init( properties + i, key, DEVPROP_TYPE_EMPTY, 0, NULL );
             continue;
         }
 
@@ -416,21 +398,11 @@ static HRESULT dev_object_iface_get_props( DEV_OBJECT *obj, HDEVINFO set, SP_DEV
             free( buf );
             goto done;
         }
-        if (!dev_properties_append( (DEVPROPERTY **)&obj->pProperties, &obj->cPropertyCount, key, type, size, buf ))
-        {
-            free( buf );
-            hr = E_OUTOFMEMORY;
-            goto done;
-        }
+        devproperty_init( properties + i, key, type, size, buf );
     }
 
 done:
-    if (FAILED( hr ))
-    {
-        DevFreeObjectProperties( obj->cPropertyCount, obj->pProperties );
-        obj->cPropertyCount = 0;
-        obj->pProperties = NULL;
-    }
+    *properties_len = i;
     return hr;
 }
 
@@ -536,6 +508,7 @@ static HRESULT enum_dev_objects( DEV_OBJECT_TYPE type, const DEVPROPCOMPKEY *pro
         for (j = 0; SUCCEEDED( hr ) && SetupDiEnumDeviceInterfaces( set, NULL, &iface_class, j, &iface ); j++)
         {
             const DEVPROPCOMPKEY *keys = props;
+            DEVPROPERTY *properties = NULL;
             ULONG keys_len = props_len;
             DEV_OBJECT obj = {0};
 
@@ -549,12 +522,14 @@ static HRESULT enum_dev_objects( DEV_OBJECT_TYPE type, const DEVPROPCOMPKEY *pro
              * evaluated, free properties that have not been requested, and set cPropertyCount to props_len.  */
             if ((all_props || filters) && FAILED(hr = dev_get_device_interface_property_keys( set, &iface, &keys, &keys_len ))) break;
 
-            hr = dev_object_iface_get_props( &obj, set, &iface, keys, keys_len );
+            if ((obj.cPropertyCount = keys_len) && !(properties = calloc( keys_len, sizeof(*properties) ))) hr = E_OUTOFMEMORY;
+            else hr = dev_object_iface_get_props( set, &iface, keys, keys_len, properties, &obj.cPropertyCount );
+            obj.pProperties = properties;
 
             if (SUCCEEDED( hr ))
             {
                 /* Sort properties by DEVPROPCOMPKEY for faster filter evaluation. */
-                if (filters) qsort( (DEVPROPERTY *)obj.pProperties, obj.cPropertyCount, sizeof(*obj.pProperties), devproperty_compare );
+                if (filters) qsort( properties, obj.cPropertyCount, sizeof(*properties), devproperty_compare );
 
                 /* By default, the evaluation is performed by AND-ing all individual filter expressions. */
                 hr = devprop_filter_matches_object( &obj, DEVPROP_OPERATOR_AND_OPEN, filters, filters_end );
@@ -1190,7 +1165,13 @@ HRESULT WINAPI DevGetObjectPropertiesEx( DEV_OBJECT_TYPE type, const WCHAR *id, 
         }
 
         if (all_props) hr = dev_get_device_interface_property_keys( set, &iface, &keys, &keys_len );
-        if (SUCCEEDED(hr)) hr = dev_object_iface_get_props( &obj, set, &iface, keys, keys_len );
+        if (SUCCEEDED(hr))
+        {
+            DEVPROPERTY *properties = NULL;
+            if ((obj.cPropertyCount = keys_len) && !(properties = calloc( keys_len, sizeof(*properties) ))) hr = E_OUTOFMEMORY;
+            else hr = dev_object_iface_get_props( set, &iface, keys, keys_len, properties, &obj.cPropertyCount );
+            obj.pProperties = properties;
+        }
 
         *buf = obj.pProperties;
         *buf_len = obj.cPropertyCount;
