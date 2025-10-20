@@ -3188,6 +3188,14 @@ NTSTATUS WINAPI wow64_NtUserGetWindowDC( UINT *args )
     return HandleToUlong( NtUserGetWindowDC( hwnd ));
 }
 
+NTSTATUS WINAPI wow64_NtUserGetWindowDisplayAffinity( UINT *args )
+{
+    HWND hwnd = get_handle( &args );
+    DWORD *affinity = get_ptr( &args );
+
+    return NtUserGetWindowDisplayAffinity( hwnd, affinity );
+}
+
 NTSTATUS WINAPI wow64_NtUserGetWindowPlacement( UINT *args )
 {
     HWND hwnd = get_handle( &args );
