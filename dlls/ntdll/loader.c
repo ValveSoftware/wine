@@ -4583,6 +4583,28 @@ static void release_address_space(void)
 #endif
 }
 
+#ifdef __x86_64__
+DWORD unknown_syscall_data[] =
+{
+             0xb8d18b4c, 0, 0, 0,
+    /* 4 */  0xb8d18b4c, 0, 0, 0,
+    /* 8 */  0xb8d18b4c, 0, 0, 0,
+    /* 12 */ 0xb8d18b4c, 0, 0, 0,
+    /* 16 */ 0xb8d18b4c, 0, 0, 0,
+};
+
+static void init_unknown_data(void)
+{
+    unknown_syscall_data[1] = *(unsigned int *)((char *)NtOpenFile + 4);
+    unknown_syscall_data[5] = *(unsigned int *)((char *)NtCreateSection + 4);
+    unknown_syscall_data[17] = *(unsigned int *)((char *)NtMapViewOfSection + 4);
+}
+#else
+static void init_unknown_data(void)
+{
+}
+#endif
+
 /******************************************************************
  *		loader_init
  *
@@ -4608,6 +4630,8 @@ void loader_init( CONTEXT *context, void **entry )
         WCHAR env_str[16];
         ULONG heap_flags = HEAP_GROWABLE;
         unsigned int i;
+
+        init_unknown_data();
 
         peb->LdrData            = &ldr;
         peb->FastPebLock        = &peb_lock;
