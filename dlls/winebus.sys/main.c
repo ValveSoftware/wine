@@ -1026,9 +1026,11 @@ static DWORD CALLBACK bus_main_thread(void *args)
             struct device_desc desc = event->device_created.desc;
             USAGE_AND_PAGE usages;
             UINT buttons;
+            BOOL hidraw_enabled;
 
             usages = get_device_usages(event->device, &buttons);
-            if (desc.is_hidraw && !is_hidraw_enabled(desc.vid, desc.pid, &usages, buttons))
+            hidraw_enabled = is_hidraw_enabled(desc.vid, desc.pid, &usages, buttons);
+            if (desc.is_hidraw && !hidraw_enabled)
             {
                 struct device_remove_params params = {.device = event->device};
                 WARN("ignoring %shidraw device %04x:%04x with usages %04x:%04x\n", desc.is_hidraw ? "" : "non-",
@@ -1036,18 +1038,18 @@ static DWORD CALLBACK bus_main_thread(void *args)
                 winebus_call(device_remove, &params);
                 break;
             }
-            else if (desc.is_hidraw)
+            else if (desc.is_hidraw && hidraw_enabled)
             {
                 RtlEnterCriticalSection(&device_list_cs);
-                if ((device = bus_find_device_from_vid_pid(!desc.is_hidraw, &event->device_created.desc)))
+                if ((device = bus_find_device_from_vid_pid(FALSE, &event->device_created.desc)))
                     bus_unlink_hid_device(device);
                 device = bus_create_hid_device(&event->device_created.desc, event->device);
                 RtlLeaveCriticalSection(&device_list_cs);
             }
-            else
+            else /* desc.is_hidraw == FALSE */
             {
                 RtlEnterCriticalSection(&device_list_cs);
-                if (bus_find_device_from_vid_pid(!desc.is_hidraw, &event->device_created.desc)) device = NULL;
+                if (hidraw_enabled && bus_find_device_from_vid_pid(TRUE, &event->device_created.desc)) device = NULL;
                 else device = bus_create_hid_device(&event->device_created.desc, event->device);
                 RtlLeaveCriticalSection(&device_list_cs);
             }
