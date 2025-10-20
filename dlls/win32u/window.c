@@ -4703,8 +4703,17 @@ static BOOL show_window( HWND hwnd, INT cmd )
     BOOL show_flag = TRUE;
     RECT newPos = {0, 0, 0, 0};
     UINT new_swp, swp = 0, context;
+    const char *sgi;
 
     TRACE( "hwnd=%p, cmd=%d, was_visible %d\n", hwnd, cmd, was_visible );
+
+    /* Batman: Arkham City minimises its main window while the splash window is shown, but under gamescope, the
+     * game then restores the window and it becomes the foreground, resulting in broken splash display. The game
+     * later calls ShowWindow() with SW_SHOWNORMAL, so it's safe to suppress the restoration. CW-Bug-Id: #25955 */
+    if (cmd == SW_RESTORE
+            && user_driver->pHasWindowManager( "steamcompmgr" )
+            && (sgi = getenv( "SteamGameId" )) && !strcmp( sgi, "200260" ))
+        return was_visible;
 
     context = set_thread_dpi_awareness_context( get_window_dpi_awareness_context( hwnd ));
 
