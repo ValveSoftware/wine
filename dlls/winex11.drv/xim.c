@@ -104,14 +104,15 @@ static void xim_update_comp_string( UINT offset, UINT old_len, const WCHAR *text
 
 void xim_set_result_string( HWND hwnd, const char *str, UINT count )
 {
+    const DWORD buf_len = (count + 1) * sizeof(WCHAR);
     WCHAR *output;
     DWORD len;
 
     TRACE( "hwnd %p, string %s\n", hwnd, debugstr_an(str, count) );
 
-    if (!(output = malloc( (count + 1) * sizeof(WCHAR) ))) return;
-    len = ntdll_umbstowcs( str, count, output, count );
-    output[len] = 0;
+    if (!(output = malloc( buf_len ))) return;
+    RtlUTF8ToUnicodeN( output, buf_len, &len, str, count );
+    output[len / sizeof(WCHAR)] = 0;
 
     post_ime_update( hwnd, 0, NULL, output );
 

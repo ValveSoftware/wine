@@ -1357,11 +1357,11 @@ BOOL X11DRV_KeyEvent( HWND hwnd, XEvent *xev )
         release_win_data( data );
     }
 
-    /* Clients should pass only KeyPress events to XmbLookupString */
+    /* Clients should pass only KeyPress events to Xutf8LookupString */
     if (xic && event->type == KeyPress)
     {
-        ascii_chars = XmbLookupString(xic, event, buf, sizeof(buf), &keysym, &status);
-        TRACE_(key)("XmbLookupString needs %i byte(s)\n", ascii_chars);
+        ascii_chars = Xutf8LookupString( xic, event, buf, sizeof(buf), &keysym, &status );
+        TRACE_(key)("Xutf8LookupString needs %i byte(s)\n", ascii_chars);
         if (status == XBufferOverflow)
         {
             Str = malloc( ascii_chars );
@@ -1370,7 +1370,7 @@ BOOL X11DRV_KeyEvent( HWND hwnd, XEvent *xev )
                 ERR_(key)("Failed to allocate memory!\n");
                 return FALSE;
             }
-            ascii_chars = XmbLookupString(xic, event, Str, ascii_chars, &keysym, &status);
+            ascii_chars = Xutf8LookupString( xic, event, Str, ascii_chars, &keysym, &status );
         }
     }
     else
