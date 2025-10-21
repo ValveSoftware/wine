@@ -2824,6 +2824,9 @@ static HRESULT WINAPI session_commands_callback_Invoke(IMFAsyncCallback *iface, 
 {
     struct session_op *op = impl_op_from_IUnknown(IMFAsyncResult_GetStateNoAddRef(result));
     struct media_session *session = impl_from_commands_callback_IMFAsyncCallback(iface);
+
+    EnterCriticalSection(&session->cs);
+
     assert( session->command_state == COMMAND_STATE_SUBMITTED );
     list_remove(&op->entry);
 
