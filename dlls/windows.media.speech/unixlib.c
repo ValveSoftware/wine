@@ -274,7 +274,7 @@ static NTSTATUS find_model_by_locale( const char *locale, VoskModel **model )
     return status;
 }
 
-static NTSTATUS grammar_to_json_array(const char **grammar, UINT32 grammar_size, const char **array)
+static NTSTATUS grammar_to_json_array(const char **grammar, UINT32 grammar_size, char **array)
 {
     size_t buf_size = strlen("[]") + 1, len;
     char *buf;
@@ -322,9 +322,9 @@ static NTSTATUS speech_create_recognizer( void *args )
 {
     struct speech_create_recognizer_params *params = args;
     VoskRecognizer *recognizer = NULL;
-    VoskModel *model = NULL;
     NTSTATUS status = STATUS_SUCCESS;
-    const char *grammar_json;
+    char *grammar_json = NULL;
+    VoskModel *model = NULL;
 
     TRACE("args %p.\n", args);
 
@@ -338,6 +338,7 @@ static NTSTATUS speech_create_recognizer( void *args )
     {
         if (!(recognizer = p_vosk_recognizer_new_grm(model, params->sample_rate, grammar_json)))
                 status = STATUS_UNSUCCESSFUL;
+        free(grammar_json);
     }
     else
     {
