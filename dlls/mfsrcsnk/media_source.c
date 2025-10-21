@@ -228,7 +228,6 @@ struct media_source
     IMFGetService IMFGetService_iface;
     IMFRateSupport IMFRateSupport_iface;
     IMFRateControl IMFRateControl_iface;
-    IMFMediaShutdownNotify IMFMediaShutdownNotify_iface;
     IMFAsyncCallback async_create_iface;
     IMFAsyncCallback async_start_iface;
     IMFAsyncCallback async_stop_iface;
@@ -1087,62 +1086,6 @@ static const IMFRateControlVtbl media_source_IMFRateControl_vtbl =
     media_source_IMFRateControl_GetRate,
 };
 
-static struct media_source *media_source_from_IMFMediaShutdownNotify(IMFMediaShutdownNotify *iface)
-{
-    return CONTAINING_RECORD(iface, struct media_source, IMFMediaShutdownNotify_iface);
-}
-
-static HRESULT WINAPI media_source_IMFMediaShutdownNotify_QueryInterface(IMFMediaShutdownNotify *iface, REFIID riid, void **obj)
-{
-    struct media_source *source = media_source_from_IMFMediaShutdownNotify(iface);
-    return IMFMediaSource_QueryInterface(&source->IMFMediaSource_iface, riid, obj);
-}
-
-static ULONG WINAPI media_source_IMFMediaShutdownNotify_AddRef(IMFMediaShutdownNotify *iface)
-{
-    struct media_source *source = media_source_from_IMFMediaShutdownNotify(iface);
-    return IMFMediaSource_AddRef(&source->IMFMediaSource_iface);
-}
-
-static ULONG WINAPI media_source_IMFMediaShutdownNotify_Release(IMFMediaShutdownNotify *iface)
-{
-    struct media_source *source = media_source_from_IMFMediaShutdownNotify(iface);
-    return IMFMediaSource_Release(&source->IMFMediaSource_iface);
-}
-
-static HRESULT WINAPI media_source_IMFMediaShutdownNotify_set_notification_callback(IMFMediaShutdownNotify *iface,
-        IMFAsyncCallback *callback, IUnknown *state)
-{
-    struct media_source *source = media_source_from_IMFMediaShutdownNotify(iface);
-    IMFAsyncResult *result = NULL;
-    HRESULT hr = S_OK;
-
-    EnterCriticalSection(&source->cs);
-
-    if (source->state == SOURCE_SHUTDOWN)
-        hr = MF_E_SHUTDOWN;
-    else if (callback && FAILED(hr = MFCreateAsyncResult(NULL, callback, state, &result)))
-        WARN("Failed to create result, hr %#lx\n", hr);
-    else
-    {
-        if (source->shutdown_result)
-            IMFAsyncResult_Release(source->shutdown_result);
-        source->shutdown_result = result;
-    }
-
-    LeaveCriticalSection(&source->cs);
-
-    return hr;
-}
-
-static const IMFMediaShutdownNotifyVtbl media_source_IMFMediaShutdownNotify_vtbl =
-{
-    media_source_IMFMediaShutdownNotify_QueryInterface,
-    media_source_IMFMediaShutdownNotify_AddRef,
-    media_source_IMFMediaShutdownNotify_Release,
-    media_source_IMFMediaShutdownNotify_set_notification_callback,
-};
-
 static HRESULT WINAPI media_source_QueryInterface(IMFMediaSource *iface, REFIID riid, void **out)
 {
     struct media_source *source = media_source_from_IMFMediaSource(iface);
@@ -1162,13 +1105,6 @@ static HRESULT WINAPI media_source_QueryInterface(IMFMediaSource *iface, REFIID 
     {
         IMFGetService_AddRef(&source->IMFGetService_iface);
         *out = &source->IMFGetService_iface;
-        return S_OK;
-    }
-
-    if (IsEqualIID(riid, &IID_IMFMediaShutdownNotify))
-    {
-        IMFMediaShutdownNotify_AddRef(&source->IMFMediaShutdownNotify_iface);
-        *out = &source->IMFMediaShutdownNotify_iface;
         return S_OK;
     }
 
@@ -1828,7 +1764,6 @@ static HRESULT media_source_create(const WCHAR *url, IMFByteStream *stream, IMFM
     source->IMFGetService_iface.lpVtbl = &media_source_IMFGetService_vtbl;
     source->IMFRateSupport_iface.lpVtbl = &media_source_IMFRateSupport_vtbl;
     source->IMFRateControl_iface.lpVtbl = &media_source_IMFRateControl_vtbl;
-    source->IMFMediaShutdownNotify_iface.lpVtbl = &media_source_IMFMediaShutdownNotify_vtbl;
     source->async_create_iface.lpVtbl = &media_source_async_create_vtbl;
     source->async_start_iface.lpVtbl = &media_source_async_start_vtbl;
     source->async_stop_iface.lpVtbl = &media_source_async_stop_vtbl;
