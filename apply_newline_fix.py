@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import shutil
 
 # Read the current file
 with open('/workspace/configure.ac', 'rb') as f:
@@ -25,7 +26,6 @@ else:
     print("File already ends with newline")
 
 # Clean cache
-import shutil
 cache_dir = '/workspace/autom4te.cache'
 if os.path.exists(cache_dir):
     shutil.rmtree(cache_dir)
