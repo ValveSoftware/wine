@@ -1023,9 +1023,14 @@ found:
 
     ZeroMemory(&si, sizeof(STARTUPINFOW));
     si.cb = sizeof(STARTUPINFOW);
-    if (!(service_entry->config.dwServiceType & SERVICE_INTERACTIVE_PROCESS))
+    if (!(service_entry->config.dwServiceType & SERVICE_INTERACTIVE_PROCESS)
+        && service_entry->config.lpDisplayName && wcscmp(service_entry->config.lpDisplayName, L"Arc Service"))
     {
         si.lpDesktop = (WCHAR *)L"__wineservice_winstation\\Default";
+    }
+    else if (!(service_entry->config.dwServiceType & SERVICE_INTERACTIVE_PROCESS))
+    {
+        FIXME("HACK: Creating service %s on default desktop.\n", debugstr_w(service_entry->config.lpDisplayName));
     }
 
     if (!environment && OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &token))
