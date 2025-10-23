@@ -68,6 +68,10 @@ static PSLIST_ENTRY (WINAPI *pRtlInterlockedPushListSListEx)(PSLIST_HEADER list,
 static NTSTATUS (WINAPI *pNtQueueApcThread)(HANDLE,PNTAPCFUNC,ULONG_PTR,ULONG_PTR,ULONG_PTR);
 static NTSTATUS (WINAPI *pNtTestAlert)(void);
 
+BOOL (WINAPI *pInitializeSynchronizationBarrier)(SYNCHRONIZATION_BARRIER *,LONG, LONG);
+BOOL (WINAPI *pDeleteSynchronizationBarrier)(SYNCHRONIZATION_BARRIER *);
+BOOL (WINAPI *pEnterSynchronizationBarrier)(SYNCHRONIZATION_BARRIER*, DWORD);
+
 #ifdef __i386__
 
 #include "pshpack1.h"
@@ -3356,6 +3360,38 @@ static void test_zigzag_event(void)
     trace("count: %d\n", zigzag_count[0]);
 }
 
+static void test_barrier(void)
+{
+    SYNCHRONIZATION_BARRIER barrier;
+    BOOL bval;
+
+    if (!pInitializeSynchronizationBarrier)
+    {
+        win_skip("InitializeSynchronizationBarrier is not available.\n");
+        return;
+    }
+
+    SetLastError( 0xdeadbeef );
+    bval = pInitializeSynchronizationBarrier( &barrier, 1, -1 );
+    ok( bval == TRUE, "got %#x.\n", bval );
+    ok( GetLastError() == 0xdeadbeef, "got %lu.\n", GetLastError() );
+
+    SetLastError( 0xdeadbeef );
+    bval = pEnterSynchronizationBarrier( &barrier, 0 );
+    ok( bval == TRUE, "got %#x.\n", bval );
+    ok( GetLastError() == 0xdeadbeef, "got %lu.\n", GetLastError() );
+
+    SetLastError( 0xdeadbeef );
+    bval = pEnterSynchronizationBarrier( &barrier, 0 );
+    ok( bval == TRUE, "got %#x.\n", bval );
+    ok( GetLastError() == 0xdeadbeef, "got %lu.\n", GetLastError() );
+
+    SetLastError( 0xdeadbeef );
+    bval = pDeleteSynchronizationBarrier( &barrier );
+    ok( bval == TRUE, "got %#x.\n", bval );
+    ok( GetLastError() == 0xdeadbeef, "got %lu.\n", GetLastError() );
+}
+
 START_TEST(sync)
 {
     char **argv;
@@ -3380,6 +3416,9 @@ START_TEST(sync)
     pReleaseSRWLockShared = (void *)GetProcAddress(hdll, "ReleaseSRWLockShared");
     pTryAcquireSRWLockExclusive = (void *)GetProcAddress(hdll, "TryAcquireSRWLockExclusive");
     pTryAcquireSRWLockShared = (void *)GetProcAddress(hdll, "TryAcquireSRWLockShared");
+    pInitializeSynchronizationBarrier = (void *)GetProcAddress(hdll, "InitializeSynchronizationBarrier");
+    pDeleteSynchronizationBarrier = (void *)GetProcAddress(hdll, "DeleteSynchronizationBarrier");
+    pEnterSynchronizationBarrier = (void *)GetProcAddress(hdll, "EnterSynchronizationBarrier");
     pNtAllocateVirtualMemory = (void *)GetProcAddress(hntdll, "NtAllocateVirtualMemory");
     pNtFreeVirtualMemory = (void *)GetProcAddress(hntdll, "NtFreeVirtualMemory");
     pNtQuerySystemTime = (void *)GetProcAddress(hntdll, "NtQuerySystemTime");
@@ -3429,4 +3468,5 @@ START_TEST(sync)
     test_apc_deadlock();
     test_zigzag_event();
     test_crit_section();
+    test_barrier();
 }

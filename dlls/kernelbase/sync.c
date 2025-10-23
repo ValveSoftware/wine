@@ -1799,3 +1799,38 @@ __ASM_STDCALL_FUNC(InterlockedDecrement, 4,
                   "ret $4")
 
 #endif  /* __i386__ */
+
+
+/***********************************************************************
+ * Synchronization barrier functions
+ ***********************************************************************/
+
+
+/***********************************************************************
+ *           InitializeSynchronizationBarrier  (kernelbase.@)
+ */
+BOOL WINAPI InitializeSynchronizationBarrier( SYNCHRONIZATION_BARRIER *barrier, LONG thread_count, LONG spin_count )
+{
+    FIXME( "%p %ld %ld stub.\n", barrier, thread_count, spin_count );
+    return TRUE;
+}
+
+
+/***********************************************************************
+ *           DeleteSynchronizationBarrier  (kernelbase.@)
+ */
+BOOL WINAPI DeleteSynchronizationBarrier( SYNCHRONIZATION_BARRIER *barrier )
+{
+    FIXME( "%p stub.\n", barrier );
+    return TRUE;
+}
+
+
+/***********************************************************************
+ *           EnterSynchronizationBarrier  (kernelbase.@)
+ */
+BOOL WINAPI EnterSynchronizationBarrier( SYNCHRONIZATION_BARRIER *barrier, DWORD flags )
+{
+    FIXME( "%p %#lx stub.\n", barrier, flags );
+    return TRUE;
+}
