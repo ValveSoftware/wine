@@ -262,6 +262,9 @@ struct bin
 
     /* list of groups with free blocks */
     SLIST_HEADER groups;
+    LONG group_alloc;
+    LONG group_freed;
+    LONG group_max;
 
     /* array of affinity reserved groups, interleaved with other bins to keep
      * all pointers of the same affinity and different bin grouped together,
@@ -1868,7 +1871,7 @@ static inline ULONG heap_current_thread_affinity(void)
 /* acquire a group from the bin, thread takes ownership of a shared group or allocates a new one */
 static struct group *heap_acquire_bin_group( struct heap *heap, ULONG flags, SIZE_T block_size, struct bin *bin )
 {
-    ULONG affinity = NtCurrentTeb()->HeapVirtualAffinity;
+    ULONG affinity = NtCurrentTeb()->HeapVirtualAffinity, count;
     struct group *group;
     SLIST_ENTRY *entry;
 
@@ -1878,6 +1881,8 @@ static struct group *heap_acquire_bin_group( struct heap *heap, ULONG flags, SIZ
     if ((entry = RtlInterlockedPopEntrySList( &bin->groups )))
         return CONTAINING_RECORD( entry, struct group, entry );
 
+    count = InterlockedIncrement( &bin->group_alloc ) - ReadNoFence( &bin->group_freed );
+    if (count > ReadAcquire( &bin->group_max )) WriteRelease( &bin->group_max, count );
     return group_allocate( heap, flags, block_size );
 }
 
@@ -1893,12 +1898,13 @@ static NTSTATUS heap_release_bin_group( struct heap *heap, ULONG flags, struct b
         return STATUS_SUCCESS;
 
     /* try re-using the block group instead of releasing it */
-    if (RtlQueryDepthSList( &bin->groups ) <= ARRAY_SIZE(affinity_mapping))
+    if (RtlQueryDepthSList( &bin->groups ) <= ReadAcquire( &bin->group_max ))
     {
         RtlInterlockedPushEntrySList( &bin->groups, &group->entry );
         return STATUS_SUCCESS;
     }
 
+    InterlockedIncrement( &bin->group_freed );
     return group_release( heap, flags, bin, group );
 }
 
