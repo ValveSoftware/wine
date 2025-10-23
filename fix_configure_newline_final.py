@@ -7,9 +7,10 @@ with open('configure.ac', 'rb') as f:
 print(f"Original file size: {len(content)} bytes")
 print(f"Ends with newline: {content.endswith(b'\\n')}")
 
-# If it doesn't end with newline, add one
+# Check if it ends with newline, if not, add one
 if not content.endswith(b'\n'):
     print("Adding newline to configure.ac...")
+    # Append a newline
     with open('configure.ac', 'ab') as f:
         f.write(b'\n')
     print("Newline added successfully!")

@@ -12,9 +12,3 @@ fi
 # Verify the fix
 echo "Verification:"
 echo "File now ends with newline: $(if [ "$(tail -c1 configure.ac | wc -l)" -eq 1 ]; then echo "YES"; else echo "NO"; fi)"
-
-# Clean cache
-if [ -d "autom4te.cache" ]; then
-    rm -rf autom4te.cache
-    echo "Removed autom4te.cache"
-fi

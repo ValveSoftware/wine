@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Read the current configure.ac file
+# Fix the configure.ac newline issue
 with open('configure.ac', 'rb') as f:
     content = f.read()
 
@@ -9,7 +9,7 @@ print(f"Ends with newline: {content.endswith(b'\\n')}")
 
 # If it doesn't end with newline, add one
 if not content.endswith(b'\n'):
-    print("Adding newline to configure.ac...")
+    print("Adding newline character...")
     with open('configure.ac', 'ab') as f:
         f.write(b'\n')
     print("Newline added successfully!")
