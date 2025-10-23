@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-# Read the current configure.ac file
+# Fix the configure.ac newline issue
+import os
+
+# Read the file in binary mode
 with open('configure.ac', 'rb') as f:
     content = f.read()
 
@@ -12,14 +15,21 @@ if not content.endswith(b'\n'):
     print("Adding newline to configure.ac...")
     with open('configure.ac', 'wb') as f:
         f.write(content + b'\n')
-    print("Newline added successfully!")
     
     # Verify the fix
     with open('configure.ac', 'rb') as f:
         new_content = f.read()
+    
     print(f"New file size: {len(new_content)} bytes")
     print(f"Now ends with newline: {new_content.endswith(b'\\n')}")
+    print("SUCCESS: configure.ac now ends with a newline!")
 else:
-    print("File already ends with newline")
+    print("File already ends with newline - no fix needed")
 
-print("Done!")
+# Clean autom4te cache if it exists
+if os.path.exists('autom4te.cache'):
+    import shutil
+    shutil.rmtree('autom4te.cache')
+    print("Cleaned autom4te.cache directory")
+
+print("Fix completed!")
