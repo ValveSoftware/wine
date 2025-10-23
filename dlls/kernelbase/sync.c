@@ -1811,8 +1811,12 @@ __ASM_STDCALL_FUNC(InterlockedDecrement, 4,
  */
 BOOL WINAPI InitializeSynchronizationBarrier( SYNCHRONIZATION_BARRIER *barrier, LONG thread_count, LONG spin_count )
 {
-    FIXME( "%p %ld %ld stub.\n", barrier, thread_count, spin_count );
-    return TRUE;
+    if (thread_count <= 0 || spin_count < -1)
+    {
+        SetLastError( ERROR_INVALID_PARAMETER );
+        return FALSE;
+    }
+    return set_ntstatus( RtlInitBarrier( barrier, thread_count, spin_count ));
 }
 
 
@@ -1821,7 +1825,7 @@ BOOL WINAPI InitializeSynchronizationBarrier( SYNCHRONIZATION_BARRIER *barrier, 
  */
 BOOL WINAPI DeleteSynchronizationBarrier( SYNCHRONIZATION_BARRIER *barrier )
 {
-    FIXME( "%p stub.\n", barrier );
+    RtlDeleteBarrier( barrier );
     return TRUE;
 }
 
@@ -1831,6 +1835,14 @@ BOOL WINAPI DeleteSynchronizationBarrier( SYNCHRONIZATION_BARRIER *barrier )
  */
 BOOL WINAPI EnterSynchronizationBarrier( SYNCHRONIZATION_BARRIER *barrier, DWORD flags )
 {
-    FIXME( "%p %#lx stub.\n", barrier, flags );
-    return TRUE;
+    static const DWORD valid_flags = SYNCHRONIZATION_BARRIER_FLAGS_SPIN_ONLY | SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY
+                                     | SYNCHRONIZATION_BARRIER_FLAGS_NO_DELETE;
+    static unsigned int once;
+
+    if (flags & ~valid_flags) RtlRaiseStatus( STATUS_INVALID_PARAMETER );
+
+    if (flags & ~SYNCHRONIZATION_BARRIER_FLAGS_NO_DELETE && !once++)
+        FIXME( "flags %#lx are not implemented.\n", flags );
+
+    return RtlBarrier( barrier, flags & SYNCHRONIZATION_BARRIER_FLAGS_NO_DELETE ? 0 : 0x10000 );
 }
