@@ -142,6 +142,7 @@
 # @ stub NtAddBootEntry
 @ stdcall -syscall NtAdjustGroupsToken(long long ptr long ptr ptr)
 @ stdcall -syscall NtAdjustPrivilegesToken(long long ptr long ptr ptr)
+@ stdcall -syscall NtAlertMultipleThreadByThreadId(ptr long ptr ptr)
 @ stdcall -syscall NtAlertResumeThread(long ptr)
 @ stdcall -syscall NtAlertThread(long)
 @ stdcall -syscall NtAlertThreadByThreadId(ptr)
@@ -1216,6 +1217,7 @@
 # @ stub ZwAddBootEntry
 @ stdcall -private -syscall ZwAdjustGroupsToken(long long ptr long ptr ptr) NtAdjustGroupsToken
 @ stdcall -private -syscall ZwAdjustPrivilegesToken(long long ptr long ptr ptr) NtAdjustPrivilegesToken
+@ stdcall -private -syscall ZwAlertMultipleThreadByThreadId(ptr long ptr ptr) NtAlertMultipleThreadByThreadId
 @ stdcall -private -syscall ZwAlertResumeThread(long ptr) NtAlertResumeThread
 @ stdcall -private -syscall ZwAlertThread(long) NtAlertThread
 @ stdcall -private -syscall ZwAlertThreadByThreadId(ptr) NtAlertThreadByThreadId
