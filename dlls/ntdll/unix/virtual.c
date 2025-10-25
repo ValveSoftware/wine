@@ -2491,12 +2491,15 @@ static void fixup_effective_user_space_limit( const void **effective_user_space_
 
     if (cached == -1)
     {
+        const char *e = getenv( "PROTON_LIMIT_ADDRESS_SPACE" );
         const char *sgi = getenv( "SteamGameId" );
-        cached = sgi &&
+        if (e) cached = e[0] != '0';
+        else cached = sgi &&
             (
                 !strcmp( sgi, "3092660" )
                 || !strcmp( sgi, "3681810" )
             );
+        if (cached) FIXME( "fixing up effective user space limit.\n" );
     }
     if (cached)
         *effective_user_space_limit = min( *effective_user_space_limit, (void *)0x700000000000 );
