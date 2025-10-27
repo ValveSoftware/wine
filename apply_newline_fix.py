@@ -4,7 +4,7 @@
 import os
 
 # First, check current state
-with open('configure.ac', 'rb') as f:
+with open('/workspace/configure.ac', 'rb') as f:
     content = f.read()
 
 print(f"Before fix:")
@@ -15,17 +15,17 @@ print(f"  Ends with newline: {content.endswith(b'\\n')}")
 # Apply fix if needed
 if not content.endswith(b'\n'):
     # Create backup first
-    with open('configure.ac.backup_before_newline_fix', 'wb') as f:
+    with open('/workspace/configure.ac.backup_before_newline_fix', 'wb') as f:
         f.write(content)
     print("Created backup: configure.ac.backup_before_newline_fix")
     
     # Apply fix
-    with open('configure.ac', 'wb') as f:
+    with open('/workspace/configure.ac', 'wb') as f:
         f.write(content + b'\n')
     print("Added newline to configure.ac")
     
     # Verify fix
-    with open('configure.ac', 'rb') as f:
+    with open('/workspace/configure.ac', 'rb') as f:
         new_content = f.read()
     
     print(f"After fix:")

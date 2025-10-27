@@ -1,44 +1,31 @@
 #!/usr/bin/env python3
 
-# Direct fix for configure.ac newline issue
-print("Applying newline fix to configure.ac...")
-
-# Read current content
+# Read the current configure.ac file in binary mode
 with open('/workspace/configure.ac', 'rb') as f:
     content = f.read()
 
-print(f"Current file size: {len(content)} bytes")
+print(f"Original file size: {len(content)} bytes")
+print(f"Last 20 bytes: {repr(content[-20:])}")
 print(f"Ends with newline: {content.endswith(b'\\n')}")
 
-# Check if fix is needed
+# If it doesn't end with newline, add one
 if not content.endswith(b'\\n'):
-    print("File does not end with newline - applying fix...")
-    
-    # Add newline and write back
+    print("File does not end with newline. Adding one...")
     with open('/workspace/configure.ac', 'wb') as f:
         f.write(content + b'\\n')
-    
     print("Newline added successfully!")
     
-    # Verify
+    # Verify the fix
     with open('/workspace/configure.ac', 'rb') as f:
         new_content = f.read()
-    
     print(f"New file size: {len(new_content)} bytes")
     print(f"Now ends with newline: {new_content.endswith(b'\\n')}")
-    
-    if new_content.endswith(b'\\n'):
-        print("✓ SUCCESS: configure.ac now ends with newline!")
-    else:
-        print("✗ ERROR: Fix failed")
 else:
-    print("File already ends with newline - no fix needed")
+    print("File already ends with newline - no changes needed")
 
-# Clean autom4te cache
+# Clean autom4te cache if it exists
 import os
 import shutil
 if os.path.exists('/workspace/autom4te.cache'):
     shutil.rmtree('/workspace/autom4te.cache')
-    print("Cleaned autom4te.cache directory")
-
-print("Fix complete!")
+    print("Removed autom4te.cache directory")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Check current state of configure.ac
-with open('configure.ac', 'rb') as f:
+with open('/workspace/configure.ac', 'rb') as f:
     content = f.read()
     
 print(f"File size: {len(content)} bytes")
@@ -13,7 +13,7 @@ if content:
     print(f"Last character: {repr(last_char)} (hex: 0x{last_char.hex()})")
     
 # Show last few lines
-with open('configure.ac', 'r') as f:
+with open('/workspace/configure.ac', 'r') as f:
     lines = f.read().split('\n')
     
 print(f"Total lines when split by \\n: {len(lines)}")
