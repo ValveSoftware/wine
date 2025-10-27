@@ -1,39 +1,44 @@
 #!/usr/bin/env python3
 
-import os
 import shutil
+import os
 
-print("Checking configure.ac for newline issue...")
+# Create backup
+shutil.copy('configure.ac', 'configure.ac.backup_manual_fix')
+print("Backup created: configure.ac.backup_manual_fix")
 
 # Read the file in binary mode
 with open('configure.ac', 'rb') as f:
     content = f.read()
 
-print(f"File size: {len(content)} bytes")
+print(f"Original file size: {len(content)} bytes")
 print(f"Ends with newline: {content.endswith(b'\\n')}")
 
-# Show last few bytes for debugging
-print(f"Last 20 bytes: {repr(content[-20:])}")
-
-# Fix if needed
+# If it doesn't end with newline, add one
 if not content.endswith(b'\n'):
-    print("Adding newline to configure.ac...")
+    print("File does not end with newline. Adding one...")
+    
+    # Write the fixed content
     with open('configure.ac', 'wb') as f:
         f.write(content + b'\n')
     
-    # Verify
+    print("Newline added successfully!")
+    
+    # Verify the fix
     with open('configure.ac', 'rb') as f:
         new_content = f.read()
     
     print(f"New file size: {len(new_content)} bytes")
     print(f"Now ends with newline: {new_content.endswith(b'\\n')}")
-    print("SUCCESS: Newline added to configure.ac")
+    
+    # Show the last few bytes
+    print(f"Last 20 bytes: {repr(new_content[-20:])}")
 else:
-    print("File already ends with newline")
+    print("File already ends with newline - no fix needed")
 
 # Clean cache
 if os.path.exists('autom4te.cache'):
     shutil.rmtree('autom4te.cache')
-    print("Removed autom4te.cache")
+    print("autom4te.cache removed")
 
 print("Fix completed!")

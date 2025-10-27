@@ -1,6 +1,1 @@
-dnl Local Variables:
-dnl comment-start: "dnl "
-dnl comment-end: ""
-dnl comment-start-skip: "\\bdnl\\b\\s *"
-dnl compile-command: "autoreconf --warnings=all"
-dnl End:
+# This will be replaced with the fixed content
