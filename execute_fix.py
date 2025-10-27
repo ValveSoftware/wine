@@ -1,45 +1,54 @@
 #!/usr/bin/env python3
 
 import os
-import subprocess
+import shutil
 
-print("=== Fixing configure.ac newline issue ===")
+print("Executing configure.ac newline fix...")
 
-# Check if configure.ac ends with newline
+# Read current file
 with open('configure.ac', 'rb') as f:
     content = f.read()
 
-print(f"File size: {len(content)} bytes")
-print(f"Last 20 bytes: {repr(content[-20:])}")
+print(f"Current file size: {len(content)} bytes")
 print(f"Ends with newline: {content.endswith(b'\\n')}")
 
-# Show the last few characters in hex
-print(f"Last 5 bytes in hex: {content[-5:].hex()}")
-
-# If it doesn't end with newline, fix it
-if not content.endswith(b'\n'):
-    print("\\nFile does not end with newline. Adding one...")
-    with open('configure.ac', 'ab') as f:
-        f.write(b'\n')
+if not content.endswith(b'\\n'):
+    print("File does not end with newline - applying fix...")
+    
+    # Create backup
+    backup_name = f'configure.ac.backup_{os.getpid()}'
+    with open(backup_name, 'wb') as f:
+        f.write(content)
+    print(f"Created backup: {backup_name}")
+    
+    # Add newline
+    fixed_content = content + b'\\n'
+    
+    # Write back
+    with open('configure.ac', 'wb') as f:
+        f.write(fixed_content)
+    
     print("Newline added successfully!")
     
-    # Verify the fix
+    # Verify
     with open('configure.ac', 'rb') as f:
-        new_content = f.read()
-    print(f"New file size: {len(new_content)} bytes")
-    print(f"Now ends with newline: {new_content.endswith(b'\\n')}")
-else:
-    print("\\nFile already ends with newline - no changes needed")
-
-# Clean autom4te cache
-print("\\n=== Cleaning autom4te cache ===")
-try:
-    if os.path.exists('autom4te.cache'):
-        subprocess.run(['rm', '-rf', 'autom4te.cache'], check=True)
-        print("autom4te.cache removed successfully")
+        verify_content = f.read()
+    
+    print(f"After fix - size: {len(verify_content)} bytes")
+    print(f"After fix - ends with newline: {verify_content.endswith(b'\\n')}")
+    
+    if verify_content.endswith(b'\\n'):
+        print("SUCCESS: configure.ac now ends with newline!")
+        
+        # Clean autom4te cache
+        if os.path.exists('autom4te.cache'):
+            shutil.rmtree('autom4te.cache')
+            print("Cleaned autom4te.cache")
+            
+        print("Fix complete! The autoreconf issue should now be resolved.")
     else:
-        print("autom4te.cache does not exist")
-except Exception as e:
-    print(f"Error removing cache: {e}")
+        print("ERROR: Fix verification failed")
+else:
+    print("File already ends with newline - no fix needed")
 
-print("\\n=== Fix completed ===")
+print("Done.")

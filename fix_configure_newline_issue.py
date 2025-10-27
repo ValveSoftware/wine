@@ -2,12 +2,10 @@
 
 import os
 import shutil
-from datetime import datetime
 
-print("=== Configure.ac Newline Fix ===")
+print("Checking configure.ac newline status...")
 
-# Step 1: Diagnostic check
-print("\\n1. Checking current state...")
+# Read the current file in binary mode
 with open('/workspace/configure.ac', 'rb') as f:
     content = f.read()
 
@@ -19,13 +17,12 @@ if content:
     last_char = content[-1:]
     print(f"Last character: {repr(last_char)} (hex: 0x{last_char.hex()})")
 
-# Step 2: Apply fix if needed
+# If it doesn't end with newline, fix it
 if not content.endswith(b'\\n'):
-    print("\\n2. File does NOT end with newline - applying fix...")
+    print("\\nFile does NOT end with newline - applying fix...")
     
     # Create backup
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_name = f'/workspace/configure.ac.backup_{timestamp}'
+    backup_name = '/workspace/configure.ac.backup_newline_fix'
     shutil.copy2('/workspace/configure.ac', backup_name)
     print(f"Created backup: {backup_name}")
     
@@ -38,19 +35,19 @@ if not content.endswith(b'\\n'):
     
     print(f"Added newline. New file size: {len(fixed_content)} bytes")
     
-    # Step 3: Verify the fix
-    print("\\n3. Verifying fix...")
+    # Verify the fix
     with open('/workspace/configure.ac', 'rb') as f:
         verify_content = f.read()
     
-    print(f"Verification - file size: {len(verify_content)} bytes")
-    print(f"Verification - ends with newline: {verify_content.endswith(b'\\n')}")
-    print(f"Verification - last 20 bytes: {repr(verify_content[-20:])}")
+    print(f"\\nVerification:")
+    print(f"  File size: {len(verify_content)} bytes")
+    print(f"  Ends with newline: {verify_content.endswith(b'\\n')}")
+    print(f"  Last 20 bytes: {repr(verify_content[-20:])}")
     
-    if verify_content.endswith(b'\\n') and len(verify_content) == len(content) + 1:
+    if verify_content.endswith(b'\\n'):
         print("\\n✅ SUCCESS: configure.ac now ends with newline!")
         
-        # Step 4: Clean autom4te cache
+        # Clean autom4te cache if it exists
         cache_dir = '/workspace/autom4te.cache'
         if os.path.exists(cache_dir):
             shutil.rmtree(cache_dir)
@@ -60,8 +57,6 @@ if not content.endswith(b'\\n'):
         
     else:
         print("\\n❌ ERROR: Fix verification failed!")
-        print(f"Restoring from backup: {backup_name}")
-        shutil.copy2(backup_name, '/workspace/configure.ac')
         
 else:
     print("\\n✅ File already ends with newline - no fix needed")

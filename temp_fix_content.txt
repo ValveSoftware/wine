@@ -1,0 +1,3 @@
+dnl comment-start-skip: "\\bdnl\\b\\s *"
+dnl compile-command: "autoreconf --warnings=all"
+dnl End:

@@ -22,3 +22,31 @@ if content.endswith('\n'):
 else:
     print("File does NOT end with newline")
     print(f"Last character: {repr(content[-1])}")
+
+# Run the diagnostic
+import subprocess
+import sys
+
+try:
+    result = subprocess.run([sys.executable, __file__.replace('show_exact_end.py', 'show_exact_end.py')], 
+                          capture_output=True, text=True, cwd='/workspace')
+    print("Diagnostic output:")
+    print(result.stdout)
+    if result.stderr:
+        print("Errors:")
+        print(result.stderr)
+except Exception as e:
+    print(f"Error running diagnostic: {e}")
+    
+# Now let's check the file directly
+print("\n=== DIRECT FILE CHECK ===")
+with open('/workspace/configure.ac', 'rb') as f:
+    content_bytes = f.read()
+    
+print(f"File size: {len(content_bytes)} bytes")
+print(f"Last 20 bytes: {repr(content_bytes[-20:])}")
+print(f"Ends with newline: {content_bytes.endswith(b'\\n')}")
+
+if content_bytes:
+    last_char = content_bytes[-1:]
+    print(f"Last character: {repr(last_char)} (hex: 0x{last_char.hex()})")

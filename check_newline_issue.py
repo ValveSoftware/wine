@@ -3,9 +3,9 @@
 # Check if configure.ac ends with newline
 with open('/workspace/configure.ac', 'rb') as f:
     content = f.read()
-    
+
 print(f"File size: {len(content)} bytes")
-print(f"Last 20 bytes: {repr(content[-20:])}")
+print(f"Last 30 bytes: {repr(content[-30:])}")
 print(f"Ends with newline: {content.endswith(b'\\n')}")
 
 if content:
