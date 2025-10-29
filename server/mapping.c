@@ -1632,7 +1632,7 @@ DECL_HANDLER(map_image_view)
                                          native_machine : req->machine;
         }
 
-        if (view->base != (mapping->image.map_addr ? mapping->image.map_addr : mapping->image.base))
+        if (view->base != (mapping->image.map_addr ? mapping->image.map_addr : mapping->image.base) + req->offset)
             set_error( STATUS_IMAGE_NOT_AT_BASE );
         if (req->machine != current->process->machine)
         {

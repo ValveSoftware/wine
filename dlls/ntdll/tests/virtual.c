@@ -1717,7 +1717,6 @@ static void test_NtMapViewOfSection(void)
     status = NtMapViewOfSection(mapping, process, &ptr2, 0, 0, &offset, &size2, 1, 0, PAGE_READONLY);
     ok(status == STATUS_IMAGE_NOT_AT_BASE, "NtMapViewOfSection returned %08lx\n", status);
 
-    todo_wine
     ok(size2 == size - si.dwAllocationGranularity, "got unexpected sizes %Ix, %Ix\n", size, size2);
     size2 = size - si.dwAllocationGranularity;
 
@@ -1731,7 +1730,6 @@ static void test_NtMapViewOfSection(void)
     ok(ret, "ReadProcessMemory failed\n");
     ok(size2 == result, "ReadProcessMemory didn't read all data (%Ix)\n", result);
 
-    todo_wine
     ok(memcmp(mem, mem2, size2) == 0, "memory does not match\n");
 
     free(mem);
