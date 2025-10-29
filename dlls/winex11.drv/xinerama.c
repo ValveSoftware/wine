@@ -123,7 +123,8 @@ static inline int query_screens(void)
 
 #endif  /* SONAME_LIBXINERAMA */
 
-/* Get xinerama monitor indices required for _NET_WM_FULLSCREEN_MONITORS */
+/* Get xinerama monitor indices required for _NET_WM_FULLSCREEN_MONITORS. Return FALSE if rect is
+ * not fullscreen */
 BOOL xinerama_get_fullscreen_monitors( const RECT *rect, long *indices )
 {
     RECT window_rect, intersected_rect, monitor_rect;
@@ -132,12 +133,6 @@ BOOL xinerama_get_fullscreen_monitors( const RECT *rect, long *indices )
     INT i;
 
     pthread_mutex_lock( &xinerama_mutex );
-    if (nb_monitors == 1)
-    {
-        memset( indices, 0, sizeof(*indices) * 4 );
-        ret = TRUE;
-        goto done;
-    }
 
     /* Convert window rectangle to root coordinates */
     offset = virtual_screen_to_root( rect->left, rect->top );
@@ -178,9 +173,7 @@ BOOL xinerama_get_fullscreen_monitors( const RECT *rect, long *indices )
         }
     }
 
-    if (indices[0] == -1 || indices[1] == -1 || indices[2] == -1 || indices[3] == -1)
-        ERR("Failed to get xinerama fullscreen monitor indices.\n");
-    else
+    if (indices[0] != -1 && indices[1] != -1 && indices[2] != -1 && indices[3] != -1)
         ret = TRUE;
 
 done:
