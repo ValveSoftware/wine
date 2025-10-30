@@ -4510,7 +4510,6 @@ static void test_sample_grabber_orientation(GUID subtype)
 
     hr = IMFMediaSession_Shutdown(session);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine
     ok(grabber_callback->shutdown, "Media sink is not shut down.\n");
     hr = IMFMediaSource_Shutdown(source);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
@@ -7140,7 +7139,6 @@ static void test_media_session_Start(void)
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     hr = IMFMediaSession_Shutdown(session);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine
     ok(grabber_callback->shutdown, "Media sink is not shut down.\n");
 
     propvar.vt = VT_I8;
@@ -7223,7 +7221,6 @@ static void test_media_session_Start(void)
     ok(!grabber_callback->shutdown, "Media sink was shut down.\n");
     hr = IMFMediaSession_Shutdown(session);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine
     ok(grabber_callback->shutdown, "Media sink is not shut down.\n");
     hr = IMFMediaSource_Shutdown(source);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
@@ -7673,7 +7670,6 @@ static void test_media_session_Close(void)
 
     hr = IMFMediaSession_Shutdown(session);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine
     ok(grabber_callback->shutdown, "Media sink is not shut down.\n");
 
     IMFPresentationClock_Release(presentation_clock);
@@ -7817,7 +7813,6 @@ static void test_media_session_thinning(void)
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     hr = IMFMediaSession_Shutdown(session);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine
     ok(grabber_callback->shutdown, "Media sink is not shut down.\n");
     hr = IMFMediaSource_Shutdown(source);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
@@ -8602,26 +8597,22 @@ static void test_media_session_sink_shutdown(void)
         hr = wait_media_event(session, callback, MESessionTopologySet, 1000, &propvar);
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
         PropVariantClear(&propvar);
-        todo_wine_if(i == 1)
         ok(!grabber_callback->shutdown, "Media sink was shut down.\n");
 
         hr = IMFMediaSession_ClearTopologies(session);
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
         hr = wait_media_event(session, callback, MESessionTopologiesCleared, 1000, &propvar);
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-        todo_wine_if(i == 1)
         ok(!grabber_callback->shutdown, "Media sink was shut down.\n");
 
         hr = IMFMediaSession_Close(session);
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
         hr = wait_media_event(session, callback, MESessionClosed, 1000, &propvar);
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-        todo_wine_if(i == 1)
         ok(!grabber_callback->shutdown, "Media sink was shut down.\n");
 
         hr = IMFMediaSession_Shutdown(session);
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-        todo_wine_if(i != 1)
         ok(grabber_callback->shutdown, "Media sink is not shut down.\n");
         IMFSampleGrabberSinkCallback_Release(&grabber_callback->IMFSampleGrabberSinkCallback_iface);
 
@@ -8630,7 +8621,6 @@ static void test_media_session_sink_shutdown(void)
 
         Sleep(20);
         ref = IMFMediaSession_Release(session);
-        todo_wine_if(i != 1)
         ok(!ref, "Unexpected refcount %ld.\n", ref);
         ref = IMFMediaSource_Release(source);
         ok(!ref, "Unexpected refcount %ld.\n", ref);
@@ -8689,7 +8679,6 @@ static void test_media_session_sink_shutdown(void)
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     for (i = 0; i < ARRAY_SIZE(grabber_callbacks); ++i)
     {
-        todo_wine_if(i)
         ok(grabber_callbacks[i]->shutdown, "Media sink %u is not shut down.\n", i);
         IMFSampleGrabberSinkCallback_Release(&grabber_callbacks[i]->IMFSampleGrabberSinkCallback_iface);
     }
