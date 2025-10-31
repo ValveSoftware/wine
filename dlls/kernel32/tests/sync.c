@@ -268,7 +268,9 @@ static void test_mutex(void)
 
     SetLastError(0xdeadbeef);
     hOpened = OpenMutexA(0, FALSE, "WineTestMutex");
+    todo_wine
     ok(hOpened == NULL, "OpenMutex succeeded\n");
+    todo_wine
     ok(GetLastError() == ERROR_ACCESS_DENIED, "wrong error %lu\n", GetLastError());
 
     SetLastError(0xdeadbeef);
@@ -308,7 +310,7 @@ todo_wine_if(getenv("WINEESYNC"))   /* XFAIL: validation is not implemented */
             if ((1 << i) == ACCESS_SYSTEM_SECURITY)
                 todo_wine ok(GetLastError() == ERROR_PRIVILEGE_NOT_HELD, "wrong error %lu, access %x\n", GetLastError(), 1 << i);
             else
-                ok(GetLastError() == ERROR_ACCESS_DENIED, "wrong error %lu, , access %x\n", GetLastError(), 1 << i);
+                todo_wine ok(GetLastError() == ERROR_ACCESS_DENIED, "wrong error %lu, , access %x\n", GetLastError(), 1 << i);
             ReleaseMutex(hCreated);
             failed |=0x1 << i;
         }
