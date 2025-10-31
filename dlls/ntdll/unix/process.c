@@ -1625,7 +1625,7 @@ NTSTATUS WINAPI NtQueryInformationProcess( HANDLE handle, PROCESSINFOCLASS class
         break;
 
     case ProcessWineUnixDebuggerPid:
-        if (handle == NtCurrentProcess()) ret = STATUS_INVALID_PARAMETER;
+        if (handle != NtCurrentProcess()) ret = STATUS_INVALID_PARAMETER;
         else if (size != sizeof(int)) ret = STATUS_INFO_LENGTH_MISMATCH;
         else *(int *)info = get_unix_debugger_pid();
         break;
