@@ -4,32 +4,35 @@
 import os
 
 # Read the file in binary mode to preserve exact content
-with open('/workspace/configure.ac', 'rb') as f:
+with open('configure.ac', 'rb') as f:
     content = f.read()
 
 print(f"Original file size: {len(content)} bytes")
-print(f"Last 30 bytes: {repr(content[-30:])}")
-print(f"Ends with newline: {content.endswith(b'\\n')}")
+print(f"File ends with newline: {content.endswith(b'\\n')}")
 
-# Check if we need to add newline
-if not content.endswith(b'\n'):
-    print("File does not end with newline - adding one")
+# Check if we need to add a newline
+if not content.endswith(b'\\n'):
+    print("Adding newline to end of file...")
     
-    # Add newline
-    new_content = content + b'\n'
+    # Create backup
+    with open('configure.ac.backup_before_newline_fix', 'wb') as f:
+        f.write(content)
+    print("Created backup: configure.ac.backup_before_newline_fix")
     
-    # Write back
-    with open('/workspace/configure.ac', 'wb') as f:
+    # Add newline and write back
+    new_content = content + b'\\n'
+    with open('configure.ac', 'wb') as f:
         f.write(new_content)
     
-    print(f"Fixed! New file size: {len(new_content)} bytes")
+    print(f"New file size: {len(new_content)} bytes")
+    print("✓ Newline added successfully!")
     
     # Verify
-    with open('/workspace/configure.ac', 'rb') as f:
+    with open('configure.ac', 'rb') as f:
         verify_content = f.read()
-    
     print(f"Verification - ends with newline: {verify_content.endswith(b'\\n')}")
-    print(f"Last 30 bytes: {repr(verify_content[-30:])}")
     
 else:
-    print("File already ends with newline - no fix needed")
+    print("✓ File already ends with newline - no fix needed!")
+
+print("\\nDone! You can now run ./autogen.sh")

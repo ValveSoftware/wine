@@ -1,3 +1,2 @@
 #!/bin/bash
-cd /workspace
-bash clean_and_fix.sh
+python3 fix_file.py
