@@ -673,6 +673,16 @@ ENABLE_WSL_FALSE
 ENABLE_WSL_TRUE
 ENABLE_ATL_FALSE
 ENABLE_ATL_TRUE
+AAPT
+ADB
+GLES2_LIBS
+GLES2_CFLAGS
+EGL_LIBS
+EGL_CFLAGS
+GBM_LIBS
+GBM_CFLAGS
+DRM_LIBS
+DRM_CFLAGS
 ATL_DEPS_LIBS
 ATL_DEPS_CFLAGS
 ENABLE_DARLING_FALSE
@@ -866,7 +876,15 @@ WINE_DEPS_LIBS
 DARLING_DEPS_CFLAGS
 DARLING_DEPS_LIBS
 ATL_DEPS_CFLAGS
-ATL_DEPS_LIBS'
+ATL_DEPS_LIBS
+DRM_CFLAGS
+DRM_LIBS
+GBM_CFLAGS
+GBM_LIBS
+EGL_CFLAGS
+EGL_LIBS
+GLES2_CFLAGS
+GLES2_LIBS'
 ac_subdirs_all='upstream/wine'
 
 # Initialize some variables set by options.
@@ -1562,6 +1580,15 @@ Some influential environment variables:
               C compiler flags for ATL_DEPS, overriding pkg-config
   ATL_DEPS_LIBS
               linker flags for ATL_DEPS, overriding pkg-config
+  DRM_CFLAGS  C compiler flags for DRM, overriding pkg-config
+  DRM_LIBS    linker flags for DRM, overriding pkg-config
+  GBM_CFLAGS  C compiler flags for GBM, overriding pkg-config
+  GBM_LIBS    linker flags for GBM, overriding pkg-config
+  EGL_CFLAGS  C compiler flags for EGL, overriding pkg-config
+  EGL_LIBS    linker flags for EGL, overriding pkg-config
+  GLES2_CFLAGS
+              C compiler flags for GLES2, overriding pkg-config
+  GLES2_LIBS  linker flags for GLES2, overriding pkg-config
 
 Use these variables to override the choices made by `configure' or to help
 it to find libraries and programs with nonstandard names/locations.
@@ -18115,6 +18142,7 @@ if test "x$enable_atl" = "xyes"; then
 printf "%s\n" "#define HAVE_ATL 1" >>confdefs.h
 
 
+
 pkg_failed=no
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for
         libdrm
@@ -18223,36 +18251,657 @@ fi
         # Put the nasty error message in config.log where it belongs
         echo "$ATL_DEPS_PKG_ERRORS" >&5
 
-        as_fn_error $? "Package requirements (
-        libdrm
-        gbm
-        egl
-        glesv2
-    ) were not met:
 
-$ATL_DEPS_PKG_ERRORS
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: Some ATL dependencies not found. ATL support may be limited." >&5
+printf "%s\n" "$as_me: WARNING: Some ATL dependencies not found. ATL support may be limited." >&2;}
 
-Consider adjusting the PKG_CONFIG_PATH environment variable if you
-installed software in a non-standard prefix.
 
-Alternatively, you may set the environment variables ATL_DEPS_CFLAGS
-and ATL_DEPS_LIBS to avoid the need to call pkg-config.
-See the pkg-config man page for more details." "$LINENO" 5
+pkg_failed=no
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for libdrm" >&5
+printf %s "checking for libdrm... " >&6; }
+
+if test -n "$DRM_CFLAGS"; then
+    pkg_cv_DRM_CFLAGS="$DRM_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libdrm\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libdrm") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_DRM_CFLAGS=`$PKG_CONFIG --cflags "libdrm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$DRM_LIBS"; then
+    pkg_cv_DRM_LIBS="$DRM_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libdrm\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libdrm") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_DRM_LIBS=`$PKG_CONFIG --libs "libdrm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+                DRM_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libdrm" 2>&1`
+        else
+                DRM_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libdrm" 2>&1`
+        fi
+        # Put the nasty error message in config.log where it belongs
+        echo "$DRM_PKG_ERRORS" >&5
+
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: libdrm not found - GPU acceleration may be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: libdrm not found - GPU acceleration may be unavailable" >&2;}
 elif test $pkg_failed = untried; then
         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
-        { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
-is in your PATH or set the PKG_CONFIG environment variable to the full
-path to pkg-config.
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: libdrm not found - GPU acceleration may be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: libdrm not found - GPU acceleration may be unavailable" >&2;}
+else
+        DRM_CFLAGS=$pkg_cv_DRM_CFLAGS
+        DRM_LIBS=$pkg_cv_DRM_LIBS
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
 
-Alternatively, you may set the environment variables ATL_DEPS_CFLAGS
-and ATL_DEPS_LIBS to avoid the need to call pkg-config.
-See the pkg-config man page for more details.
 
-To get pkg-config, see <http://pkg-config.freedesktop.org/>.
-See \`config.log' for more details" "$LINENO" 5; }
+printf "%s\n" "#define HAVE_DRM 1" >>confdefs.h
+
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $DRM_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $DRM_LIBS"
+
+fi
+
+
+pkg_failed=no
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for gbm" >&5
+printf %s "checking for gbm... " >&6; }
+
+if test -n "$GBM_CFLAGS"; then
+    pkg_cv_GBM_CFLAGS="$GBM_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"gbm\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "gbm") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_GBM_CFLAGS=`$PKG_CONFIG --cflags "gbm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$GBM_LIBS"; then
+    pkg_cv_GBM_LIBS="$GBM_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"gbm\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "gbm") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_GBM_LIBS=`$PKG_CONFIG --libs "gbm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+                GBM_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "gbm" 2>&1`
+        else
+                GBM_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "gbm" 2>&1`
+        fi
+        # Put the nasty error message in config.log where it belongs
+        echo "$GBM_PKG_ERRORS" >&5
+
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: gbm not found - GPU acceleration may be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: gbm not found - GPU acceleration may be unavailable" >&2;}
+elif test $pkg_failed = untried; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: gbm not found - GPU acceleration may be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: gbm not found - GPU acceleration may be unavailable" >&2;}
+else
+        GBM_CFLAGS=$pkg_cv_GBM_CFLAGS
+        GBM_LIBS=$pkg_cv_GBM_LIBS
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+
+
+printf "%s\n" "#define HAVE_GBM 1" >>confdefs.h
+
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $GBM_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $GBM_LIBS"
+
+fi
+
+
+pkg_failed=no
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for egl" >&5
+printf %s "checking for egl... " >&6; }
+
+if test -n "$EGL_CFLAGS"; then
+    pkg_cv_EGL_CFLAGS="$EGL_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"egl\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "egl") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_EGL_CFLAGS=`$PKG_CONFIG --cflags "egl" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$EGL_LIBS"; then
+    pkg_cv_EGL_LIBS="$EGL_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"egl\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "egl") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_EGL_LIBS=`$PKG_CONFIG --libs "egl" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+                EGL_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "egl" 2>&1`
+        else
+                EGL_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "egl" 2>&1`
+        fi
+        # Put the nasty error message in config.log where it belongs
+        echo "$EGL_PKG_ERRORS" >&5
+
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: EGL not found - OpenGL ES support may be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: EGL not found - OpenGL ES support may be unavailable" >&2;}
+elif test $pkg_failed = untried; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: EGL not found - OpenGL ES support may be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: EGL not found - OpenGL ES support may be unavailable" >&2;}
+else
+        EGL_CFLAGS=$pkg_cv_EGL_CFLAGS
+        EGL_LIBS=$pkg_cv_EGL_LIBS
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+
+
+printf "%s\n" "#define HAVE_EGL 1" >>confdefs.h
+
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $EGL_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $EGL_LIBS"
+
+fi
+
+
+pkg_failed=no
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for glesv2" >&5
+printf %s "checking for glesv2... " >&6; }
+
+if test -n "$GLES2_CFLAGS"; then
+    pkg_cv_GLES2_CFLAGS="$GLES2_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"glesv2\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "glesv2") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_GLES2_CFLAGS=`$PKG_CONFIG --cflags "glesv2" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$GLES2_LIBS"; then
+    pkg_cv_GLES2_LIBS="$GLES2_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"glesv2\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "glesv2") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_GLES2_LIBS=`$PKG_CONFIG --libs "glesv2" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+                GLES2_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "glesv2" 2>&1`
+        else
+                GLES2_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "glesv2" 2>&1`
+        fi
+        # Put the nasty error message in config.log where it belongs
+        echo "$GLES2_PKG_ERRORS" >&5
+
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: OpenGL ES 2.0 not found - 3D acceleration will be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: OpenGL ES 2.0 not found - 3D acceleration will be unavailable" >&2;}
+elif test $pkg_failed = untried; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: OpenGL ES 2.0 not found - 3D acceleration will be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: OpenGL ES 2.0 not found - 3D acceleration will be unavailable" >&2;}
+else
+        GLES2_CFLAGS=$pkg_cv_GLES2_CFLAGS
+        GLES2_LIBS=$pkg_cv_GLES2_LIBS
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+
+
+printf "%s\n" "#define HAVE_GLES2 1" >>confdefs.h
+
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $GLES2_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $GLES2_LIBS"
+
+fi
+
+elif test $pkg_failed = untried; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: Some ATL dependencies not found. ATL support may be limited." >&5
+printf "%s\n" "$as_me: WARNING: Some ATL dependencies not found. ATL support may be limited." >&2;}
+
+
+pkg_failed=no
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for libdrm" >&5
+printf %s "checking for libdrm... " >&6; }
+
+if test -n "$DRM_CFLAGS"; then
+    pkg_cv_DRM_CFLAGS="$DRM_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libdrm\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libdrm") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_DRM_CFLAGS=`$PKG_CONFIG --cflags "libdrm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$DRM_LIBS"; then
+    pkg_cv_DRM_LIBS="$DRM_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libdrm\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libdrm") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_DRM_LIBS=`$PKG_CONFIG --libs "libdrm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+                DRM_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libdrm" 2>&1`
+        else
+                DRM_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libdrm" 2>&1`
+        fi
+        # Put the nasty error message in config.log where it belongs
+        echo "$DRM_PKG_ERRORS" >&5
+
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: libdrm not found - GPU acceleration may be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: libdrm not found - GPU acceleration may be unavailable" >&2;}
+elif test $pkg_failed = untried; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: libdrm not found - GPU acceleration may be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: libdrm not found - GPU acceleration may be unavailable" >&2;}
+else
+        DRM_CFLAGS=$pkg_cv_DRM_CFLAGS
+        DRM_LIBS=$pkg_cv_DRM_LIBS
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+
+
+printf "%s\n" "#define HAVE_DRM 1" >>confdefs.h
+
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $DRM_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $DRM_LIBS"
+
+fi
+
+
+pkg_failed=no
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for gbm" >&5
+printf %s "checking for gbm... " >&6; }
+
+if test -n "$GBM_CFLAGS"; then
+    pkg_cv_GBM_CFLAGS="$GBM_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"gbm\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "gbm") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_GBM_CFLAGS=`$PKG_CONFIG --cflags "gbm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$GBM_LIBS"; then
+    pkg_cv_GBM_LIBS="$GBM_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"gbm\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "gbm") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_GBM_LIBS=`$PKG_CONFIG --libs "gbm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+                GBM_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "gbm" 2>&1`
+        else
+                GBM_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "gbm" 2>&1`
+        fi
+        # Put the nasty error message in config.log where it belongs
+        echo "$GBM_PKG_ERRORS" >&5
+
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: gbm not found - GPU acceleration may be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: gbm not found - GPU acceleration may be unavailable" >&2;}
+elif test $pkg_failed = untried; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: gbm not found - GPU acceleration may be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: gbm not found - GPU acceleration may be unavailable" >&2;}
+else
+        GBM_CFLAGS=$pkg_cv_GBM_CFLAGS
+        GBM_LIBS=$pkg_cv_GBM_LIBS
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+
+
+printf "%s\n" "#define HAVE_GBM 1" >>confdefs.h
+
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $GBM_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $GBM_LIBS"
+
+fi
+
+
+pkg_failed=no
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for egl" >&5
+printf %s "checking for egl... " >&6; }
+
+if test -n "$EGL_CFLAGS"; then
+    pkg_cv_EGL_CFLAGS="$EGL_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"egl\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "egl") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_EGL_CFLAGS=`$PKG_CONFIG --cflags "egl" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$EGL_LIBS"; then
+    pkg_cv_EGL_LIBS="$EGL_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"egl\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "egl") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_EGL_LIBS=`$PKG_CONFIG --libs "egl" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+                EGL_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "egl" 2>&1`
+        else
+                EGL_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "egl" 2>&1`
+        fi
+        # Put the nasty error message in config.log where it belongs
+        echo "$EGL_PKG_ERRORS" >&5
+
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: EGL not found - OpenGL ES support may be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: EGL not found - OpenGL ES support may be unavailable" >&2;}
+elif test $pkg_failed = untried; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: EGL not found - OpenGL ES support may be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: EGL not found - OpenGL ES support may be unavailable" >&2;}
+else
+        EGL_CFLAGS=$pkg_cv_EGL_CFLAGS
+        EGL_LIBS=$pkg_cv_EGL_LIBS
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+
+
+printf "%s\n" "#define HAVE_EGL 1" >>confdefs.h
+
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $EGL_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $EGL_LIBS"
+
+fi
+
+
+pkg_failed=no
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for glesv2" >&5
+printf %s "checking for glesv2... " >&6; }
+
+if test -n "$GLES2_CFLAGS"; then
+    pkg_cv_GLES2_CFLAGS="$GLES2_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"glesv2\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "glesv2") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_GLES2_CFLAGS=`$PKG_CONFIG --cflags "glesv2" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$GLES2_LIBS"; then
+    pkg_cv_GLES2_LIBS="$GLES2_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"glesv2\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "glesv2") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_GLES2_LIBS=`$PKG_CONFIG --libs "glesv2" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+                GLES2_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "glesv2" 2>&1`
+        else
+                GLES2_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "glesv2" 2>&1`
+        fi
+        # Put the nasty error message in config.log where it belongs
+        echo "$GLES2_PKG_ERRORS" >&5
+
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: OpenGL ES 2.0 not found - 3D acceleration will be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: OpenGL ES 2.0 not found - 3D acceleration will be unavailable" >&2;}
+elif test $pkg_failed = untried; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: OpenGL ES 2.0 not found - 3D acceleration will be unavailable" >&5
+printf "%s\n" "$as_me: WARNING: OpenGL ES 2.0 not found - 3D acceleration will be unavailable" >&2;}
+else
+        GLES2_CFLAGS=$pkg_cv_GLES2_CFLAGS
+        GLES2_LIBS=$pkg_cv_GLES2_LIBS
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+
+
+printf "%s\n" "#define HAVE_GLES2 1" >>confdefs.h
+
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $GLES2_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $GLES2_LIBS"
+
+fi
+
 else
         ATL_DEPS_CFLAGS=$pkg_cv_ATL_DEPS_CFLAGS
         ATL_DEPS_LIBS=$pkg_cv_ATL_DEPS_LIBS
@@ -18260,6 +18909,110 @@ else
 printf "%s\n" "yes" >&6; }
 
 fi
+
+        # Extract the first word of "adb", so it can be a program name with args.
+set dummy adb; ac_word=$2
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+printf %s "checking for $ac_word... " >&6; }
+if test ${ac_cv_path_ADB+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  case $ADB in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_ADB="$ADB" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  case $as_dir in #(((
+    '') as_dir=./ ;;
+    */) ;;
+    *) as_dir=$as_dir/ ;;
+  esac
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir$ac_word$ac_exec_ext"; then
+    ac_cv_path_ADB="$as_dir$ac_word$ac_exec_ext"
+    printf "%s\n" "$as_me:${as_lineno-$LINENO}: found $as_dir$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_path_ADB" && ac_cv_path_ADB="no"
+  ;;
+esac
+fi
+ADB=$ac_cv_path_ADB
+if test -n "$ADB"; then
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ADB" >&5
+printf "%s\n" "$ADB" >&6; }
+else
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+fi
+
+
+    if test "x$ADB" != "xno"; then
+
+printf "%s\n" "#define HAVE_ADB 1" >>confdefs.h
+
+    fi
+
+    # Extract the first word of "aapt", so it can be a program name with args.
+set dummy aapt; ac_word=$2
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+printf %s "checking for $ac_word... " >&6; }
+if test ${ac_cv_path_AAPT+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  case $AAPT in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_AAPT="$AAPT" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  case $as_dir in #(((
+    '') as_dir=./ ;;
+    */) ;;
+    *) as_dir=$as_dir/ ;;
+  esac
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir$ac_word$ac_exec_ext"; then
+    ac_cv_path_AAPT="$as_dir$ac_word$ac_exec_ext"
+    printf "%s\n" "$as_me:${as_lineno-$LINENO}: found $as_dir$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_path_AAPT" && ac_cv_path_AAPT="no"
+  ;;
+esac
+fi
+AAPT=$ac_cv_path_AAPT
+if test -n "$AAPT"; then
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $AAPT" >&5
+printf "%s\n" "$AAPT" >&6; }
+else
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+fi
+
+
+    if test "x$AAPT" != "xno"; then
+
+printf "%s\n" "#define HAVE_AAPT 1" >>confdefs.h
+
+    fi
 fi
 
  if test "x$enable_atl" = "xyes"; then
