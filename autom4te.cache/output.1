@@ -18403,6 +18403,7 @@ else
 fi
 
 
+
 for ac_prog in flex
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
@@ -18451,11 +18452,12 @@ fi
 done
 test -n "$FLEX" || FLEX="none"
 
-if test "$FLEX" = "none"
-then
-  as_fn_error $? "no suitable flex found. Please install the 'flex' package." "$LINENO" 5
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether flex is recent enough" >&5
+if test "$FLEX" = "none"; then
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: no suitable flex found. Some build steps may be skipped; install the 'flex' package for full functionality." >&5
+printf "%s\n" "$as_me: WARNING: no suitable flex found. Some build steps may be skipped; install the 'flex' package for full functionality." >&2;}
+    goliath_cv_recent_flex=no
+else
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether flex is recent enough" >&5
 printf %s "checking whether flex is recent enough... " >&6; }
 if test ${goliath_cv_recent_flex+y}
 then :
@@ -18467,16 +18469,21 @@ else $as_nop
 }
 %%
 EOF
-    if $FLEX -t conftest.l >/dev/null 2>&5
-    then
-      goliath_cv_recent_flex=yes
-    else
-      goliath_cv_recent_flex=no
-    fi
+        if $FLEX -t conftest.l >/dev/null 2>&5
+        then
+            goliath_cv_recent_flex=yes
+        else
+            goliath_cv_recent_flex=no
+        fi
 fi
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $goliath_cv_recent_flex" >&5
 printf "%s\n" "$goliath_cv_recent_flex" >&6; }
-test $goliath_cv_recent_flex != no || as_fn_error $? "Your flex version is too old. Please install flex version 2.5.33 or newer." "$LINENO" 5
+fi
+if test "$goliath_cv_recent_flex" = "no"; then
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: flex not found or out of date; some generated sources may be unavailable." >&5
+printf "%s\n" "$as_me: WARNING: flex not found or out of date; some generated sources may be unavailable." >&2;}
+fi
+
 
 for ac_prog in bison
 do
@@ -18526,11 +18533,12 @@ fi
 done
 test -n "$BISON" || BISON="none"
 
-if test "$BISON" = "none"
-then
-  as_fn_error $? "no suitable bison found. Please install the 'bison' package." "$LINENO" 5
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether bison is recent enough" >&5
+if test "$BISON" = "none"; then
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: no suitable bison found. Some build steps may be skipped; install the 'bison' package for full functionality." >&5
+printf "%s\n" "$as_me: WARNING: no suitable bison found. Some build steps may be skipped; install the 'bison' package for full functionality." >&2;}
+    wine_cv_recent_bison=no
+else
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether bison is recent enough" >&5
 printf %s "checking whether bison is recent enough... " >&6; }
 if test ${wine_cv_recent_bison+y}
 then :
@@ -18541,16 +18549,20 @@ else $as_nop
 %%
 empty: ;
 EOF
-    if $BISON conftest.y >/dev/null 2>&5
-    then
-      wine_cv_recent_bison=yes
-    else
-      wine_cv_recent_bison=no
-    fi
+        if $BISON conftest.y >/dev/null 2>&5
+        then
+            wine_cv_recent_bison=yes
+        else
+            wine_cv_recent_bison=no
+        fi
 fi
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $wine_cv_recent_bison" >&5
 printf "%s\n" "$wine_cv_recent_bison" >&6; }
-test $wine_cv_recent_bison != no || as_fn_error $? "Your bison version is too old. Please install bison version 3.0 or newer." "$LINENO" 5
+fi
+if test "$wine_cv_recent_bison" = "no"; then
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: bison not found or out of date; some generated parsers may be unavailable." >&5
+printf "%s\n" "$as_me: WARNING: bison not found or out of date; some generated parsers may be unavailable." >&2;}
+fi
 
 if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.

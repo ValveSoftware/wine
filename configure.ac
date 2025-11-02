@@ -150,46 +150,54 @@ fi
 
 AM_CONDITIONAL([ENABLE_LIBRETRO], [test "x$enable_libretro" = "xyes"])
 
-dnl Check for flex
+
+dnl Check for flex (optional; warn if missing)
 AC_CHECK_PROGS(FLEX,flex,none)
-if test "$FLEX" = "none"
-then
-  AC_MSG_ERROR([no suitable flex found. Please install the 'flex' package.])
-fi
-AC_CACHE_CHECK([whether flex is recent enough],goliath_cv_recent_flex,
-    [cat >conftest.l <<EOF
+if test "$FLEX" = "none"; then
+    AC_MSG_WARN([no suitable flex found. Some build steps may be skipped; install the 'flex' package for full functionality.])
+    goliath_cv_recent_flex=no
+else
+    AC_CACHE_CHECK([whether flex is recent enough],goliath_cv_recent_flex,
+        [cat >conftest.l <<EOF
 %top{
 #include "prediluvian.h"
 }
 %%
 EOF
-    if $FLEX -t conftest.l >/dev/null 2>&AS_MESSAGE_LOG_FD
-    then
-      goliath_cv_recent_flex=yes
-    else
-      goliath_cv_recent_flex=no
-    fi])
-test $goliath_cv_recent_flex != no || AC_MSG_ERROR([Your flex version is too old. Please install flex version 2.5.33 or newer.])
-
-dnl Check for bison
-AC_CHECK_PROGS(BISON,bison,none)
-if test "$BISON" = "none"
-then
-  AC_MSG_ERROR([no suitable bison found. Please install the 'bison' package.])
+        if $FLEX -t conftest.l >/dev/null 2>&AS_MESSAGE_LOG_FD
+        then
+            goliath_cv_recent_flex=yes
+        else
+            goliath_cv_recent_flex=no
+        fi])
 fi
-AC_CACHE_CHECK([whether bison is recent enough],wine_cv_recent_bison,
-    [cat >conftest.y <<EOF
+if test "$goliath_cv_recent_flex" = "no"; then
+    AC_MSG_WARN([flex not found or out of date; some generated sources may be unavailable.])
+fi
+
+
+dnl Check for bison (optional; warn if missing)
+AC_CHECK_PROGS(BISON,bison,none)
+if test "$BISON" = "none"; then
+    AC_MSG_WARN([no suitable bison found. Some build steps may be skipped; install the 'bison' package for full functionality.])
+    wine_cv_recent_bison=no
+else
+    AC_CACHE_CHECK([whether bison is recent enough],wine_cv_recent_bison,
+        [cat >conftest.y <<EOF
 %define parse.error verbose
 %%
 empty: ;
 EOF
-    if $BISON conftest.y >/dev/null 2>&AS_MESSAGE_LOG_FD
-    then
-      wine_cv_recent_bison=yes
-    else
-      wine_cv_recent_bison=no
-    fi])
-test $wine_cv_recent_bison != no || AC_MSG_ERROR([Your bison version is too old. Please install bison version 3.0 or newer.])
+        if $BISON conftest.y >/dev/null 2>&AS_MESSAGE_LOG_FD
+        then
+            wine_cv_recent_bison=yes
+        else
+            wine_cv_recent_bison=no
+        fi])
+fi
+if test "$wine_cv_recent_bison" = "no"; then
+    AC_MSG_WARN([bison not found or out of date; some generated parsers may be unavailable.])
+fi
 
 AC_CHECK_TOOL(STRIP,strip,strip)
 AC_PROG_LN_S

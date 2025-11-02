@@ -1,0 +1,42 @@
+SOURCES = \
+        main.c \
+        preloader.c \
+        preloader_mac.c \
+        main_unified.c \
+        wine.de.UTF-8.man.in \
+        wine.desktop \
+        wine.fr.UTF-8.man.in \
+        wine.inf.in \
+        wine.man.in \
+        wine.pl.UTF-8.man.in \
+        wine_info.plist.in
+
+# Goliath unified loader
+goliath_OBJS = main_unified.o
+goliath_DEPS = $(WINELOADER_DEPENDS)
+goliath_LDFLAGS = $(WINELOADER_LDFLAGS) $(LDEXECFLAGS) $(PTHREAD_LIBS)
+
+# Add goliath to the programs list
+PROGRAMS = $(WINELOADER_PROGRAMS) goliath
+INSTALL_LIB = $(WINELOADER_PROGRAMS)
+UNIX_CFLAGS = -fPIE
+
+preloader_EXTRADEFS = -fno-builtin
+
+main_EXTRADEFS = -DBINDIR=\"${bindir}\" -DLIBDIR=\"${libdir}\"
+
+wine_OBJS = main.o
+wine_DEPS = $(WINELOADER_DEPENDS)
+wine_LDFLAGS = $(WINELOADER_LDFLAGS) $(LDEXECFLAGS) $(PTHREAD_LIBS)
+
+wine64_OBJS = main.o
+wine64_DEPS = $(WINELOADER_DEPENDS)
+wine64_LDFLAGS = $(WINELOADER_LDFLAGS) $(LDEXECFLAGS) $(PTHREAD_LIBS)
+
+wine_preloader_OBJS = preloader.o preloader_mac.o
+wine_preloader_DEPS = $(WINELOADER_DEPENDS)
+wine_preloader_LDFLAGS = $(WINEPRELOADER_LDFLAGS)
+
+wine64_preloader_OBJS = preloader.o preloader_mac.o
+wine64_preloader_DEPS = $(WINELOADER_DEPENDS)
+wine64_preloader_LDFLAGS = $(WINEPRELOADER_LDFLAGS)
