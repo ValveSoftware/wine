@@ -22,6 +22,17 @@ AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 LT_INIT
 
+dnl Check for macOS build
+case $host in
+    *-*-darwin*)
+        build_macos=yes
+        ;;
+    *)
+        build_macos=no
+        ;;
+esac
+AM_CONDITIONAL([HAVE_MACOS], [test "x$build_macos" = "xyes"])
+
 # Ensure pkg-config is available early
 PKG_PROG_PKG_CONFIG
 
