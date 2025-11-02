@@ -6,7 +6,7 @@ m4_define([GOLIATH_VERSION], regexp(m4_include([VERSION]), [version \([-.0-9A-Za
 m4_ifndef([AS_VAR_APPEND], [m4_define([AS_VAR_APPEND], [])])
 m4_ifndef([AS_VAR_IF], [m4_define([AS_VAR_IF], [])])
 
-AC_PREREQ([2.63b])
+AC_PREREQ([2.69])
 AC_INIT([Goliath],[GOLIATH_VERSION],[goliath-devel@example.org],[goliath],[https://github.com/goliath-project/goliath])
 AC_CONFIG_SRCDIR([server/atom.c])
 AC_CONFIG_HEADERS([include/config.h])
@@ -21,6 +21,9 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 LT_INIT
+
+# Ensure pkg-config is available early
+PKG_PROG_PKG_CONFIG
 
 # Check for required development packages
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.32.0])
@@ -38,7 +41,6 @@ libatl_version="1.0"
 libwsl_version="1.0"
 
 AM_INIT_AUTOMAKE([foreign subdir-objects])
-LT_INIT
 
 dnl *** Wine Compatibility Layer ***
 AC_ARG_ENABLE([wine],
@@ -191,7 +193,7 @@ test $wine_cv_recent_bison != no || AC_MSG_ERROR([Your bison version is too old.
 
 AC_CHECK_TOOL(STRIP,strip,strip)
 AC_PROG_LN_S
-WINE_PATH_PKG_CONFIG
+PKG_PROG_PKG_CONFIG
 
 dnl Output all makefiles
 AC_CONFIG_FILES([

@@ -88,7 +88,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-subdir = libs/atl_android
+subdir = dlls/darling_coreaudio
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
@@ -102,11 +102,10 @@ CONFIG_HEADER = $(top_builddir)/include/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
-libatl_android_la_LIBADD =
-am_libatl_android_la_OBJECTS = asset_manager.lo bitmap.lo \
-	configuration.lo input.lo looper.lo media.lo native_window.lo \
-	sensor.lo trace.lo wayland_server.lo atl_android.lo
-libatl_android_la_OBJECTS = $(am_libatl_android_la_OBJECTS)
+libdarling_coreaudio_la_LIBADD =
+am_libdarling_coreaudio_la_OBJECTS = coreaudio.lo
+libdarling_coreaudio_la_OBJECTS =  \
+	$(am_libdarling_coreaudio_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -126,12 +125,7 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)/include
 depcomp = $(SHELL) $(top_srcdir)/tools/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/asset_manager.Plo \
-	./$(DEPDIR)/atl_android.Plo ./$(DEPDIR)/bitmap.Plo \
-	./$(DEPDIR)/configuration.Plo ./$(DEPDIR)/input.Plo \
-	./$(DEPDIR)/looper.Plo ./$(DEPDIR)/media.Plo \
-	./$(DEPDIR)/native_window.Plo ./$(DEPDIR)/sensor.Plo \
-	./$(DEPDIR)/trace.Plo ./$(DEPDIR)/wayland_server.Plo
+am__depfiles_remade = ./$(DEPDIR)/coreaudio.Plo
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -151,8 +145,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libatl_android_la_SOURCES)
-DIST_SOURCES = $(libatl_android_la_SOURCES)
+SOURCES = $(libdarling_coreaudio_la_SOURCES)
+DIST_SOURCES = $(libdarling_coreaudio_la_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -175,8 +169,7 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/tools/depcomp \
-	README.md
+am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/tools/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
@@ -321,25 +314,11 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
+noinst_LTLIBRARIES = libdarling_coreaudio.la
+libdarling_coreaudio_la_SOURCES = \
+	coreaudio.c
 
-# atl_android Makefile.am
-noinst_LTLIBRARIES = libatl_android.la
-libatl_android_la_SOURCES = \
-	asset_manager.c \
-	bitmap.c \
-	configuration.c \
-	input.c \
-	looper.c \
-	media.c \
-	native_window.c \
-	sensor.c \
-	trace.c \
-	wayland_server.c \
-	atl_android.c
-
-
-# Add any required CFLAGS or dependencies here
-AM_CFLAGS = -I$(top_srcdir)/include
+AM_CPPFLAGS = -I$(top_srcdir)/include
 all: all-am
 
 .SUFFIXES:
@@ -353,9 +332,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign libs/atl_android/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign dlls/darling_coreaudio/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign libs/atl_android/Makefile
+	  $(AUTOMAKE) --foreign dlls/darling_coreaudio/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -385,8 +364,8 @@ clean-noinstLTLIBRARIES:
 	  rm -f $${locs}; \
 	}
 
-libatl_android.la: $(libatl_android_la_OBJECTS) $(libatl_android_la_DEPENDENCIES) $(EXTRA_libatl_android_la_DEPENDENCIES) 
-	$(AM_V_CCLD)$(LINK)  $(libatl_android_la_OBJECTS) $(libatl_android_la_LIBADD) $(LIBS)
+libdarling_coreaudio.la: $(libdarling_coreaudio_la_OBJECTS) $(libdarling_coreaudio_la_DEPENDENCIES) $(EXTRA_libdarling_coreaudio_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(LINK)  $(libdarling_coreaudio_la_OBJECTS) $(libdarling_coreaudio_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -394,17 +373,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/asset_manager.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/atl_android.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bitmap.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/configuration.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/input.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/looper.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/media.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/native_window.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sensor.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/trace.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wayland_server.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/coreaudio.Plo@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -566,17 +535,7 @@ clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
 	mostlyclean-am
 
 distclean: distclean-am
-		-rm -f ./$(DEPDIR)/asset_manager.Plo
-	-rm -f ./$(DEPDIR)/atl_android.Plo
-	-rm -f ./$(DEPDIR)/bitmap.Plo
-	-rm -f ./$(DEPDIR)/configuration.Plo
-	-rm -f ./$(DEPDIR)/input.Plo
-	-rm -f ./$(DEPDIR)/looper.Plo
-	-rm -f ./$(DEPDIR)/media.Plo
-	-rm -f ./$(DEPDIR)/native_window.Plo
-	-rm -f ./$(DEPDIR)/sensor.Plo
-	-rm -f ./$(DEPDIR)/trace.Plo
-	-rm -f ./$(DEPDIR)/wayland_server.Plo
+		-rm -f ./$(DEPDIR)/coreaudio.Plo
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -622,17 +581,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-		-rm -f ./$(DEPDIR)/asset_manager.Plo
-	-rm -f ./$(DEPDIR)/atl_android.Plo
-	-rm -f ./$(DEPDIR)/bitmap.Plo
-	-rm -f ./$(DEPDIR)/configuration.Plo
-	-rm -f ./$(DEPDIR)/input.Plo
-	-rm -f ./$(DEPDIR)/looper.Plo
-	-rm -f ./$(DEPDIR)/media.Plo
-	-rm -f ./$(DEPDIR)/native_window.Plo
-	-rm -f ./$(DEPDIR)/sensor.Plo
-	-rm -f ./$(DEPDIR)/trace.Plo
-	-rm -f ./$(DEPDIR)/wayland_server.Plo
+		-rm -f ./$(DEPDIR)/coreaudio.Plo
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

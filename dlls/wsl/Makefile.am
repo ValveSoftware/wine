@@ -1,4 +1,3 @@
-noinst_LTLIBRARIES = libwsl.la
 libwsl_la_SOURCES = wsl.c
 libwsl_la_CPPFLAGS = -I$(top_srcdir)/include
 libwsl_la_LDFLAGS = -shared -fPIC

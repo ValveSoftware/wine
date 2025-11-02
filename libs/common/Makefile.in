@@ -14,6 +14,7 @@
 
 @SET_MAKE@
 
+
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -88,7 +89,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-subdir = libs/atl_android
+subdir = libs/common
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
@@ -96,17 +97,17 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/VERSION $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
-DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
+DIST_COMMON = $(srcdir)/Makefile.am $(noinst_HEADERS) \
+	$(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/include/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
-libatl_android_la_LIBADD =
-am_libatl_android_la_OBJECTS = asset_manager.lo bitmap.lo \
-	configuration.lo input.lo looper.lo media.lo native_window.lo \
-	sensor.lo trace.lo wayland_server.lo atl_android.lo
-libatl_android_la_OBJECTS = $(am_libatl_android_la_OBJECTS)
+libgoliath_common_la_LIBADD =
+am_libgoliath_common_la_OBJECTS = debug.lo error.lo memory.lo path.lo \
+	string.lo util.lo
+libgoliath_common_la_OBJECTS = $(am_libgoliath_common_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -126,12 +127,9 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)/include
 depcomp = $(SHELL) $(top_srcdir)/tools/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/asset_manager.Plo \
-	./$(DEPDIR)/atl_android.Plo ./$(DEPDIR)/bitmap.Plo \
-	./$(DEPDIR)/configuration.Plo ./$(DEPDIR)/input.Plo \
-	./$(DEPDIR)/looper.Plo ./$(DEPDIR)/media.Plo \
-	./$(DEPDIR)/native_window.Plo ./$(DEPDIR)/sensor.Plo \
-	./$(DEPDIR)/trace.Plo ./$(DEPDIR)/wayland_server.Plo
+am__depfiles_remade = ./$(DEPDIR)/debug.Plo ./$(DEPDIR)/error.Plo \
+	./$(DEPDIR)/memory.Plo ./$(DEPDIR)/path.Plo \
+	./$(DEPDIR)/string.Plo ./$(DEPDIR)/util.Plo
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -151,13 +149,14 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libatl_android_la_SOURCES)
-DIST_SOURCES = $(libatl_android_la_SOURCES)
+SOURCES = $(libgoliath_common_la_SOURCES)
+DIST_SOURCES = $(libgoliath_common_la_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
+HEADERS = $(noinst_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 # Read a list of newline-separated strings from the standard input,
 # and print each of them once, without duplicates.  Input order is
@@ -175,8 +174,7 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/tools/depcomp \
-	README.md
+am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/tools/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
@@ -321,25 +319,25 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
+noinst_LTLIBRARIES = libgoliath_common.la
+libgoliath_common_la_SOURCES = \
+        debug.c \
+        error.c \
+        memory.c \
+        path.c \
+        string.c \
+        util.c
 
-# atl_android Makefile.am
-noinst_LTLIBRARIES = libatl_android.la
-libatl_android_la_SOURCES = \
-	asset_manager.c \
-	bitmap.c \
-	configuration.c \
-	input.c \
-	looper.c \
-	media.c \
-	native_window.c \
-	sensor.c \
-	trace.c \
-	wayland_server.c \
-	atl_android.c
+noinst_HEADERS = \
+        debug.h \
+        error.h \
+        memory.h \
+        path.h \
+        string.h \
+        util.h
 
-
-# Add any required CFLAGS or dependencies here
 AM_CFLAGS = -I$(top_srcdir)/include
+AM_CPPFLAGS = -I$(top_srcdir)/include
 all: all-am
 
 .SUFFIXES:
@@ -353,9 +351,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign libs/atl_android/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign libs/common/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign libs/atl_android/Makefile
+	  $(AUTOMAKE) --foreign libs/common/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -385,8 +383,8 @@ clean-noinstLTLIBRARIES:
 	  rm -f $${locs}; \
 	}
 
-libatl_android.la: $(libatl_android_la_OBJECTS) $(libatl_android_la_DEPENDENCIES) $(EXTRA_libatl_android_la_DEPENDENCIES) 
-	$(AM_V_CCLD)$(LINK)  $(libatl_android_la_OBJECTS) $(libatl_android_la_LIBADD) $(LIBS)
+libgoliath_common.la: $(libgoliath_common_la_OBJECTS) $(libgoliath_common_la_DEPENDENCIES) $(EXTRA_libgoliath_common_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(LINK)  $(libgoliath_common_la_OBJECTS) $(libgoliath_common_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -394,17 +392,12 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/asset_manager.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/atl_android.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bitmap.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/configuration.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/input.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/looper.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/media.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/native_window.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sensor.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/trace.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wayland_server.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/debug.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/error.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memory.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/path.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/string.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/util.Plo@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -528,7 +521,7 @@ distdir-am: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(LTLIBRARIES)
+all-am: Makefile $(LTLIBRARIES) $(HEADERS)
 installdirs:
 install: install-am
 install-exec: install-exec-am
@@ -566,17 +559,12 @@ clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
 	mostlyclean-am
 
 distclean: distclean-am
-		-rm -f ./$(DEPDIR)/asset_manager.Plo
-	-rm -f ./$(DEPDIR)/atl_android.Plo
-	-rm -f ./$(DEPDIR)/bitmap.Plo
-	-rm -f ./$(DEPDIR)/configuration.Plo
-	-rm -f ./$(DEPDIR)/input.Plo
-	-rm -f ./$(DEPDIR)/looper.Plo
-	-rm -f ./$(DEPDIR)/media.Plo
-	-rm -f ./$(DEPDIR)/native_window.Plo
-	-rm -f ./$(DEPDIR)/sensor.Plo
-	-rm -f ./$(DEPDIR)/trace.Plo
-	-rm -f ./$(DEPDIR)/wayland_server.Plo
+		-rm -f ./$(DEPDIR)/debug.Plo
+	-rm -f ./$(DEPDIR)/error.Plo
+	-rm -f ./$(DEPDIR)/memory.Plo
+	-rm -f ./$(DEPDIR)/path.Plo
+	-rm -f ./$(DEPDIR)/string.Plo
+	-rm -f ./$(DEPDIR)/util.Plo
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -622,17 +610,12 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-		-rm -f ./$(DEPDIR)/asset_manager.Plo
-	-rm -f ./$(DEPDIR)/atl_android.Plo
-	-rm -f ./$(DEPDIR)/bitmap.Plo
-	-rm -f ./$(DEPDIR)/configuration.Plo
-	-rm -f ./$(DEPDIR)/input.Plo
-	-rm -f ./$(DEPDIR)/looper.Plo
-	-rm -f ./$(DEPDIR)/media.Plo
-	-rm -f ./$(DEPDIR)/native_window.Plo
-	-rm -f ./$(DEPDIR)/sensor.Plo
-	-rm -f ./$(DEPDIR)/trace.Plo
-	-rm -f ./$(DEPDIR)/wayland_server.Plo
+		-rm -f ./$(DEPDIR)/debug.Plo
+	-rm -f ./$(DEPDIR)/error.Plo
+	-rm -f ./$(DEPDIR)/memory.Plo
+	-rm -f ./$(DEPDIR)/path.Plo
+	-rm -f ./$(DEPDIR)/string.Plo
+	-rm -f ./$(DEPDIR)/util.Plo
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
