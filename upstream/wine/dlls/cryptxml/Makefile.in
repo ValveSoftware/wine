@@ -1,0 +1,5 @@
+MODULE    = cryptxml.dll
+IMPORTLIB = cryptxml
+
+SOURCES = \
+	cryptxml.c

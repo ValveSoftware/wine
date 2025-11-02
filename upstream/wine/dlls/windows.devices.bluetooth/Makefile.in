@@ -1,0 +1,9 @@
+MODULE  = windows.devices.bluetooth.dll
+IMPORTS = combase
+
+SOURCES = \
+	advertisement.c \
+	bluetoothadapter.c \
+	bluetoothdevice.c \
+	classes.idl \
+	main.c

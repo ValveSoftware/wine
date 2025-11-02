@@ -1,0 +1,12 @@
+MODULE    = winevulkan.dll
+UNIXLIB   = winevulkan.so
+IMPORTLIB = winevulkan
+IMPORTS   = advapi32
+UNIX_LIBS = -lwin32u $(PTHREAD_LIBS)
+
+SOURCES = \
+	loader.c \
+	loader_thunks.c \
+	vulkan.c \
+	vulkan_thunks.c \
+	winevulkan.rc

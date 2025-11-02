@@ -1,0 +1,5 @@
+MODULE    = xinput9_1_0.dll
+
+SOURCES = \
+	main.c \
+	version.rc

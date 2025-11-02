@@ -1,0 +1,10 @@
+TESTDLL = windows.applicationmodel.dll
+IMPORTS = combase advapi32 shlwapi
+
+application_EXTRADLLFLAGS = -mconsole
+
+SOURCES = \
+	application.c \
+	application.spec \
+	model.c \
+	resource.rc

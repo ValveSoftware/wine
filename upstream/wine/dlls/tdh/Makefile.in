@@ -1,0 +1,8 @@
+MODULE    = tdh.dll
+IMPORTLIB = tdh
+
+EXTRADLLFLAGS = -Wb,--prefer-native
+
+SOURCES = \
+	tdh_main.c \
+	version.rc
