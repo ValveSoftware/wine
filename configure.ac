@@ -261,7 +261,6 @@ AC_CONFIG_FILES([
     libs/common/Makefile
     libs/compatibility/Makefile
     loader/Makefile
-    server/Makefile
     tools/Makefile
     documentation/Makefile
 ])

@@ -134,8 +134,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/include/config.h
-CONFIG_CLEAN_FILES = include/Makefile server/Makefile tools/Makefile \
-	libretro/Makefile
+CONFIG_CLEAN_FILES = include/Makefile tools/Makefile libretro/Makefile
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -199,7 +198,6 @@ am__DIST_COMMON = $(srcdir)/Makefile.in \
 	$(top_srcdir)/include/Makefile.in \
 	$(top_srcdir)/include/config.h.in \
 	$(top_srcdir)/libretro/Makefile.in \
-	$(top_srcdir)/server/Makefile.in \
 	$(top_srcdir)/tools/Makefile.in $(top_srcdir)/tools/compile \
 	$(top_srcdir)/tools/config.guess \
 	$(top_srcdir)/tools/config.sub $(top_srcdir)/tools/install-sh \
@@ -469,8 +467,6 @@ $(top_srcdir)/include/config.h.in:  $(am__configure_deps)
 distclean-hdr:
 	-rm -f include/config.h include/stamp-h1
 include/Makefile: $(top_builddir)/config.status $(top_srcdir)/include/Makefile.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
-server/Makefile: $(top_builddir)/config.status $(top_srcdir)/server/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 tools/Makefile: $(top_builddir)/config.status $(top_srcdir)/tools/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
