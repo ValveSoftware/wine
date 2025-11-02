@@ -258,23 +258,20 @@ fi
 
 AC_OUTPUT
 
-AS_ECHO([
-Configuration summary for $PACKAGE_NAME $PACKAGE_VERSION:
-
-    prefix:            ${prefix}
-    sysconfdir:       ${sysconfdir}
-    libdir:           ${libdir}
-    includedir:       ${includedir}
-
-Components to build:
-    Wine:             ${enable_wine}
-    Darling:          ${enable_darling}
-    ATL:              ${enable_atl}
-    WSL:              ${enable_wsl}
-    LibRetro:         ${enable_libretro}
-
-Now type 'make' to compile $PACKAGE_NAME
-])
+AC_MSG_NOTICE([Configuration summary for $PACKAGE_NAME $PACKAGE_VERSION:])
+AC_MSG_NOTICE([  prefix:      ${prefix}])
+AC_MSG_NOTICE([  sysconfdir:  ${sysconfdir}])
+AC_MSG_NOTICE([  libdir:      ${libdir}])
+AC_MSG_NOTICE([  includedir:  ${includedir}])
+AC_MSG_NOTICE([])
+AC_MSG_NOTICE([Components to build:])
+AC_MSG_NOTICE([  Wine:     ${enable_wine}])
+AC_MSG_NOTICE([  Darling:  ${enable_darling}])
+AC_MSG_NOTICE([  ATL:      ${enable_atl}])
+AC_MSG_NOTICE([  WSL:      ${enable_wsl}])
+AC_MSG_NOTICE([  LibRetro: ${enable_libretro}])
+AC_MSG_NOTICE([])
+AC_MSG_NOTICE([Run 'make' to compile ${PACKAGE_NAME}])
 
 dnl Local Variables:
 dnl comment-start: "dnl "
