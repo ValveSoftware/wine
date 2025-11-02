@@ -90,11 +90,25 @@ POST_UNINSTALL = :
 build_triplet = x86_64-pc-linux-gnu
 host_triplet = x86_64-pc-linux-gnu
 #am__append_1 = $(WINE_DEPS_CFLAGS)
-#am__append_2 = $(WINE_DEPS_CFLAGS)
+# Access Wine public headers if needed
+#am__append_2 = $(WINE_DEPS_CFLAGS) \
+#	-I$(top_srcdir)/upstream/wine/include
 #am__append_3 = $(DARLING_DEPS_CFLAGS)
-#am__append_4 = $(DARLING_DEPS_CFLAGS)
+# Darling headers
+#am__append_4 = $(DARLING_DEPS_CFLAGS) \
+#	-I$(top_srcdir)/libs/darling/include \
+#	-I$(top_srcdir)/libs/darling_framework/include
 #am__append_5 = $(ATL_DEPS_CFLAGS)
-#am__append_6 = $(ATL_DEPS_CFLAGS)
+# ATL headers
+#am__append_6 = $(ATL_DEPS_CFLAGS) \
+#	-I$(top_srcdir)/libs/atl_runtime/include \
+#	-I$(top_srcdir)/libs/atl_android/include
+
+# WSL integration headers
+#am__append_7 = -I$(top_srcdir)/libs/wsl_core/include -I$(top_srcdir)/libs/wsl_bridge/include
+
+# Libretro common headers
+am__append_8 = -I$(top_srcdir)/libretro -I$(top_srcdir)/libs/libretro_core/include
 subdir = libs/compatibility
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -183,7 +197,9 @@ am__define_uniq_tagged_files = \
   done | $(am__uniquify_input)`
 am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/tools/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
+AAPT = 
 ACLOCAL = ${SHELL} '/workspaces/Goliath/tools/missing' aclocal-1.16
+ADB = 
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 1
 AR = ar
@@ -210,17 +226,25 @@ DARLING_DEPS_LIBS =
 DEFS = -DHAVE_CONFIG_H
 DEPDIR = .deps
 DLLTOOL = false
+DRM_CFLAGS = 
+DRM_LIBS = 
 DSYMUTIL = 
 DUMPBIN = 
 ECHO_C = 
 ECHO_N = -n
 ECHO_T = 
+EGL_CFLAGS = 
+EGL_LIBS = 
 EGREP = /usr/bin/grep -E
 ETAGS = etags
 EXEEXT = 
 FGREP = /usr/bin/grep -F
 FILECMD = file
 FLEX = none
+GBM_CFLAGS = 
+GBM_LIBS = 
+GLES2_CFLAGS = 
+GLES2_LIBS = 
 GLIB_CFLAGS = -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include 
 GLIB_LIBS = -lglib-2.0 
 GREP = /usr/bin/grep
@@ -232,7 +256,7 @@ INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
 LD = /usr/bin/ld -m elf_x86_64
 LDFLAGS = 
 LIBOBJS = 
-LIBS = 
+LIBS = -ldl 
 LIBTOOL = $(SHELL) $(top_builddir)/libtool
 LIPO = 
 LN_S = ln -s
@@ -321,6 +345,7 @@ runstatedir = ${localstatedir}/run
 sbindir = ${exec_prefix}/sbin
 sharedstatedir = ${prefix}/com
 srcdir = .
+subdirs = 
 sysconfdir = ${prefix}/etc
 target_alias = 
 top_build_prefix = ../../
@@ -342,7 +367,7 @@ noinst_HEADERS = \
 AM_CFLAGS = -I$(top_srcdir)/include $(am__append_1) $(am__append_3) \
 	$(am__append_5)
 AM_CPPFLAGS = -I$(top_srcdir)/include $(am__append_2) $(am__append_4) \
-	$(am__append_6)
+	$(am__append_6) $(am__append_7) $(am__append_8)
 all: all-am
 
 .SUFFIXES:

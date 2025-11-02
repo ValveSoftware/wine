@@ -90,10 +90,7 @@ host_triplet = x86_64-pc-linux-gnu
 
 # Wine components (if enabled)
 #am__append_1 = \
-#        dlls/win32 \
-#        dlls/wow64 \
-#        dlls/ntdll \
-#        programs/wine
+#        upstream/wine
 
 
 # Darling components (if enabled)
@@ -119,9 +116,9 @@ host_triplet = x86_64-pc-linux-gnu
 
 
 # LibRetro components (if enabled)
-#am__append_5 = \
-#        libretro \
-#        libs/libretro_core
+am__append_5 = \
+        libretro \
+        libs/libretro_core
 
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -137,8 +134,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/include/config.h
-CONFIG_CLEAN_FILES = include/Makefile loader/Makefile server/Makefile \
-	tools/Makefile dlls/wow64/Makefile dlls/ntdll/Makefile \
+CONFIG_CLEAN_FILES = include/Makefile server/Makefile tools/Makefile \
 	libretro/Makefile
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_$(V))
@@ -193,19 +189,16 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-DIST_SUBDIRS = tools loader server include documentation libs/common \
-	libs/compatibility dlls/win32 dlls/wow64 dlls/ntdll \
-	programs/wine dlls/darling_coreaudio dlls/darling_sandbox \
-	libs/darling libs/darling_framework libs/atl_android \
-	libs/atl_runtime dlls/atl_bridge dlls/wsl libs/wsl_core \
-	libs/wsl_bridge libretro libs/libretro_core
+DIST_SUBDIRS = tools loader include documentation libs/goliath_core \
+	libs/common libs/compatibility upstream/wine \
+	dlls/darling_coreaudio dlls/darling_sandbox libs/darling \
+	libs/darling_framework libs/atl_android libs/atl_runtime \
+	dlls/atl_bridge dlls/wsl libs/wsl_core libs/wsl_bridge \
+	libretro libs/libretro_core
 am__DIST_COMMON = $(srcdir)/Makefile.in \
-	$(top_srcdir)/dlls/ntdll/Makefile.in \
-	$(top_srcdir)/dlls/wow64/Makefile.in \
 	$(top_srcdir)/include/Makefile.in \
 	$(top_srcdir)/include/config.h.in \
 	$(top_srcdir)/libretro/Makefile.in \
-	$(top_srcdir)/loader/Makefile.in \
 	$(top_srcdir)/server/Makefile.in \
 	$(top_srcdir)/tools/Makefile.in $(top_srcdir)/tools/compile \
 	$(top_srcdir)/tools/config.guess \
@@ -258,7 +251,9 @@ distuninstallcheck_listfiles = find . -type f -print
 am__distuninstallcheck_listfiles = $(distuninstallcheck_listfiles) \
   | sed 's|^\./|$(prefix)/|' | grep -v '$(infodir)/dir$$'
 distcleancheck_listfiles = find . -type f -print
+AAPT = 
 ACLOCAL = ${SHELL} '/workspaces/Goliath/tools/missing' aclocal-1.16
+ADB = 
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 1
 AR = ar
@@ -285,17 +280,25 @@ DARLING_DEPS_LIBS =
 DEFS = -DHAVE_CONFIG_H
 DEPDIR = .deps
 DLLTOOL = false
+DRM_CFLAGS = 
+DRM_LIBS = 
 DSYMUTIL = 
 DUMPBIN = 
 ECHO_C = 
 ECHO_N = -n
 ECHO_T = 
+EGL_CFLAGS = 
+EGL_LIBS = 
 EGREP = /usr/bin/grep -E
 ETAGS = etags
 EXEEXT = 
 FGREP = /usr/bin/grep -F
 FILECMD = file
 FLEX = none
+GBM_CFLAGS = 
+GBM_LIBS = 
+GLES2_CFLAGS = 
+GLES2_LIBS = 
 GLIB_CFLAGS = -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include 
 GLIB_LIBS = -lglib-2.0 
 GREP = /usr/bin/grep
@@ -307,7 +310,7 @@ INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
 LD = /usr/bin/ld -m elf_x86_64
 LDFLAGS = 
 LIBOBJS = 
-LIBS = 
+LIBS = -ldl 
 LIBTOOL = $(SHELL) $(top_builddir)/libtool
 LIPO = 
 LN_S = ln -s
@@ -396,15 +399,17 @@ runstatedir = ${localstatedir}/run
 sbindir = ${exec_prefix}/sbin
 sharedstatedir = ${prefix}/com
 srcdir = .
+subdirs = 
 sysconfdir = ${prefix}/etc
 target_alias = 
 top_build_prefix = 
 top_builddir = .
 top_srcdir = .
+ACLOCAL_AMFLAGS = -I m4
 
 # Base libraries
-SUBDIRS = tools loader server include documentation libs/common \
-	libs/compatibility $(am__append_1) $(am__append_2) \
+SUBDIRS = tools loader include documentation libs/goliath_core \
+	libs/common libs/compatibility $(am__append_1) $(am__append_2) \
 	$(am__append_3) $(am__append_4) $(am__append_5)
 EXTRA_DIST = \
         goliath-launch.sh \
@@ -465,15 +470,9 @@ distclean-hdr:
 	-rm -f include/config.h include/stamp-h1
 include/Makefile: $(top_builddir)/config.status $(top_srcdir)/include/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-loader/Makefile: $(top_builddir)/config.status $(top_srcdir)/loader/Makefile.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
 server/Makefile: $(top_builddir)/config.status $(top_srcdir)/server/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 tools/Makefile: $(top_builddir)/config.status $(top_srcdir)/tools/Makefile.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
-dlls/wow64/Makefile: $(top_builddir)/config.status $(top_srcdir)/dlls/wow64/Makefile.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
-dlls/ntdll/Makefile: $(top_builddir)/config.status $(top_srcdir)/dlls/ntdll/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 libretro/Makefile: $(top_builddir)/config.status $(top_srcdir)/libretro/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@

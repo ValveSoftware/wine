@@ -2,7 +2,13 @@
 /* include/config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* Default LibRetro cores directory */
-/* #undef DEFAULT_LIBRETRO_CORES_DIR */
+#define DEFAULT_LIBRETRO_CORES_DIR "/usr/lib/libretro"
+
+/* Define if Android Asset Packaging Tool is available */
+/* #undef HAVE_AAPT */
+
+/* Define if Android Debug Bridge is available */
+/* #undef HAVE_ADB */
 
 /* Define if ATL support is enabled */
 /* #undef HAVE_ATL */
@@ -13,20 +19,32 @@
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
 
+/* Define if DRM is available */
+/* #undef HAVE_DRM */
+
+/* Define if EGL is available */
+/* #undef HAVE_EGL */
+
 /* Define to 1 if you have the <errno.h> header file. */
 #define HAVE_ERRNO_H 1
 
 /* Define to 1 if you have the <fcntl.h> header file. */
 #define HAVE_FCNTL_H 1
 
+/* Define if GBM is available */
+/* #undef HAVE_GBM */
+
+/* Define if OpenGL ES 2.0 is available */
+/* #undef HAVE_GLES2 */
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the `dl' library (-ldl). */
-/* #undef HAVE_LIBDL */
+#define HAVE_LIBDL 1
 
 /* Define if LibRetro support is enabled */
-/* #undef HAVE_LIBRETRO */
+#define HAVE_LIBRETRO 1
 
 /* Define to 1 if you have the <linux/binfmts.h> header file. */
 /* #undef HAVE_LINUX_BINFMTS_H */

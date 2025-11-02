@@ -739,6 +739,8 @@ GLIB_CFLAGS
 PKG_CONFIG_LIBDIR
 PKG_CONFIG_PATH
 PKG_CONFIG
+HAVE_MACOS_FALSE
+HAVE_MACOS_TRUE
 CXXCPP
 LT_SYS_LIBRARY_PATH
 OTOOL64
@@ -16530,6 +16532,23 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
+case $host in
+    *-*-darwin*)
+        build_macos=yes
+        ;;
+    *)
+        build_macos=no
+        ;;
+esac
+ if test "x$build_macos" = "xyes"; then
+  HAVE_MACOS_TRUE=
+  HAVE_MACOS_FALSE='#'
+else
+  HAVE_MACOS_TRUE='#'
+  HAVE_MACOS_FALSE=
+fi
+
+
 # Ensure pkg-config is available early
 
 
@@ -19702,6 +19721,10 @@ LIBOBJS=$ac_libobjs
 LTLIBOBJS=$ac_ltlibobjs
 
 
+if test -z "${HAVE_MACOS_TRUE}" && test -z "${HAVE_MACOS_FALSE}"; then
+  as_fn_error $? "conditional \"HAVE_MACOS\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking that generated files are newer than configure" >&5
 printf %s "checking that generated files are newer than configure... " >&6; }
    if test -n "$am_sleep_pid"; then

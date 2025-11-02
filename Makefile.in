@@ -90,10 +90,7 @@ host_triplet = @host@
 
 # Wine components (if enabled)
 @ENABLE_WINE_TRUE@am__append_1 = \
-@ENABLE_WINE_TRUE@        dlls/win32 \
-@ENABLE_WINE_TRUE@        dlls/wow64 \
-@ENABLE_WINE_TRUE@        dlls/ntdll \
-@ENABLE_WINE_TRUE@        programs/wine
+@ENABLE_WINE_TRUE@        upstream/wine
 
 
 # Darling components (if enabled)
@@ -192,12 +189,12 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-DIST_SUBDIRS = tools loader server include documentation \
-	libs/goliath_core libs/common libs/compatibility dlls/win32 \
-	dlls/wow64 dlls/ntdll programs/wine dlls/darling_coreaudio \
-	dlls/darling_sandbox libs/darling libs/darling_framework \
-	libs/atl_android libs/atl_runtime dlls/atl_bridge dlls/wsl \
-	libs/wsl_core libs/wsl_bridge libretro libs/libretro_core
+DIST_SUBDIRS = tools loader include documentation libs/goliath_core \
+	libs/common libs/compatibility upstream/wine \
+	dlls/darling_coreaudio dlls/darling_sandbox libs/darling \
+	libs/darling_framework libs/atl_android libs/atl_runtime \
+	dlls/atl_bridge dlls/wsl libs/wsl_core libs/wsl_bridge \
+	libretro libs/libretro_core
 am__DIST_COMMON = $(srcdir)/Makefile.in \
 	$(top_srcdir)/include/Makefile.in \
 	$(top_srcdir)/include/config.h.in \
@@ -411,7 +408,7 @@ top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I m4
 
 # Base libraries
-SUBDIRS = tools loader server include documentation libs/goliath_core \
+SUBDIRS = tools loader include documentation libs/goliath_core \
 	libs/common libs/compatibility $(am__append_1) $(am__append_2) \
 	$(am__append_3) $(am__append_4) $(am__append_5)
 EXTRA_DIST = \

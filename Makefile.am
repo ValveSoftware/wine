@@ -3,7 +3,6 @@ ACLOCAL_AMFLAGS = -I m4
 SUBDIRS = \
         tools \
         loader \
-        server \
         include \
         documentation
 
@@ -16,10 +15,7 @@ SUBDIRS += \
 # Wine components (if enabled)
 if ENABLE_WINE
 SUBDIRS += \
-        dlls/win32 \
-        dlls/wow64 \
-        dlls/ntdll \
-        programs/wine
+        upstream/wine
 endif
 
 # Darling components (if enabled)
