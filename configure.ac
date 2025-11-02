@@ -8,7 +8,7 @@ m4_ifndef([AS_VAR_IF], [m4_define([AS_VAR_IF], [])])
 
 AC_PREREQ([2.69])
 AC_INIT([Goliath],[GOLIATH_VERSION],[goliath-devel@example.org],[goliath],[https://github.com/goliath-project/goliath])
-AC_CONFIG_SRCDIR([server/atom.c])
+AC_CONFIG_SRCDIR([upstream/wine/server/atom.c])
 AC_CONFIG_HEADERS([include/config.h])
 AC_CONFIG_AUX_DIR([tools])
 
@@ -216,12 +216,7 @@ AC_CONFIG_FILES([
 ])
 
 if test "x$enable_wine" = "xyes"; then
-    AC_CONFIG_FILES([
-        dlls/win32/Makefile
-        dlls/wow64/Makefile
-        dlls/ntdll/Makefile
-        programs/wine/Makefile
-    ])
+    AC_CONFIG_SUBDIRS([upstream/wine])
 fi
 
 if test "x$enable_darling" = "xyes"; then
