@@ -1,6 +1,12 @@
 #ifndef LIBRETRO_LOADER_H
 #define LIBRETRO_LOADER_H
 
+#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <limits.h>
+#include <stdio.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
