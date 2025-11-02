@@ -89,12 +89,52 @@ AC_ARG_ENABLE([atl],
 
 if test "x$enable_atl" = "xyes"; then
     AC_DEFINE([HAVE_ATL], [1], [Define if ATL support is enabled])
+    
+    dnl Check for required Android/ATL dependencies
     PKG_CHECK_MODULES([ATL_DEPS], [
         libdrm
         gbm
         egl
         glesv2
+    ], [], [
+        AC_MSG_WARN([Some ATL dependencies not found. ATL support may be limited.])
+        
+        dnl Individual checks for partial functionality
+        PKG_CHECK_MODULES([DRM], [libdrm], [
+            AC_DEFINE([HAVE_DRM], [1], [Define if DRM is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $DRM_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $DRM_LIBS"
+        ], [AC_MSG_WARN([libdrm not found - GPU acceleration may be unavailable])])
+        
+        PKG_CHECK_MODULES([GBM], [gbm], [
+            AC_DEFINE([HAVE_GBM], [1], [Define if GBM is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $GBM_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $GBM_LIBS"
+        ], [AC_MSG_WARN([gbm not found - GPU acceleration may be unavailable])])
+        
+        PKG_CHECK_MODULES([EGL], [egl], [
+            AC_DEFINE([HAVE_EGL], [1], [Define if EGL is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $EGL_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $EGL_LIBS"
+        ], [AC_MSG_WARN([EGL not found - OpenGL ES support may be unavailable])])
+        
+        PKG_CHECK_MODULES([GLES2], [glesv2], [
+            AC_DEFINE([HAVE_GLES2], [1], [Define if OpenGL ES 2.0 is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $GLES2_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $GLES2_LIBS"
+        ], [AC_MSG_WARN([OpenGL ES 2.0 not found - 3D acceleration will be unavailable])])
     ])
+    
+    dnl Look for Android SDK tools
+    AC_PATH_PROG([ADB], [adb], [no])
+    if test "x$ADB" != "xno"; then
+        AC_DEFINE([HAVE_ADB], [1], [Define if Android Debug Bridge is available])
+    fi
+    
+    AC_PATH_PROG([AAPT], [aapt], [no])
+    if test "x$AAPT" != "xno"; then
+        AC_DEFINE([HAVE_AAPT], [1], [Define if Android Asset Packaging Tool is available])
+    fi
 fi
 
 AM_CONDITIONAL([ENABLE_ATL], [test "x$enable_atl" = "xyes"])

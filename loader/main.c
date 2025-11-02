@@ -325,29 +325,66 @@ static const struct wine_preload_info preload_info[] =
 
     // 1 = Windows ELF, 2 = Mach-O, 3 = Linux ELF, 0 = Unknown
     static int detect_binary_type(const char *path) {
+        char buf[8192];
         int fd = open(path, O_RDONLY);
         if (fd < 0) {
             perror("open");
             return -1;
         }
-        uint32_t magic = 0;
-        if (read(fd, &magic, sizeof(magic)) != sizeof(magic)) {
+        
+        /* Read initial bytes for magic detection */
+        ssize_t n = read(fd, buf, sizeof(buf));
+        if (n < 16) {
             close(fd);
             return -1;
         }
-        lseek(fd, 0, SEEK_SET);
-        char ident[16] = {0};
-        read(fd, ident, 16);
-        close(fd);
-        // ELF: check OS ABI field
-        if (!memcmp(&magic, ELF_MAGIC, 4)) {
-            // ident[7] is OS ABI: 0 = System V, 3 = Linux, 6 = Solaris, 9 = FreeBSD
-            if (ident[7] == 3) return 3; // Linux ELF
-            else return 1; // Default to Windows ELF
+
+        uint32_t magic;
+        memcpy(&magic, buf, sizeof(magic));
+
+        /* Check for ZIP (APK) magic */
+        if (magic == 0x04034b50) {
+            /* Look for Android manifest in ZIP */
+            bool found_manifest = false;
+            char *p = buf;
+            while (p < buf + n - 30) { /* ZIP header is at least 30 bytes */
+                if (!memcmp(p, "AndroidManifest.xml", 18) ||
+                    !memcmp(p, "classes.dex", 11)) {
+                    found_manifest = true;
+                    break;
+                }
+                p++;
+            }
+            close(fd);
+            if (found_manifest) return 4; /* Android APK */
         }
+
+        /* Check for DEX magic */
+        if (!memcmp(buf, "dex\n", 4)) {
+            close(fd);
+            return 4; /* Android DEX */
+        }
+
+        /* ELF: check OS ABI field */
+        if (!memcmp(&magic, ELF_MAGIC, 4)) {
+            /* ident[7] is OS ABI: 0 = System V, 3 = Linux, 6 = Solaris, 9 = FreeBSD */
+            if (buf[7] == 3) {
+                close(fd);
+                return 3; /* Linux ELF */
+            }
+            close(fd);
+            return 1; /* Default to Windows ELF */
+        }
+
+        /* Check Mach-O */
         if (magic == MACHO_MAGIC_32 || magic == MACHO_MAGIC_64 ||
-            magic == MACHO_CIGAM_32 || magic == MACHO_CIGAM_64) return 2; // Mach-O
-        return 0; // Unknown
+            magic == MACHO_CIGAM_32 || magic == MACHO_CIGAM_64) {
+            close(fd);
+            return 2; /* Mach-O */
+        }
+
+        close(fd);
+        return 0; /* Unknown */
     }
 
     int main(int argc, char *argv[]) {
@@ -356,18 +393,27 @@ static const struct wine_preload_info preload_info[] =
             return 1;
         }
         int type = detect_binary_type(argv[1]);
-        if (type == 1) {
-            // Windows ELF: dispatch to Wine
-            return wine_main(argc, argv);
-        } else if (type == 2) {
-            // Mach-O: dispatch to Darling
-            return darling_main(argc, argv);
-        } else if (type == 3) {
-            // Linux ELF: dispatch to WSL
-            return wsl_main(argc, argv);
-        } else {
-            fprintf(stderr, "Unknown or unsupported binary format: %s\n", argv[1]);
-            return 2;
+        switch (type) {
+            case 1:
+                /* Windows ELF: dispatch to Wine */
+                return wine_main(argc, argv);
+            case 2:
+                /* Mach-O: dispatch to Darling */
+                return darling_main(argc, argv);
+            case 3:
+                /* Linux ELF: dispatch to WSL */
+                return wsl_main(argc, argv);
+            case 4:
+                /* Android APK/DEX: dispatch to ATL */
+                return atl_main(argc, argv);
+            default:
+                fprintf(stderr, "Unknown or unsupported binary format: %s\n", argv[1]);
+                fprintf(stderr, "Supported formats:\n");
+                fprintf(stderr, "  - Windows executables (PE/COFF)\n");
+                fprintf(stderr, "  - macOS executables (Mach-O)\n");
+                fprintf(stderr, "  - Linux executables (ELF)\n");
+                fprintf(stderr, "  - Android apps (APK/DEX)\n");
+                return 2;
         }
     }
     if (len < tail_len) return NULL;

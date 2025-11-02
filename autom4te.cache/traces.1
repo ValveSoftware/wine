@@ -2352,15 +2352,42 @@ m4trace:configure.ac:82: -1- m4_pattern_allow([^ENABLE_DARLING_FALSE$])
 m4trace:configure.ac:82: -1- _AM_SUBST_NOTMAKE([ENABLE_DARLING_TRUE])
 m4trace:configure.ac:82: -1- _AM_SUBST_NOTMAKE([ENABLE_DARLING_FALSE])
 m4trace:configure.ac:91: -1- m4_pattern_allow([^HAVE_ATL$])
-m4trace:configure.ac:92: -1- PKG_CHECK_MODULES([ATL_DEPS], [
+m4trace:configure.ac:94: -1- PKG_CHECK_MODULES([ATL_DEPS], [
         libdrm
         gbm
         egl
         glesv2
+    ], [], [
+        AC_MSG_WARN([Some ATL dependencies not found. ATL support may be limited.])
+        
+        dnl Individual checks for partial functionality
+        PKG_CHECK_MODULES([DRM], [libdrm], [
+            AC_DEFINE([HAVE_DRM], [1], [Define if DRM is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $DRM_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $DRM_LIBS"
+        ], [AC_MSG_WARN([libdrm not found - GPU acceleration may be unavailable])])
+        
+        PKG_CHECK_MODULES([GBM], [gbm], [
+            AC_DEFINE([HAVE_GBM], [1], [Define if GBM is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $GBM_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $GBM_LIBS"
+        ], [AC_MSG_WARN([gbm not found - GPU acceleration may be unavailable])])
+        
+        PKG_CHECK_MODULES([EGL], [egl], [
+            AC_DEFINE([HAVE_EGL], [1], [Define if EGL is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $EGL_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $EGL_LIBS"
+        ], [AC_MSG_WARN([EGL not found - OpenGL ES support may be unavailable])])
+        
+        PKG_CHECK_MODULES([GLES2], [glesv2], [
+            AC_DEFINE([HAVE_GLES2], [1], [Define if OpenGL ES 2.0 is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $GLES2_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $GLES2_LIBS"
+        ], [AC_MSG_WARN([OpenGL ES 2.0 not found - 3D acceleration will be unavailable])])
     ])
-m4trace:configure.ac:92: -1- m4_pattern_allow([^ATL_DEPS_CFLAGS$])
-m4trace:configure.ac:92: -1- m4_pattern_allow([^ATL_DEPS_LIBS$])
-m4trace:configure.ac:92: -1- PKG_CHECK_EXISTS([
+m4trace:configure.ac:94: -1- m4_pattern_allow([^ATL_DEPS_CFLAGS$])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^ATL_DEPS_LIBS$])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([
         libdrm
         gbm
         egl
@@ -2372,7 +2399,7 @@ m4trace:configure.ac:92: -1- PKG_CHECK_EXISTS([
         glesv2
     " 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
-m4trace:configure.ac:92: -1- PKG_CHECK_EXISTS([
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([
         libdrm
         gbm
         egl
@@ -2384,51 +2411,159 @@ m4trace:configure.ac:92: -1- PKG_CHECK_EXISTS([
         glesv2
     " 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
-m4trace:configure.ac:92: -1- _PKG_SHORT_ERRORS_SUPPORTED
-m4trace:configure.ac:100: -1- AM_CONDITIONAL([ENABLE_ATL], [test "x$enable_atl" = "xyes"])
-m4trace:configure.ac:100: -1- m4_pattern_allow([^ENABLE_ATL_TRUE$])
-m4trace:configure.ac:100: -1- m4_pattern_allow([^ENABLE_ATL_FALSE$])
-m4trace:configure.ac:100: -1- _AM_SUBST_NOTMAKE([ENABLE_ATL_TRUE])
-m4trace:configure.ac:100: -1- _AM_SUBST_NOTMAKE([ENABLE_ATL_FALSE])
-m4trace:configure.ac:109: -1- m4_pattern_allow([^HAVE_WSL$])
-m4trace:configure.ac:111: -1- m4_pattern_allow([^HAVE_LINUX_BINFMTS_H$])
-m4trace:configure.ac:116: -1- AM_CONDITIONAL([ENABLE_WSL], [test "x$enable_wsl" = "xyes"])
-m4trace:configure.ac:116: -1- m4_pattern_allow([^ENABLE_WSL_TRUE$])
-m4trace:configure.ac:116: -1- m4_pattern_allow([^ENABLE_WSL_FALSE$])
-m4trace:configure.ac:116: -1- _AM_SUBST_NOTMAKE([ENABLE_WSL_TRUE])
-m4trace:configure.ac:116: -1- _AM_SUBST_NOTMAKE([ENABLE_WSL_FALSE])
-m4trace:configure.ac:125: -1- m4_pattern_allow([^HAVE_LIBRETRO$])
-m4trace:configure.ac:128: -1- m4_pattern_allow([^HAVE_LIBDL$])
-m4trace:configure.ac:144: -1- m4_pattern_allow([^DEFAULT_LIBRETRO_CORES_DIR$])
-m4trace:configure.ac:147: -1- m4_pattern_allow([^DEFAULT_LIBRETRO_CORES_DIR$])
-m4trace:configure.ac:151: -1- AM_CONDITIONAL([ENABLE_LIBRETRO], [test "x$enable_libretro" = "xyes"])
-m4trace:configure.ac:151: -1- m4_pattern_allow([^ENABLE_LIBRETRO_TRUE$])
-m4trace:configure.ac:151: -1- m4_pattern_allow([^ENABLE_LIBRETRO_FALSE$])
-m4trace:configure.ac:151: -1- _AM_SUBST_NOTMAKE([ENABLE_LIBRETRO_TRUE])
-m4trace:configure.ac:151: -1- _AM_SUBST_NOTMAKE([ENABLE_LIBRETRO_FALSE])
-m4trace:configure.ac:155: -1- m4_pattern_allow([^FLEX$])
-m4trace:configure.ac:180: -1- m4_pattern_allow([^BISON$])
-m4trace:configure.ac:202: -1- m4_pattern_allow([^STRIP$])
-m4trace:configure.ac:203: -1- m4_pattern_allow([^LN_S$])
-m4trace:configure.ac:204: -1- PKG_PROG_PKG_CONFIG
-m4trace:configure.ac:204: -1- m4_pattern_forbid([^_?PKG_[A-Z_]+$])
-m4trace:configure.ac:204: -1- m4_pattern_allow([^PKG_CONFIG(_(PATH|LIBDIR|SYSROOT_DIR|ALLOW_SYSTEM_(CFLAGS|LIBS)))?$])
-m4trace:configure.ac:204: -1- m4_pattern_allow([^PKG_CONFIG_(DISABLE_UNINSTALLED|TOP_BUILD_DIR|DEBUG_SPEW)$])
-m4trace:configure.ac:204: -1- m4_pattern_allow([^PKG_CONFIG$])
-m4trace:configure.ac:204: -1- m4_pattern_allow([^PKG_CONFIG_PATH$])
-m4trace:configure.ac:204: -1- m4_pattern_allow([^PKG_CONFIG_LIBDIR$])
-m4trace:configure.ac:204: -1- m4_pattern_allow([^PKG_CONFIG$])
-m4trace:configure.ac:219: -1- m4_pattern_allow([^subdirs$])
-m4trace:configure.ac:254: -1- m4_pattern_allow([^LIB@&t@OBJS$])
-m4trace:configure.ac:254: -1- m4_pattern_allow([^LTLIBOBJS$])
-m4trace:configure.ac:254: -1- AM_CONDITIONAL([am__EXEEXT], [test -n "$EXEEXT"])
-m4trace:configure.ac:254: -1- m4_pattern_allow([^am__EXEEXT_TRUE$])
-m4trace:configure.ac:254: -1- m4_pattern_allow([^am__EXEEXT_FALSE$])
-m4trace:configure.ac:254: -1- _AM_SUBST_NOTMAKE([am__EXEEXT_TRUE])
-m4trace:configure.ac:254: -1- _AM_SUBST_NOTMAKE([am__EXEEXT_FALSE])
-m4trace:configure.ac:254: -1- _AC_AM_CONFIG_HEADER_HOOK(["$ac_file"])
-m4trace:configure.ac:254: -1- _LT_PROG_LTMAIN
-m4trace:configure.ac:254: -1- _AM_OUTPUT_DEPENDENCY_COMMANDS
-m4trace:configure.ac:254: -1- AM_RUN_LOG([cd "$am_dirpart" \
+m4trace:configure.ac:94: -1- _PKG_SHORT_ERRORS_SUPPORTED
+m4trace:configure.ac:94: -1- PKG_CHECK_MODULES([DRM], [libdrm], [
+            AC_DEFINE([HAVE_DRM], [1], [Define if DRM is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $DRM_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $DRM_LIBS"
+        ], [AC_MSG_WARN([libdrm not found - GPU acceleration may be unavailable])])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^DRM_CFLAGS$])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^DRM_LIBS$])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([libdrm], [pkg_cv_[]DRM_CFLAGS=`$PKG_CONFIG --[]cflags "libdrm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([libdrm], [pkg_cv_[]DRM_LIBS=`$PKG_CONFIG --[]libs "libdrm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- _PKG_SHORT_ERRORS_SUPPORTED
+m4trace:configure.ac:94: -1- m4_pattern_allow([^HAVE_DRM$])
+m4trace:configure.ac:94: -1- PKG_CHECK_MODULES([GBM], [gbm], [
+            AC_DEFINE([HAVE_GBM], [1], [Define if GBM is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $GBM_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $GBM_LIBS"
+        ], [AC_MSG_WARN([gbm not found - GPU acceleration may be unavailable])])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^GBM_CFLAGS$])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^GBM_LIBS$])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([gbm], [pkg_cv_[]GBM_CFLAGS=`$PKG_CONFIG --[]cflags "gbm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([gbm], [pkg_cv_[]GBM_LIBS=`$PKG_CONFIG --[]libs "gbm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- _PKG_SHORT_ERRORS_SUPPORTED
+m4trace:configure.ac:94: -1- m4_pattern_allow([^HAVE_GBM$])
+m4trace:configure.ac:94: -1- PKG_CHECK_MODULES([EGL], [egl], [
+            AC_DEFINE([HAVE_EGL], [1], [Define if EGL is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $EGL_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $EGL_LIBS"
+        ], [AC_MSG_WARN([EGL not found - OpenGL ES support may be unavailable])])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^EGL_CFLAGS$])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^EGL_LIBS$])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([egl], [pkg_cv_[]EGL_CFLAGS=`$PKG_CONFIG --[]cflags "egl" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([egl], [pkg_cv_[]EGL_LIBS=`$PKG_CONFIG --[]libs "egl" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- _PKG_SHORT_ERRORS_SUPPORTED
+m4trace:configure.ac:94: -1- m4_pattern_allow([^HAVE_EGL$])
+m4trace:configure.ac:94: -1- PKG_CHECK_MODULES([GLES2], [glesv2], [
+            AC_DEFINE([HAVE_GLES2], [1], [Define if OpenGL ES 2.0 is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $GLES2_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $GLES2_LIBS"
+        ], [AC_MSG_WARN([OpenGL ES 2.0 not found - 3D acceleration will be unavailable])])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^GLES2_CFLAGS$])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^GLES2_LIBS$])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([glesv2], [pkg_cv_[]GLES2_CFLAGS=`$PKG_CONFIG --[]cflags "glesv2" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([glesv2], [pkg_cv_[]GLES2_LIBS=`$PKG_CONFIG --[]libs "glesv2" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- _PKG_SHORT_ERRORS_SUPPORTED
+m4trace:configure.ac:94: -1- m4_pattern_allow([^HAVE_GLES2$])
+m4trace:configure.ac:94: -1- PKG_CHECK_MODULES([DRM], [libdrm], [
+            AC_DEFINE([HAVE_DRM], [1], [Define if DRM is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $DRM_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $DRM_LIBS"
+        ], [AC_MSG_WARN([libdrm not found - GPU acceleration may be unavailable])])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^DRM_CFLAGS$])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^DRM_LIBS$])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([libdrm], [pkg_cv_[]DRM_CFLAGS=`$PKG_CONFIG --[]cflags "libdrm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([libdrm], [pkg_cv_[]DRM_LIBS=`$PKG_CONFIG --[]libs "libdrm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- _PKG_SHORT_ERRORS_SUPPORTED
+m4trace:configure.ac:94: -1- m4_pattern_allow([^HAVE_DRM$])
+m4trace:configure.ac:94: -1- PKG_CHECK_MODULES([GBM], [gbm], [
+            AC_DEFINE([HAVE_GBM], [1], [Define if GBM is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $GBM_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $GBM_LIBS"
+        ], [AC_MSG_WARN([gbm not found - GPU acceleration may be unavailable])])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^GBM_CFLAGS$])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^GBM_LIBS$])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([gbm], [pkg_cv_[]GBM_CFLAGS=`$PKG_CONFIG --[]cflags "gbm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([gbm], [pkg_cv_[]GBM_LIBS=`$PKG_CONFIG --[]libs "gbm" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- _PKG_SHORT_ERRORS_SUPPORTED
+m4trace:configure.ac:94: -1- m4_pattern_allow([^HAVE_GBM$])
+m4trace:configure.ac:94: -1- PKG_CHECK_MODULES([EGL], [egl], [
+            AC_DEFINE([HAVE_EGL], [1], [Define if EGL is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $EGL_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $EGL_LIBS"
+        ], [AC_MSG_WARN([EGL not found - OpenGL ES support may be unavailable])])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^EGL_CFLAGS$])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^EGL_LIBS$])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([egl], [pkg_cv_[]EGL_CFLAGS=`$PKG_CONFIG --[]cflags "egl" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([egl], [pkg_cv_[]EGL_LIBS=`$PKG_CONFIG --[]libs "egl" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- _PKG_SHORT_ERRORS_SUPPORTED
+m4trace:configure.ac:94: -1- m4_pattern_allow([^HAVE_EGL$])
+m4trace:configure.ac:94: -1- PKG_CHECK_MODULES([GLES2], [glesv2], [
+            AC_DEFINE([HAVE_GLES2], [1], [Define if OpenGL ES 2.0 is available])
+            ATL_DEPS_CFLAGS="$ATL_DEPS_CFLAGS $GLES2_CFLAGS"
+            ATL_DEPS_LIBS="$ATL_DEPS_LIBS $GLES2_LIBS"
+        ], [AC_MSG_WARN([OpenGL ES 2.0 not found - 3D acceleration will be unavailable])])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^GLES2_CFLAGS$])
+m4trace:configure.ac:94: -1- m4_pattern_allow([^GLES2_LIBS$])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([glesv2], [pkg_cv_[]GLES2_CFLAGS=`$PKG_CONFIG --[]cflags "glesv2" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- PKG_CHECK_EXISTS([glesv2], [pkg_cv_[]GLES2_LIBS=`$PKG_CONFIG --[]libs "glesv2" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes ], [pkg_failed=yes])
+m4trace:configure.ac:94: -1- _PKG_SHORT_ERRORS_SUPPORTED
+m4trace:configure.ac:94: -1- m4_pattern_allow([^HAVE_GLES2$])
+m4trace:configure.ac:129: -1- m4_pattern_allow([^ADB$])
+m4trace:configure.ac:131: -1- m4_pattern_allow([^HAVE_ADB$])
+m4trace:configure.ac:134: -1- m4_pattern_allow([^AAPT$])
+m4trace:configure.ac:136: -1- m4_pattern_allow([^HAVE_AAPT$])
+m4trace:configure.ac:140: -1- AM_CONDITIONAL([ENABLE_ATL], [test "x$enable_atl" = "xyes"])
+m4trace:configure.ac:140: -1- m4_pattern_allow([^ENABLE_ATL_TRUE$])
+m4trace:configure.ac:140: -1- m4_pattern_allow([^ENABLE_ATL_FALSE$])
+m4trace:configure.ac:140: -1- _AM_SUBST_NOTMAKE([ENABLE_ATL_TRUE])
+m4trace:configure.ac:140: -1- _AM_SUBST_NOTMAKE([ENABLE_ATL_FALSE])
+m4trace:configure.ac:149: -1- m4_pattern_allow([^HAVE_WSL$])
+m4trace:configure.ac:151: -1- m4_pattern_allow([^HAVE_LINUX_BINFMTS_H$])
+m4trace:configure.ac:156: -1- AM_CONDITIONAL([ENABLE_WSL], [test "x$enable_wsl" = "xyes"])
+m4trace:configure.ac:156: -1- m4_pattern_allow([^ENABLE_WSL_TRUE$])
+m4trace:configure.ac:156: -1- m4_pattern_allow([^ENABLE_WSL_FALSE$])
+m4trace:configure.ac:156: -1- _AM_SUBST_NOTMAKE([ENABLE_WSL_TRUE])
+m4trace:configure.ac:156: -1- _AM_SUBST_NOTMAKE([ENABLE_WSL_FALSE])
+m4trace:configure.ac:165: -1- m4_pattern_allow([^HAVE_LIBRETRO$])
+m4trace:configure.ac:168: -1- m4_pattern_allow([^HAVE_LIBDL$])
+m4trace:configure.ac:184: -1- m4_pattern_allow([^DEFAULT_LIBRETRO_CORES_DIR$])
+m4trace:configure.ac:187: -1- m4_pattern_allow([^DEFAULT_LIBRETRO_CORES_DIR$])
+m4trace:configure.ac:191: -1- AM_CONDITIONAL([ENABLE_LIBRETRO], [test "x$enable_libretro" = "xyes"])
+m4trace:configure.ac:191: -1- m4_pattern_allow([^ENABLE_LIBRETRO_TRUE$])
+m4trace:configure.ac:191: -1- m4_pattern_allow([^ENABLE_LIBRETRO_FALSE$])
+m4trace:configure.ac:191: -1- _AM_SUBST_NOTMAKE([ENABLE_LIBRETRO_TRUE])
+m4trace:configure.ac:191: -1- _AM_SUBST_NOTMAKE([ENABLE_LIBRETRO_FALSE])
+m4trace:configure.ac:195: -1- m4_pattern_allow([^FLEX$])
+m4trace:configure.ac:220: -1- m4_pattern_allow([^BISON$])
+m4trace:configure.ac:242: -1- m4_pattern_allow([^STRIP$])
+m4trace:configure.ac:243: -1- m4_pattern_allow([^LN_S$])
+m4trace:configure.ac:244: -1- PKG_PROG_PKG_CONFIG
+m4trace:configure.ac:244: -1- m4_pattern_forbid([^_?PKG_[A-Z_]+$])
+m4trace:configure.ac:244: -1- m4_pattern_allow([^PKG_CONFIG(_(PATH|LIBDIR|SYSROOT_DIR|ALLOW_SYSTEM_(CFLAGS|LIBS)))?$])
+m4trace:configure.ac:244: -1- m4_pattern_allow([^PKG_CONFIG_(DISABLE_UNINSTALLED|TOP_BUILD_DIR|DEBUG_SPEW)$])
+m4trace:configure.ac:244: -1- m4_pattern_allow([^PKG_CONFIG$])
+m4trace:configure.ac:244: -1- m4_pattern_allow([^PKG_CONFIG_PATH$])
+m4trace:configure.ac:244: -1- m4_pattern_allow([^PKG_CONFIG_LIBDIR$])
+m4trace:configure.ac:244: -1- m4_pattern_allow([^PKG_CONFIG$])
+m4trace:configure.ac:259: -1- m4_pattern_allow([^subdirs$])
+m4trace:configure.ac:294: -1- m4_pattern_allow([^LIB@&t@OBJS$])
+m4trace:configure.ac:294: -1- m4_pattern_allow([^LTLIBOBJS$])
+m4trace:configure.ac:294: -1- AM_CONDITIONAL([am__EXEEXT], [test -n "$EXEEXT"])
+m4trace:configure.ac:294: -1- m4_pattern_allow([^am__EXEEXT_TRUE$])
+m4trace:configure.ac:294: -1- m4_pattern_allow([^am__EXEEXT_FALSE$])
+m4trace:configure.ac:294: -1- _AM_SUBST_NOTMAKE([am__EXEEXT_TRUE])
+m4trace:configure.ac:294: -1- _AM_SUBST_NOTMAKE([am__EXEEXT_FALSE])
+m4trace:configure.ac:294: -1- _AC_AM_CONFIG_HEADER_HOOK(["$ac_file"])
+m4trace:configure.ac:294: -1- _LT_PROG_LTMAIN
+m4trace:configure.ac:294: -1- _AM_OUTPUT_DEPENDENCY_COMMANDS
+m4trace:configure.ac:294: -1- AM_RUN_LOG([cd "$am_dirpart" \
       && sed -e '/# am--include-marker/d' "$am_filepart" \
         | $MAKE -f - am--depfiles])
