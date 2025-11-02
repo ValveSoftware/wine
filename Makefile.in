@@ -138,8 +138,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/include/config.h
 CONFIG_CLEAN_FILES = include/Makefile loader/Makefile server/Makefile \
-	tools/Makefile dlls/wow64/Makefile dlls/ntdll/Makefile \
-	libretro/Makefile
+	tools/Makefile libretro/Makefile
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -193,15 +192,13 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-DIST_SUBDIRS = tools loader server include documentation libs/common \
-	libs/compatibility dlls/win32 dlls/wow64 dlls/ntdll \
-	programs/wine dlls/darling_coreaudio dlls/darling_sandbox \
-	libs/darling libs/darling_framework libs/atl_android \
-	libs/atl_runtime dlls/atl_bridge dlls/wsl libs/wsl_core \
-	libs/wsl_bridge libretro libs/libretro_core
+DIST_SUBDIRS = tools loader server include documentation \
+	libs/goliath_core libs/common libs/compatibility dlls/win32 \
+	dlls/wow64 dlls/ntdll programs/wine dlls/darling_coreaudio \
+	dlls/darling_sandbox libs/darling libs/darling_framework \
+	libs/atl_android libs/atl_runtime dlls/atl_bridge dlls/wsl \
+	libs/wsl_core libs/wsl_bridge libretro libs/libretro_core
 am__DIST_COMMON = $(srcdir)/Makefile.in \
-	$(top_srcdir)/dlls/ntdll/Makefile.in \
-	$(top_srcdir)/dlls/wow64/Makefile.in \
 	$(top_srcdir)/include/Makefile.in \
 	$(top_srcdir)/include/config.h.in \
 	$(top_srcdir)/libretro/Makefile.in \
@@ -396,6 +393,7 @@ runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
+subdirs = @subdirs@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
@@ -404,8 +402,8 @@ top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I m4
 
 # Base libraries
-SUBDIRS = tools loader server include documentation libs/common \
-	libs/compatibility $(am__append_1) $(am__append_2) \
+SUBDIRS = tools loader server include documentation libs/goliath_core \
+	libs/common libs/compatibility $(am__append_1) $(am__append_2) \
 	$(am__append_3) $(am__append_4) $(am__append_5)
 EXTRA_DIST = \
         goliath-launch.sh \
@@ -471,10 +469,6 @@ loader/Makefile: $(top_builddir)/config.status $(top_srcdir)/loader/Makefile.in
 server/Makefile: $(top_builddir)/config.status $(top_srcdir)/server/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 tools/Makefile: $(top_builddir)/config.status $(top_srcdir)/tools/Makefile.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
-dlls/wow64/Makefile: $(top_builddir)/config.status $(top_srcdir)/dlls/wow64/Makefile.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
-dlls/ntdll/Makefile: $(top_builddir)/config.status $(top_srcdir)/dlls/ntdll/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 libretro/Makefile: $(top_builddir)/config.status $(top_srcdir)/libretro/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@

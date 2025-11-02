@@ -9,6 +9,7 @@ SUBDIRS = \
 
 # Base libraries
 SUBDIRS += \
+        libs/goliath_core \
         libs/common \
         libs/compatibility
 

@@ -1,12 +1,14 @@
 # main Gitlab CI script
 
 stages:
+  - policy
   - image
   - build
   - test
   - deploy
 
 include:
+  - local: "/tools/gitlab/policy.yml"
   - local: "/tools/gitlab/image.yml"
   - local: "/tools/gitlab/build.yml"
   - local: "/tools/gitlab/test.yml"
