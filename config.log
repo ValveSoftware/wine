@@ -716,6 +716,7 @@ config.status:1220: creating documentation/Makefile
 config.status:1220: creating libretro/Makefile
 config.status:1220: creating libs/libretro_core/Makefile
 config.status:1220: creating include/config.h
+config.status:1401: include/config.h is unchanged
 config.status:1449: executing libtool commands
 config.status:1449: executing depfiles commands
 config.status:2242: cd libs/common       && sed -e '/# am--include-marker/d' Makefile         | make -f - am--depfiles
@@ -725,6 +726,9 @@ config.status:2242: cd libs/compatibility       && sed -e '/# am--include-marker
 make: Nothing to be done for 'am--depfiles'.
 config.status:2247: $? = 0
 config.status:2242: cd loader       && sed -e '/# am--include-marker/d' Makefile         | make -f - am--depfiles
+make: Nothing to be done for 'am--depfiles'.
+config.status:2247: $? = 0
+config.status:2242: cd libs/libretro_core       && sed -e '/# am--include-marker/d' Makefile         | make -f - am--depfiles
 config.status:2247: $? = 0
 configure:22355: Configuration summary for Goliath 1.0-beta:
 configure:22357:   prefix:      /usr/local
