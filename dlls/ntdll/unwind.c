@@ -1929,6 +1929,8 @@ static int get_opcode_size( struct opcode op )
 
 static BOOL is_inside_epilog( BYTE *pc, ULONG64 base, const RUNTIME_FUNCTION *function )
 {
+    BYTE rex;
+
     /* add or lea must be the first instruction, and it must have a rex.W prefix */
     if ((pc[0] & 0xf8) == 0x48)
     {
@@ -1970,7 +1972,8 @@ static BOOL is_inside_epilog( BYTE *pc, ULONG64 base, const RUNTIME_FUNCTION *fu
 
     for (;;)
     {
-        if ((*pc & 0xf0) == 0x40) pc++;  /* rex prefix */
+        rex = 0;
+        if ((*pc & 0xf0) == 0x40) rex |= *pc++;  /* rex prefix */
 
         switch (*pc)
         {
@@ -1995,6 +1998,10 @@ static BOOL is_inside_epilog( BYTE *pc, ULONG64 base, const RUNTIME_FUNCTION *fu
             return !(pc - (BYTE *)base >= function->BeginAddress && pc - (BYTE *)base < function->EndAddress);
         case 0xf3: /* rep; ret (for amd64 prediction bug) */
             return pc[1] == 0xc3;
+        case 0xff: /* jmp */
+            if (rex && rex != 0x48) return FALSE;
+            if (pc[1] == 0x25) return TRUE;
+            return rex && ((pc[1] >> 3) & 7) == 4;
         }
         return FALSE;
     }
@@ -2051,6 +2058,7 @@ static void interpret_epilog( BYTE *pc, CONTEXT *context, KNONVOLATILE_CONTEXT_P
         case 0xeb: /* jmp n */
         case 0xc3: /* ret */
         case 0xf3: /* rep; ret */
+        case 0xff: /* ret */
             context->Rip = *(ULONG64 *)context->Rsp;
             context->Rsp += sizeof(ULONG64);
             return;
