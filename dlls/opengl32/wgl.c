@@ -1718,6 +1718,7 @@ static char *fixup_shader( GLsizei count, const GLchar *const*string, const GLin
         const char *gameid;
         const char *add_ext;
         const char *search_str;
+        BOOL replace;
         const char *prepend_str;
     }
     replace[] =
@@ -1730,8 +1731,8 @@ static char *fixup_shader( GLsizei count, const GLchar *const*string, const GLin
             "#extension GL_ARB_explicit_uniform_location : enable\r\n"
             "#extension GL_ARB_explicit_attrib_location : enable\r\n",
             /* search_str */
-            "uniform mat4 boneMatrices[NBONES];",
-            /* replace_str */
+            "uniform mat4 boneMatrices[NBONES];", FALSE,
+            /* prepend_str */
             "layout(location = 2) ",
         },
         {
@@ -1744,11 +1745,21 @@ static char *fixup_shader( GLsizei count, const GLchar *const*string, const GLin
             /* add_ext */
             "#version 120\r\n",
         },
+        {
+            "2578670",
+            /* add_ext */
+            NULL,
+            /* search_str */
+            "#version 420", TRUE,
+            /* prepend_str */
+            "#version 330"
+        },
     };
     static const char *add_ext;
     static const char *search_str;
     static const char *prepend_str;
     static unsigned int add_ext_len, search_len, prepend_len;
+    static BOOL replace_found_str;
     unsigned int new_len;
     const char *p, *next;
     BOOL found = FALSE;
@@ -1773,12 +1784,11 @@ static char *fixup_shader( GLsizei count, const GLchar *const*string, const GLin
             search_len = search_str ? strlen(search_str) : 0;
             prepend_str = replace[i].prepend_str;
             prepend_len = prepend_str ? strlen(prepend_str) : 0;
+            replace_found_str = replace[i].replace;
         }
     }
 
     if (!needs_fixup) return NULL;
-
-    if (length || count != 1) return NULL;
 
     if (!once++)
       FIXME( "HACK: Fixing up shader.\n" );
@@ -1803,7 +1813,8 @@ static char *fixup_shader( GLsizei count, const GLchar *const*string, const GLin
           out += p - *string;
           memcpy( out, prepend_str, prepend_len );
           out += prepend_len;
-          strcpy( out, p );
+          if (replace_found_str) strcpy( out, next );
+          else                   strcpy( out, p );
           found = TRUE;
           break;
       }
