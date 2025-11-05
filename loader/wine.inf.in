@@ -630,6 +630,7 @@ HKLM,%FontsNT%,"Wingdings (TrueType)",,"wingdings.ttf"
 HKCU,Software\Wine\Fonts\Replacements,"Palatino Linotype",,"Times New Roman"
 HKCU,Software\Wine\Fonts\Replacements,"Verdana",,"Times New Roman"
 HKCU,Software\Wine\Fonts\Replacements,"Segoe UI",,"Times New Roman"
+HKCU,Software\Wine\Fonts\Replacements,"Segoe UI Semibold",,"Times New Roman"
 
 [MCI]
 HKLM,%Mci32Str%,"AVIVideo",,"mciavi32.dll"
