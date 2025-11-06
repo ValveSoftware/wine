@@ -865,6 +865,8 @@ int CDECL MSVCRT__isatty(int fd)
 }
 __ASM_GLOBAL_FUNC( _isatty,
         "sub $0x30,%rsp\n\t"
+        __ASM_SEH(".seh_stackalloc 0x30\n\t")
+        __ASM_SEH(".seh_endprologue\n\t")
         "lea MSVCRT___pioinfo(%rip),%rdx\n\t"
         "nop;nop;nop;nop;nop;nop;nop;nop;nop\n\t"
         "add $0x30,%rsp\n\t"
