@@ -1925,6 +1925,7 @@ syscall_nr_translation[] =
     {0x06, ~0u, NtReadFile},
     {0x0f, ~0u, NtClose},
     {0x23, ~0u, NtQueryVirtualMemory},
+    {0x50, ~0u, NtProtectVirtualMemory},
 };
 
 static void sigsys_handler_rdr2( int signal, siginfo_t *siginfo, void *sigcontext )
@@ -2043,7 +2044,7 @@ static void install_bpf(struct sigaction *sig_act)
 
     {
         const char *sgi = getenv("SteamGameId");
-        if (sgi && (!strcmp(sgi, "1174180") || !strcmp(sgi, "1404210") || !strcmp(sgi, "1418100")))
+        if (sgi && (!strcmp(sgi, "1174180") || !strcmp(sgi, "1404210") || !strcmp(sgi, "1418100") || !strcmp(sgi, "2767030")))
         {
             /* Use specific signal handler. */
             sig_act->sa_sigaction = sigsys_handler_rdr2;
