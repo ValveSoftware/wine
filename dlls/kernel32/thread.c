@@ -55,7 +55,7 @@ __ASM_FASTCALL_FUNC( BaseThreadInitThunk, 12,
                     "call *%edx\n\t"
                     "movl %eax,(%esp)\n\t"
                     "call " __ASM_STDCALL( "RtlExitUserThread", 4 ))
-#elif defined(__x86_64__) && defined(__WINE_PE_BUILD)
+#elif defined(__x86_64__) && defined(__WINE_PE_BUILD) && !defined(__arm64ec__)
 __ASM_GLOBAL_FUNC( BaseThreadInitThunk,
                     "subq $0x28,%rsp\n\t"
                    ".seh_stackalloc 0x28\n\t"
