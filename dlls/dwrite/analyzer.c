@@ -360,6 +360,8 @@ system_fallback_config[] =
     { "FF00-FFEF",              L"Noto Sans CJK TC", L"zh-Hant" },
     { "FF00-FFEF",              L"Malgun Gothic", L"ko" },
     { "FF00-FFEF",              L"MS Gothic" },
+
+    { "1F800-1F8FF",            L"Noto Sans Symbols 2" },
 };
 
 struct text_source_context
