@@ -33,3 +33,7 @@ extern const struct object_ops esync_ops;
 void esync_set_event( struct esync *esync );
 void esync_reset_event( struct esync *esync );
 void esync_abandon_mutexes( struct thread *thread );
+
+struct esync *create_esync( struct object *root, const struct unicode_str *name,
+                            unsigned int attr, int initval, int max, enum esync_type type,
+                            const struct security_descriptor *sd );

@@ -34,3 +34,7 @@ extern void fsync_set_event( struct fsync *fsync );
 extern void fsync_reset_event( struct fsync *fsync );
 extern void fsync_abandon_mutexes( struct thread *thread );
 extern void fsync_cleanup_process_shm_indices( process_id_t id );
+
+extern struct fsync *create_fsync( struct object *root, const struct unicode_str *name,
+    unsigned int attr, int low, int high, enum fsync_type type,
+    const struct security_descriptor *sd );

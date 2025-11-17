@@ -38,6 +38,9 @@
 #include "file.h"
 #include "unicode.h"
 
+#include "esync.h"
+#include "fsync.h"
+
 #define HASH_SIZE 7  /* default hash size */
 
 static const WCHAR objtype_name[] = {'T','y','p','e'};
@@ -492,7 +495,14 @@ void init_directories( struct fd *intl_fd )
 
     /* events */
     for (i = 0; i < ARRAY_SIZE( kernel_events ); i++)
-        release_object( create_event( &dir_kernel->obj, &kernel_events[i], OBJ_PERMANENT, 1, 0, NULL ));
+    {
+        if (do_fsync())
+            release_object( create_fsync( &dir_kernel->obj, &kernel_events[i], OBJ_PERMANENT, 0, 0xdeadbeef, FSYNC_MANUAL_EVENT, NULL ));
+        else if (do_esync())
+            release_object( create_esync( &dir_kernel->obj, &kernel_events[i], OBJ_PERMANENT, 0, 0, ESYNC_MANUAL_EVENT, NULL ));
+        else
+            release_object( create_event( &dir_kernel->obj, &kernel_events[i], OBJ_PERMANENT, 1, 0, NULL ));
+    }
     release_object( create_keyed_event( &dir_kernel->obj, &keyed_event_crit_sect_str, OBJ_PERMANENT, NULL ));
 
     /* mappings */
