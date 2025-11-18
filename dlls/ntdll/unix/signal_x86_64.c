@@ -2044,7 +2044,8 @@ static void install_bpf(struct sigaction *sig_act)
 
     {
         const char *sgi = getenv("SteamGameId");
-        if (sgi && (!strcmp(sgi, "1174180") || !strcmp(sgi, "1404210") || !strcmp(sgi, "1418100") || !strcmp(sgi, "2767030")))
+        if (sgi && (!strcmp(sgi, "1174180") || !strcmp(sgi, "1404210") || !strcmp(sgi, "1418100") || !strcmp(sgi, "2767030")
+                    || !strcmp(sgi, "2853730")))
         {
             /* Use specific signal handler. */
             sig_act->sa_sigaction = sigsys_handler_rdr2;
