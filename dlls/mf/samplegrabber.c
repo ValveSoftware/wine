@@ -92,6 +92,7 @@ struct sample_grabber
     UINT32 sample_count;
     IMFSample *samples[MAX_SAMPLE_QUEUE_LENGTH];
     UINT32 samples_queued;
+    UINT32 pending_sample_deliveries;
 };
 
 static IMFSampleGrabberSinkCallback *sample_grabber_get_callback(const struct sample_grabber *sink)
@@ -414,12 +415,13 @@ static HRESULT stream_queue_sample(struct sample_grabber *grabber, IMFSample *sa
 static void sample_grabber_stream_request_sample(struct sample_grabber *grabber)
 {
     IMFStreamSink_QueueEvent(&grabber->IMFStreamSink_iface, MEStreamSinkRequestSample, &GUID_NULL, S_OK, NULL);
+    grabber->pending_sample_deliveries++;
 }
 
 static HRESULT WINAPI sample_grabber_stream_ProcessSample(IMFStreamSink *iface, IMFSample *sample)
 {
     struct sample_grabber *grabber = impl_from_IMFStreamSink(iface);
-    BOOL sample_delivered;
+    BOOL sample_delivered = FALSE;
     LONGLONG sampletime;
     HRESULT hr = S_OK;
 
@@ -434,6 +436,9 @@ static HRESULT WINAPI sample_grabber_stream_ProcessSample(IMFStreamSink *iface, 
         hr = MF_E_STREAMSINK_REMOVED;
     else if (grabber->state != SINK_STATE_STOPPED)
     {
+        if (grabber->pending_sample_deliveries)
+            grabber->pending_sample_deliveries--;
+
         hr = IMFSample_GetSampleTime(sample, &sampletime);
 
         if (SUCCEEDED(hr))
@@ -1157,6 +1162,7 @@ static HRESULT sample_grabber_set_state(struct sample_grabber *grabber, enum sin
         [SINK_STATE_RUNNING] = MEStreamSinkStarted,
     };
     BOOL do_callback = FALSE;
+    byte required_requests;
     HRESULT hr = S_OK;
     unsigned int i;
 
@@ -1173,29 +1179,22 @@ static HRESULT sample_grabber_set_state(struct sample_grabber *grabber, enum sin
                 sample_grabber_cancel_timer(grabber);
                 release_samples(grabber);
                 grabber->sample_count = MAX_SAMPLE_QUEUE_LENGTH;
+                sample_grabber_release_pending_items(grabber);
+                grabber->pending_sample_deliveries = 0;
             }
-
-            if (state == SINK_STATE_RUNNING && grabber->state != SINK_STATE_RUNNING)
+            else if (state == SINK_STATE_RUNNING &&
+                 (grabber->state != SINK_STATE_RUNNING || offset != PRESENTATION_CURRENT_POSITION))
             {
-                /* Unpause at a position is a seek operation which drops everything pending. */
-                if (grabber->state == SINK_STATE_PAUSED && offset != PRESENTATION_CURRENT_POSITION)
-                    grabber->sample_count = MAX_SAMPLE_QUEUE_LENGTH;
-
-                /* Every transition to running state sends a bunch requests to build up initial queue. */
-                for (i = 0; i < grabber->sample_count; ++i)
+                if (offset != PRESENTATION_CURRENT_POSITION)
                 {
-                    if (grabber->state == SINK_STATE_PAUSED && offset == PRESENTATION_CURRENT_POSITION)
-                    {
-                        assert(grabber->samples[i]);
-                        stream_queue_sample(grabber, grabber->samples[i]);
-                    }
-                    else
-                    {
-                        sample_grabber_stream_request_sample(grabber);
-                    }
+                    sample_grabber_cancel_timer(grabber);
+                    sample_grabber_release_pending_items(grabber);
                 }
-                release_samples(grabber);
-                grabber->sample_count = 0;
+
+                required_requests = MAX_SAMPLE_QUEUE_LENGTH - grabber->pending_sample_deliveries;
+
+                for (i = 0; i < required_requests; i++)
+                    sample_grabber_stream_request_sample(grabber);
             }
 
             do_callback = state != grabber->state || state != SINK_STATE_PAUSED;
