@@ -89,8 +89,6 @@ struct sample_grabber
     float rate;
     enum sink_state state;
     CRITICAL_SECTION cs;
-    UINT32 sample_count;
-    IMFSample *samples[MAX_SAMPLE_QUEUE_LENGTH];
     UINT32 samples_queued;
     UINT32 pending_sample_deliveries;
 };
@@ -843,20 +841,6 @@ static void sample_grabber_release_pending_items(struct sample_grabber *grabber)
     }
 }
 
-static void release_samples(struct sample_grabber *grabber)
-{
-    unsigned int i;
-
-    for (i = 0; i < MAX_SAMPLE_QUEUE_LENGTH; ++i)
-    {
-        if (grabber->samples[i])
-        {
-            IMFSample_Release(grabber->samples[i]);
-            grabber->samples[i] = NULL;
-        }
-    }
-}
-
 static ULONG WINAPI sample_grabber_sink_Release(IMFMediaSink *iface)
 {
     struct sample_grabber *grabber = impl_from_IMFMediaSink(iface);
@@ -889,7 +873,6 @@ static ULONG WINAPI sample_grabber_sink_Release(IMFMediaSink *iface)
         if (grabber->sample_attributes)
             IMFAttributes_Release(grabber->sample_attributes);
         sample_grabber_release_pending_items(grabber);
-        release_samples(grabber);
         DeleteCriticalSection(&grabber->cs);
         free(grabber);
     }
@@ -1177,8 +1160,6 @@ static HRESULT sample_grabber_set_state(struct sample_grabber *grabber, enum sin
             if (state == SINK_STATE_STOPPED)
             {
                 sample_grabber_cancel_timer(grabber);
-                release_samples(grabber);
-                grabber->sample_count = MAX_SAMPLE_QUEUE_LENGTH;
                 sample_grabber_release_pending_items(grabber);
                 grabber->pending_sample_deliveries = 0;
             }
@@ -1502,7 +1483,6 @@ static HRESULT sample_grabber_create_object(IMFAttributes *attributes, void *use
     object->IMFStreamSink_iface.lpVtbl = &sample_grabber_stream_vtbl;
     object->IMFMediaTypeHandler_iface.lpVtbl = &sample_grabber_stream_type_handler_vtbl;
     object->timer_callback.lpVtbl = &sample_grabber_stream_timer_callback_vtbl;
-    object->sample_count = MAX_SAMPLE_QUEUE_LENGTH;
     object->refcount = 1;
     object->rate = 1.0f;
     if (FAILED(IMFSampleGrabberSinkCallback_QueryInterface(context->callback, &IID_IMFSampleGrabberSinkCallback2,
