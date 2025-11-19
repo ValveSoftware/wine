@@ -967,6 +967,44 @@ BOOL WINAPI ExtTextOutW( HDC hdc, INT x, INT y, UINT flags, const RECT *rect,
     if (dc_attr->emf && !EMFDC_ExtTextOut( dc_attr, x, y, flags, rect, str, count, dx ))
         return FALSE;
 
+    /* HACK: Use Microsoft Sans Serif for Thai. */
+    do
+    {
+        BOOL is_thai = FALSE;
+        int i;
+
+        for (i = 0; i < count; ++i)
+        {
+            if (str[i] >= 0x0e00 && str[i] <= 0x0e7f)
+                is_thai = TRUE;
+        }
+
+        if (is_thai)
+        {
+            const WCHAR *font_name = L"Microsoft Sans Serif";
+            HFONT old_font, new_font;
+            LOGFONTW log_font;
+
+            if (!(old_font = GetCurrentObject(hdc, OBJ_FONT))
+                    || !GetObjectW(old_font, sizeof(log_font), &log_font))
+                break;
+
+            if (wcscmp(log_font.lfFaceName, font_name) != 0)
+            {
+                wcscpy(log_font.lfFaceName, font_name);
+                if (!(new_font = CreateFontIndirectW(&log_font)))
+                    break;
+
+                SelectObject(hdc, new_font);
+                ret = ExtTextOutW(hdc, x, y, flags, rect, str, count, dx);
+                DeleteObject(new_font);
+                SelectObject(hdc, old_font);
+
+                return ret;
+            }
+        }
+    } while (0);
+
     if (!(flags & (ETO_GLYPH_INDEX | ETO_IGNORELANGUAGE)) && count > 0)
     {
         UINT bidi_flags;
