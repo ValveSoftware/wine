@@ -91,6 +91,7 @@ struct sample_grabber
     CRITICAL_SECTION cs;
     UINT32 sample_count;
     IMFSample *samples[MAX_SAMPLE_QUEUE_LENGTH];
+    UINT32 samples_queued;
 };
 
 static IMFSampleGrabberSinkCallback *sample_grabber_get_callback(const struct sample_grabber *sink)
@@ -187,13 +188,14 @@ static ULONG WINAPI sample_grabber_stream_AddRef(IMFStreamSink *iface)
     return IMFMediaSink_AddRef(&grabber->IMFMediaSink_iface);
 }
 
-static void stream_release_pending_item(struct scheduled_item *item)
+static void stream_release_pending_item(struct sample_grabber *grabber, struct scheduled_item *item)
 {
     list_remove(&item->entry);
     switch (item->type)
     {
         case ITEM_TYPE_SAMPLE:
             IMFSample_Release(item->u.sample);
+            grabber->samples_queued--;
             break;
         case ITEM_TYPE_MARKER:
             PropVariantClear(&item->u.marker.context);
@@ -398,13 +400,13 @@ static HRESULT stream_queue_sample(struct sample_grabber *grabber, IMFSample *sa
     item->u.sample = sample;
     IMFSample_AddRef(item->u.sample);
     list_init(&item->entry);
-    if (list_empty(&grabber->items))
+    if (!grabber->samples_queued++)
         hr = stream_schedule_sample(grabber, item);
 
     if (SUCCEEDED(hr))
         list_add_tail(&grabber->items, &item->entry);
     else
-        stream_release_pending_item(item);
+        stream_release_pending_item(grabber, item);
 
     return hr;
 }
@@ -492,7 +494,7 @@ static HRESULT stream_place_marker(struct sample_grabber *grabber, MFSTREAMSINK_
     if (SUCCEEDED(hr))
         list_add_tail(&grabber->items, &item->entry);
     else
-        stream_release_pending_item(item);
+        stream_release_pending_item(grabber, item);
 
     return hr;
 }
@@ -749,7 +751,7 @@ static HRESULT WINAPI sample_grabber_stream_timer_callback_Invoke(IMFAsyncCallba
         if (item->type == ITEM_TYPE_MARKER)
         {
             sample_grabber_stream_report_marker(grabber, &item->u.marker.context, S_OK);
-            stream_release_pending_item(item);
+            stream_release_pending_item(grabber, item);
         }
         else if (item->type == ITEM_TYPE_SAMPLE)
         {
@@ -757,7 +759,7 @@ static HRESULT WINAPI sample_grabber_stream_timer_callback_Invoke(IMFAsyncCallba
             {
                 if (FAILED(hr = sample_grabber_report_sample(grabber, item->u.sample, &sample_delivered)))
                     WARN("Failed to report a sample, hr %#lx.\n", hr);
-                stream_release_pending_item(item);
+                stream_release_pending_item(grabber, item);
                 sample_reported = TRUE;
             }
             else
@@ -840,7 +842,7 @@ static void sample_grabber_release_pending_items(struct sample_grabber *grabber)
 
     LIST_FOR_EACH_ENTRY_SAFE(item, next_item, &grabber->items, struct scheduled_item, entry)
     {
-        stream_release_pending_item(item);
+        stream_release_pending_item(grabber, item);
     }
 }
 
