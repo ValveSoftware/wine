@@ -432,7 +432,7 @@ static HRESULT WINAPI sample_grabber_stream_ProcessSample(IMFStreamSink *iface, 
 
     if (grabber->is_shut_down)
         hr = MF_E_STREAMSINK_REMOVED;
-    else if (grabber->state == SINK_STATE_RUNNING || (grabber->state == SINK_STATE_PAUSED && grabber->ignore_clock))
+    else if (grabber->state != SINK_STATE_STOPPED)
     {
         hr = IMFSample_GetSampleTime(sample, &sampletime);
 
@@ -448,14 +448,6 @@ static HRESULT WINAPI sample_grabber_stream_ProcessSample(IMFStreamSink *iface, 
             }
             else
                 hr = stream_queue_sample(grabber, sample);
-        }
-    }
-    else if (grabber->state == SINK_STATE_PAUSED)
-    {
-        if (grabber->sample_count < MAX_SAMPLE_QUEUE_LENGTH)
-        {
-            IMFSample_AddRef(sample);
-            grabber->samples[grabber->sample_count++] = sample;
         }
     }
 
