@@ -520,7 +520,6 @@ static HRESULT WINAPI sample_grabber_stream_PlaceMarker(IMFStreamSink *iface, MF
 static HRESULT WINAPI sample_grabber_stream_Flush(IMFStreamSink *iface)
 {
     struct sample_grabber *grabber = impl_from_IMFStreamSink(iface);
-    struct scheduled_item *item, *next_item;
     HRESULT hr = S_OK;
 
     TRACE("%p.\n", iface);
@@ -529,17 +528,6 @@ static HRESULT WINAPI sample_grabber_stream_Flush(IMFStreamSink *iface)
 
     if (grabber->is_shut_down)
         hr = MF_E_STREAMSINK_REMOVED;
-    else
-    {
-        LIST_FOR_EACH_ENTRY_SAFE(item, next_item, &grabber->items, struct scheduled_item, entry)
-        {
-            /* Samples are discarded, markers are processed immediately. */
-            if (item->type == ITEM_TYPE_MARKER)
-                sample_grabber_stream_report_marker(grabber, &item->u.marker.context, E_ABORT);
-
-            stream_release_pending_item(item);
-        }
-    }
 
     LeaveCriticalSection(&grabber->cs);
 
