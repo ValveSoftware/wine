@@ -756,6 +756,8 @@ static HRESULT WINAPI sample_grabber_stream_timer_callback_Invoke(IMFAsyncCallba
                     WARN("Failed to report a sample, hr %#lx.\n", hr);
                 stream_release_pending_item(grabber, item);
                 sample_reported = TRUE;
+                if (sample_delivered)
+                    sample_grabber_stream_request_sample(grabber);
             }
             else
             {
@@ -765,8 +767,6 @@ static HRESULT WINAPI sample_grabber_stream_timer_callback_Invoke(IMFAsyncCallba
             }
         }
     }
-    if (sample_delivered)
-        sample_grabber_stream_request_sample(grabber);
 
     LeaveCriticalSection(&grabber->cs);
 
