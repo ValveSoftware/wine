@@ -1020,9 +1020,9 @@ static BOOL enum_fallbacks( DWORD pitch_and_family, int index, WCHAR buffer[LF_F
     {
         const char * const *defaults;
 
-        if ((pitch_and_family & FIXED_PITCH) || (pitch_and_family & 0xf0) == FF_MODERN)
+        if ((pitch_and_family & FIXED_PITCH) || (pitch_and_family & 0x70) == FF_MODERN)
             defaults = default_fixed_list;
-        else if ((pitch_and_family & 0xf0) == FF_ROMAN)
+        else if ((pitch_and_family & 0x70) == FF_ROMAN)
             defaults = default_serif_list;
         else
             defaults = default_sans_list;
