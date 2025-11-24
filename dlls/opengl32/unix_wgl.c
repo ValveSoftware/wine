@@ -748,6 +748,7 @@ static GLubyte *filter_extensions( struct context *ctx, const char *extensions, 
 
     size = strlen( extensions ) + 2;
     if (funcs->p_glImportMemoryWin32HandleEXT) size += strlen( "GL_EXT_memory_object_win32" ) + 1;
+    if (funcs->p_glImportSemaphoreWin32HandleEXT) size += strlen( "GL_EXT_semaphore_win32" ) + 1;
     for (extra = legacy_extensions; *extra; extra++) size += strlen( *extra ) + 1;
     if (!(p = str = malloc( size ))) return NULL;
 
@@ -776,6 +777,7 @@ static GLubyte *filter_extensions( struct context *ctx, const char *extensions, 
     }
 
     if (funcs->p_glImportMemoryWin32HandleEXT) p = append_extension( p, "GL_EXT_memory_object_win32" );
+    if (funcs->p_glImportSemaphoreWin32HandleEXT) p = append_extension( p, "GL_EXT_semaphore_win32" );
     for (extra = legacy_extensions; *extra; extra++) p = append_extension( p, *extra );
 
     if (p != str) --p;
@@ -1516,6 +1518,7 @@ static void make_context_current( TEB *teb, const struct opengl_funcs *funcs, HD
     TRACE( "context %p version %d.%d\n", ctx, ctx->major_version, ctx->minor_version );
 
     if (funcs->p_glImportMemoryWin32HandleEXT) size++;
+    if (funcs->p_glImportSemaphoreWin32HandleEXT) size++;
 
     if (ctx->major_version >= 3)
     {
@@ -1574,6 +1577,7 @@ static void make_context_current( TEB *teb, const struct opengl_funcs *funcs, HD
     }
 
     if (funcs->p_glImportMemoryWin32HandleEXT) extensions[count++] = "GL_EXT_memory_object_win32";
+    if (funcs->p_glImportSemaphoreWin32HandleEXT) extensions[count++] = "GL_EXT_semaphore_win32";
     for (i = 0; legacy_extensions[i]; i++) extensions[count++] = legacy_extensions[i];
     qsort( extensions, count, sizeof(*extensions), string_array_cmp );
     ctx->extension_array = extensions;
