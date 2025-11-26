@@ -3322,6 +3322,19 @@ DWORD WINAPI GetOwnerModuleFromTcpEntry( PMIB_TCPROW_OWNER_MODULE entry, TCPIP_O
 }
 
 /******************************************************************
+ *    GetOwnerModuleFromTcp6Entry (IPHLPAPI.@)
+ */
+DWORD WINAPI GetOwnerModuleFromTcp6Entry( PMIB_TCP6ROW_OWNER_MODULE entry, TCPIP_OWNER_MODULE_INFO_CLASS class,
+                                         void *buffer, DWORD *size )
+{
+    TRACE( "entry %p, class %d, buffer %p, size %p.\n", entry, class, buffer, size );
+
+    if (!entry) return ERROR_INVALID_PARAMETER;
+
+    return get_owner_module_from_pid( class, buffer, size, entry->dwOwningPid );
+}
+
+/******************************************************************
  *    GetTcpTable (IPHLPAPI.@)
  *
  * Get the table of active TCP connections.
