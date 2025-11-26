@@ -38,6 +38,7 @@
 #include "ip2string.h"
 #include "netiodef.h"
 #include "icmpapi.h"
+#include "psapi.h"
 
 #include "wine/nsi.h"
 #include "wine/debug.h"
@@ -3269,6 +3270,55 @@ DWORD WINAPI GetExtendedTcpTable( void *table, DWORD *size, BOOL sort, ULONG fam
 
     if (!ip_module_id( family )) return ERROR_INVALID_PARAMETER;
     return get_extended_tcp_table( table, size, sort, family, table_class );
+}
+
+static DWORD get_owner_module_from_pid( TCPIP_OWNER_MODULE_INFO_CLASS class, void *buffer, DWORD *size, DWORD pid )
+{
+    WCHAR path[(MAX_PATH + 1) * sizeof(WCHAR)], *name;
+    TCPIP_OWNER_MODULE_BASIC_INFO *info = buffer;
+    DWORD len, ret_size;
+    HANDLE process;
+
+    if (class != TCPIP_OWNER_MODULE_INFO_BASIC)
+    {
+        FIXME( "Unsupported class %d.\n", class );
+        return ERROR_INVALID_PARAMETER;
+    }
+
+    if (!size) return ERROR_INVALID_PARAMETER;
+    if (!pid) return ERROR_NOT_FOUND;
+    if (!(process = OpenProcess( PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid ))) return GetLastError();
+    len = GetModuleFileNameExW( process, NULL, path, ARRAY_SIZE(path) );
+    CloseHandle( process );
+    if (!len) return ERROR_NOT_FOUND;
+    if (len == ARRAY_SIZE(path)) return ERROR_PATH_NOT_FOUND;
+    if (!(name = wcsrchr( path, '\\' ))) return ERROR_PATH_NOT_FOUND;
+    ++name;
+    len = wcslen( name ) + 1;
+    ret_size = sizeof(*info) + (len + wcslen( path ) + 1) * sizeof(WCHAR);
+    if (*size < ret_size)
+    {
+        *size = ret_size;
+        return ERROR_INSUFFICIENT_BUFFER;
+    }
+    info->pModuleName = (WCHAR *)(info + 1);
+    info->pModulePath = info->pModuleName + len;
+    memcpy( info->pModuleName, name, len * sizeof(WCHAR) );
+    wcscpy( info->pModulePath, path );
+    return ERROR_SUCCESS;
+}
+
+/******************************************************************
+ *    GetOwnerModuleFromTcpEntry (IPHLPAPI.@)
+ */
+DWORD WINAPI GetOwnerModuleFromTcpEntry( PMIB_TCPROW_OWNER_MODULE entry, TCPIP_OWNER_MODULE_INFO_CLASS class,
+                                         void *buffer, DWORD *size )
+{
+    TRACE( "entry %p, class %d, buffer %p, size %p.\n", entry, class, buffer, size );
+
+    if (!entry) return ERROR_INVALID_PARAMETER;
+
+    return get_owner_module_from_pid( class, buffer, size, entry->dwOwningPid );
 }
 
 /******************************************************************

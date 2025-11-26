@@ -2211,6 +2211,7 @@ static void test_GetExtendedTcpTable(void)
    we make, and associates it with our process. */
 static void test_GetExtendedTcpTable_owner( int family )
 {
+    BOOL found_it;
     SOCKET sock;
     int port;
     DWORD i, ret;
@@ -2266,7 +2267,7 @@ static void test_GetExtendedTcpTable_owner( int family )
     if (family == AF_INET)
     {
         MIB_TCPTABLE_OWNER_PID *table = raw_table;
-        BOOL found_it = FALSE;
+        found_it = FALSE;
         for (i = 0; i < table->dwNumEntries; i++)
         {
             MIB_TCPROW_OWNER_PID *row = &table->table[i];
@@ -2283,7 +2284,7 @@ static void test_GetExtendedTcpTable_owner( int family )
     else
     {
         MIB_TCP6TABLE_OWNER_PID *table = raw_table;
-        BOOL found_it = FALSE;
+        found_it = FALSE;
         for (i = 0; i < table->dwNumEntries; i++)
         {
             MIB_TCP6ROW_OWNER_PID *row = &table->table[i];
@@ -2293,6 +2294,101 @@ static void test_GetExtendedTcpTable_owner( int family )
                 ok( row->dwOwningPid == GetCurrentProcessId(), "unexpected socket owner %04lx\n", row->dwOwningPid );
                 found_it = TRUE;
                 break;
+            }
+        }
+        ok( found_it, "no table entry for socket\n" );
+    }
+
+    free( raw_table );
+    raw_table = NULL;
+    ret = get_extended_tcp_table( family, TCP_TABLE_OWNER_MODULE_ALL, &raw_table );
+    if (ret != ERROR_SUCCESS)
+    {
+        skip( "error %lu getting TCP table\n", ret );
+        goto done;
+    }
+
+    if (family == AF_INET)
+    {
+        MIB_TCPTABLE_OWNER_MODULE *t = raw_table;
+        TCPIP_OWNER_MODULE_BASIC_INFO *info;
+        MIB_TCPROW_OWNER_MODULE entry;
+        WCHAR mod[MAX_PATH], *name;
+        DWORD sz, expected, name_len;
+        BYTE buf[MAX_PATH + sizeof(TCPIP_OWNER_MODULE_BASIC_INFO) + 128];
+        HANDLE process;
+        char *p;
+
+        info = (TCPIP_OWNER_MODULE_BASIC_INFO *)buf;
+
+        mod[0] = 0;
+        GetModuleFileNameW( NULL, mod, ARRAY_SIZE(mod) );
+        name = wcsrchr( mod, '\\' );
+        ok( !!name, "could not get name, mod %s.\n", debugstr_w(mod) );
+        ++name;
+        name_len = (wcslen( name ) + 1) * sizeof(WCHAR);
+        expected = sizeof(TCPIP_OWNER_MODULE_BASIC_INFO) + name_len + (wcslen( mod ) + 1) * sizeof(WCHAR);
+        memset( &entry, 0, sizeof(entry) );
+
+        sz = sizeof(buf);
+        ret = GetOwnerModuleFromTcpEntry( NULL, TCPIP_OWNER_MODULE_INFO_BASIC, buf, &sz );
+        ok( ret == ERROR_INVALID_PARAMETER, "got %lu.\n", ret );
+
+        entry.dwOwningPid = 0;
+        ret = GetOwnerModuleFromTcpEntry( &entry, TCPIP_OWNER_MODULE_INFO_BASIC, buf, &sz );
+        ok( ret == ERROR_NOT_FOUND, "got %lu.\n", ret );
+
+        entry.dwOwningPid = 0xffff;
+        ret = GetOwnerModuleFromTcpEntry( &entry, TCPIP_OWNER_MODULE_INFO_BASIC, buf, &sz );
+        ok( ret == ERROR_INVALID_PARAMETER, "got %lu.\n", ret );
+
+        entry.dwOwningPid = GetCurrentProcessId();
+        sz = 1;
+        ret = GetOwnerModuleFromTcpEntry( &entry, TCPIP_OWNER_MODULE_INFO_BASIC, buf, &sz );
+        ok( ret == ERROR_INSUFFICIENT_BUFFER, "got %lu.\n", ret );
+        ok( sz == expected, "got %lu, expected %lu.\n", sz, expected );
+
+        ret = GetOwnerModuleFromTcpEntry( &entry, TCPIP_OWNER_MODULE_INFO_BASIC, buf, &sz );
+        ok( !ret, "got %lu.\n", ret );
+
+        p = (char *)(info + 1);
+        ok( (char *)info->pModuleName == p, "got %p, %p.\n", info, p );
+        p += name_len;
+        ok( (char *)info->pModulePath == p, "got %p, %p.\n", info, p);
+        ok( !wcscmp( info->pModuleName, name ), "got %s, %s.\n", debugstr_w(info->pModuleName), debugstr_w(name) );
+
+        found_it = FALSE;
+        for (i = 0; i < t->dwNumEntries; ++i)
+        {
+            info = (TCPIP_OWNER_MODULE_BASIC_INFO *)buf;
+
+            memset(buf, 0xcc, sizeof(buf));
+            sz = sizeof(buf) + 1;
+            ret = GetOwnerModuleFromTcpEntry( &t->table[i], TCPIP_OWNER_MODULE_INFO_BASIC, buf, &sz );
+            ok(sz == sizeof(buf) + 1, "got %ld.\n", sz);
+            ok( !ret || ret == ERROR_NOT_FOUND || ret == ERROR_ACCESS_DENIED
+                || ret == ERROR_MOD_NOT_FOUND,
+                /* This is weird, newer Windows seems to return non-zero OwningModuleInfo[0] sometimes but then
+                 * GetOwnerModuleFromTcp6Entry always fails with ERROR_MOD_NOT_FOUND, while that succeeds for the
+                 * same PID in MIB_TCPTABLE_OWNER_MODULE and zeroed OwningModuleInfo */
+                "got %#lx, pid %ld, info %#I64x.\n", ret, t->table[i].dwOwningPid, t->table[i].OwningModuleInfo[0] );
+
+            memset( &entry, 0, sizeof(entry) );
+            entry.dwOwningPid = t->table[i].dwOwningPid;
+            if (entry.dwOwningPid == GetCurrentProcessId())
+                found_it = TRUE;
+            ret = GetOwnerModuleFromTcpEntry( &entry, TCPIP_OWNER_MODULE_INFO_BASIC, buf, &sz );
+            process = OpenProcess( PROCESS_QUERY_LIMITED_INFORMATION, FALSE, entry.dwOwningPid );
+            ok( !ret || ret == ERROR_NOT_FOUND || ret == ERROR_ACCESS_DENIED,
+                "got %#lx, pid %ld, info %#I64x.\n", ret, t->table[i].dwOwningPid, t->table[i].OwningModuleInfo[0] );
+            if (!ret && !wcscmp( info->pModuleName, L"System" ))
+            {
+                ok( !wcscmp( info->pModulePath, L"System" ), "got %s.\n", debugstr_w(info->pModulePath) );
+            }
+            else if (ret == ERROR_ACCESS_DENIED)
+            {
+                process = OpenProcess( PROCESS_QUERY_LIMITED_INFORMATION, FALSE, entry.dwOwningPid );
+                ok( !process && GetLastError() == ERROR_ACCESS_DENIED, "got process %p, err %lu.\n", process, GetLastError() );
             }
         }
         ok( found_it, "no table entry for socket\n" );
