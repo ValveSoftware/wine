@@ -5692,6 +5692,39 @@ int disable_gamescope_max_size_hack(void)
     return cached;
 }
 
+static void style_fixup_workarounds( CREATESTRUCTW *cs, const UNICODE_STRING *class_name )
+{
+    static const WCHAR BlockClickMASKWndW[] = {'B','l','o','c','k','C','l','i','c','k','M','A','S','K','W','n','d'};
+    static const struct
+    {
+        const WCHAR *class_name;
+        const char *wm;
+        const char *game_id;
+        unsigned exstyle;
+    }
+    workarounds[] =
+    {
+        { BlockClickMASKWndW, "steamcompmgr", "3839850", WS_EX_NOACTIVATE },
+    };
+    const char *sgi = getenv( "SteamGameId" );
+    unsigned int i;
+
+    if (class_name->Buffer == (LPCWSTR)DESKTOP_CLASS_ATOM) return;
+
+    for (i = 0; i < ARRAY_SIZE(workarounds); ++i)
+    {
+        if ((!workarounds[i].wm || user_driver->pHasWindowManager( workarounds[i].wm ))
+            && (!workarounds[i].game_id || (sgi && !strcmp( sgi, workarounds[i].game_id )))
+            && (!workarounds[i].class_name ||
+                 (class_name->Length == wcslen( workarounds[i].class_name ) * sizeof(WCHAR)
+                 && !memcmp( class_name->Buffer, workarounds[i].class_name, class_name->Length ))))
+        {
+            FIXME( "HACK: adding %#x exstyle for %s.\n", workarounds[i].exstyle, debugstr_w( cs->lpszClass ));
+            cs->dwExStyle |= workarounds[i].exstyle;
+        }
+    }
+}
+
 /***********************************************************************
  *           NtUserCreateWindowEx (win32u.@)
  */
@@ -5728,6 +5761,8 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
     cs.y  = y;
     cs.cx = cx;
     cs.cy = cy;
+
+    style_fixup_workarounds( &cs, class_name );
 
     /* Find the parent window */
     if (parent == HWND_MESSAGE)
