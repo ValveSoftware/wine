@@ -1674,6 +1674,8 @@ struct test_handler
     ULONG set_current_count;
     IMFMediaType *current_type;
     IMFMediaType *invalid_type;
+    BOOL support_any;
+    BOOL return_media_types;
 
     ULONG enum_count;
     ULONG media_types_count;
@@ -1713,6 +1715,7 @@ static HRESULT WINAPI test_handler_IsMediaTypeSupported(IMFMediaTypeHandler *ifa
 {
     struct test_handler *impl = impl_from_IMFMediaTypeHandler(iface);
     BOOL result;
+    ULONG i;
 
     if (out_type)
         *out_type = NULL;
@@ -1721,12 +1724,17 @@ static HRESULT WINAPI test_handler_IsMediaTypeSupported(IMFMediaTypeHandler *ifa
             MF_ATTRIBUTES_MATCH_OUR_ITEMS, &result) == S_OK && result)
         return MF_E_INVALIDMEDIATYPE;
 
-    if (!impl->current_type)
+    if (impl->support_any)
         return S_OK;
 
-    if (IMFMediaType_Compare(impl->current_type, (IMFAttributes *)in_type,
+    if (impl->current_type && IMFMediaType_Compare(impl->current_type, (IMFAttributes *)in_type,
             MF_ATTRIBUTES_MATCH_OUR_ITEMS, &result) == S_OK && result)
         return S_OK;
+
+    for (i = 0; i < impl->media_types_count; ++i)
+        if (IMFMediaType_Compare(impl->media_types[i], (IMFAttributes *)in_type,
+                MF_ATTRIBUTES_MATCH_OUR_ITEMS, &result) == S_OK && result)
+            return S_OK;
 
     return MF_E_INVALIDMEDIATYPE;
 }
@@ -1742,7 +1750,7 @@ static HRESULT WINAPI test_handler_GetMediaTypeByIndex(IMFMediaTypeHandler *ifac
 {
     struct test_handler *impl = impl_from_IMFMediaTypeHandler(iface);
 
-    if (impl->media_types)
+    if (impl->return_media_types && impl->media_types)
     {
         impl->enum_count++;
 
@@ -1776,7 +1784,7 @@ static HRESULT WINAPI test_handler_GetCurrentMediaType(IMFMediaTypeHandler *ifac
 
     if (!impl->current_type)
     {
-        if (!impl->media_types)
+        if (!impl->return_media_types)
             return E_FAIL;
         if (!impl->media_types_count)
             return MF_E_TRANSFORM_TYPE_NOT_SET;
@@ -2185,6 +2193,7 @@ enum loader_test_flags
     LOADER_SET_INVALID_INPUT = 0x40,
     LOADER_SET_MEDIA_TYPES = 0x80,
     LOADER_ADD_RESAMPLER_MFT = 0x100,
+    LOADER_SUPPORT_ANY = 0x200,
 };
 
 static void test_topology_loader(void)
@@ -2491,13 +2500,13 @@ static void test_topology_loader(void)
             /* RGB32 -> Any Video, no current output type */
             .input_type = &video_i420_1280, .output_type = &video_dummy, .sink_method = -1, .source_method = -1,
             .expected_result = S_OK,
-            .flags = LOADER_NO_CURRENT_OUTPUT,
+            .flags = LOADER_NO_CURRENT_OUTPUT | LOADER_SUPPORT_ANY,
         },
         {
             /* RGB32 -> Any Video, no current output type, refuse input type */
             .input_type = &video_i420_1280, .output_type = &video_dummy, .sink_method = -1, .source_method = -1,
             .expected_result = S_OK, .converter_class = CLSID_CColorConvertDMO,
-            .flags = LOADER_NO_CURRENT_OUTPUT | LOADER_SET_INVALID_INPUT,
+            .flags = LOADER_NO_CURRENT_OUTPUT | LOADER_SET_INVALID_INPUT | LOADER_SUPPORT_ANY,
         },
         {
             /* RGB32 -> Any Video, no current output type, refuse input type */
@@ -2662,6 +2671,14 @@ static void test_topology_loader(void)
             handler.invalid_type = input_type;
         else
             handler.invalid_type = NULL;
+        if (test->flags & LOADER_SUPPORT_ANY)
+            handler.support_any = TRUE;
+        else
+            handler.support_any = FALSE;
+        if (test->flags & LOADER_SET_MEDIA_TYPES)
+            handler.return_media_types = TRUE;
+        else
+            handler.return_media_types = FALSE;
 
         handler.enum_count = 0;
         if (test->flags & LOADER_SET_MEDIA_TYPES)
