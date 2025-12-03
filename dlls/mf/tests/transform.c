@@ -6267,6 +6267,10 @@ static void test_audio_convert(void)
     check_mft_set_output_type(transform, output_type_desc, S_OK);
     check_mft_get_output_current_type_(__LINE__, transform, expect_output_type_desc, FALSE, TRUE);
 
+    check_mft_set_input_type(transform, input_type_desc, S_OK);
+    /* setting the input type does not set the output type to null */
+    check_mft_get_output_current_type_(__LINE__, transform, expect_output_type_desc, FALSE, TRUE);
+
     check_mft_get_input_stream_info(transform, S_OK, &input_info);
     check_mft_get_output_stream_info(transform, S_OK, &output_info);
 
@@ -6323,6 +6327,15 @@ static void test_audio_convert(void)
     ok(length == 0, "got length %lu\n", length);
     ret = IMFSample_Release(output_sample);
     ok(ret == 0, "Release returned %lu\n", ret);
+
+    /* setting the input type to null does not set the output type to null */
+    hr = IMFTransform_SetInputType(transform, 0, NULL, 0);
+    ok(hr == S_OK, "SetInputType returned %#lx\n", hr);
+    hr = IMFTransform_GetInputCurrentType(transform, 0, &media_type);
+    ok(hr == MF_E_TRANSFORM_TYPE_NOT_SET, "GetInputCurrentType returned hr %#lx.\n", hr);
+    hr = IMFTransform_GetOutputCurrentType(transform, 0, &media_type);
+    ok(hr == S_OK, "GetOutputCurrentType returned hr %#lx.\n", hr);
+    IMFMediaType_Release(media_type);
 
     ret = IMFTransform_Release(transform);
     ok(ret == 0, "Release returned %lu\n", ret);
