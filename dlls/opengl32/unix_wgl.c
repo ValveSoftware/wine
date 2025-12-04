@@ -730,14 +730,24 @@ static BOOL is_extension_supported( struct context *ctx, const char *extension )
                     sizeof(ctx->extension_array[0]), string_array_cmp ) != NULL;
 }
 
+static char *append_extension( char *ptr, const char *name )
+{
+    size_t size = strlen( name );
+    memcpy( ptr, name, size );
+    ptr += size;
+    *ptr++ = ' ';
+    return ptr;
+}
+
 /* build the extension string by filtering out the disabled extensions */
-static GLubyte *filter_extensions( struct context *ctx, const char *extensions )
+static GLubyte *filter_extensions( struct context *ctx, const char *extensions, const struct opengl_funcs *funcs )
 {
     const char *end, **extra;
     size_t size;
     char *p, *str;
 
     size = strlen( extensions ) + 2;
+    if (funcs->p_glImportMemoryWin32HandleEXT) size += strlen( "GL_EXT_memory_object_win32" ) + 1;
     for (extra = legacy_extensions; *extra; extra++) size += strlen( *extra ) + 1;
     if (!(p = str = malloc( size ))) return NULL;
 
@@ -765,13 +775,8 @@ static GLubyte *filter_extensions( struct context *ctx, const char *extensions )
         extensions = end;
     }
 
-    for (extra = legacy_extensions; *extra; extra++)
-    {
-        size = strlen( *extra );
-        memcpy( p, *extra, size );
-        p += size;
-        *p++ = ' ';
-    }
+    if (funcs->p_glImportMemoryWin32HandleEXT) p = append_extension( p, "GL_EXT_memory_object_win32" );
+    for (extra = legacy_extensions; *extra; extra++) p = append_extension( p, *extra );
 
     if (p != str) --p;
     *p = 0;
@@ -988,7 +993,7 @@ const GLubyte *wrap_glGetString( TEB *teb, GLenum name )
         {
             struct context *ctx = get_current_context( teb, NULL, NULL );
             GLubyte **extensions = &ctx->extensions;
-            if (*extensions || (*extensions = filter_extensions( ctx, (const char *)ret ))) return *extensions;
+            if (*extensions || (*extensions = filter_extensions( ctx, (const char *)ret, funcs ))) return *extensions;
         }
         else if (name == GL_VERSION)
         {
@@ -1510,6 +1515,8 @@ static void make_context_current( TEB *teb, const struct opengl_funcs *funcs, HD
     if (!ctx->major_version) ctx->major_version = 1;
     TRACE( "context %p version %d.%d\n", ctx, ctx->major_version, ctx->minor_version );
 
+    if (funcs->p_glImportMemoryWin32HandleEXT) size++;
+
     if (ctx->major_version >= 3)
     {
         GLint extensions_count;
@@ -1549,7 +1556,6 @@ static void make_context_current( TEB *teb, const struct opengl_funcs *funcs, HD
             }
             ext++;
         }
-        assert( count + ARRAYSIZE(legacy_extensions) - 1 == size );
     }
 
     if (!disabled && !(disabled = query_opengl_option( "DisabledExtensions" ))) disabled = "";
@@ -1567,6 +1573,7 @@ static void make_context_current( TEB *teb, const struct opengl_funcs *funcs, HD
         count = j;
     }
 
+    if (funcs->p_glImportMemoryWin32HandleEXT) extensions[count++] = "GL_EXT_memory_object_win32";
     for (i = 0; legacy_extensions[i]; i++) extensions[count++] = legacy_extensions[i];
     qsort( extensions, count, sizeof(*extensions), string_array_cmp );
     ctx->extension_array = extensions;
