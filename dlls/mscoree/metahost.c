@@ -791,7 +791,8 @@ static BOOL get_mono_path_registry(LPWSTR path)
 
 static BOOL get_mono_path_dos(const WCHAR *dir, LPWSTR path)
 {
-    static const WCHAR basedir[] = L"\\wine-mono-" WINE_MONO_VERSION;
+    static const WCHAR basedir[] = L"\\wine-mono";
+    static const WCHAR basedir2[] = L"\\wine-mono-" WINE_MONO_VERSION;
     LPWSTR dos_dir;
     WCHAR mono_dll_path[MAX_PATH];
     DWORD len;
@@ -807,6 +808,20 @@ static BOOL get_mono_path_dos(const WCHAR *dir, LPWSTR path)
         lstrcpyW(path, dos_dir);
 
     free(dos_dir);
+
+    if (!ret)
+    {
+        len = lstrlenW( dir ) + lstrlenW( basedir2 ) + 1;
+        if (!(dos_dir = malloc( len * sizeof(WCHAR) ))) return FALSE;
+        lstrcpyW( dos_dir, dir );
+        lstrcatW( dos_dir, basedir2 );
+
+        ret = find_mono_dll(dos_dir, mono_dll_path);
+        if (ret)
+            lstrcpyW(path, dos_dir);
+
+        free(dos_dir);
+    }
 
     return ret;
 }
