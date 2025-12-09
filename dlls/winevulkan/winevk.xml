@@ -2,10 +2,70 @@
 <registry>
     <types>
         <type requires="windows.h" name="BOOL"/>
+        <type requires="windows.h" name="UINT64"/>
         <type category="struct" name="SECURITY_ATTRIBUTES">
             <member><type>DWORD</type> <name>nLength</name></member>
             <member><type>void</type>* <name>lpSecurityDescriptor</name></member>
             <member><type>BOOL</type> <name>bInheritHandle</name></member>
         </type>
+
+        <type category="funcpointer" requires="VkInstance">typedef PFN_vkVoidFunction (VKAPI_PTR *<name>PFN_vkGetInstanceProcAddrWINE</name>)(
+            <type>VkInstance</type> instance, const <type>char</type>* name );</type>
+        <type category="funcpointer">typedef VkResult (VKAPI_PTR *<name>PFN_vkCreateInstanceCallbackWINE</name>)(
+            const <type>void</type>* create_info,
+            const <type>void</type>* allocator,
+            <type>VkInstance</type>* instance,
+            <type>PFN_vkGetInstanceProcAddrWINE</type> get_instance_proc_addr,
+            <type>void</type>* context );</type>
+        <type category="struct" name="VkCreateInfoWineInstanceCallback" structextends="VkInstanceCreateInfo">
+            <member values="VK_STRUCTURE_TYPE_CREATE_INFO_WINE_INSTANCE_CALLBACK"><type>VkStructureType</type> <name>sType</name></member>
+            <member optional="true">const <type>void</type>* <name>pNext</name></member>
+            <member><type>UINT64</type> <name>native_create_callback</name></member>
+            <member><type>UINT64</type> <name>context</name></member>
+        </type>
+
+        <type category="funcpointer" requires="VkDevice">typedef PFN_vkVoidFunction (VKAPI_PTR *<name>PFN_vkGetDeviceProcAddrWINE</name>)(
+            <type>VkDevice</type> device, const <type>char</type>* name );</type>
+        <type category="funcpointer">typedef VkResult (VKAPI_PTR *<name>PFN_vkCreateDeviceCallbackWINE</name>)(
+            <type>VkPhysicalDevice</type> physical_device,
+            const <type>void</type>* create_info,
+            const <type>void</type>* allocator,
+            <type>VkDevice</type>* device,
+            <type>PFN_vkGetDeviceProcAddrWINE</type> get_device_proc_addr,
+            <type>void</type>* context );</type>
+        <type category="struct" name="VkCreateInfoWineDeviceCallback" structextends="VkDeviceCreateInfo">
+            <member values="VK_STRUCTURE_TYPE_CREATE_INFO_WINE_DEVICE_CALLBACK"><type>VkStructureType</type> <name>sType</name></member>
+            <member optional="true">const <type>void</type>* <name>pNext</name></member>
+            <member><type>UINT64</type> <name>native_create_callback</name></member>
+            <member><type>UINT64</type> <name>context</name></member>
+        </type>
     </types>
+    <extensions>
+        <extension name="VK_WINE_openvr_device_extensions" number="-1" author="WINE" depends="VK_VERSION_1_1" type="device" supported="vulkan">
+            <require>
+                <enum value="1"                                                 name="VK_WINE_OPENVR_DEVICE_EXTENSIONS_SPEC_VERSION"/>
+                <enum value="&quot;VK_WINE_openvr_device_extensions&quot;"      name="VK_WINE_OPENVR_DEVICE_EXTENSIONS_EXTENSION_NAME"/>
+            </require>
+        </extension>
+        <extension name="VK_WINE_openxr_instance_extensions" number="-2" author="WINE" depends="VK_VERSION_1_1" type="instance" supported="vulkan">
+            <require>
+                <enum value="1"                                                 name="VK_WINE_OPENXR_INSTANCE_EXTENSIONS_SPEC_VERSION"/>
+                <enum value="&quot;VK_WINE_openxr_instance_extensions&quot;"    name="VK_WINE_OPENXR_INSTANCE_EXTENSIONS_EXTENSION_NAME"/>
+                <enum offset="0" extends="VkStructureType"                      name="VK_STRUCTURE_TYPE_CREATE_INFO_WINE_INSTANCE_CALLBACK"/>
+                <type name="PFN_vkGetInstanceProcAddrWINE"/>
+                <type name="PFN_vkCreateInstanceCallbackWINE"/>
+                <type name="VkCreateInfoWineInstanceCallback"/>
+            </require>
+        </extension>
+        <extension name="VK_WINE_openxr_device_extensions" number="-3" author="WINE" depends="VK_VERSION_1_1" type="device" supported="vulkan">
+            <require>
+                <enum value="1"                                                 name="VK_WINE_OPENXR_DEVICE_EXTENSIONS_SPEC_VERSION"/>
+                <enum value="&quot;VK_WINE_openxr_device_extensions&quot;"      name="VK_WINE_OPENXR_DEVICE_EXTENSIONS_EXTENSION_NAME"/>
+                <enum offset="0" extends="VkStructureType"                      name="VK_STRUCTURE_TYPE_CREATE_INFO_WINE_DEVICE_CALLBACK"/>
+                <type name="PFN_vkGetDeviceProcAddrWINE"/>
+                <type name="PFN_vkCreateDeviceCallbackWINE"/>
+                <type name="VkCreateInfoWineDeviceCallback"/>
+            </require>
+        </extension>
+    </extensions>
 </registry>

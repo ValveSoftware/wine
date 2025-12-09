@@ -336,6 +336,14 @@ static const void *find_next_struct( const VkBaseInStructure *header, VkStructur
     return NULL;
 }
 
+static const void *pop_next_struct( VkBaseOutStructure **next, VkStructureType type )
+{
+    VkBaseOutStructure *ptr;
+    while (*next && (*next)->sType != type) next = &(*next)->pNext;
+    if ((ptr = *next)) *next = ptr->pNext;
+    return ptr;
+}
+
 static int vulkan_object_compare( const void *key, const struct rb_entry *entry )
 {
     struct vulkan_object *object = RB_ENTRY_VALUE( entry, struct vulkan_object, entry );
@@ -593,11 +601,38 @@ failed:
     return res;
 }
 
+static BOOL add_instance_extension( const char *extension, size_t len, struct vulkan_instance_extensions *extensions )
+{
+#define USE_VK_EXT(x) \
+    if (len == sizeof(#x) - 1 && !strncmp( #x, extension, len ))    \
+    {                                                               \
+        if (!extensions->has_ ## x) TRACE( "Adding %s\n", #x );     \
+        return extensions->has_ ## x = 1;                           \
+    }
+    ALL_VK_INSTANCE_EXTS
+#undef USE_VK_EXT
+    WARN( "Extension %s is not supported.\n", debugstr_a(extension) );
+    return FALSE;
+}
+
+static void parse_instance_extensions( struct vulkan_instance_extensions *extensions, const char *str )
+{
+    const char *next;
+    for (next = str; *next; next++)
+    {
+        if (*next != ' ') continue;
+        add_instance_extension( str, next - str, extensions );
+        str = next + 1;
+    }
+    if (next > str) add_instance_extension( str, next - str, extensions );
+}
+
 static VkResult win32u_vkCreateInstance( const VkInstanceCreateInfo *client_create_info, const VkAllocationCallbacks *allocator,
                                          VkInstance *client_instance_ptr )
 {
     VkInstanceCreateInfo *create_info = (VkInstanceCreateInfo *)client_create_info; /* cast away const, chain has been copied in the thunks */
     VkInstance host_instance = VK_NULL_HANDLE, client_instance = *client_instance_ptr;
+    const VkCreateInfoWineInstanceCallback *callback_info;
     struct vulkan_physical_device *physical_devices;
     struct mempool pool = {0};
     struct instance *instance;
@@ -611,8 +646,19 @@ static VkResult win32u_vkCreateInstance( const VkInstanceCreateInfo *client_crea
     list_init( &instance->utils_messengers );
     list_init( &instance->report_callbacks );
 
+    if (instance->obj.extensions.has_VK_WINE_openxr_instance_extensions)
+    {
+        parse_instance_extensions( &instance->obj.extensions, getenv( "__WINE_OPENXR_VK_INSTANCE_EXTENSIONS" ) );
+        instance->obj.extensions.has_VK_WINE_openxr_instance_extensions = 0;
+    }
+
     if ((res = convert_instance_create_info( &pool, create_info, instance ))) goto failed;
-    if ((res = p_vkCreateInstance( create_info, NULL /* allocator */, &host_instance ))) goto failed;
+    if ((callback_info = pop_next_struct( (VkBaseOutStructure **)&create_info->pNext, VK_STRUCTURE_TYPE_CREATE_INFO_WINE_INSTANCE_CALLBACK )))
+    {
+        PFN_vkCreateInstanceCallbackWINE callback = (void *)(UINT_PTR)callback_info->native_create_callback;
+        if ((res = callback( create_info, allocator, &host_instance, p_vkGetInstanceProcAddr, (void *)(UINT_PTR)callback_info->context ))) goto failed;
+    }
+    else if ((res = p_vkCreateInstance( create_info, NULL /* allocator */, &host_instance ))) goto failed;
 
     vulkan_object_init_ptr( &instance->obj.obj, (UINT_PTR)host_instance, &client_instance->obj );
     instance->obj.p_insert_object = vulkan_instance_insert_object;
@@ -668,6 +714,33 @@ static void win32u_vkDestroyInstance( VkInstance client_instance, const VkAlloca
     free( instance );
 }
 
+static BOOL add_device_extension( const char *extension, size_t len, struct vulkan_device_extensions *extensions )
+{
+#define USE_VK_EXT(x) \
+    if (len == sizeof(#x) - 1 && !strncmp( #x, extension, len ))    \
+    {                                                               \
+        if (!extensions->has_ ## x) TRACE( "Adding %s\n", #x );     \
+        return extensions->has_ ## x = 1;                           \
+    }
+    ALL_VK_DEVICE_EXTS
+#undef USE_VK_EXT
+    WARN( "Extension %s is not supported.\n", debugstr_a(extension) );
+    return FALSE;
+}
+
+static void parse_device_extensions( struct vulkan_device_extensions *extensions, const char *str )
+{
+    const char *next;
+
+    for (next = str; *next; next++)
+    {
+        if (*next != ' ') continue;
+        add_device_extension( str, next - str, extensions );
+        str = next + 1;
+    }
+    if (next > str) add_device_extension( str, next - str, extensions );
+}
+
 static VkResult convert_device_create_info( struct vulkan_physical_device *physical_device, VkDeviceCreateInfo *info,
                                             struct mempool *pool, struct vulkan_device *device )
 {
@@ -691,6 +764,8 @@ static VkResult convert_device_create_info( struct vulkan_physical_device *physi
     device->extensions.has_VK_KHR_external_memory_win32 = 0;
     device->extensions.has_VK_KHR_external_fence_win32 = 0;
     device->extensions.has_VK_KHR_external_semaphore_win32 = 0;
+    device->extensions.has_VK_WINE_openvr_device_extensions = 0;
+    device->extensions.has_VK_WINE_openxr_device_extensions = 0;
 
     if (device->extensions.has_VK_EXT_external_memory_dma_buf)
         device->extensions.has_VK_KHR_external_memory_fd = 1;
@@ -769,6 +844,7 @@ static VkResult win32u_vkCreateDevice( VkPhysicalDevice client_physical_device, 
     struct vulkan_physical_device *physical_device = vulkan_physical_device_from_handle( client_physical_device );
     struct vulkan_instance *instance = physical_device->instance;
     VkDevice host_device, client_device = *client_device_ptr;
+    const VkCreateInfoWineDeviceCallback *callback_info;
     struct vulkan_device *device;
     unsigned int queue_count, i;
     struct mempool pool = {0};
@@ -789,8 +865,30 @@ static VkResult win32u_vkCreateDevice( VkPhysicalDevice client_physical_device, 
     if (!(device = calloc( 1, offsetof(struct vulkan_device, queues[queue_count]) ))) return VK_ERROR_OUT_OF_HOST_MEMORY;
     device->extensions = client_device->extensions;
 
+    if (device->extensions.has_VK_WINE_openvr_device_extensions)
+    {
+        VkPhysicalDeviceProperties properties = {0};
+        const char *vr_exts;
+        char name[64];
+        instance->p_vkGetPhysicalDeviceProperties( physical_device->host.physical_device, &properties );
+        sprintf( name, "VK_WINE_OPENVR_DEVICE_EXTS_PCIID_%04x_%04x", properties.vendorID, properties.deviceID );
+        if (!(vr_exts = getenv( name ))) vr_exts = getenv( "VK_WINE_OPENVR_DEVICE_EXTS" );
+        if (vr_exts) parse_device_extensions( &device->extensions, vr_exts );
+        device->extensions.has_VK_WINE_openvr_device_extensions = 0;
+    }
+    if (device->extensions.has_VK_WINE_openxr_device_extensions)
+    {
+        parse_device_extensions( &device->extensions, getenv( "__WINE_OPENXR_VK_DEVICE_EXTENSIONS" ) );
+        device->extensions.has_VK_WINE_openxr_device_extensions = 0;
+    }
+
     if ((res = convert_device_create_info( physical_device, create_info, &pool, device ))) goto failed;
-    if ((res = instance->p_vkCreateDevice( physical_device->host.physical_device, create_info, NULL /* allocator */, &host_device ))) goto failed;
+    if ((callback_info = pop_next_struct( (VkBaseOutStructure **)&create_info->pNext, VK_STRUCTURE_TYPE_CREATE_INFO_WINE_DEVICE_CALLBACK )))
+    {
+        PFN_vkCreateDeviceCallbackWINE callback = (void *)(UINT_PTR)callback_info->native_create_callback;
+        if ((res = callback( physical_device->host.physical_device, create_info, allocator, &host_device, p_vkGetDeviceProcAddr, (void *)(UINT_PTR)callback_info->context ))) goto failed;
+    }
+    else if ((res = instance->p_vkCreateDevice( physical_device->host.physical_device, create_info, NULL /* allocator */, &host_device ))) goto failed;
 
     vulkan_object_init_ptr( &device->obj, (UINT_PTR)host_device, &client_device->obj );
     device->physical_device = physical_device;
@@ -2931,6 +3029,8 @@ static void nulldrv_map_device_extensions( struct vulkan_device_extensions *exte
     if (extensions->has_VK_KHR_external_semaphore_fd) extensions->has_VK_KHR_external_semaphore_win32 = 1;
     if (extensions->has_VK_KHR_external_fence_win32) extensions->has_VK_KHR_external_fence_fd = 1;
     if (extensions->has_VK_KHR_external_fence_fd) extensions->has_VK_KHR_external_fence_win32 = 1;
+    extensions->has_VK_WINE_openvr_device_extensions = 1;
+    extensions->has_VK_WINE_openxr_device_extensions = 1;
 }
 
 static const struct vulkan_driver_funcs nulldrv_funcs =

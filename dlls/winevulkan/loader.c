@@ -602,6 +602,19 @@ VkResult WINAPI vkEnumerateDeviceExtensionProperties(VkPhysicalDevice physical_d
         TRACE("  - VK_KHR_win32_keyed_mutex\n");
         if (len++ < capacity && properties) properties[len - 1] = VK_KHR_win32_keyed_mutex;
     }
+    if (physical_device->extensions.has_VK_WINE_openvr_device_extensions)
+    {
+        static const VkExtensionProperties VK_WINE_openvr_device_extensions = {VK_WINE_OPENVR_DEVICE_EXTENSIONS_EXTENSION_NAME, VK_WINE_OPENVR_DEVICE_EXTENSIONS_SPEC_VERSION};
+        TRACE("  - VK_WINE_openvr_device_extensions\n");
+        if (len++ < capacity && properties) properties[len - 1] = VK_WINE_openvr_device_extensions;
+    }
+    if (physical_device->extensions.has_VK_WINE_openxr_device_extensions)
+    {
+        static const VkExtensionProperties VK_WINE_openxr_device_extensions = {VK_WINE_OPENXR_DEVICE_EXTENSIONS_EXTENSION_NAME, VK_WINE_OPENXR_DEVICE_EXTENSIONS_SPEC_VERSION};
+        TRACE("  - VK_WINE_openxr_device_extensions\n");
+        if (len++ < capacity && properties) properties[len - 1] = VK_WINE_openxr_device_extensions;
+    }
+
     res = len > capacity ? VK_INCOMPLETE : VK_SUCCESS;
     *count = min(len, capacity);
 

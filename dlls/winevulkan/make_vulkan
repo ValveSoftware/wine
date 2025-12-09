@@ -3516,7 +3516,7 @@ class VkRegistry(object):
         self.bitmasks = sorted(bitmasks, key=lambda bitmask: bitmask.name)
         self.defines = defines
         self.enums = OrderedDict(sorted(self.enums.items()))
-        self.funcpointers = sorted(funcpointers, key=lambda fp: fp.value)
+        self.funcpointers = funcpointers
         self.handles = sorted(handles, key=lambda handle: handle.name)
         self.structs = sorted(structs.values(), key=lambda struct: (-struct.order, struct.name))
 
