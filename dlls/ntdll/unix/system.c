@@ -1895,6 +1895,7 @@ void init_cpu_info(void)
     peb->NumberOfProcessors = cpu_override.mapping.cpu_count
             ? cpu_override.mapping.cpu_count : num;
     init_cpu_model();
+    get_random( &process_cookie, sizeof(process_cookie) );
 }
 
 static SYSTEM_CPU_INFORMATION get_cpuinfo(void)
