@@ -3720,6 +3720,35 @@ void net_supported_init( struct x11drv_thread_data *data )
     }
 }
 
+static Window get_net_supporting_wm_check( Display *display, Window window )
+{
+    unsigned long count, remaining;
+    Window *tmp, support = None;
+    int format;
+    Atom type;
+
+    if (!XGetWindowProperty( display, window, x11drv_atom(_NET_SUPPORTING_WM_CHECK), 0, 65536 / sizeof(CARD32),
+                             False, XA_WINDOW, &type, &format, &count, &remaining, (unsigned char **)&tmp ) && tmp)
+    {
+        support = *tmp;
+        free( tmp );
+    }
+
+    return support;
+}
+
+void net_supporting_wm_check_init( struct x11drv_thread_data *data )
+{
+    Window window = None, other;
+
+    if (!(window = get_net_supporting_wm_check( data->display, DefaultRootWindow( data->display ) ))) return;
+
+    /* the window itself must have the property set too */
+    X11DRV_expect_error( data->display, host_window_error, NULL );
+    other = get_net_supporting_wm_check( data->display, window );
+    if (X11DRV_check_error() || window != other) WARN( "Invalid _NET_SUPPORTING_WM_CHECK window\n" );
+}
+
 void init_win_context(void)
 {
     init_recursive_mutex( &win_data_mutex );

@@ -513,6 +513,7 @@ enum x11drv_atoms
     XATOM__NET_STARTUP_INFO_BEGIN,
     XATOM__NET_STARTUP_INFO,
     XATOM__NET_SUPPORTED,
+    XATOM__NET_SUPPORTING_WM_CHECK,
     XATOM__NET_SYSTEM_TRAY_OPCODE,
     XATOM__NET_SYSTEM_TRAY_S0,
     XATOM__NET_SYSTEM_TRAY_VISUAL,
@@ -718,6 +719,7 @@ extern void net_active_window_notify( unsigned long serial, Window window, Time 
 extern void net_active_window_init( struct x11drv_thread_data *data );
 extern void net_supported_init( struct x11drv_thread_data *data );
 extern BOOL is_net_supported( Atom atom );
+extern void net_supporting_wm_check_init( struct x11drv_thread_data *data );
 
 extern Window init_clip_window(void);
 extern void window_set_user_time( struct x11drv_win_data *data, Time time, BOOL init );
