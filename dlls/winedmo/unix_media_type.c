@@ -259,6 +259,7 @@ static void mf_video_format_init( const AVCodecParameters *params, MFVIDEOFORMAT
         else if (params->codec_id == AV_CODEC_ID_H264) format->guidFormat.Data1 = MFVideoFormat_H264.Data1;
         else if (params->codec_id == AV_CODEC_ID_VP9) format->guidFormat.Data1 = MFVideoFormat_VP90.Data1;
         else if (params->codec_id == AV_CODEC_ID_AV1) format->guidFormat.Data1 = MFVideoFormat_AV1.Data1;
+        else if (params->codec_id == AV_CODEC_ID_HEVC) format->guidFormat.Data1 = MFVideoFormat_HEVC.Data1;
         else if (params->codec_tag) format->guidFormat.Data1 = params->codec_tag;
         else format->guidFormat.Data1 = video_format_tag_from_codec_id( params->codec_id );
     }
