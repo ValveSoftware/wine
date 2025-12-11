@@ -166,7 +166,7 @@ static INT64 last_query_display_time;
 static UINT64 monitor_update_serial;
 static pthread_mutex_t display_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static BOOL emulate_modeset;
+static BOOL emulate_modeset = TRUE;
 BOOL decorated_mode = TRUE;
 UINT64 thunk_lock_callback = 0;
 
@@ -2817,6 +2817,8 @@ static BOOL lock_display_devices( BOOL force )
     BOOL ret = TRUE;
 
     init_display_driver(); /* make sure to load the driver before anything else */
+
+    if (user_driver->pHasWindowManager( "steamcompmgr" )) emulate_modeset = FALSE;
 
     pthread_mutex_lock( &display_lock );
 
@@ -5941,7 +5943,7 @@ void sysparams_init(void)
     if (!get_config_key( hkey, appkey, "Decorated", buffer, sizeof(buffer) ))
         decorated_mode = IS_OPTION_TRUE( buffer[0] );
     if (!get_config_key( hkey, appkey, "EmulateModeset", buffer, sizeof(buffer) ))
-        emulate_modeset = IS_OPTION_TRUE( buffer[0] );
+        emulate_modeset = !IS_OPTION_TRUE( buffer[0] );
 
 #undef IS_OPTION_TRUE
 
