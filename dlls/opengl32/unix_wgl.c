@@ -1219,13 +1219,190 @@ static BOOL initialize_vk_device( TEB *teb, struct context *ctx )
     return FALSE;
 }
 
+static BOOL fs_hack_is_integer(void)
+{
+    static int is_int = -1;
+    if (is_int < 0)
+    {
+        const char *e = getenv( "WINE_FULLSCREEN_INTEGER_SCALING" );
+        is_int = e && strcmp( e, "0" );
+    }
+    TRACE( "is_interger_scaling: %s\n", is_int ? "TRUE" : "FALSE" );
+    return is_int;
+}
+
+static const char *fs_hack_gamma_vertex_shader_src =
+"#version 330\n"
+"\n"
+"const vec4 square[4] = vec4[4](\n"
+"    vec4(-1.0, -1.0, 0.0, 1.0),\n"
+"    vec4(-1.0, 1.0, 0.0, 1.0),\n"
+"    vec4(1.0, -1.0, 0.0, 1.0),\n"
+"    vec4(1.0, 1.0, 0.0, 1.0)\n"
+");\n"
+"const vec2 texsq[4] = vec2[4](\n"
+"    vec2(0.0, 0.0),\n"
+"    vec2(0.0, 1.0),\n"
+"    vec2(1.0, 0.0),\n"
+"    vec2(1.0, 1.0)\n"
+");\n"
+"\n"
+"out vec2 texCoord;\n"
+"\n"
+"void main(void)\n"
+"{\n"
+"    gl_Position = square[gl_VertexID];\n"
+"    texCoord = texsq[gl_VertexID];\n"
+"}\n"
+;
+
+static const char *fs_hack_gamma_frag_shader_src =
+"#version 330\n"
+"\n"
+"uniform sampler2D tex;\n"
+"in vec2 texCoord;\n"
+"layout (std140) uniform ramp {\n"
+"    vec3 values[256];\n"
+"};\n"
+"\n"
+"layout(location = 0) out vec4 outColor;\n"
+"\n"
+"vec3 color_from_index(vec3 index)\n"
+"{\n"
+"    ivec3 i = ivec3(index);\n"
+"    return vec3(values[i.r].r, values[i.g].g, values[i.b].b);\n"
+"}\n"
+"\n"
+"void main(void)\n"
+"{\n"
+"    vec3 lookup = texture(tex, texCoord).xyz * 255.0;\n"
+"    vec3 lookup1, lookup2;\n"
+"    lookup1 = floor(lookup);\n"
+"    lookup2 = ceil(lookup);\n"
+"    outColor.xyz = mix(color_from_index(lookup1), color_from_index(lookup2), lookup - lookup1);\n"
+"    outColor.a = 1.0;\n"
+"}\n"
+;
+
+#define GAMMA_RAMP_SIZE 256
+
+static const float *fs_hack_get_default_gamma_ramp(void)
+{
+    static float default_gamma_ramp[GAMMA_RAMP_SIZE * 4];
+    static BOOL initialized;
+    unsigned int i;
+
+    if (!initialized)
+    {
+        for (i = 0; i < GAMMA_RAMP_SIZE; i++)
+        {
+            default_gamma_ramp[i * 4] = i / (float)(GAMMA_RAMP_SIZE - 1);
+            default_gamma_ramp[i * 4 + 1] = i / (float)(GAMMA_RAMP_SIZE - 1);
+            default_gamma_ramp[i * 4 + 2] = i / (float)(GAMMA_RAMP_SIZE - 1);
+        }
+        initialized = TRUE;
+    }
+    return default_gamma_ramp;
+}
+
+static void fs_hack_setup_gamma_shader( struct wgl_context *ctx, const struct opengl_funcs *funcs )
+{
+    GLint success;
+    GLuint vshader, fshader, program, ramp_index, tex_loc;
+    char errstr[512];
+    const float *default_gamma_ramp = fs_hack_get_default_gamma_ramp();
+
+    vshader = funcs->p_glCreateShader( GL_VERTEX_SHADER );
+    if (vshader == 0)
+    {
+        ERR( "Failed to create gamma vertex shader\n" );
+        return;
+    }
+    funcs->p_glShaderSource( vshader, 1, &fs_hack_gamma_vertex_shader_src, NULL );
+    funcs->p_glCompileShader( vshader );
+
+    funcs->p_glGetShaderiv( vshader, GL_COMPILE_STATUS, &success );
+    if (!success)
+    {
+        funcs->p_glGetShaderInfoLog( vshader, sizeof(errstr), NULL, errstr );
+        ERR( "Compiling gamma vertex shader failed: %s\n", errstr );
+        funcs->p_glDeleteShader( vshader );
+        return;
+    }
+
+    /* fragment shader */
+    fshader = funcs->p_glCreateShader( GL_FRAGMENT_SHADER );
+    if (fshader == 0)
+    {
+        ERR( "Failed to create gamma fragment shader\n" );
+        funcs->p_glDeleteShader( vshader );
+        return;
+    }
+    funcs->p_glShaderSource( fshader, 1, &fs_hack_gamma_frag_shader_src, NULL );
+    funcs->p_glCompileShader( fshader );
+
+    funcs->p_glGetShaderiv( fshader, GL_COMPILE_STATUS, &success );
+    if (!success)
+    {
+        funcs->p_glGetShaderInfoLog( fshader, sizeof(errstr), NULL, errstr );
+        ERR( "Compiling gamma fragment shader failed: %s\n", errstr );
+        funcs->p_glDeleteShader( fshader );
+        funcs->p_glDeleteShader( vshader );
+        return;
+    }
+
+    /* gamma program */
+    program = funcs->p_glCreateProgram();
+    if (program == 0)
+    {
+        ERR( "Failed to create gamma program\n" );
+        funcs->p_glDeleteShader( fshader );
+        funcs->p_glDeleteShader( vshader );
+        return;
+    }
+
+    funcs->p_glAttachShader( program, vshader );
+    funcs->p_glAttachShader( program, fshader );
+
+    funcs->p_glLinkProgram( program );
+
+    funcs->p_glGetProgramiv( program, GL_LINK_STATUS, &success );
+    if (!success)
+    {
+        funcs->p_glGetProgramInfoLog( program, sizeof(errstr), NULL, errstr );
+        ERR( "Linking gamma shader failed: %s\n", errstr );
+        funcs->p_glDeleteProgram( program );
+        funcs->p_glDeleteShader( fshader );
+        funcs->p_glDeleteShader( vshader );
+        return;
+    }
+
+    funcs->p_glDeleteShader( fshader );
+    funcs->p_glDeleteShader( vshader );
+
+    funcs->p_glGenBuffers( 1, &ctx->gamma_ramp );
+    funcs->p_glBindBuffer( GL_UNIFORM_BUFFER, ctx->gamma_ramp );
+    funcs->p_glBufferData( GL_UNIFORM_BUFFER, sizeof(float) * 4 * GAMMA_RAMP_SIZE, default_gamma_ramp, GL_DYNAMIC_DRAW );
+
+    ramp_index = funcs->p_glGetUniformBlockIndex( program, "ramp" );
+    funcs->p_glUniformBlockBinding( program, ramp_index, 0 );
+
+    funcs->p_glUseProgram( program );
+
+    tex_loc = funcs->p_glGetUniformLocation( program, "tex" );
+    funcs->p_glUniform1i( tex_loc, 0 );
+
+    ctx->gamma_program = program;
+    funcs->p_glUseProgram( 0 );
+}
+
 static void make_context_current( TEB *teb, const struct opengl_funcs *funcs, HDC draw_hdc, HDC read_hdc,
                                   HGLRC hglrc, struct context *ctx )
 {
     DWORD tid = HandleToULong(teb->ClientId.UniqueThread);
     size_t size = ARRAYSIZE(legacy_extensions) - 1, count = 0;
     const char *version, *rest = "", **extensions;
-    int i, j;
+    int i, j, profile;
 
     static const char *disabled, *enabled;
 
@@ -1329,6 +1506,16 @@ static void make_context_current( TEB *teb, const struct opengl_funcs *funcs, HD
     }
 
     if (TRACE_ON(opengl)) for (i = 0; i < count; i++) TRACE( "++ %s\n", extensions[i] );
+
+    funcs->p_glGetIntegerv( GL_CONTEXT_PROFILE_MASK, &profile );
+    ctx->base.is_core = !!(profile & GL_CONTEXT_CORE_PROFILE_BIT);
+    ctx->base.has_GL_ARB_viewport_array = is_extension_supported( ctx, "GL_ARB_viewport_array" );
+    ctx->base.has_GL_ARB_clip_control = is_extension_supported( ctx, "GL_ARB_clip_control" );
+    ctx->base.has_GL_ATI_fragment_shader = !ctx->base.is_core && is_extension_supported( ctx, "GL_ATI_fragment_shader" );
+    ctx->base.has_GL_ARB_fragment_program = !ctx->base.is_core && is_extension_supported( ctx, "GL_ARB_fragment_program" );
+    ctx->base.has_GL_ARB_vertex_program = !ctx->base.is_core && is_extension_supported( ctx, "GL_ARB_vertex_program" );
+    ctx->base.integer_scaling = fs_hack_is_integer();
+    fs_hack_setup_gamma_shader( &ctx->base, funcs );
 }
 
 BOOL wrap_wglMakeCurrent( TEB *teb, HDC hdc, HGLRC hglrc )

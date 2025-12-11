@@ -83,6 +83,16 @@ struct wgl_context
     struct opengl_drawable *read;               /* currently bound read surface */
     GLenum                  error;              /* wrapped GL error */
     BOOL                    reserved_textures;  /* internal texture names have been reserved */
+
+    unsigned                is_core : 1;
+    unsigned                has_GL_ARB_viewport_array : 1;
+    unsigned                has_GL_ARB_clip_control : 1;
+    unsigned                has_GL_ATI_fragment_shader : 1;
+    unsigned                has_GL_ARB_fragment_program : 1;
+    unsigned                has_GL_ARB_vertex_program : 1;
+    unsigned                integer_scaling : 1;
+    GLuint                  gamma_program;
+    GLuint                  gamma_ramp;
 };
 
 /* interface between opengl32 and win32u */
@@ -218,7 +228,7 @@ struct opengl_driver_funcs
     UINT (*p_init_pixel_formats)(UINT*);
     BOOL (*p_describe_pixel_format)(int,struct wgl_pixel_format*);
     const char *(*p_init_wgl_extensions)(struct opengl_funcs *funcs);
-    BOOL (*p_surface_create)( HWND hwnd, int format, struct opengl_drawable **drawable );
+    BOOL (*p_surface_create)( HWND hwnd, BOOL raw, int format, struct opengl_drawable **drawable );
     BOOL (*p_context_create)( int format, void *share, const int *attribs, void **context );
     BOOL (*p_context_destroy)(void*);
     BOOL (*p_make_current)( struct opengl_drawable *draw, struct opengl_drawable *read, void *private );

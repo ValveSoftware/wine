@@ -81,7 +81,7 @@ static void wayland_gl_drawable_sync_size(struct wayland_gl_drawable *gl)
     wl_egl_window_resize(gl->wl_egl_window, client_width, client_height, 0, 0);
 }
 
-static BOOL wayland_opengl_surface_create(HWND hwnd, int format, struct opengl_drawable **drawable)
+static BOOL wayland_opengl_surface_create(HWND hwnd, BOOL raw, int format, struct opengl_drawable **drawable)
 {
     EGLConfig config = egl_config_for_format(format);
     struct wayland_client_surface *client;

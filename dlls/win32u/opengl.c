@@ -56,6 +56,7 @@ static const struct opengl_driver_funcs nulldrv_funcs, *driver_funcs = &nulldrv_
 static struct list devices_egl = LIST_INIT( devices_egl );
 static struct egl_platform display_egl;
 static struct opengl_funcs display_funcs;
+static int fshack_enabled = -1;
 
 static struct wgl_pixel_format *pixel_formats;
 static UINT formats_count, onscreen_count;
@@ -177,7 +178,9 @@ static BOOL opengl_drawable_swap( struct opengl_drawable *drawable )
 struct framebuffer_surface
 {
     struct opengl_drawable base;
+    struct opengl_drawable *target;
     UINT frame;
+    LONG last_gamma_serial;
 };
 
 static struct framebuffer_surface *framebuffer_from_opengl_drawable( struct opengl_drawable *base )
@@ -370,7 +373,9 @@ static void destroy_framebuffer( struct opengl_drawable *drawable, const struct 
 
 static void framebuffer_surface_destroy( struct opengl_drawable *drawable )
 {
+    struct framebuffer_surface *surface = framebuffer_from_opengl_drawable( drawable );
     TRACE( "%s\n", debugstr_opengl_drawable( drawable ) );
+    if (surface->target) opengl_drawable_release( surface->target );
 }
 
 static void framebuffer_surface_resize( struct opengl_drawable *drawable )
@@ -424,10 +429,296 @@ static void framebuffer_surface_set_context( struct opengl_drawable *drawable, v
     }
 }
 
+struct fs_hack_gl_state
+{
+    GLuint draw_fbo;
+    GLuint read_fbo;
+    GLuint program;
+    GLuint bound_texture;
+    GLint active_texture;
+    GLint clip_origin, clip_depth_mode;
+    GLuint ubo;
+    GLint64 ubo_size, ubo_start;
+    GLint viewporti[4];
+    GLfloat viewportf[4];
+    GLboolean scissor_test, cull_face, blend, alpha_test, depth_test, stencil_test;
+    GLboolean arb_frag, arb_vert, ati_frag, fb_srgb;
+    GLboolean clip_distance[8];
+    GLboolean color_mask[4];
+    GLuint sampler;
+};
+
+#define SET 0
+#define RESET 1
+
+static void fs_hack_handle_enable_switch( int mode, GLenum cap, GLboolean *b, BOOL new )
+{
+    const struct opengl_funcs *funcs = &display_funcs;
+    if (mode == SET)
+    {
+        *b = funcs->p_glIsEnabled( cap );
+        if (new) funcs->p_glEnable( cap );
+        else funcs->p_glDisable( cap );
+    }
+    else
+    {
+        if (*b) funcs->p_glEnable( cap );
+        else funcs->p_glDisable( cap );
+    }
+}
+
+static void fs_hack_handle_fbo_state( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
+{
+    const struct opengl_funcs *funcs = &display_funcs;
+    if (mode == SET)
+    {
+        funcs->p_glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, (GLint *)&state->draw_fbo );
+        funcs->p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)&state->read_fbo );
+    }
+    else
+    {
+        funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, state->draw_fbo );
+        funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, state->read_fbo );
+    }
+}
+
+static void fs_hack_handle_clip_control( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
+{
+    const struct opengl_funcs *funcs = &display_funcs;
+    if (!ctx->has_GL_ARB_clip_control) return;
+
+    if (mode == SET)
+    {
+        funcs->p_glGetIntegerv( GL_CLIP_ORIGIN, (GLint *)&state->clip_origin );
+        funcs->p_glGetIntegerv( GL_CLIP_DEPTH_MODE, (GLint *)&state->clip_depth_mode );
+        funcs->p_glClipControl( GL_LOWER_LEFT, GL_NEGATIVE_ONE_TO_ONE );
+    }
+    else
+    {
+        funcs->p_glClipControl( state->clip_origin, state->clip_depth_mode );
+    }
+}
+
+static void fs_hack_handle_shaders( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
+{
+    const struct opengl_funcs *funcs = &display_funcs;
+
+    if (ctx->has_GL_ARB_fragment_program) fs_hack_handle_enable_switch( mode, GL_FRAGMENT_PROGRAM_ARB, &state->arb_frag, FALSE );
+    if (ctx->has_GL_ARB_vertex_program) fs_hack_handle_enable_switch( mode, GL_VERTEX_PROGRAM_ARB, &state->arb_vert, FALSE );
+    fs_hack_handle_enable_switch( mode, GL_FRAMEBUFFER_SRGB, &state->fb_srgb, FALSE );
+    if (ctx->has_GL_ATI_fragment_shader) fs_hack_handle_enable_switch( mode, GL_FRAGMENT_SHADER_ATI, &state->ati_frag, FALSE );
+
+    if (mode == SET)
+    {
+        funcs->p_glGetIntegerv( GL_CURRENT_PROGRAM, (GLint *)&state->program );
+
+        funcs->p_glGetIntegeri_v( GL_UNIFORM_BUFFER_BINDING, 0, (GLint *)&state->ubo );
+        funcs->p_glGetInteger64i_v( GL_UNIFORM_BUFFER_START, 0, &state->ubo_start );
+        funcs->p_glGetInteger64i_v( GL_UNIFORM_BUFFER_SIZE, 0, &state->ubo_size );
+
+        funcs->p_glGetIntegerv( GL_ACTIVE_TEXTURE, &state->active_texture );
+        funcs->p_glActiveTexture( GL_TEXTURE0 );
+        funcs->p_glGetIntegerv( GL_TEXTURE_BINDING_2D, (GLint *)&state->bound_texture );
+        funcs->p_glGetIntegeri_v( GL_SAMPLER_BINDING, 0, (GLint *)&state->sampler );
+
+        funcs->p_glBindBufferBase( GL_UNIFORM_BUFFER, 0, ctx->gamma_ramp );
+        funcs->p_glBindSampler( 0, 0 );
+
+        funcs->p_glUseProgram( ctx->gamma_program );
+    }
+    else
+    {
+        funcs->p_glUseProgram( state->program );
+
+        funcs->p_glBindSampler( 0, state->sampler );
+
+        funcs->p_glBindTexture( GL_TEXTURE_2D, state->bound_texture );
+        funcs->p_glActiveTexture( state->active_texture );
+
+        funcs->p_glBindBufferRange( GL_UNIFORM_BUFFER, 0, state->ubo, state->ubo_start, state->ubo_size );
+    }
+}
+
+static void fs_hack_handle_viewport( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
+{
+    const struct opengl_funcs *funcs = &display_funcs;
+    if (mode == SET)
+    {
+        if (ctx->has_GL_ARB_viewport_array)
+        {
+            funcs->p_glGetFloati_v( GL_VIEWPORT, 0, state->viewportf );
+        }
+        else
+        {
+            funcs->p_glGetIntegerv( GL_VIEWPORT, state->viewporti );
+        }
+    }
+    else
+    {
+        if (ctx->has_GL_ARB_viewport_array)
+        {
+            funcs->p_glViewportIndexedfv( 0, state->viewportf );
+        }
+        else
+        {
+            funcs->p_glViewport( state->viewporti[0], state->viewporti[1],
+                                          state->viewporti[2], state->viewporti[3] );
+        }
+    }
+}
+
+static void fs_hack_handle_clip_distance( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
+{
+    const struct opengl_funcs *funcs = &display_funcs;
+    unsigned int i;
+    if (mode == SET)
+    {
+        for (i = 0; i < ARRAY_SIZE(state->clip_distance); ++i)
+        {
+            state->clip_distance[i] = funcs->p_glIsEnabled( GL_CLIP_DISTANCE0 + i );
+            funcs->p_glDisable( GL_CLIP_DISTANCE0 + i );
+        }
+    }
+    else
+    {
+        for (i = 0; i < ARRAY_SIZE(state->clip_distance); ++i)
+        {
+            if (state->clip_distance[i]) funcs->p_glEnable( GL_CLIP_DISTANCE0 + i );
+        }
+    }
+}
+
+static void fs_hack_handle_color_mask( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
+{
+    const struct opengl_funcs *funcs = &display_funcs;
+    if (mode == SET)
+    {
+        funcs->p_glGetBooleani_v( GL_COLOR_WRITEMASK, 0, state->color_mask );
+        funcs->p_glColorMaski( 0, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+    }
+    else
+    {
+        funcs->p_glColorMaski( 0, state->color_mask[0], state->color_mask[1], state->color_mask[2], state->color_mask[3] );
+    }
+}
+
+static void fs_hack_handle_scissor( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
+{
+    fs_hack_handle_enable_switch( mode, GL_SCISSOR_TEST, &state->scissor_test, FALSE );
+}
+
+static void fs_hack_handle_cull_face( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
+{
+    fs_hack_handle_enable_switch( mode, GL_CULL_FACE, &state->cull_face, FALSE );
+}
+
+static void fs_hack_handle_blend( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
+{
+    fs_hack_handle_enable_switch( mode, GL_BLEND, &state->blend, FALSE );
+}
+
+static void fs_hack_handle_alpha_test( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
+{
+    if (ctx->is_core) return;
+    fs_hack_handle_enable_switch( mode, GL_ALPHA_TEST, &state->alpha_test, FALSE );
+}
+
+static void fs_hack_handle_ds_test( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
+{
+    fs_hack_handle_enable_switch( mode, GL_DEPTH_TEST, &state->depth_test, FALSE );
+    fs_hack_handle_enable_switch( mode, GL_STENCIL_TEST, &state->stencil_test, FALSE );
+}
+
+#define GAMMA_RAMP_SIZE 256
+
+static void blit_framebuffer_surface( struct framebuffer_surface *surface )
+{
+    struct wgl_context *ctx = NtCurrentTeb()->glContext;
+    const struct opengl_funcs *funcs = &display_funcs;
+    struct client_surface *client;
+    RECT src, dst;
+
+    typedef void (*state_handler_t)(int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state);
+    static const state_handler_t general_state_handlers[] =
+    {
+        fs_hack_handle_fbo_state,
+        fs_hack_handle_scissor,
+    },
+    draw_state_handlers[] =
+    {
+        fs_hack_handle_clip_control,
+        fs_hack_handle_shaders,
+        fs_hack_handle_viewport,
+        fs_hack_handle_cull_face,
+        fs_hack_handle_clip_distance,
+        fs_hack_handle_color_mask,
+        fs_hack_handle_blend,
+        fs_hack_handle_alpha_test,
+        fs_hack_handle_ds_test,
+    };
+    float gamma_ramp[GAMMA_RAMP_SIZE * 4];
+    struct fs_hack_gl_state state = {0};
+    LONG gamma_serial = 0;
+    BOOL needs_gamma = get_float_gamma_ramp( gamma_ramp, &gamma_serial );
+
+    if (!(client = surface->base.client)) return;
+    if (!NtUserGetClientRect( client->hwnd, &src, NtUserGetDpiForWindow( client->hwnd ) )) return;
+    if (!NtUserGetClientRect( client->hwnd, &dst, NtUserGetWinMonitorDpi( client->hwnd, MDT_RAW_DPI ) )) return;
+
+    TRACE( "hwnd %p src %s dst %s fbo %u\n", client->hwnd, wine_dbgstr_rect(&src), wine_dbgstr_rect(&dst), surface->base.read_fbo );
+
+    for (int i = 0; i < ARRAY_SIZE(general_state_handlers); i++)
+        general_state_handlers[i]( SET, ctx, &state );
+
+    funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
+    funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, surface->base.read_fbo );
+
+    if (!needs_gamma)
+    {
+        funcs->p_glBlitFramebuffer( 0, 0, src.right, src.bottom, 0, 0, dst.right, dst.bottom, GL_COLOR_BUFFER_BIT,
+                                    ctx->integer_scaling ? GL_NEAREST : GL_LINEAR );
+    }
+    else
+    {
+        UINT front = surface->base.doublebuffer ? (surface->frame & 1) : 1;
+
+        for (int i = 0; i < ARRAY_SIZE(draw_state_handlers); i++)
+            draw_state_handlers[i]( SET, ctx, &state );
+
+        funcs->p_glBindTexture( GL_TEXTURE_2D, WINE_OPENGL_RESERVED_TEXTURE0 + (1 - front) );
+
+        if (ctx->has_GL_ARB_viewport_array) funcs->p_glViewportIndexedf( 0, 0, 0, dst.right, dst.bottom );
+        else funcs->p_glViewport( 0, 0, dst.right, dst.bottom );
+
+        if (gamma_serial != surface->last_gamma_serial)
+        {
+            TRACE( "updating gamma ramp (serial: %u)\n", (int)gamma_serial );
+            funcs->p_glBufferData( GL_UNIFORM_BUFFER, sizeof(float) * 4 * GAMMA_RAMP_SIZE, gamma_ramp, GL_DYNAMIC_DRAW );
+            surface->last_gamma_serial = gamma_serial;
+        }
+
+        funcs->p_glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+
+        for (int i = 0; i < ARRAY_SIZE(draw_state_handlers); i++)
+            draw_state_handlers[i]( RESET, ctx, &state );
+    }
+
+    for (int i = 0; i < ARRAY_SIZE(general_state_handlers); i++)
+        general_state_handlers[i]( RESET, ctx, &state );
+}
+
 static void framebuffer_surface_flush( struct opengl_drawable *drawable, UINT flags )
 {
+    struct framebuffer_surface *surface = framebuffer_from_opengl_drawable( drawable );
+
     TRACE( "%s, flags %#x\n", debugstr_opengl_drawable( drawable ), flags );
+
     if (flags & GL_FLUSH_UPDATED && drawable->read_fbo) framebuffer_surface_resize( drawable );
+    if (surface->target)
+    {
+        blit_framebuffer_surface( surface );
+        opengl_drawable_flush( surface->target, surface->target->interval, flags );
+    }
 }
 
 static BOOL framebuffer_surface_swap( struct opengl_drawable *drawable )
@@ -453,6 +744,11 @@ static BOOL framebuffer_surface_swap( struct opengl_drawable *drawable )
         surface->frame++;
     }
 
+    if (surface->target)
+    {
+        blit_framebuffer_surface( surface );
+        opengl_drawable_swap( surface->target );
+    }
     return TRUE;
 }
 
@@ -464,10 +760,12 @@ static const struct opengl_drawable_funcs framebuffer_surface_funcs =
     .set_context = framebuffer_surface_set_context,
 };
 
-static struct opengl_drawable *framebuffer_surface_create( int format, struct client_surface *client )
+static struct opengl_drawable *framebuffer_surface_create( int format, struct client_surface *client, struct opengl_drawable *target )
 {
     struct framebuffer_surface *surface;
+
     if (!(surface = opengl_drawable_create( sizeof(*surface), &framebuffer_surface_funcs, format, client ))) return NULL;
+    if ((surface->target = target)) opengl_drawable_add_ref( surface->target );
 
     surface->base.buffer_map[0] = GL_COLOR_ATTACHMENT0;
     surface->base.buffer_map[2] = surface->base.doublebuffer ? GL_COLOR_ATTACHMENT1 : GL_NONE;
@@ -488,6 +786,16 @@ static struct opengl_drawable *framebuffer_surface_create( int format, struct cl
     surface->base.buffer_map[GL_FRONT_AND_BACK - GL_FRONT_LEFT] = surface->base.buffer_map[0]; /* only front left */
 
     return &surface->base;
+}
+
+static BOOL needs_framebuffer_surface( HWND hwnd )
+{
+    float gamma_ramp[GAMMA_RAMP_SIZE * 4];
+    LONG gamma_serial;
+
+    if (!fshack_enabled) return FALSE;
+    if (NtUserGetDpiForWindow( hwnd ) != NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI )) return TRUE;
+    return get_float_gamma_ramp( gamma_ramp, &gamma_serial );
 }
 
 static const struct opengl_drawable_funcs egldrv_pbuffer_funcs;
@@ -710,12 +1018,12 @@ static const char *egldrv_init_wgl_extensions( struct opengl_funcs *funcs )
     return "";
 }
 
-static BOOL egldrv_surface_create( HWND hwnd, int format, struct opengl_drawable **drawable )
+static BOOL egldrv_surface_create( HWND hwnd, BOOL raw, int format, struct opengl_drawable **drawable )
 {
     struct client_surface *client;
 
     if (!(client = nulldrv_client_surface_create( hwnd ))) return FALSE;
-    *drawable = framebuffer_surface_create( format, client );
+    *drawable = framebuffer_surface_create( format, client, NULL );
     client_surface_release( client );
 
     return !!*drawable;
@@ -1308,7 +1616,7 @@ static const char *nulldrv_init_wgl_extensions( struct opengl_funcs *funcs )
     return "";
 }
 
-static BOOL nulldrv_surface_create( HWND hwnd, int format, struct opengl_drawable **drawable )
+static BOOL nulldrv_surface_create( HWND hwnd, BOOL raw, int format, struct opengl_drawable **drawable )
 {
     return TRUE;
 }
@@ -1430,6 +1738,7 @@ static struct opengl_drawable *get_window_current_drawable( HWND hwnd )
 
 static struct opengl_drawable *get_window_unused_drawable( HWND hwnd, int format )
 {
+    BOOL raw = needs_framebuffer_surface( hwnd );
     struct opengl_drawable *drawable = NULL;
     WND *win;
 
@@ -1445,13 +1754,25 @@ static struct opengl_drawable *get_window_unused_drawable( HWND hwnd, int format
         opengl_drawable_release( drawable );
         drawable = NULL;
     }
+    if (drawable && (drawable->funcs == &framebuffer_surface_funcs) != raw)
+    {
+        opengl_drawable_release( drawable );
+        drawable = NULL;
+    }
 
     /* No compatible window drawable found, try creating a new one. This is not what native
      * is doing, it allows multiple contexts to be current on separate threads on the same
      * window, each drawing to the same back/front buffers. We cannot do that because host
      * OpenGL usually doesn't allow multiple contexts to use the same surface at the same time.
      */
-    if (!drawable) driver_funcs->p_surface_create( hwnd, format, &drawable );
+    if (!drawable) driver_funcs->p_surface_create( hwnd, raw, format, &drawable );
+
+    if (drawable && drawable->funcs != &framebuffer_surface_funcs && raw)
+    {
+        struct opengl_drawable *surface = framebuffer_surface_create( format, drawable->client, drawable );
+        opengl_drawable_release( drawable );
+        drawable = surface;
+    }
 
     TRACE( "hwnd %p, drawable %s\n", hwnd, debugstr_opengl_drawable( drawable ) );
     return drawable;
@@ -1644,6 +1965,11 @@ static BOOL win32u_wglSetPixelFormatWINE( HDC hdc, int format )
         opengl_drawable_release( drawable );
         drawable = NULL;
     }
+    if (drawable && (drawable->funcs == &framebuffer_surface_funcs) != needs_framebuffer_surface( hwnd ))
+    {
+        opengl_drawable_release( drawable );
+        drawable = NULL;
+    }
     if (format && (drawable || (drawable = get_window_unused_drawable( hwnd, format ))))
     {
         set_window_opengl_drawable( hwnd, drawable, TRUE );
@@ -1707,6 +2033,11 @@ static struct opengl_drawable *get_updated_drawable( HDC hdc, int format, struct
     if (!hdc && drawable && drawable->client) hwnd = drawable->client->hwnd;
     if (!hwnd) return NULL;
 
+    if (drawable && (drawable->funcs == &framebuffer_surface_funcs) != needs_framebuffer_surface( hwnd ))
+    {
+        drawable = NULL;
+    }
+
     /* if the drawable we were using is for the same window, keep using it */
     if (drawable && is_client_surface_window( drawable->client, hwnd ))
     {
@@ -1723,7 +2054,7 @@ static struct opengl_drawable *get_updated_drawable( HDC hdc, int format, struct
 
 static BOOL context_sync_drawables( struct wgl_context *context, HDC draw_hdc, HDC read_hdc )
 {
-    struct opengl_drawable *new_draw, *new_read, *old_draw = NULL, *old_read = NULL;
+    struct opengl_drawable *new_draw, *new_read, *old_draw = NULL, *old_read = NULL, *draw, *read;
     struct wgl_context *previous = NtCurrentTeb()->glContext;
     BOOL ret = FALSE;
 
@@ -1748,7 +2079,10 @@ static BOOL context_sync_drawables( struct wgl_context *context, HDC draw_hdc, H
         if (old_read != old_draw) opengl_drawable_set_context( old_draw, NULL );
     }
 
-    if (!ret && (ret = driver_funcs->p_make_current( new_draw, new_read, context->driver_private )))
+    if ((draw = new_draw) && new_draw->funcs == &framebuffer_surface_funcs) draw = framebuffer_from_opengl_drawable( new_draw )->target;
+    if ((read = new_read) && new_read->funcs == &framebuffer_surface_funcs) read = framebuffer_from_opengl_drawable( new_read )->target;
+
+    if (!ret && (ret = driver_funcs->p_make_current( draw, read, context->driver_private )))
     {
         NtCurrentTeb()->glContext = context;
 
@@ -2558,6 +2892,9 @@ static void display_funcs_init(void)
     struct egl_platform *egl;
     UINT status;
 
+    const char *env = getenv( "WINE_DISABLE_FULLSCREEN_HACK" );
+    fshack_enabled = !env || !atoi( env );
+
     if (egl_init( &driver_funcs )) TRACE( "Initialized EGL library\n" );
 
     if ((status = user_driver->pOpenGLInit( WINE_OPENGL_DRIVER_VERSION, &display_funcs, &driver_funcs )))
@@ -2572,20 +2909,52 @@ static void display_funcs_init(void)
     if (!display_funcs.p_##func && !(display_funcs.p_##func = driver_funcs->p_get_proc_address( #func ))) \
         WARN( "%s not found.\n", #func );
     ALL_GL_FUNCS
+    USE_GL_FUNC(glActiveTexture)
+    USE_GL_FUNC(glAttachShader)
+    USE_GL_FUNC(glBindBuffer)
+    USE_GL_FUNC(glBindBufferBase)
+    USE_GL_FUNC(glBindBufferRange)
     USE_GL_FUNC(glBindFramebuffer)
+    USE_GL_FUNC(glBindSampler)
     USE_GL_FUNC(glBlitFramebuffer)
+    USE_GL_FUNC(glBufferData)
     USE_GL_FUNC(glCheckNamedFramebufferStatus)
+    USE_GL_FUNC(glClipControl)
+    USE_GL_FUNC(glColorMaski)
+    USE_GL_FUNC(glCompileShader)
     USE_GL_FUNC(glCreateFramebuffers)
+    USE_GL_FUNC(glCreateProgram)
     USE_GL_FUNC(glCreateRenderbuffers)
+    USE_GL_FUNC(glCreateShader)
     USE_GL_FUNC(glCreateTextures)
     USE_GL_FUNC(glDeleteFramebuffers)
+    USE_GL_FUNC(glDeleteProgram)
     USE_GL_FUNC(glDeleteRenderbuffers)
+    USE_GL_FUNC(glDeleteShader)
+    USE_GL_FUNC(glGenBuffers)
+    USE_GL_FUNC(glGetBooleani_v)
+    USE_GL_FUNC(glGetFloati_v)
+    USE_GL_FUNC(glGetInteger64i_v)
+    USE_GL_FUNC(glGetIntegeri_v)
     USE_GL_FUNC(glGetNamedFramebufferAttachmentParameteriv)
+    USE_GL_FUNC(glGetProgramInfoLog)
+    USE_GL_FUNC(glGetProgramiv)
+    USE_GL_FUNC(glGetShaderInfoLog)
+    USE_GL_FUNC(glGetShaderiv)
+    USE_GL_FUNC(glGetUniformBlockIndex)
+    USE_GL_FUNC(glGetUniformLocation)
+    USE_GL_FUNC(glLinkProgram)
     USE_GL_FUNC(glNamedFramebufferDrawBuffer)
     USE_GL_FUNC(glNamedFramebufferReadBuffer)
     USE_GL_FUNC(glNamedFramebufferRenderbuffer)
     USE_GL_FUNC(glNamedFramebufferTexture)
     USE_GL_FUNC(glNamedRenderbufferStorageMultisample)
+    USE_GL_FUNC(glShaderSource)
+    USE_GL_FUNC(glUniform1i)
+    USE_GL_FUNC(glUniformBlockBinding)
+    USE_GL_FUNC(glUseProgram)
+    USE_GL_FUNC(glViewportIndexedf)
+    USE_GL_FUNC(glViewportIndexedfv)
 #undef USE_GL_FUNC
 
     display_funcs.p_wglGetProcAddress = win32u_wglGetProcAddress;

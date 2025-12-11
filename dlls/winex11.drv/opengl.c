@@ -521,7 +521,7 @@ static BOOL x11drv_egl_describe_pixel_format( int format, struct wgl_pixel_forma
     return TRUE;
 }
 
-static BOOL x11drv_egl_surface_create( HWND hwnd, int format, struct opengl_drawable **drawable )
+static BOOL x11drv_egl_surface_create( HWND hwnd, BOOL raw, int format, struct opengl_drawable **drawable )
 {
     struct opengl_drawable *previous;
     struct client_surface *client;
@@ -529,7 +529,7 @@ static BOOL x11drv_egl_surface_create( HWND hwnd, int format, struct opengl_draw
     Window window;
 
     if ((previous = *drawable) && previous->format == format) return TRUE;
-    if (!(window = x11drv_client_surface_create( hwnd, FALSE, format, &client ))) return FALSE;
+    if (!(window = x11drv_client_surface_create( hwnd, raw, format, &client ))) return FALSE;
     gl = opengl_drawable_create( sizeof(*gl), &x11drv_egl_surface_funcs, format, client );
     client_surface_release( client );
     if (!gl) return FALSE;
@@ -957,7 +957,7 @@ static GLXContext create_glxcontext( int format, GLXContext share, const int *at
     return ctx;
 }
 
-static BOOL x11drv_surface_create( HWND hwnd, int format, struct opengl_drawable **drawable )
+static BOOL x11drv_surface_create( HWND hwnd, BOOL raw, int format, struct opengl_drawable **drawable )
 {
     struct glx_pixel_format *fmt = glx_pixel_format_from_format( format );
     struct opengl_drawable *previous;
@@ -966,7 +966,7 @@ static BOOL x11drv_surface_create( HWND hwnd, int format, struct opengl_drawable
     Window window;
 
     if ((previous = *drawable) && previous->format == format) return TRUE;
-    if (!(window = x11drv_client_surface_create( hwnd, FALSE, format, &client ))) return FALSE;
+    if (!(window = x11drv_client_surface_create( hwnd, raw, format, &client ))) return FALSE;
     gl = opengl_drawable_create( sizeof(*gl), &x11drv_surface_funcs, format, client );
     client_surface_release( client );
     if (!gl) return FALSE;

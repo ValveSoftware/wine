@@ -311,6 +311,14 @@ static WORD gamma_ramp_i[GAMMA_RAMP_SIZE * 3];
 static float gamma_ramp[GAMMA_RAMP_SIZE * 4];
 static LONG gamma_serial;
 
+BOOL get_float_gamma_ramp( float *data, LONG *serial )
+{
+    pthread_mutex_lock( &display_lock );
+    if ((*serial = gamma_serial)) memcpy( data, gamma_ramp, sizeof(gamma_ramp) );
+    pthread_mutex_unlock( &display_lock );
+    return !!*serial;
+}
+
 BOOL get_global_gamma_ramp( void *data )
 {
     pthread_mutex_lock( &display_lock );
