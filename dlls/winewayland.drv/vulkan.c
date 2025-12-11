@@ -39,8 +39,8 @@ WINE_DEFAULT_DEBUG_CHANNEL(vulkan);
 
 static const struct vulkan_driver_funcs wayland_vulkan_driver_funcs;
 
-static VkResult wayland_vulkan_surface_create(HWND hwnd, const struct vulkan_instance *instance, VkSurfaceKHR *handle,
-                                              struct client_surface **client)
+static VkResult wayland_vulkan_surface_create(HWND hwnd, BOOL raw, const struct vulkan_instance *instance,
+                                              VkSurfaceKHR *handle, struct client_surface **client)
 {
     VkResult res;
     VkWaylandSurfaceCreateInfoKHR create_info_host;

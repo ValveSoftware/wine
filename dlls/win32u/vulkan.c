@@ -24,6 +24,7 @@
 
 #include "config.h"
 
+#include <math.h>
 #include <dlfcn.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -46,6 +47,7 @@ static struct vulkan_funcs vulkan_funcs;
 WINE_DECLARE_DEBUG_CHANNEL(fps);
 
 static const struct vulkan_driver_funcs *driver_funcs;
+static int fshack_enabled = -1;
 
 static const UINT EXTERNAL_MEMORY_WIN32_BITS = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT |
                                                VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT |
@@ -151,11 +153,54 @@ static struct surface *surface_from_handle( VkSurfaceKHR handle )
     return CONTAINING_RECORD( obj, struct surface, obj );
 }
 
+/* Return whether integer scaling is on */
+static BOOL fs_hack_is_integer(void)
+{
+    static int is_int = -1;
+    if (is_int < 0)
+    {
+        const char *e = getenv( "WINE_FULLSCREEN_INTEGER_SCALING" );
+        is_int = e && strcmp( e, "0" );
+        TRACE( "is_integer_scaling: %s\n", is_int ? "TRUE" : "FALSE" );
+    }
+    return is_int;
+}
+
+struct fs_hack_image
+{
+    uint32_t cmd_queue_idx;
+    VkCommandBuffer cmd;
+    VkImage swapchain_image;
+    VkImage user_image;
+    VkSemaphore blit_finished;
+    VkImageView user_view, blit_view;
+    VkDescriptorSet descriptor_set;
+};
+
+static const char *debugstr_vkextent2d( const VkExtent2D *ext )
+{
+    if (!ext) return "(null)";
+    return wine_dbg_sprintf( "(%d,%d)", (int)ext->width, (int)ext->height );
+}
+
 struct swapchain
 {
     struct vulkan_swapchain obj;
     struct surface *surface;
     VkExtent2D extents;
+
+    /* fs hack data below */
+    UINT fshack_dpi;
+    VkExtent2D host_extents;
+    VkCommandPool *cmd_pools; /* VkCommandPool[device->queue_count] */
+    VkDeviceMemory user_image_memory;
+    uint32_t n_images;
+    struct fs_hack_image *fs_hack_images; /* struct fs_hack_image[n_images] */
+    VkSampler sampler;
+    VkDescriptorPool descriptor_pool;
+    VkDescriptorSetLayout descriptor_set_layout;
+    VkPipelineLayout pipeline_layout;
+    VkPipeline pipeline;
 };
 
 static struct swapchain *swapchain_from_handle( VkSwapchainKHR handle )
@@ -845,8 +890,8 @@ static VkResult win32u_vkCreateDevice( VkPhysicalDevice client_physical_device, 
     struct vulkan_instance *instance = physical_device->instance;
     VkDevice host_device, client_device = *client_device_ptr;
     const VkCreateInfoWineDeviceCallback *callback_info;
+    unsigned int queue_count, props_count, i;
     struct vulkan_device *device;
-    unsigned int queue_count, i;
     struct mempool pool = {0};
     VkResult res;
 
@@ -861,9 +906,36 @@ static VkResult win32u_vkCreateDevice( VkPhysicalDevice client_physical_device, 
 
     /* We need to cache all queues within the device as each requires wrapping since queues are dispatchable objects. */
     for (queue_count = 0, i = 0; i < create_info->queueCreateInfoCount; i++) queue_count += create_info->pQueueCreateInfos[i].queueCount;
+    instance->p_vkGetPhysicalDeviceQueueFamilyProperties(physical_device->host.physical_device, &props_count, NULL);
 
-    if (!(device = calloc( 1, offsetof(struct vulkan_device, queues[queue_count]) ))) return VK_ERROR_OUT_OF_HOST_MEMORY;
+    if (!(device = calloc( 1, sizeof(*device) + queue_count * sizeof(*device->queues) + props_count * sizeof(*device->queue_props) ))) return VK_ERROR_OUT_OF_HOST_MEMORY;
     device->extensions = client_device->extensions;
+    device->queues = (void *)(device + 1);
+    device->queue_props = (void *)(device->queues + queue_count);
+
+{
+        VkPhysicalDeviceFeatures features = {0};
+        VkPhysicalDeviceFeatures2 *features2;
+
+        /* Enable shaderStorageImageWriteWithoutFormat for fshack
+         * This is available on all hardware and driver combinations we care about.
+         */
+        if (create_info->pEnabledFeatures)
+        {
+            features = *create_info->pEnabledFeatures;
+            features.shaderStorageImageWriteWithoutFormat = VK_TRUE;
+            create_info->pEnabledFeatures = &features;
+        }
+        if ((features2 = (void *)find_next_struct((const void *)create_info, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2)))
+        {
+            features2->features.shaderStorageImageWriteWithoutFormat = VK_TRUE;
+        }
+        else if (!create_info->pEnabledFeatures)
+        {
+            features.shaderStorageImageWriteWithoutFormat = VK_TRUE;
+            create_info->pEnabledFeatures = &features;
+        }
+}
 
     if (device->extensions.has_VK_WINE_openvr_device_extensions)
     {
@@ -900,6 +972,7 @@ static VkResult win32u_vkCreateDevice( VkPhysicalDevice client_physical_device, 
 #undef USE_VK_FUNC
 
     for (i = 0; i < create_info->queueCreateInfoCount; i++) init_device_queues( device, create_info->pQueueCreateInfos + i, client_device );
+    instance->p_vkGetPhysicalDeviceQueueFamilyProperties( physical_device->host.physical_device, &props_count, device->queue_props );
 
     TRACE( "Created device %p, host_device %p.\n", device, device->host.device );
     for (struct vulkan_queue *queue = device->queues; queue < device->queues + device->queue_count; queue++)
@@ -1633,7 +1706,8 @@ static VkResult win32u_vkCreateWin32SurfaceKHR( VkInstance client_instance, cons
         surface->hwnd = dummy;
     }
 
-    if ((res = driver_funcs->p_vulkan_surface_create( surface->hwnd, instance, &host_surface, &surface->client )))
+    if ((res = driver_funcs->p_vulkan_surface_create( surface->hwnd, fshack_enabled, instance,
+                                                      &host_surface, &surface->client )))
     {
         if (dummy) NtUserDestroyWindow( dummy );
         free( surface );
@@ -1881,6 +1955,521 @@ static BOOL extents_equals( const VkExtent2D *extents, const RECT *rect )
     return extents->width == rect->right - rect->left && extents->height == rect->bottom - rect->top;
 }
 
+/*
+#version 460
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2D texSampler;
+layout(binding = 1) uniform writeonly image2D outImage;
+layout(push_constant) uniform pushConstants {
+    //both in real image coords
+    vec2 offset;
+    vec2 extents;
+} constants;
+
+void main()
+{
+    vec2 texcoord = (vec2(gl_GlobalInvocationID.xy) - constants.offset) / constants.extents;
+    vec4 c = texture(texSampler, texcoord);
+
+    // Convert linear -> srgb
+    bvec3 isLo = lessThanEqual(c.rgb, vec3(0.0031308f));
+    vec3 loPart = c.rgb * 12.92f;
+    vec3 hiPart = pow(c.rgb, vec3(5.0f / 12.0f)) * 1.055f - 0.055f;
+    c.rgb = mix(hiPart, loPart, isLo);
+
+    imageStore(outImage, ivec2(gl_GlobalInvocationID.xy), c);
+}
+
+*/
+const uint32_t blit_comp_spv[] =
+{
+    0x07230203, 0x00010000, 0x0008000a, 0x0000005e, 0x00000000, 0x00020011, 0x00000001, 0x00020011,
+    0x00000038, 0x0006000b, 0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e,
+    0x00000000, 0x00000001, 0x0006000f, 0x00000005, 0x00000004, 0x6e69616d, 0x00000000, 0x0000000d,
+    0x00060010, 0x00000004, 0x00000011, 0x00000008, 0x00000008, 0x00000001, 0x00030003, 0x00000002,
+    0x000001cc, 0x00040005, 0x00000004, 0x6e69616d, 0x00000000, 0x00050005, 0x00000009, 0x63786574,
+    0x64726f6f, 0x00000000, 0x00080005, 0x0000000d, 0x475f6c67, 0x61626f6c, 0x766e496c, 0x7461636f,
+    0x496e6f69, 0x00000044, 0x00060005, 0x00000012, 0x68737570, 0x736e6f43, 0x746e6174, 0x00000073,
+    0x00050006, 0x00000012, 0x00000000, 0x7366666f, 0x00007465, 0x00050006, 0x00000012, 0x00000001,
+    0x65747865, 0x0073746e, 0x00050005, 0x00000014, 0x736e6f63, 0x746e6174, 0x00000073, 0x00030005,
+    0x00000021, 0x00000063, 0x00050005, 0x00000025, 0x53786574, 0x6c706d61, 0x00007265, 0x00040005,
+    0x0000002d, 0x6f4c7369, 0x00000000, 0x00040005, 0x00000035, 0x61506f6c, 0x00007472, 0x00040005,
+    0x0000003a, 0x61506968, 0x00007472, 0x00050005, 0x00000055, 0x4974756f, 0x6567616d, 0x00000000,
+    0x00040047, 0x0000000d, 0x0000000b, 0x0000001c, 0x00050048, 0x00000012, 0x00000000, 0x00000023,
+    0x00000000, 0x00050048, 0x00000012, 0x00000001, 0x00000023, 0x00000008, 0x00030047, 0x00000012,
+    0x00000002, 0x00040047, 0x00000025, 0x00000022, 0x00000000, 0x00040047, 0x00000025, 0x00000021,
+    0x00000000, 0x00040047, 0x00000055, 0x00000022, 0x00000000, 0x00040047, 0x00000055, 0x00000021,
+    0x00000001, 0x00030047, 0x00000055, 0x00000019, 0x00040047, 0x0000005d, 0x0000000b, 0x00000019,
+    0x00020013, 0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016, 0x00000006, 0x00000020,
+    0x00040017, 0x00000007, 0x00000006, 0x00000002, 0x00040020, 0x00000008, 0x00000007, 0x00000007,
+    0x00040015, 0x0000000a, 0x00000020, 0x00000000, 0x00040017, 0x0000000b, 0x0000000a, 0x00000003,
+    0x00040020, 0x0000000c, 0x00000001, 0x0000000b, 0x0004003b, 0x0000000c, 0x0000000d, 0x00000001,
+    0x00040017, 0x0000000e, 0x0000000a, 0x00000002, 0x0004001e, 0x00000012, 0x00000007, 0x00000007,
+    0x00040020, 0x00000013, 0x00000009, 0x00000012, 0x0004003b, 0x00000013, 0x00000014, 0x00000009,
+    0x00040015, 0x00000015, 0x00000020, 0x00000001, 0x0004002b, 0x00000015, 0x00000016, 0x00000000,
+    0x00040020, 0x00000017, 0x00000009, 0x00000007, 0x0004002b, 0x00000015, 0x0000001b, 0x00000001,
+    0x00040017, 0x0000001f, 0x00000006, 0x00000004, 0x00040020, 0x00000020, 0x00000007, 0x0000001f,
+    0x00090019, 0x00000022, 0x00000006, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000001,
+    0x00000000, 0x0003001b, 0x00000023, 0x00000022, 0x00040020, 0x00000024, 0x00000000, 0x00000023,
+    0x0004003b, 0x00000024, 0x00000025, 0x00000000, 0x0004002b, 0x00000006, 0x00000028, 0x00000000,
+    0x00020014, 0x0000002a, 0x00040017, 0x0000002b, 0x0000002a, 0x00000003, 0x00040020, 0x0000002c,
+    0x00000007, 0x0000002b, 0x00040017, 0x0000002e, 0x00000006, 0x00000003, 0x0004002b, 0x00000006,
+    0x00000031, 0x3b4d2e1c, 0x0006002c, 0x0000002e, 0x00000032, 0x00000031, 0x00000031, 0x00000031,
+    0x00040020, 0x00000034, 0x00000007, 0x0000002e, 0x0004002b, 0x00000006, 0x00000038, 0x414eb852,
+    0x0004002b, 0x00000006, 0x0000003d, 0x3ed55555, 0x0006002c, 0x0000002e, 0x0000003e, 0x0000003d,
+    0x0000003d, 0x0000003d, 0x0004002b, 0x00000006, 0x00000040, 0x3f870a3d, 0x0004002b, 0x00000006,
+    0x00000042, 0x3d6147ae, 0x0004002b, 0x0000000a, 0x00000049, 0x00000000, 0x00040020, 0x0000004a,
+    0x00000007, 0x00000006, 0x0004002b, 0x0000000a, 0x0000004d, 0x00000001, 0x0004002b, 0x0000000a,
+    0x00000050, 0x00000002, 0x00090019, 0x00000053, 0x00000006, 0x00000001, 0x00000000, 0x00000000,
+    0x00000000, 0x00000002, 0x00000000, 0x00040020, 0x00000054, 0x00000000, 0x00000053, 0x0004003b,
+    0x00000054, 0x00000055, 0x00000000, 0x00040017, 0x00000059, 0x00000015, 0x00000002, 0x0004002b,
+    0x0000000a, 0x0000005c, 0x00000008, 0x0006002c, 0x0000000b, 0x0000005d, 0x0000005c, 0x0000005c,
+    0x0000004d, 0x00050036, 0x00000002, 0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005,
+    0x0004003b, 0x00000008, 0x00000009, 0x00000007, 0x0004003b, 0x00000020, 0x00000021, 0x00000007,
+    0x0004003b, 0x0000002c, 0x0000002d, 0x00000007, 0x0004003b, 0x00000034, 0x00000035, 0x00000007,
+    0x0004003b, 0x00000034, 0x0000003a, 0x00000007, 0x0004003d, 0x0000000b, 0x0000000f, 0x0000000d,
+    0x0007004f, 0x0000000e, 0x00000010, 0x0000000f, 0x0000000f, 0x00000000, 0x00000001, 0x00040070,
+    0x00000007, 0x00000011, 0x00000010, 0x00050041, 0x00000017, 0x00000018, 0x00000014, 0x00000016,
+    0x0004003d, 0x00000007, 0x00000019, 0x00000018, 0x00050083, 0x00000007, 0x0000001a, 0x00000011,
+    0x00000019, 0x00050041, 0x00000017, 0x0000001c, 0x00000014, 0x0000001b, 0x0004003d, 0x00000007,
+    0x0000001d, 0x0000001c, 0x00050088, 0x00000007, 0x0000001e, 0x0000001a, 0x0000001d, 0x0003003e,
+    0x00000009, 0x0000001e, 0x0004003d, 0x00000023, 0x00000026, 0x00000025, 0x0004003d, 0x00000007,
+    0x00000027, 0x00000009, 0x00070058, 0x0000001f, 0x00000029, 0x00000026, 0x00000027, 0x00000002,
+    0x00000028, 0x0003003e, 0x00000021, 0x00000029, 0x0004003d, 0x0000001f, 0x0000002f, 0x00000021,
+    0x0008004f, 0x0000002e, 0x00000030, 0x0000002f, 0x0000002f, 0x00000000, 0x00000001, 0x00000002,
+    0x000500bc, 0x0000002b, 0x00000033, 0x00000030, 0x00000032, 0x0003003e, 0x0000002d, 0x00000033,
+    0x0004003d, 0x0000001f, 0x00000036, 0x00000021, 0x0008004f, 0x0000002e, 0x00000037, 0x00000036,
+    0x00000036, 0x00000000, 0x00000001, 0x00000002, 0x0005008e, 0x0000002e, 0x00000039, 0x00000037,
+    0x00000038, 0x0003003e, 0x00000035, 0x00000039, 0x0004003d, 0x0000001f, 0x0000003b, 0x00000021,
+    0x0008004f, 0x0000002e, 0x0000003c, 0x0000003b, 0x0000003b, 0x00000000, 0x00000001, 0x00000002,
+    0x0007000c, 0x0000002e, 0x0000003f, 0x00000001, 0x0000001a, 0x0000003c, 0x0000003e, 0x0005008e,
+    0x0000002e, 0x00000041, 0x0000003f, 0x00000040, 0x00060050, 0x0000002e, 0x00000043, 0x00000042,
+    0x00000042, 0x00000042, 0x00050083, 0x0000002e, 0x00000044, 0x00000041, 0x00000043, 0x0003003e,
+    0x0000003a, 0x00000044, 0x0004003d, 0x0000002e, 0x00000045, 0x0000003a, 0x0004003d, 0x0000002e,
+    0x00000046, 0x00000035, 0x0004003d, 0x0000002b, 0x00000047, 0x0000002d, 0x000600a9, 0x0000002e,
+    0x00000048, 0x00000047, 0x00000046, 0x00000045, 0x00050041, 0x0000004a, 0x0000004b, 0x00000021,
+    0x00000049, 0x00050051, 0x00000006, 0x0000004c, 0x00000048, 0x00000000, 0x0003003e, 0x0000004b,
+    0x0000004c, 0x00050041, 0x0000004a, 0x0000004e, 0x00000021, 0x0000004d, 0x00050051, 0x00000006,
+    0x0000004f, 0x00000048, 0x00000001, 0x0003003e, 0x0000004e, 0x0000004f, 0x00050041, 0x0000004a,
+    0x00000051, 0x00000021, 0x00000050, 0x00050051, 0x00000006, 0x00000052, 0x00000048, 0x00000002,
+    0x0003003e, 0x00000051, 0x00000052, 0x0004003d, 0x00000053, 0x00000056, 0x00000055, 0x0004003d,
+    0x0000000b, 0x00000057, 0x0000000d, 0x0007004f, 0x0000000e, 0x00000058, 0x00000057, 0x00000057,
+    0x00000000, 0x00000001, 0x0004007c, 0x00000059, 0x0000005a, 0x00000058, 0x0004003d, 0x0000001f,
+    0x0000005b, 0x00000021, 0x00040063, 0x00000056, 0x0000005a, 0x0000005b, 0x000100fd, 0x00010038,
+};
+
+static VkResult create_pipeline( struct vulkan_device *device, struct swapchain *swapchain, VkShaderModule shaderModule )
+{
+    VkComputePipelineCreateInfo pipelineInfo = {0};
+    VkResult res;
+
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    pipelineInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    pipelineInfo.stage.module = shaderModule;
+    pipelineInfo.stage.pName = "main";
+    pipelineInfo.layout = swapchain->pipeline_layout;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex = -1;
+
+    if ((res = device->p_vkCreateComputePipelines( device->host.device, VK_NULL_HANDLE, 1,
+                                                   &pipelineInfo, NULL, &swapchain->pipeline )))
+    {
+        ERR( "vkCreateComputePipelines: %d\n", res );
+        return res;
+    }
+
+    return VK_SUCCESS;
+}
+
+static VkResult create_descriptor_set( struct vulkan_device *device, struct swapchain *swapchain, struct fs_hack_image *hack )
+{
+    VkDescriptorImageInfo userDescriptorImageInfo = {0}, realDescriptorImageInfo = {0};
+    VkDescriptorSetAllocateInfo descriptorAllocInfo = {0};
+    VkWriteDescriptorSet descriptorWrites[2] = {{0}, {0}};
+    VkResult res;
+
+    descriptorAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descriptorAllocInfo.descriptorPool = swapchain->descriptor_pool;
+    descriptorAllocInfo.descriptorSetCount = 1;
+    descriptorAllocInfo.pSetLayouts = &swapchain->descriptor_set_layout;
+
+    if ((res = device->p_vkAllocateDescriptorSets( device->host.device, &descriptorAllocInfo, &hack->descriptor_set )))
+    {
+        ERR( "vkAllocateDescriptorSets: %d\n", res );
+        return res;
+    }
+
+    userDescriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    userDescriptorImageInfo.imageView = hack->user_view;
+    userDescriptorImageInfo.sampler = swapchain->sampler;
+
+    realDescriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    realDescriptorImageInfo.imageView = hack->blit_view;
+
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = hack->descriptor_set;
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pImageInfo = &userDescriptorImageInfo;
+
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = hack->descriptor_set;
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pImageInfo = &realDescriptorImageInfo;
+
+    device->p_vkUpdateDescriptorSets( device->host.device, 2, descriptorWrites, 0, NULL );
+    return VK_SUCCESS;
+}
+
+static VkResult init_blit_images( struct vulkan_device *device, struct swapchain *swapchain )
+{
+    VkResult res;
+    VkSamplerCreateInfo samplerInfo = {0};
+    VkDescriptorPoolSize poolSizes[2] = {{0}, {0}};
+    VkDescriptorPoolCreateInfo poolInfo = {0};
+    VkDescriptorSetLayoutBinding layoutBindings[2] = {{0}, {0}};
+    VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo = {0};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
+    VkPushConstantRange pushConstants;
+    VkShaderModuleCreateInfo shaderInfo = {0};
+    VkShaderModule shaderModule = 0;
+    VkImageViewCreateInfo viewInfo = {0};
+    uint32_t i;
+
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = samplerInfo.minFilter = fs_hack_is_integer() ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 1;
+    samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if ((res = device->p_vkCreateSampler( device->host.device, &samplerInfo, NULL, &swapchain->sampler )))
+    {
+        WARN( "vkCreateSampler failed, res=%d\n", res );
+        return res;
+    }
+
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[0].descriptorCount = swapchain->n_images;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    poolSizes[1].descriptorCount = swapchain->n_images;
+
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 2;
+    poolInfo.pPoolSizes = poolSizes;
+    poolInfo.maxSets = swapchain->n_images;
+
+    if ((res = device->p_vkCreateDescriptorPool( device->host.device, &poolInfo, NULL, &swapchain->descriptor_pool )))
+    {
+        ERR( "vkCreateDescriptorPool: %d\n", res );
+        goto fail;
+    }
+
+    layoutBindings[0].binding = 0;
+    layoutBindings[0].descriptorCount = 1;
+    layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    layoutBindings[0].pImmutableSamplers = NULL;
+    layoutBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    layoutBindings[1].binding = 1;
+    layoutBindings[1].descriptorCount = 1;
+    layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    layoutBindings[1].pImmutableSamplers = NULL;
+    layoutBindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descriptorLayoutInfo.bindingCount = 2;
+    descriptorLayoutInfo.pBindings = layoutBindings;
+
+    if ((res = device->p_vkCreateDescriptorSetLayout( device->host.device, &descriptorLayoutInfo,
+                                                      NULL, &swapchain->descriptor_set_layout )))
+    {
+        ERR( "vkCreateDescriptorSetLayout: %d\n", res );
+        goto fail;
+    }
+
+    pushConstants.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pushConstants.offset = 0;
+    pushConstants.size = 4 * sizeof(float); /* 2 * vec2 */
+
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &swapchain->descriptor_set_layout;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstants;
+
+    if ((res = device->p_vkCreatePipelineLayout( device->host.device, &pipelineLayoutInfo, NULL,
+                                                 &swapchain->pipeline_layout )))
+    {
+        ERR( "vkCreatePipelineLayout: %d\n", res );
+        goto fail;
+    }
+
+    shaderInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    shaderInfo.codeSize = sizeof(blit_comp_spv);
+    shaderInfo.pCode = blit_comp_spv;
+
+    if ((res = device->p_vkCreateShaderModule( device->host.device, &shaderInfo, NULL, &shaderModule )))
+    {
+        ERR( "vkCreateShaderModule: %d\n", res );
+        goto fail;
+    }
+
+    if ((res = create_pipeline( device, swapchain, shaderModule ))) goto fail;
+
+    device->p_vkDestroyShaderModule( device->host.device, shaderModule, NULL );
+
+    for (i = 0; i < swapchain->n_images; ++i)
+    {
+        struct fs_hack_image *hack = &swapchain->fs_hack_images[i];
+
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = hack->swapchain_image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        if ((res = device->p_vkCreateImageView( device->host.device, &viewInfo, NULL, &hack->blit_view )))
+        {
+            ERR( "vkCreateImageView(blit): %d\n", res );
+            goto fail;
+        }
+
+        if ((res = create_descriptor_set( device, swapchain, hack ))) goto fail;
+    }
+
+    return VK_SUCCESS;
+
+fail:
+    for (i = 0; i < swapchain->n_images; ++i)
+    {
+        struct fs_hack_image *hack = &swapchain->fs_hack_images[i];
+
+        device->p_vkDestroyImageView( device->host.device, hack->blit_view, NULL );
+        hack->blit_view = VK_NULL_HANDLE;
+    }
+
+    device->p_vkDestroyShaderModule( device->host.device, shaderModule, NULL );
+
+    device->p_vkDestroyPipeline( device->host.device, swapchain->pipeline, NULL );
+    swapchain->pipeline = VK_NULL_HANDLE;
+
+    device->p_vkDestroyPipelineLayout( device->host.device, swapchain->pipeline_layout, NULL );
+    swapchain->pipeline_layout = VK_NULL_HANDLE;
+
+    device->p_vkDestroyDescriptorSetLayout( device->host.device, swapchain->descriptor_set_layout, NULL );
+    swapchain->descriptor_set_layout = VK_NULL_HANDLE;
+
+    device->p_vkDestroyDescriptorPool( device->host.device, swapchain->descriptor_pool, NULL );
+    swapchain->descriptor_pool = VK_NULL_HANDLE;
+
+    device->p_vkDestroySampler( device->host.device, swapchain->sampler, NULL );
+    swapchain->sampler = VK_NULL_HANDLE;
+
+    return res;
+}
+
+static void destroy_fs_hack_image( struct vulkan_device *device, struct swapchain *swapchain, struct fs_hack_image *hack )
+{
+    device->p_vkDestroyImageView( device->host.device, hack->user_view, NULL );
+    device->p_vkDestroyImageView( device->host.device, hack->blit_view, NULL );
+    device->p_vkDestroyImage( device->host.device, hack->user_image, NULL );
+    if (hack->cmd) device->p_vkFreeCommandBuffers( device->host.device, swapchain->cmd_pools[hack->cmd_queue_idx], 1, &hack->cmd );
+    device->p_vkDestroySemaphore( device->host.device, hack->blit_finished, NULL );
+}
+
+static VkResult init_fs_hack_images( struct vulkan_device *device, struct swapchain *swapchain,
+                                     const VkSwapchainCreateInfoKHR *createinfo )
+{
+    struct vulkan_physical_device *physical_device = device->physical_device;
+    struct vulkan_instance *instance = physical_device->instance;
+    VkResult res;
+    VkImage *real_images = NULL;
+    VkDeviceSize userMemTotal = 0, offs;
+    VkImageCreateInfo imageInfo = {0};
+    VkSemaphoreCreateInfo semaphoreInfo = {0};
+    VkMemoryRequirements userMemReq;
+    VkMemoryAllocateInfo allocInfo = {0};
+    VkPhysicalDeviceMemoryProperties memProperties;
+    VkImageViewCreateInfo viewInfo = {0};
+    uint32_t count, i = 0, user_memory_type = -1;
+
+    if ((res = device->p_vkGetSwapchainImagesKHR( device->host.device, swapchain->obj.host.swapchain, &count, NULL )))
+    {
+        WARN( "vkGetSwapchainImagesKHR failed, res=%d\n", res );
+        return res;
+    }
+
+    real_images = malloc( count * sizeof(VkImage) );
+    swapchain->cmd_pools = calloc( device->queue_count, sizeof(VkCommandPool) );
+    swapchain->fs_hack_images = calloc( count, sizeof(struct fs_hack_image) );
+    if (!real_images || !swapchain->cmd_pools || !swapchain->fs_hack_images) goto fail;
+
+    if ((res = device->p_vkGetSwapchainImagesKHR( device->host.device, swapchain->obj.host.swapchain, &count, real_images )))
+    {
+        WARN( "vkGetSwapchainImagesKHR failed, res=%d\n", res );
+        goto fail;
+    }
+
+    /* create user images */
+    for (i = 0; i < count; ++i)
+    {
+        struct fs_hack_image *hack = &swapchain->fs_hack_images[i];
+
+        hack->swapchain_image = real_images[i];
+
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        if ((res = device->p_vkCreateSemaphore( device->host.device, &semaphoreInfo, NULL, &hack->blit_finished )))
+        {
+            WARN( "vkCreateSemaphore failed, res=%d\n", res );
+            goto fail;
+        }
+
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = swapchain->extents.width;
+        imageInfo.extent.height = swapchain->extents.height;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = createinfo->imageArrayLayers;
+        imageInfo.format = createinfo->imageFormat;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = createinfo->imageUsage | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.sharingMode = createinfo->imageSharingMode;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.queueFamilyIndexCount = createinfo->queueFamilyIndexCount;
+        imageInfo.pQueueFamilyIndices = createinfo->pQueueFamilyIndices;
+
+        if (createinfo->flags & VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR)
+            imageInfo.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_EXTENDED_USAGE_BIT;
+        else if (createinfo->imageFormat != VK_FORMAT_B8G8R8A8_SRGB)
+            imageInfo.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+
+        if ((res = device->p_vkCreateImage( device->host.device, &imageInfo, NULL, &hack->user_image )))
+        {
+            ERR( "vkCreateImage failed: %d\n", res );
+            goto fail;
+        }
+
+        device->p_vkGetImageMemoryRequirements( device->host.device, hack->user_image, &userMemReq );
+
+        offs = userMemTotal % userMemReq.alignment;
+        if (offs) userMemTotal += userMemReq.alignment - offs;
+
+        userMemTotal += userMemReq.size;
+
+        swapchain->n_images++;
+    }
+
+    /* allocate backing memory */
+    instance->p_vkGetPhysicalDeviceMemoryProperties( physical_device->host.physical_device, &memProperties );
+
+    for (i = 0; i < memProperties.memoryTypeCount; i++)
+    {
+        UINT flag = memProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        if (flag == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+        {
+            if (userMemReq.memoryTypeBits & (1 << i))
+            {
+                user_memory_type = i;
+                break;
+            }
+        }
+    }
+
+    if (user_memory_type == -1)
+    {
+        ERR( "unable to find suitable memory type\n" );
+        res = VK_ERROR_OUT_OF_HOST_MEMORY;
+        goto fail;
+    }
+
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = userMemTotal;
+    allocInfo.memoryTypeIndex = user_memory_type;
+
+    if ((res = device->p_vkAllocateMemory( device->host.device, &allocInfo, NULL, &swapchain->user_image_memory )))
+    {
+        ERR( "vkAllocateMemory: %d\n", res );
+        goto fail;
+    }
+
+    /* bind backing memory and create imageviews */
+    userMemTotal = 0;
+    for (i = 0; i < count; ++i)
+    {
+        device->p_vkGetImageMemoryRequirements( device->host.device, swapchain->fs_hack_images[i].user_image, &userMemReq );
+
+        offs = userMemTotal % userMemReq.alignment;
+        if (offs) userMemTotal += userMemReq.alignment - offs;
+
+        if ((res = device->p_vkBindImageMemory( device->host.device, swapchain->fs_hack_images[i].user_image,
+                                                swapchain->user_image_memory, userMemTotal )))
+        {
+            ERR( "vkBindImageMemory: %d\n", res );
+            goto fail;
+        }
+
+        userMemTotal += userMemReq.size;
+
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = swapchain->fs_hack_images[i].user_image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = VK_FORMAT_B8G8R8A8_SRGB;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        if ((res = device->p_vkCreateImageView( device->host.device, &viewInfo, NULL,
+                                                &swapchain->fs_hack_images[i].user_view )))
+        {
+            ERR( "vkCreateImageView(user): %d\n", res );
+            goto fail;
+        }
+    }
+
+    free( real_images );
+
+    return VK_SUCCESS;
+
+fail:
+    for (i = 0; i < swapchain->n_images; ++i) destroy_fs_hack_image( device, swapchain, &swapchain->fs_hack_images[i] );
+    free( real_images );
+    free( swapchain->cmd_pools );
+    free( swapchain->fs_hack_images );
+    return res;
+}
+
+static BOOL surface_get_fshack_dpi( struct surface *surface )
+{
+    UINT dpi = NtUserGetDpiForWindow( surface->hwnd ), raw = NtUserGetWinMonitorDpi( surface->hwnd, MDT_RAW_DPI );
+    return fshack_enabled && dpi != raw ? raw : 0;
+}
+
 static VkResult win32u_vkCreateSwapchainKHR( VkDevice client_device, const VkSwapchainCreateInfoKHR *create_info,
                                              const VkAllocationCallbacks *allocator, VkSwapchainKHR *ret )
 {
@@ -1927,6 +2516,31 @@ static VkResult win32u_vkCreateSwapchainKHR( VkDevice client_device, const VkSwa
 
     if (!(swapchain = calloc( 1, sizeof(*swapchain) ))) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
+    if ((swapchain->fshack_dpi = surface_get_fshack_dpi( surface )))
+    {
+        VkSurfaceCapabilitiesKHR caps = {0};
+
+        if ((res = instance->p_vkGetPhysicalDeviceSurfaceCapabilitiesKHR( physical_device->host.physical_device,
+                                                                          create_info_host.surface, &caps )))
+        {
+            TRACE( "vkGetPhysicalDeviceSurfaceCapabilities failed, res=%d\n", res );
+            free( swapchain );
+            return res;
+        }
+
+        if (!(caps.supportedUsageFlags & VK_IMAGE_USAGE_STORAGE_BIT))
+            FIXME( "Swapchain does not support required VK_IMAGE_USAGE_STORAGE_BIT\n" );
+
+        swapchain->host_extents = capabilities.minImageExtent;
+        create_info_host.imageExtent = capabilities.minImageExtent;
+        create_info_host.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
+        create_info_host.imageUsage = VK_IMAGE_USAGE_STORAGE_BIT;
+
+        if (create_info->imageFormat != VK_FORMAT_B8G8R8A8_UNORM && create_info->imageFormat != VK_FORMAT_B8G8R8A8_SRGB)
+            FIXME( "swapchain image format is not BGRA8 UNORM/SRGB. Things may go badly. %d\n",
+                   create_info_host.imageFormat );
+    }
+
     if ((res = device->p_vkCreateSwapchainKHR( device->host.device, &create_info_host, NULL, &host_swapchain )))
     {
         free( swapchain );
@@ -1937,6 +2551,28 @@ static VkResult win32u_vkCreateSwapchainKHR( VkDevice client_device, const VkSwa
     swapchain->surface = surface;
     swapchain->extents = create_info->imageExtent;
     instance->p_insert_object( instance, &swapchain->obj.obj );
+
+    if (swapchain->fshack_dpi)
+    {
+        if ((res = init_fs_hack_images( device, swapchain, create_info )))
+        {
+            ERR( "creating fs hack images failed: %d\n", res );
+            device->p_vkDestroySwapchainKHR( device->host.device, swapchain->obj.host.swapchain, NULL );
+            free( swapchain );
+            return res;
+        }
+
+        if ((res = init_blit_images( device, swapchain )))
+        {
+            ERR( "creating blit images failed: %d\n", res );
+            device->p_vkDestroySwapchainKHR( device->host.device, swapchain->obj.host.swapchain, NULL );
+            free( swapchain );
+            return res;
+        }
+
+        WARN( "Enabled fullscreen hack on swapchain %p, scalind from %s -> %s\n", swapchain,
+              debugstr_vkextent2d(&swapchain->extents), debugstr_vkextent2d(&swapchain->host_extents) );
+    }
 
     *ret = swapchain->obj.client.swapchain;
     return VK_SUCCESS;
@@ -1951,6 +2587,28 @@ void win32u_vkDestroySwapchainKHR( VkDevice client_device, VkSwapchainKHR client
 
     if (allocator) FIXME( "Support for allocation callbacks not implemented yet\n" );
     if (!swapchain) return;
+
+    if (swapchain->fshack_dpi)
+    {
+        for (uint32_t i = 0; i < swapchain->n_images; ++i)
+        {
+            destroy_fs_hack_image( device, swapchain, &swapchain->fs_hack_images[i] );
+        }
+        for (uint32_t i = 0; i < device->queue_count; ++i)
+        {
+            if (!swapchain->cmd_pools[i]) continue;
+            device->p_vkDestroyCommandPool( device->host.device, swapchain->cmd_pools[i], NULL );
+        }
+
+        device->p_vkDestroyPipeline( device->host.device, swapchain->pipeline, NULL );
+        device->p_vkDestroyPipelineLayout( device->host.device, swapchain->pipeline_layout, NULL );
+        device->p_vkDestroyDescriptorSetLayout( device->host.device, swapchain->descriptor_set_layout, NULL );
+        device->p_vkDestroyDescriptorPool( device->host.device, swapchain->descriptor_pool, NULL );
+        device->p_vkDestroySampler( device->host.device, swapchain->sampler, NULL );
+        device->p_vkFreeMemory( device->host.device, swapchain->user_image_memory, NULL );
+        free( swapchain->cmd_pools );
+        free( swapchain->fs_hack_images );
+    }
 
     device->p_vkDestroySwapchainKHR( device->host.device, swapchain->obj.host.swapchain, NULL );
     instance->p_remove_object( instance, &swapchain->obj.obj );
@@ -1974,6 +2632,12 @@ static VkResult win32u_vkAcquireNextImage2KHR( VkDevice client_device, const VkA
     acquire_info_host.semaphore = semaphore ? semaphore->host.semaphore : 0;
     acquire_info_host.fence = fence ? fence->host.fence : 0;
     res = device->p_vkAcquireNextImage2KHR( device->host.device, &acquire_info_host, image_index );
+
+    if (!res && swapchain->fshack_dpi != surface_get_fshack_dpi( surface ))
+    {
+        WARN( "window %p swapchain %p needs fullscreen hack VK_SUBOPTIMAL_KHR\n", surface->hwnd, swapchain );
+        return VK_SUBOPTIMAL_KHR;
+    }
 
     if (!res && get_surface_rect( surface->hwnd, &client_rect, NtUserGetDpiForWindow( surface->hwnd ) ) &&
         !extents_equals( &swapchain->extents, &client_rect ))
@@ -2001,6 +2665,12 @@ static VkResult win32u_vkAcquireNextImageKHR( VkDevice client_device, VkSwapchai
                                               semaphore ? semaphore->host.semaphore : 0, fence ? fence->host.fence : 0,
                                               image_index );
 
+    if (!res && swapchain->fshack_dpi != surface_get_fshack_dpi( surface ))
+    {
+        WARN( "window %p swapchain %p needs fullscreen hack VK_SUBOPTIMAL_KHR\n", surface->hwnd, swapchain );
+        return VK_SUBOPTIMAL_KHR;
+    }
+
     if (!res && get_surface_rect( surface->hwnd, &client_rect, NtUserGetDpiForWindow( surface->hwnd ) ) &&
         !extents_equals( &swapchain->extents, &client_rect ))
     {
@@ -2012,20 +2682,216 @@ static VkResult win32u_vkAcquireNextImageKHR( VkDevice client_device, VkSwapchai
     return res;
 }
 
+static VkResult win32u_vkGetSwapchainImagesKHR( VkDevice client_device, VkSwapchainKHR client_swapchain,
+                                                uint32_t *count, VkImage *images )
+{
+    struct vulkan_device *device = vulkan_device_from_handle( client_device );
+    struct swapchain *swapchain = swapchain_from_handle( client_swapchain );
+    uint32_t i;
+
+    if (images && swapchain->fshack_dpi)
+    {
+        if (*count > swapchain->n_images) *count = swapchain->n_images;
+        for (i = 0; i < *count; ++i) images[i] = swapchain->fs_hack_images[i].user_image;
+        return *count == swapchain->n_images ? VK_SUCCESS : VK_INCOMPLETE;
+    }
+
+    return device->p_vkGetSwapchainImagesKHR( device->host.device, swapchain->obj.host.swapchain, count, images );
+}
+
+static VkCommandBuffer create_hack_cmd( struct vulkan_queue *queue, struct swapchain *swapchain, uint32_t queue_idx )
+{
+    VkCommandBufferAllocateInfo allocInfo = {0};
+    VkCommandBuffer cmd;
+    VkResult res;
+
+    if (!swapchain->cmd_pools[queue_idx])
+    {
+        VkCommandPoolCreateInfo poolInfo = {0};
+
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.queueFamilyIndex = queue_idx;
+
+        if ((res = queue->device->p_vkCreateCommandPool( queue->device->host.device, &poolInfo, NULL,
+                                                         &swapchain->cmd_pools[queue_idx] )))
+        {
+            ERR( "vkCreateCommandPool failed, res=%d\n", res );
+            return NULL;
+        }
+    }
+
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = swapchain->cmd_pools[queue_idx];
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+
+    if ((res = queue->device->p_vkAllocateCommandBuffers( queue->device->host.device, &allocInfo, &cmd )))
+    {
+        ERR( "vkAllocateCommandBuffers failed, res=%d\n", res );
+        return NULL;
+    }
+
+    return cmd;
+}
+
+static VkResult record_compute_cmd( struct vulkan_device *device, struct swapchain *swapchain, struct fs_hack_image *hack )
+{
+    VkResult res;
+    VkImageMemoryBarrier barriers[3] = {{0}};
+    VkCommandBufferBeginInfo beginInfo = {0};
+    float constants[4];
+
+    TRACE( "recording compute command\n" );
+
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+
+    device->p_vkBeginCommandBuffer( hack->cmd, &beginInfo );
+
+    /* for the cs we run... */
+    /* transition user image from PRESENT_SRC to SHADER_READ */
+    barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barriers[0].oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    barriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[0].image = hack->user_image;
+    barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barriers[0].subresourceRange.baseMipLevel = 0;
+    barriers[0].subresourceRange.levelCount = 1;
+    barriers[0].subresourceRange.baseArrayLayer = 0;
+    barriers[0].subresourceRange.layerCount = 1;
+    barriers[0].srcAccessMask = 0;
+    barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    /* storage image... */
+    /* transition swapchain image from whatever to GENERAL */
+    barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barriers[1].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barriers[1].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[1].image = hack->swapchain_image;
+    barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barriers[1].subresourceRange.baseMipLevel = 0;
+    barriers[1].subresourceRange.levelCount = 1;
+    barriers[1].subresourceRange.baseArrayLayer = 0;
+    barriers[1].subresourceRange.layerCount = 1;
+    barriers[1].srcAccessMask = 0;
+    barriers[1].dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+
+    device->p_vkCmdPipelineBarrier( hack->cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                                    0, 0, NULL, 0, NULL, 2, barriers );
+
+    /* perform blit shader */
+    device->p_vkCmdBindPipeline( hack->cmd, VK_PIPELINE_BIND_POINT_COMPUTE, swapchain->pipeline );
+
+    device->p_vkCmdBindDescriptorSets( hack->cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                       swapchain->pipeline_layout, 0, 1, &hack->descriptor_set, 0, NULL );
+
+    /* vec2: blit dst offset in real coords */
+    constants[0] = 0;
+    constants[1] = 0;
+
+    /* offset by 0.5f because sampling is relative to pixel center */
+    constants[0] -= 0.5f * swapchain->host_extents.width / swapchain->extents.width;
+    constants[1] -= 0.5f * swapchain->host_extents.height / swapchain->extents.height;
+
+    /* vec2: blit dst extents in real coords */
+    constants[2] = swapchain->host_extents.width;
+    constants[3] = swapchain->host_extents.height;
+    device->p_vkCmdPushConstants( hack->cmd, swapchain->pipeline_layout,
+                                  VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(constants), constants );
+
+    /* local sizes in shader are 8 */
+    device->p_vkCmdDispatch( hack->cmd, ceil( swapchain->host_extents.width / 8. ),
+                             ceil( swapchain->host_extents.height / 8. ), 1 );
+
+    /* transition user image from SHADER_READ back to PRESENT_SRC */
+    barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barriers[0].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barriers[0].newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[0].image = hack->user_image;
+    barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barriers[0].subresourceRange.baseMipLevel = 0;
+    barriers[0].subresourceRange.levelCount = 1;
+    barriers[0].subresourceRange.baseArrayLayer = 0;
+    barriers[0].subresourceRange.layerCount = 1;
+    barriers[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    barriers[0].dstAccessMask = 0;
+
+    /* transition swapchain image from GENERAL to PRESENT_SRC */
+    barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barriers[1].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barriers[1].newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[1].image = hack->swapchain_image;
+    barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barriers[1].subresourceRange.baseMipLevel = 0;
+    barriers[1].subresourceRange.levelCount = 1;
+    barriers[1].subresourceRange.baseArrayLayer = 0;
+    barriers[1].subresourceRange.layerCount = 1;
+    barriers[1].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barriers[1].dstAccessMask = 0;
+
+    device->p_vkCmdPipelineBarrier( hack->cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                    0, 0, NULL, 0, NULL, 2, barriers );
+
+    if ((res = device->p_vkEndCommandBuffer( hack->cmd )))
+    {
+        ERR( "vkEndCommandBuffer: %d\n", res );
+        return res;
+    }
+
+    return VK_SUCCESS;
+}
+
 static VkResult win32u_vkQueuePresentKHR( VkQueue client_queue, const VkPresentInfoKHR *client_present_info )
 {
     VkPresentInfoKHR *present_info = (VkPresentInfoKHR *)client_present_info; /* cast away const, it has been copied in the thunks */
     struct vulkan_queue *queue = vulkan_queue_from_handle( client_queue );
-    VkSwapchainKHR swapchains_buffer[16], *swapchains = swapchains_buffer;
     struct vulkan_device *device = queue->device;
+    VkResult res = VK_ERROR_OUT_OF_HOST_MEMORY;
     const VkSwapchainKHR *client_swapchains;
-    VkResult res;
+    VkSwapchainKHR *swapchains;
+    VkCommandBuffer *blit_cmds;
+    struct mempool pool = {0};
+    uint32_t blit_count = 0;
+    VkSemaphore blit_sema;
 
     TRACE( "queue %p, present_info %p\n", queue, present_info );
 
-    if (present_info->swapchainCount > ARRAY_SIZE(swapchains_buffer) &&
-        !(swapchains = malloc( present_info->swapchainCount * sizeof(*swapchains) )))
-        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    if (!(swapchains = mem_alloc( &pool, present_info->swapchainCount * sizeof(*swapchains) ))) return VK_ERROR_OUT_OF_HOST_MEMORY;
+    if (!(blit_cmds = mem_alloc( &pool, present_info->swapchainCount * sizeof(blit_cmds) ))) goto failed;
+
+    for (uint32_t i = 0; i < present_info->swapchainCount; ++i)
+    {
+        struct swapchain *swapchain = swapchain_from_handle( present_info->pSwapchains[i] );
+        struct fs_hack_image *hack = &swapchain->fs_hack_images[present_info->pImageIndices[i]];
+
+        if (!swapchain->fshack_dpi) continue;
+        blit_sema = hack->blit_finished;
+
+        if (!hack->cmd || hack->cmd_queue_idx != queue->info.queueFamilyIndex)
+        {
+            if (hack->cmd) device->p_vkFreeCommandBuffers( queue->device->host.device, swapchain->cmd_pools[hack->cmd_queue_idx], 1, &hack->cmd );
+            if (!(queue->device->queue_props[queue->info.queueFamilyIndex].queueFlags & VK_QUEUE_COMPUTE_BIT)) goto failed; /* TODO */
+
+            if (!(hack->cmd = create_hack_cmd( queue, swapchain, queue->info.queueFamilyIndex )) || record_compute_cmd( queue->device, swapchain, hack ))
+            {
+                device->p_vkFreeCommandBuffers( queue->device->host.device, swapchain->cmd_pools[hack->cmd_queue_idx], 1, &hack->cmd );
+                hack->cmd = NULL;
+                goto failed;
+            }
+
+            hack->cmd_queue_idx = queue->info.queueFamilyIndex;
+        }
+
+        blit_cmds[blit_count++] = hack->cmd;
+    }
 
     for (uint32_t i = 0; i < present_info->waitSemaphoreCount; i++)
     {
@@ -2048,6 +2914,28 @@ static VkResult win32u_vkQueuePresentKHR( VkQueue client_queue, const VkPresentI
         struct swapchain *swapchain = swapchain_from_handle( client_swapchains[i] );
         struct surface *surface = swapchain->surface;
         client_surface_update( surface->client );
+    }
+
+    if (blit_count)
+    {
+        VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        VkPipelineStageFlags *stages;
+
+        if (!(stages = mem_alloc( &pool, sizeof(VkPipelineStageFlags) * present_info->waitSemaphoreCount ))) goto failed;
+        for (uint32_t i = 0; i < present_info->waitSemaphoreCount; ++i) stages[i] = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+        /* blit user image to real image */
+        submit_info.waitSemaphoreCount = present_info->waitSemaphoreCount;
+        submit_info.pWaitSemaphores = present_info->pWaitSemaphores;
+        submit_info.pWaitDstStageMask = stages;
+        submit_info.commandBufferCount = blit_count;
+        submit_info.pCommandBuffers = blit_cmds;
+        submit_info.signalSemaphoreCount = 1;
+        submit_info.pSignalSemaphores = &blit_sema;
+        device->p_vkQueueSubmit( queue->host.queue, 1, &submit_info, VK_NULL_HANDLE );
+
+        present_info->waitSemaphoreCount = 1;
+        present_info->pWaitSemaphores = &blit_sema;
     }
 
     res = device->p_vkQueuePresentKHR( queue->host.queue, present_info );
@@ -2079,8 +2967,6 @@ static VkResult win32u_vkQueuePresentKHR( VkQueue client_queue, const VkPresentI
         }
     }
 
-    if (swapchains != swapchains_buffer) free( swapchains );
-
     if (TRACE_ON( fps ))
     {
         static unsigned long frames, frames_total;
@@ -2102,6 +2988,8 @@ static VkResult win32u_vkQueuePresentKHR( VkQueue client_queue, const VkPresentI
         }
     }
 
+failed:
+    mem_free( &pool );
     return res;
 }
 
@@ -2982,6 +3870,7 @@ static struct vulkan_funcs vulkan_funcs =
     .p_vkGetPhysicalDeviceSurfaceFormatsKHR = win32u_vkGetPhysicalDeviceSurfaceFormatsKHR,
     .p_vkGetPhysicalDeviceWin32PresentationSupportKHR = win32u_vkGetPhysicalDeviceWin32PresentationSupportKHR,
     .p_vkGetSemaphoreWin32HandleKHR = win32u_vkGetSemaphoreWin32HandleKHR,
+    .p_vkGetSwapchainImagesKHR = win32u_vkGetSwapchainImagesKHR,
     .p_vkImportFenceWin32HandleKHR = win32u_vkImportFenceWin32HandleKHR,
     .p_vkImportSemaphoreWin32HandleKHR = win32u_vkImportSemaphoreWin32HandleKHR,
     .p_vkMapMemory = win32u_vkMapMemory,
@@ -2994,8 +3883,8 @@ static struct vulkan_funcs vulkan_funcs =
     .p_vkUnmapMemory2KHR = win32u_vkUnmapMemory2KHR,
 };
 
-static VkResult nulldrv_vulkan_surface_create( HWND hwnd, const struct vulkan_instance *instance, VkSurfaceKHR *surface,
-                                               struct client_surface **client )
+static VkResult nulldrv_vulkan_surface_create( HWND hwnd, BOOL raw, const struct vulkan_instance *instance,
+                                               VkSurfaceKHR *surface, struct client_surface **client )
 {
     VkHeadlessSurfaceCreateInfoEXT create_info = {.sType = VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT};
     VkResult res;
@@ -3061,11 +3950,11 @@ static void vulkan_driver_load(void)
     pthread_once( &init_once, vulkan_driver_init );
 }
 
-static VkResult lazydrv_vulkan_surface_create( HWND hwnd, const struct vulkan_instance *instance, VkSurfaceKHR *surface,
-                                               struct client_surface **client )
+static VkResult lazydrv_vulkan_surface_create( HWND hwnd, BOOL raw, const struct vulkan_instance *instance,
+                                               VkSurfaceKHR *surface, struct client_surface **client )
 {
     vulkan_driver_load();
-    return driver_funcs->p_vulkan_surface_create( hwnd, instance, surface, client );
+    return driver_funcs->p_vulkan_surface_create( hwnd, raw, instance, surface, client );
 }
 
 static VkBool32 lazydrv_get_physical_device_presentation_support( struct vulkan_physical_device *physical_device, uint32_t queue )
@@ -3100,6 +3989,9 @@ static void vulkan_init_once(void)
     VkExtensionProperties *properties = NULL;
     uint32_t count = 0;
     VkResult res;
+
+    const char *env = getenv( "WINE_DISABLE_FULLSCREEN_HACK" );
+    fshack_enabled = !env || !atoi( env );
 
 #ifdef SONAME_LIBVULKAN
     vulkan_handle = dlopen( SONAME_LIBVULKAN, RTLD_NOW );

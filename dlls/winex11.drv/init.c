@@ -226,9 +226,24 @@ static BOOL needs_client_window_clipping( HWND hwnd )
     return ret > 0;
 }
 
+static BOOL enable_fullscreen_hack( HWND hwnd )
+{
+    static int disable_fshack = -1;
+
+    if (disable_fshack == -1)
+    {
+        const char *env = getenv( "WINE_DISABLE_FULLSCREEN_HACK" );
+        disable_fshack = env && atoi( env );
+    }
+    if (disable_fshack) return FALSE;
+
+    if (NtUserGetDpiForWindow( hwnd ) != NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI )) return TRUE; /* needs DPI scaling */
+    return FALSE;
+}
+
 BOOL needs_offscreen_rendering( HWND hwnd )
 {
-    if (NtUserGetDpiForWindow( hwnd ) != NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI )) return TRUE; /* needs DPI scaling */
+    if (NtUserGetDpiForWindow( hwnd ) != NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI ) && !enable_fullscreen_hack( hwnd )) return TRUE; /* needs DPI scaling */
     if (NtUserGetAncestor( hwnd, GA_PARENT ) != NtUserGetDesktopWindow()) return TRUE; /* child window, needs compositing */
     if (NtUserGetWindowRelative( hwnd, GW_CHILD )) return needs_client_window_clipping( hwnd ); /* window has children, needs compositing */
     return FALSE;
@@ -273,6 +288,7 @@ struct x11drv_client_surface
     Colormap colormap;
     Window window;
     RECT rect;
+    BOOL raw;
 
     HDC hdc_src;
     HDC hdc_dst;
@@ -314,7 +330,7 @@ static void x11drv_client_surface_detach( struct client_surface *client )
 
 static void client_surface_update_geometry( HWND hwnd, struct x11drv_client_surface *surface )
 {
-    UINT dpi = NtUserGetDpiForWindow( hwnd ); /* use window DPI here, DPI scaling is handled through offscreen presentation */
+    UINT dpi = surface->raw ? NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI ) : NtUserGetDpiForWindow( hwnd );
     HWND origin = hwnd, toplevel = NtUserGetAncestor( hwnd, GA_ROOT );
     XWindowChanges changes = surface->changes;
     struct x11drv_win_data *data;
@@ -477,8 +493,9 @@ static int visual_class_alloc( int class )
     return class == PseudoColor || class == GrayScale || class == DirectColor ? AllocAll : AllocNone;
 }
 
-Window x11drv_client_surface_create( HWND hwnd, int format, struct client_surface **client )
+Window x11drv_client_surface_create( HWND hwnd, BOOL raw, int format, struct client_surface **client )
 {
+    UINT dpi = raw ? NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI ) : NtUserGetDpiForWindow( hwnd );
     struct x11drv_client_surface *surface;
     XVisualInfo visual = default_visual;
     Colormap colormap;
@@ -491,8 +508,9 @@ Window x11drv_client_surface_create( HWND hwnd, int format, struct client_surfac
 
     if (!(surface = client_surface_create( sizeof(*surface), &x11drv_client_surface_funcs, hwnd ))) goto failed;
     surface->colormap = colormap;
+    surface->raw = raw;
 
-    if (!get_surface_rect( hwnd, &surface->rect, NtUserGetDpiForWindow( hwnd ) )) goto failed;
+    if (!get_surface_rect( hwnd, &surface->rect, dpi )) goto failed;
     if (!(surface->window = create_client_window( hwnd, surface->rect, &visual, colormap ))) goto failed;
 
     TRACE( "Created %s for client window %lx\n", debugstr_client_surface( &surface->client ), surface->window );

@@ -529,7 +529,7 @@ static BOOL x11drv_egl_surface_create( HWND hwnd, int format, struct opengl_draw
     Window window;
 
     if ((previous = *drawable) && previous->format == format) return TRUE;
-    if (!(window = x11drv_client_surface_create( hwnd, format, &client ))) return FALSE;
+    if (!(window = x11drv_client_surface_create( hwnd, FALSE, format, &client ))) return FALSE;
     gl = opengl_drawable_create( sizeof(*gl), &x11drv_egl_surface_funcs, format, client );
     client_surface_release( client );
     if (!gl) return FALSE;
@@ -966,7 +966,7 @@ static BOOL x11drv_surface_create( HWND hwnd, int format, struct opengl_drawable
     Window window;
 
     if ((previous = *drawable) && previous->format == format) return TRUE;
-    if (!(window = x11drv_client_surface_create( hwnd, format, &client ))) return FALSE;
+    if (!(window = x11drv_client_surface_create( hwnd, FALSE, format, &client ))) return FALSE;
     gl = opengl_drawable_create( sizeof(*gl), &x11drv_surface_funcs, format, client );
     client_surface_release( client );
     if (!gl) return FALSE;

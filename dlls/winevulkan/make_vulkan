@@ -229,6 +229,7 @@ USER_DRIVER_FUNCS = {
     "vkGetPhysicalDeviceSurfaceFormatsKHR",
     "vkGetPhysicalDeviceWin32PresentationSupportKHR",
     "vkGetSemaphoreWin32HandleKHR",
+    "vkGetSwapchainImagesKHR",
     "vkImportFenceWin32HandleKHR",
     "vkImportSemaphoreWin32HandleKHR",
     "vkMapMemory",

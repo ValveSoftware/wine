@@ -47,8 +47,8 @@ WINE_DEFAULT_DEBUG_CHANNEL(vulkan);
 
 static const struct vulkan_driver_funcs x11drv_vulkan_driver_funcs;
 
-static VkResult X11DRV_vulkan_surface_create( HWND hwnd, const struct vulkan_instance *instance, VkSurfaceKHR *handle,
-                                              struct client_surface **client )
+static VkResult X11DRV_vulkan_surface_create( HWND hwnd, BOOL raw, const struct vulkan_instance *instance,
+                                              VkSurfaceKHR *handle, struct client_surface **client )
 {
     VkXlibSurfaceCreateInfoKHR info =
     {
@@ -58,7 +58,7 @@ static VkResult X11DRV_vulkan_surface_create( HWND hwnd, const struct vulkan_ins
 
     TRACE( "%p %p %p %p\n", hwnd, instance, handle, client );
 
-    if (!(info.window = x11drv_client_surface_create( hwnd, 0, client ))) return VK_ERROR_OUT_OF_HOST_MEMORY;
+    if (!(info.window = x11drv_client_surface_create( hwnd, raw, 0, client ))) return VK_ERROR_OUT_OF_HOST_MEMORY;
     if (instance->p_vkCreateXlibSurfaceKHR( instance->host.instance, &info, NULL /* allocator */, handle ))
     {
         ERR("Failed to create Xlib surface\n");
