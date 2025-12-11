@@ -84,8 +84,6 @@ extern const char* debugstr_cf(CFTypeRef t);
 
 extern CGRect macdrv_get_desktop_rect(void);
 extern void macdrv_reset_device_metrics(void);
-extern BOOL macdrv_GetDeviceGammaRamp(PHYSDEV dev, LPVOID ramp);
-extern BOOL macdrv_SetDeviceGammaRamp(PHYSDEV dev, LPVOID ramp);
 
 
 /**************************************************************************
@@ -127,8 +125,8 @@ extern void macdrv_Beep(void);
 extern LONG macdrv_ChangeDisplaySettings(LPDEVMODEW displays, LPCWSTR primary_name, HWND hwnd, DWORD flags, LPVOID lpvoid);
 extern LRESULT macdrv_ClipboardWindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
 extern UINT macdrv_UpdateDisplayDevices(const struct gdi_device_manager *device_manager, void *param);
-extern BOOL macdrv_GetDeviceGammaRamp(PHYSDEV dev, LPVOID ramp);
-extern BOOL macdrv_SetDeviceGammaRamp(PHYSDEV dev, LPVOID ramp);
+extern UINT macdrv_GetDeviceGammaRamp(PHYSDEV dev, LPVOID ramp);
+extern UINT macdrv_SetDeviceGammaRamp(PHYSDEV dev, LPVOID ramp);
 extern BOOL macdrv_ClipCursor(const RECT *clip, BOOL reset);
 extern LRESULT macdrv_NotifyIcon(HWND hwnd, UINT msg, NOTIFYICONDATAW *data);
 extern void macdrv_CleanupIcons(HWND hwnd);

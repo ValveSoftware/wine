@@ -156,7 +156,7 @@ struct gdi_dc_funcs
     BOOL     (*pGetCharWidth)(PHYSDEV,UINT,UINT,const WCHAR*,LPINT);
     BOOL     (*pGetCharWidthInfo)(PHYSDEV,void*);
     INT      (*pGetDeviceCaps)(PHYSDEV,INT);
-    BOOL     (*pGetDeviceGammaRamp)(PHYSDEV,LPVOID);
+    UINT     (*pGetDeviceGammaRamp)(PHYSDEV,LPVOID);
     DWORD    (*pGetFontData)(PHYSDEV,DWORD,DWORD,LPVOID,DWORD);
     BOOL     (*pGetFontRealizationInfo)(PHYSDEV,void*);
     DWORD    (*pGetFontUnicodeRanges)(PHYSDEV,LPGLYPHSET);
@@ -202,7 +202,7 @@ struct gdi_dc_funcs
     COLORREF (*pSetDCPenColor)(PHYSDEV, COLORREF);
     INT      (*pSetDIBitsToDevice)(PHYSDEV,INT,INT,DWORD,DWORD,INT,INT,UINT,UINT,LPCVOID,BITMAPINFO*,UINT);
     VOID     (*pSetDeviceClipping)(PHYSDEV,HRGN);
-    BOOL     (*pSetDeviceGammaRamp)(PHYSDEV,LPVOID);
+    UINT     (*pSetDeviceGammaRamp)(PHYSDEV,LPVOID);
     COLORREF (*pSetPixel)(PHYSDEV,INT,INT,COLORREF);
     COLORREF (*pSetTextColor)(PHYSDEV,COLORREF);
     INT      (*pStartDoc)(PHYSDEV,const DOCINFOW*);

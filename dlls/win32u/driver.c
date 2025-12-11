@@ -287,10 +287,9 @@ static INT nulldrv_GetDeviceCaps( PHYSDEV dev, INT cap )
     }
 }
 
-static BOOL nulldrv_GetDeviceGammaRamp( PHYSDEV dev, void *ramp )
+static UINT nulldrv_GetDeviceGammaRamp( PHYSDEV dev, void *ramp )
 {
-    RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
-    return FALSE;
+    return -1; /* use default implementation */
 }
 
 static DWORD nulldrv_GetFontData( PHYSDEV dev, DWORD table, DWORD offset, LPVOID buffer, DWORD length )
@@ -486,10 +485,9 @@ static void nulldrv_SetDeviceClipping( PHYSDEV dev, HRGN rgn )
 {
 }
 
-static BOOL nulldrv_SetDeviceGammaRamp( PHYSDEV dev, void *ramp )
+static UINT nulldrv_SetDeviceGammaRamp( PHYSDEV dev, void *ramp )
 {
-    RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
-    return FALSE;
+    return -1; /* use default implementation */
 }
 
 static COLORREF nulldrv_SetPixel( PHYSDEV dev, INT x, INT y, COLORREF color )

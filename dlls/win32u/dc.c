@@ -1301,8 +1301,9 @@ BOOL WINAPI NtGdiGetDeviceGammaRamp( HDC hdc, void *ptr )
         {
             PHYSDEV physdev = GET_DC_PHYSDEV( dc, pGetDeviceGammaRamp );
             ret = physdev->funcs->pGetDeviceGammaRamp( physdev, ptr );
+            if (ret == -1) ret = get_global_gamma_ramp( ptr );
         }
-        else RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
+        if (!ret) RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
 	release_dc_ptr( dc );
     }
     return ret;
@@ -1400,11 +1401,10 @@ BOOL WINAPI NtGdiSetDeviceGammaRamp( HDC hdc, void *ptr )
         if (get_gdi_object_type( hdc ) != NTGDI_OBJ_MEMDC)
         {
             PHYSDEV physdev = GET_DC_PHYSDEV( dc, pSetDeviceGammaRamp );
-
-            if (check_gamma_ramps(ptr))
-                ret = physdev->funcs->pSetDeviceGammaRamp( physdev, ptr );
+            if (check_gamma_ramps(ptr)) ret = physdev->funcs->pSetDeviceGammaRamp( physdev, ptr );
+            if (ret == -1) ret = set_global_gamma_ramp( ptr );
         }
-        else RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
+        if (!ret) RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
 	release_dc_ptr( dc );
     }
     return ret;

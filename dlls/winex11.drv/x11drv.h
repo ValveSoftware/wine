@@ -169,7 +169,7 @@ extern BOOL X11DRV_Chord( PHYSDEV dev, INT left, INT top, INT right, INT bottom,
 extern BOOL X11DRV_Ellipse( PHYSDEV dev, INT left, INT top, INT right, INT bottom );
 extern BOOL X11DRV_ExtFloodFill( PHYSDEV dev, INT x, INT y, COLORREF color, UINT fillType );
 extern BOOL X11DRV_FillPath( PHYSDEV dev );
-extern BOOL X11DRV_GetDeviceGammaRamp( PHYSDEV dev, LPVOID ramp );
+extern UINT X11DRV_GetDeviceGammaRamp( PHYSDEV dev, LPVOID ramp );
 extern DWORD X11DRV_GetImage( PHYSDEV dev, BITMAPINFO *info,
                               struct gdi_image_bits *bits, struct bitblt_coords *src );
 extern COLORREF X11DRV_GetNearestColor( PHYSDEV dev, COLORREF color );
@@ -196,7 +196,7 @@ extern HPEN X11DRV_SelectPen( PHYSDEV dev, HPEN hpen, const struct brush_pattern
 extern COLORREF X11DRV_SetDCBrushColor( PHYSDEV dev, COLORREF crColor );
 extern COLORREF X11DRV_SetDCPenColor( PHYSDEV dev, COLORREF crColor );
 extern void X11DRV_SetDeviceClipping( PHYSDEV dev, HRGN rgn );
-extern BOOL X11DRV_SetDeviceGammaRamp( PHYSDEV dev, LPVOID ramp );
+extern UINT X11DRV_SetDeviceGammaRamp( PHYSDEV dev, LPVOID ramp );
 extern COLORREF X11DRV_SetPixel( PHYSDEV dev, INT x, INT y, COLORREF color );
 extern BOOL X11DRV_StretchBlt( PHYSDEV dst_dev, struct bitblt_coords *dst,
                                PHYSDEV src_dev, struct bitblt_coords *src, DWORD rop );

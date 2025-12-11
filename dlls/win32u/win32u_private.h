@@ -193,6 +193,8 @@ extern void reset_monitor_update_serial(void);
 extern void user_lock(void);
 extern void user_unlock(void);
 extern void user_check_not_lock(void);
+extern BOOL get_global_gamma_ramp( void *data );
+extern BOOL set_global_gamma_ramp( void *data );
 
 /* d3dkmtc. */
 
