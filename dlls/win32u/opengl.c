@@ -177,7 +177,13 @@ static BOOL opengl_drawable_swap( struct opengl_drawable *drawable )
 struct framebuffer_surface
 {
     struct opengl_drawable base;
+    UINT frame;
 };
+
+static struct framebuffer_surface *framebuffer_from_opengl_drawable( struct opengl_drawable *base )
+{
+    return CONTAINING_RECORD( base, struct framebuffer_surface, base );
+}
 
 static GLenum color_format_from_pfd( const struct wgl_pixel_format *desc )
 {
@@ -426,7 +432,27 @@ static void framebuffer_surface_flush( struct opengl_drawable *drawable, UINT fl
 
 static BOOL framebuffer_surface_swap( struct opengl_drawable *drawable )
 {
+    struct framebuffer_surface *surface = framebuffer_from_opengl_drawable( drawable );
+    const struct opengl_funcs *funcs = &display_funcs;
+
     TRACE( "%s\n", debugstr_opengl_drawable( drawable ) );
+
+    if (surface->base.doublebuffer)
+    {
+        UINT front = surface->frame & 1;
+
+        funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT0, WINE_OPENGL_RESERVED_TEXTURE0 + front, 0 );
+        funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT1, WINE_OPENGL_RESERVED_TEXTURE0 + (1 - front), 0 );
+
+        if (drawable->stereo)
+        {
+            funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT2, WINE_OPENGL_RESERVED_TEXTURE0 + 2 + front, 0 );
+            funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT3, WINE_OPENGL_RESERVED_TEXTURE0 + 2 + (1 - front), 0 );
+        }
+
+        surface->frame++;
+    }
+
     return TRUE;
 }
 
