@@ -2357,6 +2357,7 @@ void destroy_client_window( HWND hwnd, Window client_window )
     }
 
     XDestroyWindow( gdi_display, client_window );
+    XFlush( gdi_display );
 }
 
 
@@ -2394,11 +2395,8 @@ Window create_client_window( HWND hwnd, RECT client_rect, const XVisualInfo *vis
     if (data->client_window)
     {
         XMapWindow( gdi_display, data->client_window );
-        if (data->whole_window)
-        {
-            XFlush( gdi_display ); /* make sure client_window is created for XSelectInput */
-            client_window_events_enable( data, data->client_window );
-        }
+        XFlush( gdi_display ); /* make sure client_window is created for XSelectInput */
+        if (data->whole_window) client_window_events_enable( data, data->client_window );
         TRACE( "%p xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
     }
 
