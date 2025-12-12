@@ -1074,7 +1074,7 @@ static void session_flush_sinks(struct media_session *session)
         {
             if (node->u.sink.requests)
             {
-                node->u.sink.requests--;
+                node->u.sink.requests--; /* session_request_sample will increment this back */
                 session_request_sample(session, node->object.sink_stream);
             }
             IMFStreamSink_Flush(node->object.sink_stream);
@@ -3944,7 +3944,11 @@ static void session_deliver_sample_to_node(struct media_session *session, struct
             {
                 if (sample)
                 {
-                    if (FAILED(hr = IMFStreamSink_ProcessSample(topo_node->object.sink_stream, sample)))
+                    if (SUCCEEDED(hr = IMFStreamSink_ProcessSample(topo_node->object.sink_stream, sample)))
+                    {
+                        topo_node->u.sink.requests--;
+                    }
+                    else
                     {
                         WARN("Stream sink failed to process sample, hr %#lx.\n", hr);
                         IMFMediaEventQueue_QueueEventParamVar(session->event_queue, MEError, &GUID_NULL, hr, NULL);
@@ -3955,7 +3959,6 @@ static void session_deliver_sample_to_node(struct media_session *session, struct
                 {
                     WARN("Failed to place sink marker, hr %#lx.\n", hr);
                 }
-                topo_node->u.sink.requests--;
             }
             break;
         case MF_TOPOLOGY_TRANSFORM_NODE:
