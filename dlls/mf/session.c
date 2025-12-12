@@ -1046,19 +1046,36 @@ static void session_subscribe_sinks(struct media_session *session)
     session->presentation.flags |= SESSION_FLAG_SINKS_SUBSCRIBED;
 }
 
+static void session_flush_transform_node(struct topo_node *node)
+{
+    struct transform_stream *stream;
+    UINT i;
+
+    if (node->type == MF_TOPOLOGY_TRANSFORM_NODE)
+    {
+        for (i = 0; i < node->u.transform.input_count; ++i)
+        {
+            stream = &node->u.transform.inputs[i];
+            transform_stream_drop_events(stream);
+            stream->draining = FALSE; /* we're about to flush, so draining can halt */
+        }
+        IMFTransform_ProcessMessage(node->object.transform, MFT_MESSAGE_COMMAND_FLUSH, 0);
+        for (i = 0; i < node->u.transform.output_count; i++)
+        {
+            stream = &node->u.transform.outputs[i];
+            transform_stream_drop_events(stream);
+            stream->requests = 0; /* these requests might have been flushed */
+        }
+    }
+}
+
 static void session_flush_transforms(struct media_session *session)
 {
     struct topo_node *node;
-    UINT i;
 
     LIST_FOR_EACH_ENTRY(node, &session->presentation.nodes, struct topo_node, entry)
     {
-        if (node->type == MF_TOPOLOGY_TRANSFORM_NODE)
-        {
-            IMFTransform_ProcessMessage(node->object.transform, MFT_MESSAGE_COMMAND_FLUSH, 0);
-            for (i = 0; i < node->u.transform.output_count; i++)
-                node->u.transform.outputs[i].requests = 0; /* these requests might have been flushed */
-        }
+        session_flush_transform_node(node);
     }
 }
 
@@ -1085,19 +1102,13 @@ static void session_flush_sinks(struct media_session *session)
 static void session_flush_nodes(struct media_session *session)
 {
     struct topo_node *node;
-    UINT i;
 
     LIST_FOR_EACH_ENTRY(node, &session->presentation.nodes, struct topo_node, entry)
     {
         if (node->type == MF_TOPOLOGY_OUTPUT_NODE)
             IMFStreamSink_Flush(node->object.sink_stream);
-        else if (node->type == MF_TOPOLOGY_TRANSFORM_NODE)
-        {
-            for (i = 0; i < node->u.transform.output_count; ++i)
-                node->u.transform.outputs[i].requests = 0;
-
-            IMFTransform_ProcessMessage(node->object.transform, MFT_MESSAGE_COMMAND_FLUSH, 0);
-        }
+        else
+            session_flush_transform_node(node);
     }
 }
 
