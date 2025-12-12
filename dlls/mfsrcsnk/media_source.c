@@ -274,6 +274,7 @@ struct media_source
     struct winedmo_demuxer winedmo_demuxer;
     struct winedmo_stream winedmo_stream;
     UINT64 file_size;
+    UINT64 position;
     INT64 duration;
     UINT stream_count;
     WCHAR mime_type[256];
@@ -1767,16 +1768,26 @@ static NTSTATUS CDECL media_source_seek_cb( struct winedmo_stream *stream, UINT6
 
     if (FAILED(IMFByteStream_Seek(source->stream, msoBegin, *pos, 0, pos)))
         return STATUS_UNSUCCESSFUL;
+
+    source->position = *pos;
     return STATUS_SUCCESS;
 }
 
 static NTSTATUS CDECL media_source_read_cb(struct winedmo_stream *stream, BYTE *buffer, ULONG *size)
 {
     struct media_source *source = CONTAINING_RECORD(stream, struct media_source, winedmo_stream);
+    UINT64 position;
+
     TRACE("stream %p, buffer %p, size %p\n", stream, buffer, size);
+
+    if (SUCCEEDED(IMFByteStream_GetCurrentPosition(source->stream, &position)) && position != source->position
+            && FAILED(IMFByteStream_SetCurrentPosition(source->stream, source->position)))
+        WARN("Failed to set current position\n");
 
     if (FAILED(IMFByteStream_Read(source->stream, buffer, *size, size)))
         return STATUS_UNSUCCESSFUL;
+
+    source->position += *size;
     return STATUS_SUCCESS;
 }
 
