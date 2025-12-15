@@ -1,4 +1,3 @@
-EXTRADEFS = -DWINE_NO_LONG_TYPES
 MODULE = atiadlxx.dll
 IMPORTS = user32 dxgi cfgmgr32
 

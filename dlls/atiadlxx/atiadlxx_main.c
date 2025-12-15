@@ -51,7 +51,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(atiadlxx);
 
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
-    TRACE("(%p, %u, %p)\n", instance, reason, reserved);
+    TRACE("(%p, %lu, %p)\n", instance, reason, reserved);
 
     switch (reason)
     {
