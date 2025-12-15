@@ -1217,7 +1217,7 @@ dispex_static_data_t MutationObserver_dispex = {
     .vtbl             = &mutation_observer_dispex_vtbl,
     .disp_tid         = IWineMSHTMLMutationObserver_tid,
     .iface_tids       = mutation_observer_iface_tids,
-    .min_compat_mode  = COMPAT_MODE_IE11,
+    .min_compat_mode  = COMPAT_MODE_IE11 + 1,  /* FIXME HACK: Not exposed as FFXIV Launcher breaks with MutationObserver stub */
 };
 
 static HRESULT create_mutation_observer(DispatchEx *owner, IDispatch *callback,
