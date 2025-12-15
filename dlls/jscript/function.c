@@ -1067,17 +1067,12 @@ static void HostFunction_destructor(FunctionInstance *func)
 {
 }
 
-static HRESULT HostFunction_gc_traverse(struct gc_ctx *gc_ctx, enum gc_traverse_op op, FunctionInstance *func)
-{
-    return S_OK;
-}
-
 static const function_vtbl_t HostFunctionVtbl = {
     HostFunction_call,
     HostFunction_toString,
     HostFunction_get_code,
     HostFunction_destructor,
-    HostFunction_gc_traverse
+    no_gc_traverse,
 };
 
 HRESULT create_host_function(script_ctx_t *ctx, const struct property_info *desc, DWORD flags, jsdisp_t **ret)
@@ -1202,17 +1197,12 @@ static void HostConstructor_destructor(FunctionInstance *func)
 {
 }
 
-static HRESULT HostConstructor_gc_traverse(struct gc_ctx *gc_ctx, enum gc_traverse_op op, FunctionInstance *func)
-{
-    return S_OK;
-}
-
 static const function_vtbl_t HostConstructorVtbl = {
     HostConstructor_call,
     HostConstructor_toString,
     HostConstructor_get_code,
     HostConstructor_destructor,
-    HostConstructor_gc_traverse
+    no_gc_traverse,
 };
 
 HRESULT init_host_constructor(script_ctx_t *ctx, IWineJSDispatchHost *host_constr, const WCHAR *method_name, IWineJSDispatch **ret)
