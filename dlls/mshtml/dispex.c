@@ -2928,11 +2928,13 @@ static IWineJSDispatchHostVtbl JSDispatchHostVtbl = {
 
 struct EnumVARIANT {
     IEnumVARIANT IEnumVARIANT_iface;
-    LONG ref;
+    nsCycleCollectingAutoRefCnt ccref;
 
     DispatchEx *collection;
     ULONG iter;
 };
+
+static ExternalCycleCollectionParticipant enum_ccp;
 
 static inline struct EnumVARIANT *impl_from_IEnumVARIANT(IEnumVARIANT *iface)
 {
@@ -2945,9 +2947,15 @@ static HRESULT WINAPI EnumVARIANT_QueryInterface(IEnumVARIANT *iface, REFIID rii
 
     TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
 
-    if(IsEqualGUID(riid, &IID_IUnknown) || IsEqualGUID(riid, &IID_IEnumVARIANT))
+    if(IsEqualGUID(riid, &IID_IUnknown) || IsEqualGUID(riid, &IID_IEnumVARIANT)) {
         *ppv = &This->IEnumVARIANT_iface;
-    else {
+    }else if(IsEqualGUID(&IID_nsXPCOMCycleCollectionParticipant, riid)) {
+        *ppv = &enum_ccp;
+        return S_OK;
+    }else if(IsEqualGUID(&IID_nsCycleCollectionISupports, riid)) {
+        *ppv = &This->IEnumVARIANT_iface;
+        return S_OK;
+    }else {
         FIXME("Unsupported iface %s\n", debugstr_mshtml_guid(riid));
         *ppv = NULL;
         return E_NOINTERFACE;
@@ -2960,7 +2968,7 @@ static HRESULT WINAPI EnumVARIANT_QueryInterface(IEnumVARIANT *iface, REFIID rii
 static ULONG WINAPI EnumVARIANT_AddRef(IEnumVARIANT *iface)
 {
     struct EnumVARIANT *This = impl_from_IEnumVARIANT(iface);
-    LONG ref = InterlockedIncrement(&This->ref);
+    LONG ref = ccref_incr(&This->ccref, (nsISupports*)&This->IEnumVARIANT_iface);
 
     TRACE("(%p) ref=%ld\n", This, ref);
 
@@ -2970,14 +2978,9 @@ static ULONG WINAPI EnumVARIANT_AddRef(IEnumVARIANT *iface)
 static ULONG WINAPI EnumVARIANT_Release(IEnumVARIANT *iface)
 {
     struct EnumVARIANT *This = impl_from_IEnumVARIANT(iface);
-    LONG ref = InterlockedDecrement(&This->ref);
+    LONG ref = ccref_decr(&This->ccref, (nsISupports*)&This->IEnumVARIANT_iface, &enum_ccp);
 
     TRACE("(%p) ref=%ld\n", This, ref);
-
-    if(!ref) {
-        DispatchEx_Release(&This->collection->IWineJSDispatchHost_iface);
-        free(This);
-    }
 
     return ref;
 }
@@ -3057,6 +3060,37 @@ static const IEnumVARIANTVtbl EnumVARIANTVtbl = {
     EnumVARIANT_Clone
 };
 
+static nsresult NSAPI EnumVARIANT_traverse(void *ccp, void *p, nsCycleCollectionTraversalCallback *cb)
+{
+    struct EnumVARIANT *This = impl_from_IEnumVARIANT(p);
+
+    describe_cc_node(&This->ccref, "EnumVARIANT", cb);
+
+    if(This->collection)
+        note_cc_edge((nsISupports*)&This->collection->IWineJSDispatchHost_iface, "collection", cb);
+    return NS_OK;
+}
+
+static nsresult NSAPI EnumVARIANT_unlink(void *p)
+{
+    struct EnumVARIANT *This = impl_from_IEnumVARIANT(p);
+
+    if(This->collection) {
+        DispatchEx *col = This->collection;
+        This->collection = NULL;
+        DispatchEx_Release(&col->IWineJSDispatchHost_iface);
+    }
+    return NS_OK;
+}
+
+static void NSAPI EnumVARIANT_delete_cycle_collectable(void *p)
+{
+    struct EnumVARIANT *This = impl_from_IEnumVARIANT(p);
+
+    EnumVARIANT_unlink(p);
+    free(This);
+}
+
 HRESULT create_enum_variant(DispatchEx *collection, IUnknown **ret)
 {
     struct EnumVARIANT *enumvar = malloc(sizeof(*enumvar));
@@ -3065,13 +3099,23 @@ HRESULT create_enum_variant(DispatchEx *collection, IUnknown **ret)
         return E_OUTOFMEMORY;
 
     enumvar->IEnumVARIANT_iface.lpVtbl = &EnumVARIANTVtbl;
-    enumvar->ref = 1;
     enumvar->iter = 0;
     enumvar->collection = collection;
+    ccref_init(&enumvar->ccref, 1);
     DispatchEx_AddRef(&collection->IWineJSDispatchHost_iface);
 
     *ret = (IUnknown*)&enumvar->IEnumVARIANT_iface;
     return S_OK;
+}
+
+void init_enum_cc(void)
+{
+    static const CCObjCallback ccp_callback = {
+        EnumVARIANT_traverse,
+        EnumVARIANT_unlink,
+        EnumVARIANT_delete_cycle_collectable
+    };
+    ccp_init(&enum_ccp, &ccp_callback);
 }
 
 HRESULT dispex_builtin_props_to_json(DispatchEx *dispex, HTMLInnerWindow *window, VARIANT *ret)

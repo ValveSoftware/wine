@@ -1259,6 +1259,7 @@ float get_viewer_zoom(GeckoBrowser*);
 
 void init_dispex_cc(void);
 void init_window_cc(void);
+void init_enum_cc(void);
 
 HRESULT nsuri_to_url(LPCWSTR,BOOL,BSTR*);
 
