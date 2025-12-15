@@ -2363,6 +2363,12 @@ static void client_window_events_disable( struct x11drv_win_data *data, Window c
     XDeleteContext( data->display, client_window, winContext );
 }
 
+static void set_wine_allow_flip( Window client_window, unsigned int allow_flip )
+{
+    XChangeProperty( gdi_display, client_window, x11drv_atom(_WINE_ALLOW_FLIP), XA_CARDINAL, 32,
+                     PropModeReplace, (unsigned char *)&allow_flip, sizeof(allow_flip) / 4 );
+}
+
 /**********************************************************************
  *		detach_client_window
  */
@@ -2371,6 +2377,8 @@ void detach_client_window( struct x11drv_win_data *data, Window client_window )
     if (data->client_window != client_window || !client_window) return;
 
     TRACE( "%p/%lx detaching client window %lx\n", data->hwnd, data->whole_window, client_window );
+
+    set_wine_allow_flip( client_window, 0 );
 
     if (data->whole_window)
     {
@@ -2399,6 +2407,8 @@ void attach_client_window( struct x11drv_win_data *data, Window client_window )
         XReparentWindow( gdi_display, client_window, data->whole_window, data->rects.client.left - data->rects.visible.left,
                          data->rects.client.top - data->rects.visible.top );
     }
+
+    set_wine_allow_flip( client_window, 1 );
 
     data->client_window = client_window;
 }
@@ -2461,6 +2471,7 @@ Window create_client_window( HWND hwnd, RECT client_rect, const XVisualInfo *vis
                                                CWBackingStore | CWColormap | CWBorderPixel, &attr );
     if (data->client_window)
     {
+        set_wine_allow_flip( data->client_window, !!data->whole_window );
         XMapWindow( gdi_display, data->client_window );
         XFlush( gdi_display ); /* make sure client_window is created for XSelectInput */
         if (data->whole_window) client_window_events_enable( data, data->client_window );
@@ -2513,6 +2524,8 @@ static void create_whole_window( struct x11drv_win_data *data )
                                         cx, cy, 0, data->vis.depth, InputOutput,
                                         data->vis.visual, mask, &attr );
     if (!data->whole_window) goto done;
+    set_wine_allow_flip( data->whole_window, 0 );
+
     SetRect( &data->current_state.rect, pos.x, pos.y, pos.x + cx, pos.y + cy );
     data->pending_state.rect = data->current_state.rect;
     data->desired_state.rect = data->current_state.rect;
