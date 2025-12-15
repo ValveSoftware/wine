@@ -82,6 +82,8 @@
 #if defined(HAVE_LINUX_USERFAULTFD_H) && defined(HAVE_LINUX_FS_H)
 # include <linux/userfaultfd.h>
 # include <linux/fs.h>
+#include "uffd_tmp_defs.h"
+
 #if defined(UFFD_FEATURE_WP_ASYNC) && defined(PM_SCAN_WP_MATCHING)
 #define USE_UFFD_WRITEWATCH
 #endif
