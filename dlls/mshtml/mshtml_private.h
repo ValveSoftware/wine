@@ -368,7 +368,6 @@ typedef struct dispex_dynamic_data_t dispex_dynamic_data_t;
 #define MSHTML_CUSTOM_DISPID_CNT (MSHTML_DISPID_CUSTOM_MAX-MSHTML_DISPID_CUSTOM_MIN)
 
 typedef struct DispatchEx DispatchEx;
-typedef struct nsCycleCollectionTraversalCallback nsCycleCollectionTraversalCallback;
 typedef struct dispex_static_data_t dispex_static_data_t;
 
 typedef struct {
@@ -622,20 +621,6 @@ struct DispatchEx {
         return IWineJSDispatchHost_Release(&(dispex).IWineJSDispatchHost_iface);                       \
     }                                                                                          \
     DISPEX_IDISPATCH_NOUNK_IMPL(prefix, iface_name, dispex)
-
-typedef struct {
-    void *vtbl;
-    int ref_flags;
-    void *callbacks;
-} ExternalCycleCollectionParticipant;
-
-typedef struct {
-    nsresult (NSAPI *traverse)(void*,void*,nsCycleCollectionTraversalCallback*);
-    nsresult (NSAPI *unlink)(void*);
-    void (NSAPI *delete_cycle_collectable)(void*);
-} CCObjCallback;
-
-DEFINE_GUID(IID_nsXPCOMCycleCollectionParticipant, 0x9674489b,0x1f6f,0x4550,0xa7,0x30, 0xcc,0xae,0xdd,0x10,0x4c,0xf9);
 
 extern nsrefcnt (__cdecl *ccref_incr)(nsCycleCollectingAutoRefCnt*,nsISupports*);
 extern nsrefcnt (__cdecl *ccref_decr)(nsCycleCollectingAutoRefCnt*,nsISupports*,ExternalCycleCollectionParticipant*);
