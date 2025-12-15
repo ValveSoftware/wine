@@ -3660,16 +3660,12 @@ HRESULT init_host_object(script_ctx_t *ctx, IWineJSDispatchHost *host_iface, IWi
 IWineJSDispatchHost *get_host_dispatch(IDispatch *disp)
 {
     IWineJSDispatchHost *ret;
-    HostObject *host_obj;
     jsdisp_t *jsdisp;
 
-    if(!(jsdisp = to_jsdisp(disp)))
-        return NULL;
-    if(jsdisp->builtin_info != &HostObject_info)
+    if(!(jsdisp = to_jsdisp(disp)) || !jsdisp->builtin_info->get_host_disp)
         return NULL;
 
-    host_obj = HostObject_from_jsdisp(jsdisp);
-    IWineJSDispatchHost_GetOuterDispatch(host_obj->host_iface, &ret);
+    IWineJSDispatchHost_GetOuterDispatch(jsdisp->builtin_info->get_host_disp(jsdisp), &ret);
     return ret;
 }
 
