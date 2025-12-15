@@ -2872,6 +2872,30 @@ static HRESULT WINAPI JSDispatchHost_ToString(IWineJSDispatchHost *iface, BSTR *
     return dispex_to_string(This, str);
 }
 
+static BOOL __cdecl is_full_cc(void)
+{
+    thread_data_t *thread_data = get_thread_data(FALSE);
+    return thread_data ? thread_data->full_cc_in_progress : FALSE;
+}
+
+static void __cdecl describe_node(ULONG ref, const char *obj_name, nsCycleCollectionTraversalCallback *cb)
+{
+    nsCycleCollectingAutoRefCnt ccref;
+
+    ccref_init(&ccref, ref);
+    describe_cc_node(&ccref, obj_name, cb);
+}
+
+static void WINAPI JSDispatchHost_InitCC(IWineJSDispatchHost *iface, struct jshost_cc_api *cc_api, const CCObjCallback *callback)
+{
+    ccp_init(&cc_api->participant, callback);
+    cc_api->is_full_cc = is_full_cc;
+    cc_api->collect = cc_api_collect;
+    cc_api->describe_node = describe_node;
+    cc_api->note_edge = (note_edge_t)note_cc_edge;
+    list_add_tail(&cc_api_list, &cc_api->entry);
+}
+
 static IWineJSDispatchHostVtbl JSDispatchHostVtbl = {
     DispatchEx_QueryInterface,
     DispatchEx_AddRef,
@@ -2899,6 +2923,7 @@ static IWineJSDispatchHostVtbl JSDispatchHostVtbl = {
     JSDispatchHost_FillProperties,
     JSDispatchHost_GetOuterDispatch,
     JSDispatchHost_ToString,
+    JSDispatchHost_InitCC
 };
 
 struct EnumVARIANT {
@@ -3096,6 +3121,9 @@ static nsresult NSAPI dispex_traverse(void *ccp, void *p, nsCycleCollectionTrave
     if(This->info->vtbl->traverse)
         This->info->vtbl->traverse(This, cb);
 
+    if(This->jsdisp)
+        IWineJSDispatch_Traverse(This->jsdisp, cb);
+
     if(!This->dynamic_data)
         return NS_OK;
 
@@ -3150,6 +3178,9 @@ static nsresult NSAPI dispex_unlink(void *p)
 
     if(This->info->vtbl->unlink)
         This->info->vtbl->unlink(This);
+
+    if(This->jsdisp)
+        IWineJSDispatch_Unlink(This->jsdisp);
 
     dispex_props_unlink(This);
     return NS_OK;

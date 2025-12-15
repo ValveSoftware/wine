@@ -64,6 +64,7 @@ static IMultiLanguage2 *mlang;
 static IInternetSecurityManager *security_manager;
 static unsigned global_max_compat_mode = COMPAT_MODE_IE11;
 static struct list compat_config = LIST_INIT(compat_config);
+struct list cc_api_list = LIST_INIT(cc_api_list);
 
 typedef struct {
     struct list entry;
@@ -376,6 +377,15 @@ static void process_detach(void)
 
     close_gecko();
     release_typelib();
+
+    while(!list_empty(&cc_api_list)) {
+        struct jshost_cc_api *entry = LIST_ENTRY(list_head(&cc_api_list), struct jshost_cc_api, entry);
+        entry->is_full_cc = NULL;
+        entry->collect = NULL;
+        entry->describe_node = NULL;
+        entry->note_edge = NULL;
+        list_remove(&entry->entry);
+    }
 
     while(!list_empty(&compat_config)) {
         config = LIST_ENTRY(list_head(&compat_config), compat_config_t, entry);

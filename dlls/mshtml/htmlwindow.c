@@ -65,6 +65,22 @@ HTMLOuterWindow *mozwindow_to_window(const mozIDOMWindowProxy *mozwindow)
     return entry ? WINE_RB_ENTRY_VALUE(entry, HTMLOuterWindow, entry) : NULL;
 }
 
+void __cdecl cc_api_collect(void)
+{
+    nsIDOMWindowUtils *window_utils = NULL;
+    HTMLOuterWindow *window;
+
+    /* We can't rely on GetScriptGlobal as this can be initialized before any scripts are set up */
+    if(!window_map.root || !(window = WINE_RB_ENTRY_VALUE(window_map.root, HTMLOuterWindow, entry))->browser)
+        return;
+    get_nsinterface((nsISupports*)window->browser->content_window->nswindow, &IID_nsIDOMWindowUtils, (void**)&window_utils);
+
+    if(window_utils) {
+        cycle_collect(window_utils);
+        nsIDOMWindowUtils_Release(window_utils);
+    }
+}
+
 static HRESULT get_location(HTMLOuterWindow *This, HTMLLocation **ret)
 {
     if(!This->location) {
@@ -3551,6 +3567,13 @@ static HRESULT WINAPI WindowDispEx_ToString(IWineJSDispatchHost *iface, BSTR *st
     return IWineJSDispatchHost_ToString(&This->base.inner_window->event_target.dispex.IWineJSDispatchHost_iface, str);
 }
 
+static void WINAPI WindowDispEx_InitCC(IWineJSDispatchHost *iface, struct jshost_cc_api *cc_api, const CCObjCallback *callback)
+{
+    HTMLOuterWindow *This = impl_from_IWineJSDispatchHost(iface);
+
+    IWineJSDispatchHost_InitCC(&This->base.inner_window->event_target.dispex.IWineJSDispatchHost_iface, cc_api, callback);
+}
+
 static const IWineJSDispatchHostVtbl WindowDispExVtbl = {
     WindowDispEx_QueryInterface,
     WindowDispEx_AddRef,
@@ -3578,6 +3601,7 @@ static const IWineJSDispatchHostVtbl WindowDispExVtbl = {
     WindowDispEx_FillProperties,
     WindowDispEx_GetOuterDispatch,
     WindowDispEx_ToString,
+    WindowDispEx_InitCC
 };
 
 static inline HTMLOuterWindow *impl_from_IEventTarget(IEventTarget *iface)

@@ -60,6 +60,18 @@ typedef struct {
     void (__stdcall *delete_cycle_collectable)(void*);
 } CCObjCallback;
 
+typedef void (__cdecl *note_edge_t)(IUnknown*,const char*,nsCycleCollectionTraversalCallback*);
+
+struct jshost_cc_api
+{
+    ExternalCycleCollectionParticipant participant;
+    BOOL (__cdecl *is_full_cc)(void);
+    void (__cdecl *collect)(void);
+    void (__cdecl *describe_node)(ULONG ref, const char *obj_name, nsCycleCollectionTraversalCallback *cb);
+    note_edge_t note_edge;
+    struct list entry;
+};
+
 interface IWineJSDispatchHost;
 
 [
@@ -70,6 +82,8 @@ interface IWineJSDispatchHost;
 interface IWineJSDispatch : IDispatchEx
 {
     void Free();
+    void Traverse(nsCycleCollectionTraversalCallback *cb);
+    void Unlink();
     HRESULT GetPropertyFlags(DISPID id, UINT32 *ret);
     HRESULT DefineProperty(const WCHAR *name, unsigned int flags, VARIANT *v);
     HRESULT UpdateProperty(struct property_info *desc);
@@ -95,6 +109,7 @@ interface IWineJSDispatchHost : IDispatchEx
     HRESULT FillProperties();
     HRESULT GetOuterDispatch(IWineJSDispatchHost **ret);
     HRESULT ToString(BSTR *str);
+    void InitCC(struct jshost_cc_api *cc_api, const CCObjCallback *callback);
 }
 
 const unsigned int SCRIPTLANGUAGEVERSION_HTML  = 0x400;

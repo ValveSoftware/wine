@@ -924,6 +924,11 @@ HRESULT gc_run(script_ctx_t *ctx)
     if(thread_data->gc_is_unlinking)
         return S_OK;
 
+    thread_data->gc_is_unlinking = TRUE;
+    if(cc_api.collect)
+        cc_api.collect();
+    thread_data->gc_is_unlinking = FALSE;
+
     if(!(head = malloc(sizeof(*head))))
         return E_OUTOFMEMORY;
     head->next = NULL;
@@ -1921,6 +1926,21 @@ static HRESULT WINAPI DispatchEx_QueryInterface(IWineJSDispatch *iface, REFIID r
     }else if(IsEqualGUID(&IID_IWineJSDispatch, riid)) {
         TRACE("(%p)->(IID_IWineJSDispatch %p)\n", This, ppv);
         *ppv = &This->IWineJSDispatch_iface;
+    }else if(IsEqualGUID(&IID_nsXPCOMCycleCollectionParticipant, riid)) {
+        /* Only expose these during a full CC, as we can't have their refs change between incremental CC phases */
+        if(!This->builtin_info->get_host_disp && cc_api.is_full_cc && cc_api.is_full_cc()) {
+            *ppv = &cc_api.participant;
+            return S_OK;
+        }
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }else if(IsEqualGUID(&IID_nsCycleCollectionISupports, riid)) {
+        if(!This->builtin_info->get_host_disp && cc_api.is_full_cc && cc_api.is_full_cc()) {
+            *ppv = &This->IWineJSDispatch_iface;
+            return S_OK;
+        }
+        *ppv = NULL;
+        return E_NOINTERFACE;
     }else {
         WARN("(%p)->(%s %p)\n", This, debugstr_guid(riid), ppv);
         *ppv = NULL;
@@ -2369,6 +2389,41 @@ static void WINAPI WineJSDispatch_Free(IWineJSDispatch *iface)
    jsdisp_free(This);
 }
 
+static void WINAPI WineJSDispatch_Traverse(IWineJSDispatch *iface, nsCycleCollectionTraversalCallback *cb)
+{
+    jsdisp_t *This = impl_from_IWineJSDispatch(iface);
+    note_edge_t note_edge = cc_api.note_edge;
+    dispex_prop_t *prop = This->props, *end;
+
+    for(end = prop + This->prop_cnt; prop < end; prop++) {
+        switch(prop->type) {
+        case PROP_JSVAL:
+            if(is_object_instance(prop->u.val))
+                note_edge(get_edge_obj(get_object(prop->u.val)), "prop", cb);
+            break;
+        case PROP_ACCESSOR:
+            if(prop->u.accessor.getter)
+                note_edge(jsdisp_get_edge_obj(prop->u.accessor.getter), "prop", cb);
+            if(prop->u.accessor.setter)
+                note_edge(jsdisp_get_edge_obj(prop->u.accessor.setter), "prop", cb);
+            break;
+        default:
+            break;
+        }
+    }
+
+    if(This->prototype)
+        note_edge(jsdisp_get_edge_obj(This->prototype), "prototype", cb);
+
+    if(This->builtin_info->cc_traverse)
+        This->builtin_info->cc_traverse(This, cb);
+}
+
+static void WINAPI WineJSDispatch_Unlink(IWineJSDispatch *iface)
+{
+    unlink_jsdisp(impl_from_IWineJSDispatch(iface));
+}
+
 static HRESULT WINAPI WineJSDispatch_GetPropertyFlags(IWineJSDispatch *iface, DISPID id, UINT32 *ret)
 {
     jsdisp_t *This = impl_from_IWineJSDispatch(iface);
@@ -2454,6 +2509,8 @@ static IWineJSDispatchVtbl DispatchExVtbl = {
     DispatchEx_GetNextDispID,
     DispatchEx_GetNameSpaceParent,
     WineJSDispatch_Free,
+    WineJSDispatch_Traverse,
+    WineJSDispatch_Unlink,
     WineJSDispatch_GetPropertyFlags,
     WineJSDispatch_DefineProperty,
     WineJSDispatch_UpdateProperty,
@@ -2568,6 +2625,34 @@ jsdisp_t *iface_to_jsdisp(IDispatch *iface)
     return iface->lpVtbl == (const IDispatchVtbl*)&DispatchExVtbl
         ? jsdisp_addref( impl_from_IWineJSDispatch((IWineJSDispatch*)iface))
         : NULL;
+}
+
+static HRESULT WINAPI jsdisp_cc_traverse(void *ccp, void *p, nsCycleCollectionTraversalCallback *cb)
+{
+    jsdisp_t *This = impl_from_IWineJSDispatch(p);
+
+    cc_api.describe_node(This->ref, "jsdisp", cb);
+    WineJSDispatch_Traverse(&This->IWineJSDispatch_iface, cb);
+    return S_OK;
+}
+
+static HRESULT WINAPI jsdisp_cc_unlink(void *p)
+{
+    unlink_jsdisp(impl_from_IWineJSDispatch(p));
+    return S_OK;
+}
+
+struct jshost_cc_api cc_api;
+
+void init_cc_api(IWineJSDispatchHost *host_obj)
+{
+    static const CCObjCallback jsdisp_ccp_callback = {
+        jsdisp_cc_traverse,
+        jsdisp_cc_unlink,
+        NULL  /* delete_cycle_collectable shouldn't ever be called, since we're never part of the purple buffer */
+    };
+
+    IWineJSDispatchHost_InitCC(host_obj, &cc_api, &jsdisp_ccp_callback);
 }
 
 HRESULT jsdisp_get_id(jsdisp_t *jsdisp, const WCHAR *name, DWORD flags, DISPID *id)
@@ -3634,6 +3719,9 @@ HRESULT init_host_object(script_ctx_t *ctx, IWineJSDispatchHost *host_iface, IWi
     HostObject *host_obj;
     jsdisp_t *prototype;
     HRESULT hres;
+
+    if(!cc_api.note_edge)
+        init_cc_api(host_iface);
 
     if(!(host_obj = calloc(1, sizeof(*host_obj))))
         return E_OUTOFMEMORY;

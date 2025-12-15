@@ -560,6 +560,13 @@ static HRESULT RegExp_gc_traverse(struct gc_ctx *gc_ctx, enum gc_traverse_op op,
     return gc_process_linked_val(gc_ctx, op, dispex, &regexp_from_jsdisp(dispex)->last_index_val);
 }
 
+static void RegExp_cc_traverse(jsdisp_t *dispex, nsCycleCollectionTraversalCallback *cb)
+{
+    RegExpInstance *This = regexp_from_jsdisp(dispex);
+    if(is_object_instance(This->last_index_val))
+        cc_api.note_edge(get_edge_obj(get_object(This->last_index_val)), "last_index_val", cb);
+}
+
 static const builtin_prop_t RegExp_props[] = {
     {L"exec",                RegExp_exec,                  PROPF_METHOD|1},
     {L"global",              NULL,0,                       RegExp_get_global},
@@ -577,7 +584,8 @@ static const builtin_info_t RegExp_info = {
     .props_cnt   = ARRAY_SIZE(RegExp_props),
     .props       = RegExp_props,
     .destructor  = RegExp_destructor,
-    .gc_traverse = RegExp_gc_traverse
+    .gc_traverse = RegExp_gc_traverse,
+    .cc_traverse = RegExp_cc_traverse
 };
 
 static const builtin_prop_t RegExpInst_props[] = {
@@ -594,7 +602,8 @@ static const builtin_info_t RegExpInst_info = {
     .props_cnt   = ARRAY_SIZE(RegExpInst_props),
     .props       = RegExpInst_props,
     .destructor  = RegExp_destructor,
-    .gc_traverse = RegExp_gc_traverse
+    .gc_traverse = RegExp_gc_traverse,
+    .cc_traverse = RegExp_cc_traverse
 };
 
 static HRESULT alloc_regexp(script_ctx_t *ctx, jsstr_t *str, jsdisp_t *object_prototype, RegExpInstance **ret)

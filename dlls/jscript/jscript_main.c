@@ -27,7 +27,6 @@
 #include "mshtmhst.h"
 #include "rpcproxy.h"
 #include "jscript_classes.h"
-#include "jsdisp.h"
 
 #include "wine/debug.h"
 
@@ -208,6 +207,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstDLL, DWORD fdwReason, LPVOID lpv)
         if (lpv) break;
         if (dispatch_typeinfo) ITypeInfo_Release(dispatch_typeinfo);
         if(jscript_tls != TLS_OUT_OF_INDEXES) TlsFree(jscript_tls);
+        list_remove(&cc_api.entry);
         free_strings();
         break;
     }
