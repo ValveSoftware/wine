@@ -1096,16 +1096,10 @@ HRESULT create_host_function(script_ctx_t *ctx, const struct property_info *desc
     return S_OK;
 }
 
-static ULONG HostConstructor_addref(jsdisp_t *jsdisp)
+static IWineJSDispatchHost *HostConstructor_get_host_disp(jsdisp_t *jsdisp)
 {
     HostConstructor *constr = (HostConstructor*)jsdisp;
-    return IWineJSDispatchHost_AddRef(constr->host_iface);
-}
-
-static ULONG HostConstructor_release(jsdisp_t *jsdisp)
-{
-    HostConstructor *constr = (HostConstructor*)jsdisp;
-    return IWineJSDispatchHost_Release(constr->host_iface);
+    return constr->host_iface;
 }
 
 static HRESULT HostConstructor_lookup_prop(jsdisp_t *jsdisp, const WCHAR *name, unsigned flags, struct property_info *desc)
@@ -1117,15 +1111,14 @@ static HRESULT HostConstructor_lookup_prop(jsdisp_t *jsdisp, const WCHAR *name, 
 }
 
 static const builtin_info_t HostConstructor_info = {
-    .class       = JSCLASS_FUNCTION,
-    .addref      = HostConstructor_addref,
-    .release     = HostConstructor_release,
-    .call        = Function_value,
-    .destructor  = Function_destructor,
-    .props_cnt   = ARRAY_SIZE(HostFunction_props),
-    .props       = HostFunction_props,
-    .gc_traverse = Function_gc_traverse,
-    .lookup_prop = HostConstructor_lookup_prop,
+    .class         = JSCLASS_FUNCTION,
+    .call          = Function_value,
+    .destructor    = Function_destructor,
+    .props_cnt     = ARRAY_SIZE(HostFunction_props),
+    .props         = HostFunction_props,
+    .get_host_disp = HostConstructor_get_host_disp,
+    .gc_traverse   = Function_gc_traverse,
+    .lookup_prop   = HostConstructor_lookup_prop,
 };
 
 static HRESULT HostConstructor_call(script_ctx_t *ctx, FunctionInstance *func, jsval_t vthis, unsigned flags,
