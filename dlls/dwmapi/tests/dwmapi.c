@@ -83,6 +83,27 @@ static void test_DwmGetCompositionTimingInfo(void)
             "Got wrong monitor refresh period %s.\n", wine_dbgstr_longlong(timing_info.qpcRefreshPeriod));
 }
 
+static void test_DWMWA_NCRENDERING_ENABLED(void)
+{
+    BOOL nc_rendering;
+    HRESULT hr;
+    HWND hwnd;
+
+    hwnd = CreateWindowW(L"static", L"static", WS_OVERLAPPEDWINDOW | WS_POPUP | WS_VISIBLE, 10, 10, 200, 200, NULL, NULL, NULL, NULL);
+
+    hr = DwmGetWindowAttribute(hwnd, DWMWA_NCRENDERING_ENABLED, NULL, sizeof(nc_rendering));
+    ok(hr == E_INVALIDARG, "Got hr %#lx.\n", hr);
+    hr = DwmGetWindowAttribute(hwnd, DWMWA_NCRENDERING_ENABLED, &nc_rendering, 0);
+    ok(hr == E_INVALIDARG, "Got hr %#lx.\n", hr);
+
+    nc_rendering = 0xdeadbeef;
+    hr = DwmGetWindowAttribute(hwnd, DWMWA_NCRENDERING_ENABLED, &nc_rendering, sizeof(nc_rendering));
+    ok(hr == S_OK, "Got hr %#lx.\n", hr);
+    ok(nc_rendering == FALSE || nc_rendering == TRUE, "non-boolean value %#x.\n", nc_rendering);
+
+    DestroyWindow(hwnd);
+}
+
 static void test_DWMWA_EXTENDED_FRAME_BOUNDS(void)
 {
     DPI_AWARENESS_CONTEXT (WINAPI *pSetThreadDpiAwarenessContext)(DPI_AWARENESS_CONTEXT);
@@ -174,6 +195,7 @@ START_TEST(dwmapi)
 {
     test_DwmIsCompositionEnabled();
     test_DwmGetCompositionTimingInfo();
+    test_DWMWA_NCRENDERING_ENABLED();
     test_DWMWA_EXTENDED_FRAME_BOUNDS();
     test_DwmFlush();
 }
