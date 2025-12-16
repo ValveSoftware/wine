@@ -112,9 +112,18 @@ static ULONG WINAPI async_impl_Release( IAsyncInfoImpl *iface )
 static HRESULT WINAPI async_impl_put_Completed( IAsyncInfoImpl *iface, IAsyncOperationCompletedHandlerImpl *handler )
 {
     struct async_info *impl = impl_from_IAsyncInfoImpl( iface );
+    const char *var = getenv("SteamAppId");
     HRESULT hr = S_OK;
 
     TRACE( "iface %p, handler %p.\n", iface, handler );
+
+    /*
+     * HACK: Forza Horizon 5 will segfault when trying to get an interface if
+     * we invoke the handler, so we should just return S_OK and let it hang
+     * indefinitely.
+     */
+    if (var && !strcmp(var, "1551360"))
+        return S_OK;
 
     EnterCriticalSection( &impl->cs );
     if (impl->status == Closed) hr = E_ILLEGAL_METHOD_CALL;
