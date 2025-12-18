@@ -1,0 +1,47 @@
+/*
+ * futex-based synchronization objects
+ *
+ * Copyright (C) 2018 Zebediah Figura
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+
+extern void fsync_init( DWORD pid );
+extern NTSTATUS fsync_close( HANDLE handle );
+
+extern NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev );
+extern NTSTATUS fsync_query_semaphore( HANDLE handle, void *info );
+extern NTSTATUS fsync_set_event( HANDLE handle, LONG *prev );
+extern NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev );
+extern NTSTATUS fsync_pulse_event( HANDLE handle, LONG *prev );
+extern NTSTATUS fsync_query_event( HANDLE handle, void *info );
+extern NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev );
+extern NTSTATUS fsync_query_mutex( HANDLE handle, void *info );
+
+extern NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
+                                    BOOLEAN alertable, const LARGE_INTEGER *timeout );
+extern NTSTATUS fsync_signal_and_wait( HANDLE signal, HANDLE wait,
+    BOOLEAN alertable, const LARGE_INTEGER *timeout );
+
+/* We have to synchronize on the fd cache mutex so that fsync_close(), close_handle() sequence 
+ * called from NtClose() doesn't race with get_fsync_idx(), add_to_list() sequence called
+ * from get_object(). */
+extern pthread_mutex_t fd_cache_mutex;
+
+extern int fsync_enabled;
+static inline int do_fsync(void)
+{
+    return fsync_enabled;
+}

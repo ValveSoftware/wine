@@ -42,6 +42,8 @@
 #include "unicode.h"
 #include "security.h"
 
+#include "fsync.h"
+
 /* command-line options */
 int debug_level = 0;
 int foreground = 0;
@@ -259,6 +261,9 @@ int main( int argc, char *argv[] )
 
     sock_init();
     open_master_socket();
+
+    if (do_fsync())
+        fsync_init();
 
     if (debug_level) fprintf( stderr, "wineserver: starting (pid=%ld)\n", (long) getpid() );
     set_current_time();

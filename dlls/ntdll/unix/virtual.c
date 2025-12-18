@@ -4274,6 +4274,7 @@ static TEB *init_teb( void *ptr, BOOL is_wow )
     thread_data->wait_fd[1] = -1;
     thread_data->alert_fd   = -1;
     list_add_head( &teb_list, &thread_data->entry );
+    thread_data->fsync_apc_futex = NULL;
     return teb;
 }
 

@@ -65,6 +65,8 @@
 #include "user.h"
 #include "security.h"
 
+#include "fsync.h"
+
 /* process object */
 
 static struct list process_list = LIST_INIT(process_list);
@@ -820,6 +822,7 @@ static void process_destroy( struct object *obj )
     if (process->id) free_ptid( process->id );
     if (process->token) release_object( process->token );
     if (process->sync) release_object( process->sync );
+    if (do_fsync()) fsync_cleanup_process_shm_indices( process->id );
     list_remove( &process->rawinput_entry );
     free( process->rawinput_devices );
     free( process->dir_cache );

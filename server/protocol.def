@@ -4229,6 +4229,7 @@ enum inproc_sync_type
 @REPLY
     int           type;         /* inproc sync type */
     unsigned int access;        /* handle access rights */
+    unsigned int fsync_shm_idx;
 @END
 
 
@@ -4236,6 +4237,7 @@ enum inproc_sync_type
 @REQ(get_inproc_alert_fd)
 @REPLY
     obj_handle_t handle;        /* alert fd is in flight with this handle */
+    unsigned int fsync_shm_idx;
 @END
 
 
@@ -4328,4 +4330,24 @@ enum inproc_sync_type
     unsigned __int64    fence_value;    /* semaphore fence value */
     data_size_t         runtime_size;   /* size of client runtime data */
     VARARG(runtime,bytes);              /* client runtime data */
+@END
+
+/* fsync definitions */
+#define FSYNC_SHM_PAGE_SIZE 0x10000
+#define FSYNC_USED_BY_SERVER 0x7eadfeef
+
+enum fsync_type
+{
+    FSYNC_SEMAPHORE = 1,
+    FSYNC_AUTO_EVENT,
+    FSYNC_MANUAL_EVENT,
+    FSYNC_MUTEX,
+    FSYNC_AUTO_SERVER,
+    FSYNC_MANUAL_SERVER,
+    FSYNC_QUEUE,
+};
+
+@REQ(fsync_free_shm_idx)
+    unsigned int shm_idx;
+@REPLY
 @END

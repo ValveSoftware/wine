@@ -34,6 +34,8 @@
 #include "thread.h"
 #include "user.h"
 
+#include "fsync.h"
+
 #include "ntsync_tmp.h"
 
 #ifdef NTSYNC_IOC_EVENT_READ
@@ -46,7 +48,20 @@
 int get_inproc_device_fd(void)
 {
     static int fd = -2;
-    if (fd == -2) fd = open( "/dev/ntsync", O_CLOEXEC | O_RDONLY );
+    if (fd == -2)
+    {
+        if (getenv( "PROTON_NO_NTSYNC" ) && atoi(getenv( "PROTON_NO_NTSYNC" )))
+            fd = -1;
+        else
+            fd = open( "/dev/ntsync", O_CLOEXEC | O_RDONLY );
+        if (fd >= 0)
+        {
+            do_fsync_cached = 0;
+            fprintf( stderr, "ntsync: up and running.\n" );
+        }
+        else if (do_fsync()) fd = FSYNC_USED_BY_SERVER;
+        else fprintf( stderr, "wineserver: using server-side synchronization.\n" );
+    }
     return fd;
 }
 
@@ -101,8 +116,16 @@ struct inproc_sync *create_inproc_internal_sync( int manual, int signaled )
     struct inproc_sync *event;
 
     if (!(event = alloc_object( &inproc_sync_ops ))) return NULL;
-    event->type = INPROC_SYNC_INTERNAL;
-    event->fd   = ioctl( get_inproc_device_fd(), NTSYNC_IOC_CREATE_EVENT, &args );
+    if (do_fsync())
+    {
+        event->type = manual ? FSYNC_MANUAL_SERVER : FSYNC_AUTO_SERVER;
+        event->fd = fsync_alloc_shm( signaled, 0xdeadbeef );
+    }
+    else
+    {
+        event->type = INPROC_SYNC_INTERNAL;
+        event->fd   = ioctl( get_inproc_device_fd(), NTSYNC_IOC_CREATE_EVENT, &args );
+    }
     list_init( &event->entry );
 
     if (event->fd == -1)
@@ -120,8 +143,16 @@ struct inproc_sync *create_inproc_event_sync( int manual, int signaled )
     struct inproc_sync *event;
 
     if (!(event = alloc_object( &inproc_sync_ops ))) return NULL;
-    event->type = INPROC_SYNC_EVENT;
-    event->fd   = ioctl( get_inproc_device_fd(), NTSYNC_IOC_CREATE_EVENT, &args );
+    if (do_fsync())
+    {
+        event->type = manual ? FSYNC_MANUAL_EVENT : FSYNC_AUTO_EVENT;
+        event->fd = fsync_alloc_shm( signaled, 0xdeadbeef );
+    }
+    else
+    {
+        event->type = INPROC_SYNC_EVENT;
+        event->fd   = ioctl( get_inproc_device_fd(), NTSYNC_IOC_CREATE_EVENT, &args );
+    }
     list_init( &event->entry );
 
     if (event->fd == -1)
@@ -139,8 +170,16 @@ struct inproc_sync *create_inproc_mutex_sync( thread_id_t owner, unsigned int co
     struct inproc_sync *mutex;
 
     if (!(mutex = alloc_object( &inproc_sync_ops ))) return NULL;
-    mutex->type = INPROC_SYNC_MUTEX;
-    mutex->fd   = ioctl( get_inproc_device_fd(), NTSYNC_IOC_CREATE_MUTEX, &args );
+    if (do_fsync())
+    {
+        mutex->type = FSYNC_MUTEX;
+        mutex->fd = fsync_alloc_shm( owner, count );
+    }
+    else
+    {
+        mutex->type = INPROC_SYNC_MUTEX;
+        mutex->fd   = ioctl( get_inproc_device_fd(), NTSYNC_IOC_CREATE_MUTEX, &args );
+    }
     list_add_tail( &inproc_mutexes, &mutex->entry );
 
     if (mutex->fd == -1)
@@ -158,8 +197,17 @@ struct inproc_sync *create_inproc_semaphore_sync( unsigned int initial, unsigned
     struct inproc_sync *sem;
 
     if (!(sem = alloc_object( &inproc_sync_ops ))) return NULL;
-    sem->type = INPROC_SYNC_SEMAPHORE;
-    sem->fd   = ioctl( get_inproc_device_fd(), NTSYNC_IOC_CREATE_SEM, &args );
+
+    if (do_fsync())
+    {
+        sem->type = FSYNC_SEMAPHORE;
+        sem->fd = fsync_alloc_shm( initial, max );
+    }
+    else
+    {
+        sem->type = INPROC_SYNC_SEMAPHORE;
+        sem->fd   = ioctl( get_inproc_device_fd(), NTSYNC_IOC_CREATE_SEM, &args );
+    }
     list_init( &sem->entry );
 
     if (sem->fd == -1)
@@ -182,14 +230,16 @@ void signal_inproc_sync( struct inproc_sync *sync )
 {
     __u32 count;
     if (debug_level) fprintf( stderr, "set_inproc_event %d\n", sync->fd );
-    ioctl( sync->fd, NTSYNC_IOC_EVENT_SET, &count );
+    if (do_fsync()) fsync_set_event( sync->fd );
+    else            ioctl( sync->fd, NTSYNC_IOC_EVENT_SET, &count );
 }
 
 void reset_inproc_sync( struct inproc_sync *sync )
 {
     __u32 count;
     if (debug_level) fprintf( stderr, "reset_inproc_event %d\n", sync->fd );
-    ioctl( sync->fd, NTSYNC_IOC_EVENT_RESET, &count );
+    if (do_fsync()) fsync_reset_event( sync->fd );
+    else            ioctl( sync->fd, NTSYNC_IOC_EVENT_RESET, &count );
 }
 
 static int inproc_sync_signal( struct object *obj, unsigned int access, int signal )
@@ -197,7 +247,8 @@ static int inproc_sync_signal( struct object *obj, unsigned int access, int sign
     struct inproc_sync *sync = (struct inproc_sync *)obj;
     assert( obj->ops == &inproc_sync_ops );
 
-    assert( sync->type == INPROC_SYNC_INTERNAL || sync->type == INPROC_SYNC_EVENT ); /* never called for mutex / semaphore */
+    if (!do_fsync())
+        assert( sync->type == INPROC_SYNC_INTERNAL || sync->type == INPROC_SYNC_EVENT ); /* never called for mutex / semaphore */
     assert( signal == 0 || signal == 1 ); /* never called from signal_object */
 
     if (signal) signal_inproc_sync( sync );
@@ -210,12 +261,20 @@ static void inproc_sync_destroy( struct object *obj )
     struct inproc_sync *sync = (struct inproc_sync *)obj;
     assert( obj->ops == &inproc_sync_ops );
     list_remove( &sync->entry );
-    close( sync->fd );
+    if (do_fsync()) fsync_free_shm_idx( sync->fd );
+    else            close( sync->fd );
 }
 
 void abandon_inproc_mutexes( thread_id_t tid )
 {
     struct inproc_sync *mutex;
+
+    if (do_fsync())
+    {
+        LIST_FOR_EACH_ENTRY( mutex, &inproc_mutexes, struct inproc_sync, entry )
+            fsync_abandon_mutex( mutex->fd, tid );
+        return;
+    }
 
     LIST_FOR_EACH_ENTRY( mutex, &inproc_mutexes, struct inproc_sync, entry )
         ioctl( mutex->fd, NTSYNC_IOC_MUTEX_KILL, &tid );
@@ -299,6 +358,7 @@ DECL_HANDLER(get_inproc_sync_fd)
     reply->access = get_handle_access( current->process, req->handle );
 
     if ((fd = get_obj_inproc_sync( obj, &reply->type )) < 0) set_error( STATUS_NOT_IMPLEMENTED );
+    else if (do_fsync()) reply->fsync_shm_idx = fsync_grab_shm_idx( fd );
     else send_client_fd( current->process, fd, req->handle );
 
     release_object( obj );

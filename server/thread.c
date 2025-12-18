@@ -61,6 +61,7 @@
 #include "user.h"
 #include "security.h"
 
+#include "fsync.h"
 
 /* thread queues */
 
@@ -1821,7 +1822,11 @@ DECL_HANDLER(init_first_thread)
     set_reply_data( supported_machines,
                     min( supported_machines_count * sizeof(unsigned short), get_reply_max_size() ));
 
-    if ((fd = get_inproc_device_fd()) >= 0)
+    if (do_fsync())
+    {
+        reply->inproc_device = FSYNC_USED_BY_SERVER;
+    }
+    else if ((fd = get_inproc_device_fd()) >= 0)
     {
         reply->inproc_device = get_process_id( process ) | 1;
         send_client_fd( process, fd, reply->inproc_device );
@@ -2463,6 +2468,7 @@ DECL_HANDLER(get_inproc_alert_fd)
     int fd;
 
     if ((fd = get_inproc_sync_fd( current->alert_sync )) < 0) set_error( STATUS_INVALID_PARAMETER );
+    else if (do_fsync()) reply->fsync_shm_idx = fd;
     else
     {
         reply->handle = get_thread_id( current ) | 1; /* arbitrary token */
