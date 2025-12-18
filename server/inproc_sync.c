@@ -34,9 +34,7 @@
 #include "thread.h"
 #include "user.h"
 
-#ifdef HAVE_LINUX_NTSYNC_H
-# include <linux/ntsync.h>
-#endif
+#include "ntsync_tmp.h"
 
 #ifdef NTSYNC_IOC_EVENT_READ
 
