@@ -1087,7 +1087,7 @@ NTSTATUS wg_transform_push_data(void *args)
 }
 
 static NTSTATUS copy_video_buffer(GstBuffer *buffer, GstVideoInfo *src_video_info,
-        GstVideoInfo *dst_video_info, struct wg_sample *sample, gsize *total_size)
+        GstVideoInfo *dst_video_info, struct wg_sample *sample, gsize *total_size, GstBuffer **ret_buffer)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     GstVideoFrame src_frame, dst_frame;
@@ -1125,7 +1125,10 @@ static NTSTATUS copy_video_buffer(GstBuffer *buffer, GstVideoInfo *src_video_inf
         gst_video_frame_unmap(&src_frame);
     }
 
-    gst_buffer_unref(dst_buffer);
+    if (status == STATUS_SUCCESS)
+        *ret_buffer = dst_buffer;
+    else
+        gst_buffer_unref(dst_buffer);
     return status;
 }
 
@@ -1218,26 +1221,52 @@ static bool sample_needs_buffer_copy(struct wg_sample *sample, GstBuffer *buffer
     return needs_copy;
 }
 
-static void fill_frame_padded_bits(GstBuffer *buffer, const GstVideoAlignment *align, const GstVideoInfo *info)
+enum fill_action
 {
-    guint i, plane, padded_height, height, stride, padding = align->padding_bottom;
+    FILL_RIGHT  = 1,
+    FILL_BOTTOM = 2,
+};
+
+static void fill_frame_padded_bits(GstBuffer *buffer, const GstVideoAlignment *align, const GstVideoInfo *info,
+        enum fill_action action)
+{
+    guint i, j, plane, padded_height, width, height, stride, pixel_stride, padding_bottom = align->padding_bottom;
     GstVideoFrame frame;
 
-    if (!padding || !gst_video_frame_map(&frame, info, buffer, GST_MAP_WRITE)) return;
+    if (!padding_bottom) action &= ~FILL_BOTTOM;
+    if (!align->padding_right) action &= ~FILL_RIGHT;
 
-    /* Windows uses the data in the last scanline for its bottom padding */
+    if (!action || !gst_video_frame_map(&frame, info, buffer, GST_MAP_WRITE)) return;
+
+    /* Windows uses the data in the last scanline for its bottom padding, and the last pixel
+     * in a row for right padding. GStreamer can do this, but it requires cropping first, then
+     * edge replication using videobox, so it has a larger performance cost than this hack. */
     for (plane = 0; plane < GST_VIDEO_FRAME_N_PLANES(&frame); plane++)
     {
-        guint8 *data = GST_VIDEO_FRAME_PLANE_DATA(&frame, plane);
         gint comp[GST_VIDEO_MAX_COMPONENTS];
 
         gst_video_format_info_component(frame.info.finfo, plane, comp);
-        padded_height = GST_VIDEO_FORMAT_INFO_SCALE_HEIGHT(frame.info.finfo, comp[0], info->height + padding);
         height = GST_VIDEO_FRAME_COMP_HEIGHT(&frame, comp[0]);
         stride = GST_VIDEO_FRAME_PLANE_STRIDE(&frame, plane);
-        data += height * stride;
 
-        for (i = 0; i < padded_height - height; i++) memcpy(data + i * stride, data - stride, stride);
+        if (action & FILL_RIGHT)
+        {
+            guint8 *data = GST_VIDEO_FRAME_PLANE_DATA(&frame, plane);
+            pixel_stride = GST_VIDEO_FRAME_COMP_PSTRIDE(&frame, plane);
+            width = GST_VIDEO_FRAME_COMP_WIDTH(&frame, comp[0]) * pixel_stride;
+            data += width;
+            for (i = 0; i < height; i++)
+                for (j = 0; j < stride - width; j += pixel_stride)
+                    memcpy(data + i * stride + j, data + i * stride - pixel_stride, pixel_stride);
+        }
+
+        if (action & FILL_BOTTOM)
+        {
+            guint8 *data = GST_VIDEO_FRAME_PLANE_DATA(&frame, plane);
+            padded_height = GST_VIDEO_FORMAT_INFO_SCALE_HEIGHT(frame.info.finfo, comp[0], info->height + padding_bottom);
+            data += height * stride;
+            for (i = 0; i < padded_height - height; i++) memcpy(data + i * stride, data - stride, stride);
+        }
     }
 
     gst_video_frame_unmap(&frame);
@@ -1246,6 +1275,7 @@ static void fill_frame_padded_bits(GstBuffer *buffer, const GstVideoAlignment *a
 static NTSTATUS read_transform_output_video(struct wg_sample *sample, GstBuffer *buffer,
         const GstVideoInfo *src_video_info, const GstVideoInfo *dst_video_info, const GstVideoAlignment *align)
 {
+    GstBuffer *dst_buffer = NULL;
     gsize total_size;
     NTSTATUS status;
     bool needs_copy;
@@ -1254,7 +1284,7 @@ static NTSTATUS read_transform_output_video(struct wg_sample *sample, GstBuffer 
     if (!(needs_copy = sample_needs_buffer_copy(sample, buffer, &total_size)))
         status = STATUS_SUCCESS;
     else
-        status = copy_video_buffer(buffer, src_video_info, dst_video_info, sample, &total_size);
+        status = copy_video_buffer(buffer, src_video_info, dst_video_info, sample, &total_size, &dst_buffer);
 
     if (status)
     {
@@ -1263,8 +1293,20 @@ static NTSTATUS read_transform_output_video(struct wg_sample *sample, GstBuffer 
         return status;
     }
 
-    if ((sgi = getenv("SteamGameId")) && !strcmp(sgi, "1449280"))
-        fill_frame_padded_bits(buffer, align, dst_video_info);
+    if ((sgi = getenv("SteamGameId")))
+    {
+        enum fill_action action = 0;
+
+        if (!strcmp(sgi, "1449280"))
+            action |= FILL_BOTTOM;
+        else if (!strcmp(sgi, "536280"))
+            action |= FILL_RIGHT;
+
+        fill_frame_padded_bits(dst_buffer ? dst_buffer : buffer, align, dst_video_info, action);
+    }
+
+    if (dst_buffer)
+        gst_buffer_unref(dst_buffer);
 
     set_sample_flags_from_buffer(sample, buffer, total_size);
 
