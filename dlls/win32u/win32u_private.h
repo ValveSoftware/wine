@@ -151,6 +151,7 @@ extern BOOL get_scroll_info( HWND hwnd, INT bar, SCROLLINFO *info );
 extern void handle_scroll_event( HWND hwnd, INT bar, UINT msg, POINT pt );
 extern LRESULT scroll_bar_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam,
                                        BOOL ansi );
+extern int set_scroll_info( HWND hwnd, INT bar, const SCROLLINFO *info, BOOL redraw );
 extern void set_standard_scroll_painted( HWND hwnd, int bar, BOOL painted );
 extern void track_scroll_bar( HWND hwnd, int scrollbar, POINT pt );
 
