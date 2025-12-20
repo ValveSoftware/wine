@@ -910,11 +910,14 @@ BOOL get_scroll_info( HWND hwnd, int bar, SCROLLINFO *info )
     return (info->fMask & SIF_ALL) != 0;
 }
 
-static int set_scroll_info( HWND hwnd, int bar, const SCROLLINFO *info, BOOL redraw )
+int set_scroll_info( HWND hwnd, int bar, const SCROLLINFO *info, BOOL redraw )
 {
     struct scroll_info *scroll;
     UINT new_flags;
     int action = 0, ret = 0;
+
+    if (bar != SB_CTL && !is_current_thread_window( hwnd ))
+        return send_message( hwnd, WM_WINE_SETSCROLLINFO, MAKEWPARAM(bar, redraw), (LPARAM)info );
 
     /* handle invalid data structure */
     if (!validate_scroll_info( info ) ||
