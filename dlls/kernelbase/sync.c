@@ -770,7 +770,7 @@ HANDLE WINAPI DECLSPEC_HOTPATCH OpenMutexW( DWORD access, BOOL inherit, LPCWSTR 
 {
     HANDLE ret;
     UNICODE_STRING nameW;
-    OBJECT_ATTRIBUTES attr;
+    DECLSPEC_ALIGN(32) OBJECT_ATTRIBUTES attr;
 
     if (!is_version_nt()) access = MUTEX_ALL_ACCESS;
 
