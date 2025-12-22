@@ -299,6 +299,7 @@ static struct desktop *create_desktop( const struct unicode_str *name, unsigned 
             desktop->close_timeout = NULL;
             desktop->close_timeout_val = 0;
             desktop->foreground_input = NULL;
+            desktop->foreground_pid = 0;
             desktop->users = 0;
             list_init( &desktop->threads );
             desktop->clip_flags = 0;

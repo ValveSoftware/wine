@@ -81,6 +81,7 @@ struct desktop
     struct timeout_user *close_timeout;    /* timeout before closing the desktop */
     timeout_t            close_timeout_val;/* timeout duration before closing desktop */
     struct thread_input *foreground_input; /* thread input of foreground thread */
+    process_id_t         foreground_pid;   /* id of the foreground process */
     unsigned int         users;            /* processes and threads using this desktop */
     unsigned char        keystate[256];    /* asynchronous key state */
     unsigned char        alt_pressed;      /* last key press was Alt (used to determine msg on release) */
