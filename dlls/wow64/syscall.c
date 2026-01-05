@@ -566,8 +566,13 @@ NTSTATUS WINAPI wow64_NtGetContextThread( UINT *args )
 {
     HANDLE handle = get_handle( &args );
     WOW64_CONTEXT *context = get_ptr( &args );
+    NTSTATUS status;
+    ULONG count;
 
-    return RtlWow64GetThreadContext( handle, context );
+    if (wow64info->CpuFlags & WOW64_CPUFLAGS_SOFTWARE) RtlWow64SuspendThread( handle, &count );
+    status = RtlWow64GetThreadContext( handle, context );
+    if (wow64info->CpuFlags & WOW64_CPUFLAGS_SOFTWARE) NtResumeThread( handle, &count );
+    return status;
 }
 
 
