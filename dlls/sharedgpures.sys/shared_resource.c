@@ -51,7 +51,7 @@ static void *reference_client_handle(obj_handle_t handle)
     cid.UniqueProcess = PsGetCurrentProcessId();
     cid.UniqueThread = 0;
 
-    if (NtOpenProcess(&client_process, PROCESS_ALL_ACCESS, &attr, &cid) != STATUS_SUCCESS)
+    if (NtOpenProcess(&client_process, PROCESS_DUP_HANDLE, &attr, &cid) != STATUS_SUCCESS)
         return NULL;
 
     if (NtDuplicateObject(client_process, wine_server_ptr_handle(handle), NtCurrentProcess(), &kernel_handle,
@@ -226,7 +226,7 @@ static obj_handle_t open_client_handle(void *object)
     cid.UniqueProcess = PsGetCurrentProcessId();
     cid.UniqueThread = 0;
 
-    if (NtOpenProcess(&client_process, PROCESS_ALL_ACCESS, &attr, &cid) != STATUS_SUCCESS)
+    if (NtOpenProcess(&client_process, PROCESS_DUP_HANDLE, &attr, &cid) != STATUS_SUCCESS)
         return 0;
 
     if (ObOpenObjectByPointer(object, 0, NULL, GENERIC_ALL, NULL, KernelMode, &kernel_handle) != STATUS_SUCCESS)
