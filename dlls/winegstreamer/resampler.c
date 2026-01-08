@@ -390,11 +390,6 @@ static HRESULT WINAPI transform_SetInputType(IMFTransform *iface, DWORD id, IMFM
         CoTaskMemFree(impl->input_format);
         impl->input_format = NULL;
     }
-    if (impl->output_format)
-    {
-        CoTaskMemFree(impl->output_format);
-        impl->output_format = NULL;
-    }
 
     if (SUCCEEDED(hr = MFCreateWaveFormatExFromMFMediaType(type, &format, &value, 0)))
     {
