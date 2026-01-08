@@ -340,6 +340,9 @@ static HRESULT check_media_type(IMFMediaType *type)
     HRESULT hr;
     ULONG i;
 
+    if (!type)
+        return S_OK;
+
     if (FAILED(hr = IMFMediaType_GetGUID(type, &MF_MT_MAJOR_TYPE, &major)) ||
             FAILED(hr = IMFMediaType_GetGUID(type, &MF_MT_SUBTYPE, &subtype)))
         return MF_E_ATTRIBUTENOTFOUND;
@@ -380,7 +383,7 @@ static HRESULT WINAPI transform_SetInputType(IMFTransform *iface, DWORD id, IMFM
 
     if (FAILED(hr = check_media_type(type)))
         return hr;
-    if (FAILED(hr = IMFMediaType_GetUINT32(type, &MF_MT_AUDIO_BLOCK_ALIGNMENT, &value)))
+    if (type && FAILED(hr = IMFMediaType_GetUINT32(type, &MF_MT_AUDIO_BLOCK_ALIGNMENT, &value)))
         return MF_E_INVALIDMEDIATYPE;
     if (flags & MFT_SET_TYPE_TEST_ONLY)
         return S_OK;
@@ -391,7 +394,7 @@ static HRESULT WINAPI transform_SetInputType(IMFTransform *iface, DWORD id, IMFM
         impl->input_format = NULL;
     }
 
-    if (SUCCEEDED(hr = MFCreateWaveFormatExFromMFMediaType(type, &format, &value, 0)))
+    if (type && SUCCEEDED(hr = MFCreateWaveFormatExFromMFMediaType(type, &format, &value, 0)))
     {
         format->nBlockAlign = format->wBitsPerSample * format->nChannels / 8;
         format->nAvgBytesPerSec = format->nSamplesPerSec * format->nBlockAlign;
