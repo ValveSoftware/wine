@@ -73,6 +73,8 @@ static uint32_t d3dx_conv_flags_from_filter(uint32_t filter)
 
     if ((filter & D3DX_FILTER_PMA) && ((filter & D3DX_FILTER_PMA) != D3DX_FILTER_PMA))
         conv_flags |= (filter & D3DX_FILTER_PMA_IN) ? CONV_FLAG_PM_ALPHA_IN : CONV_FLAG_PM_ALPHA_OUT;
+    if ((filter & D3DX_FILTER_SRGB) && ((filter & D3DX_FILTER_SRGB) != D3DX_FILTER_SRGB))
+        conv_flags |= (filter & D3DX_FILTER_SRGB_IN) ? CONV_FLAG_GAMMA_2_2_IN : CONV_FLAG_GAMMA_2_2_OUT;
 
     return conv_flags;
 }
@@ -2458,6 +2460,20 @@ static void undo_premultiplied_alpha(struct vec4 *vec)
     vec->z = (vec->w == 0.0f) ? 0.0f : vec->z / vec->w;
 }
 
+static void apply_gamma_2_2(struct vec4 *vec)
+{
+    vec->x = powf(vec->x, 1.0f / 2.2f);
+    vec->y = powf(vec->y, 1.0f / 2.2f);
+    vec->z = powf(vec->z, 1.0f / 2.2f);
+}
+
+static void undo_gamma_2_2(struct vec4 *vec)
+{
+    vec->x = powf(vec->x, 2.2f);
+    vec->y = powf(vec->y, 2.2f);
+    vec->z = powf(vec->z, 2.2f);
+}
+
 static void convert_argb_pixel(const uint8_t *src_ptr, const struct pixel_format_desc *src_fmt,
         uint8_t *dst_ptr, const struct pixel_format_desc *dst_fmt, const PALETTEENTRY *palette,
         struct argb_conversion_info *conv_info, const struct d3dx_color_key *color_key,
@@ -2499,6 +2515,8 @@ static void convert_argb_pixel(const uint8_t *src_ptr, const struct pixel_format
         format_to_d3dx_color(src_fmt, src_ptr, palette, &color);
         if (conv_flags & CONV_FLAG_PM_ALPHA_IN)
             undo_premultiplied_alpha(&color.value);
+        if (conv_flags & CONV_FLAG_GAMMA_2_2_IN)
+            undo_gamma_2_2(&color.value);
         tmp = color;
 
         if (color_key)
@@ -2518,6 +2536,8 @@ static void convert_argb_pixel(const uint8_t *src_ptr, const struct pixel_format
         }
 
         color = tmp;
+        if (conv_flags & CONV_FLAG_GAMMA_2_2_OUT)
+            apply_gamma_2_2(&color.value);
         if (conv_flags & CONV_FLAG_PM_ALPHA_OUT)
             premultiply_alpha(&color.value);
         format_from_d3dx_color(dst_fmt, &color, dst_ptr);
