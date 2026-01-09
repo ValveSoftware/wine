@@ -1,0 +1,20 @@
+PARENTSRC = ../loader
+
+SOURCES = \
+	main.c \
+	preloader.c \
+	preloader_mac.c
+
+PROGRAMS = wine64 wine64-preloader
+INSTALL_LIB = wine64 wine64-preloader
+UNIX_CFLAGS = -fPIE
+
+preloader_EXTRADEFS = -fno-builtin
+
+wine64_OBJS = main.o
+wine64_DEPS = $(WINELOADER_DEPENDS)
+wine64_LDFLAGS = $(WINELOADER_LDFLAGS) $(LDEXECFLAGS) $(PTHREAD_LIBS)
+
+wine64_preloader_OBJS = preloader.o
+wine64_preloader_DEPS = $(WINELOADER_DEPENDS)
+wine64_preloader_LDFLAGS = $(WINEPRELOADER_LDFLAGS)

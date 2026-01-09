@@ -2433,6 +2433,13 @@ else
     enable_compiler_rt=${enable_compiler_rt:-no}
 fi
 
+if test "$host_cpu" = "x86_64"
+then
+    enable_loader64=${enable_loader64:-yes}
+else
+    enable_loader64=${enable_loader64:-no}
+fi
+
 dnl Disable some programs for other PE archs
 enable_conhost=${enable_conhost:-$HOST_ARCH}
 enable_plugplay=${enable_plugplay:-$HOST_ARCH}
@@ -3562,6 +3569,7 @@ WINE_CONFIG_MAKEFILE(libs/xml2)
 WINE_CONFIG_MAKEFILE(libs/xslt)
 WINE_CONFIG_MAKEFILE(libs/zlib)
 WINE_CONFIG_MAKEFILE(loader)
+WINE_CONFIG_MAKEFILE(loader64)
 WINE_CONFIG_MAKEFILE(nls)
 WINE_CONFIG_MAKEFILE(po)
 WINE_CONFIG_MAKEFILE(programs/arp)

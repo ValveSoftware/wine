@@ -3912,7 +3912,7 @@ static void output_programs( struct makefile *make )
         }
         strarray_addall( &make->all_targets[arch], symlinks );
 
-        install_dir = !strcmp( make->obj_dir, "loader" ) ? arch_install_dirs[arch] : "$(bindir)";
+        install_dir = !strcmp( make->obj_dir, "loader" ) || !strcmp( make->obj_dir, "loader64" ) ? arch_install_dirs[arch] : "$(bindir)";
         install_program( make, name, arch, program, install_dir );
         STRARRAY_FOR_EACH( link, &symlinks )
             install_program_symlink( make, link, obj_dir_path( make, program ),

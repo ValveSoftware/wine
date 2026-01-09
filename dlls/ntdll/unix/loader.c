@@ -544,10 +544,16 @@ char *get_alternate_wineloader( WORD machine )
 }
 
 
-static void preloader_exec( char **argv )
+static void preloader_exec( char **argv, WORD machine )
 {
 #ifdef HAVE_WINE_PRELOADER
-    asprintf( &argv[0], "%s-preloader", argv[1] );
+#if !defined(__arm__) && !defined(__aarch64__)
+    if (machine == IMAGE_FILE_MACHINE_AMD64)
+        asprintf( &argv[0], "%s64-preloader", argv[1] );
+    else
+#endif
+        asprintf( &argv[0], "%s-preloader", argv[1] );
+
 #ifdef __APPLE__
     {
         posix_spawnattr_t attr;
@@ -570,10 +576,10 @@ static NTSTATUS loader_exec( char **argv, WORD machine )
 
     putenv( noexec );
 
-    if (((argv[1] = get_alternate_wineloader( machine )))) preloader_exec( argv );
+    if (((argv[1] = get_alternate_wineloader( machine )))) preloader_exec( argv, machine );
 
     argv[1] = strdup( wineloader );
-    preloader_exec( argv );
+    preloader_exec( argv, machine );
     return STATUS_INVALID_IMAGE_FORMAT;
 }
 
