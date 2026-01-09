@@ -504,6 +504,14 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
         if (!stream->source.pin.peer)
             continue;
 
+        value = IMemInputPin_ReceiveCanBlock(stream->source.pMemInputPin) == S_OK;
+        if (FAILED(hr = IWMReaderAdvanced2_SetOutputSetting(reader_advanced, i, L"DedicatedDeliveryThread",
+                WMT_TYPE_BOOL, (BYTE *)&value, sizeof(value))))
+        {
+            WARN("Failed to set DedicatedDeliveryThread for stream %u, hr %#lx\n", i, hr);
+            break;
+        }
+
         if (FAILED(hr = IMemAllocator_Commit(stream->source.pAllocator)))
         {
             WARN("Failed to commit stream %u allocator, hr %#lx\n", i, hr);
@@ -535,14 +543,6 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
         if (FAILED(hr = IPin_NewSegment(stream->source.pin.peer, stream->seek.llCurrent, stream->seek.llStop, stream->seek.dRate)))
         {
             WARN("Failed to start stream %u new segment, hr %#lx\n", i, hr);
-            break;
-        }
-
-        value = IMemInputPin_ReceiveCanBlock(stream->source.pMemInputPin) == S_OK;
-        if (FAILED(hr = IWMReaderAdvanced2_SetOutputSetting(reader_advanced, i, L"DedicatedDeliveryThread",
-                WMT_TYPE_BOOL, (BYTE *)&value, sizeof(value))))
-        {
-            WARN("Failed to set DedicatedDeliveryThread for stream %u, hr %#lx\n", i, hr);
             break;
         }
 
