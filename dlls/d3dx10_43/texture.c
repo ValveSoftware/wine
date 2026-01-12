@@ -1587,3 +1587,25 @@ HRESULT WINAPI D3DX10FilterTexture(ID3D10Resource *texture, UINT src_level, UINT
 
     return D3DX10LoadTextureFromTexture(texture, &load_info, texture);
 }
+
+HRESULT WINAPI D3DX10SaveTextureToFileW(ID3D10Resource *texture, D3DX10_IMAGE_FILE_FORMAT format, const WCHAR *filename)
+{
+    FIXME("texture %p, format %u, filename %s stub!\n", texture, format, debugstr_w(filename));
+
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI D3DX10SaveTextureToFileA(ID3D10Resource *texture, D3DX10_IMAGE_FILE_FORMAT format, const char *filename)
+{
+    FIXME("texture %p, format %u, filename %s stub!\n", texture, format, debugstr_a(filename));
+
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI D3DX10SaveTextureToMemory(ID3D10Resource *texture, D3DX10_IMAGE_FILE_FORMAT format, ID3D10Blob **buffer,
+        UINT flags)
+{
+    FIXME("texture %p, format %u, buffer %p, flags %#x stub!\n", texture, format, buffer, flags);
+
+    return E_NOTIMPL;
+}

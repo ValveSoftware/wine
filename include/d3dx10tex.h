@@ -185,6 +185,13 @@ HRESULT WINAPI D3DX10CreateShaderResourceViewFromResourceW(ID3D10Device *device,
 HRESULT WINAPI D3DX10LoadTextureFromTexture(ID3D10Resource *src_texture, D3DX10_TEXTURE_LOAD_INFO *load_info,
         ID3D10Resource *dst_texture);
 
+HRESULT WINAPI D3DX10SaveTextureToFileA(ID3D10Resource *texture, D3DX10_IMAGE_FILE_FORMAT format, const char *filename);
+HRESULT WINAPI D3DX10SaveTextureToFileW(ID3D10Resource *texture, D3DX10_IMAGE_FILE_FORMAT format, const WCHAR *filename);
+#define        D3DX10SaveTextureToFile WINELIB_NAME_AW(D3DX10SaveTextureToFile)
+
+HRESULT WINAPI D3DX10SaveTextureToMemory(ID3D10Resource *texture, D3DX10_IMAGE_FILE_FORMAT format, ID3D10Blob **buffer,
+        UINT flags);
+
 #ifdef __cplusplus
 }
 #endif

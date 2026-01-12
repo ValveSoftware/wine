@@ -61,9 +61,9 @@
 @ stub D3DX10PreprocessShaderFromResourceA(long str str ptr ptr ptr ptr ptr)
 @ stub D3DX10PreprocessShaderFromResourceW(long wstr wstr ptr ptr ptr ptr ptr)
 @ stub D3DX10SHProjectCubeMap(long ptr ptr ptr ptr)
-@ stub D3DX10SaveTextureToFileA(ptr ptr str)
-@ stub D3DX10SaveTextureToFileW(ptr ptr wstr)
-@ stub D3DX10SaveTextureToMemory(ptr ptr ptr long)
+@ stdcall D3DX10SaveTextureToFileA(ptr ptr str)
+@ stdcall D3DX10SaveTextureToFileW(ptr ptr wstr)
+@ stdcall D3DX10SaveTextureToMemory(ptr ptr ptr long)
 @ stdcall D3DX10UnsetAllDeviceObjects(ptr)
 @ stdcall D3DXBoxBoundProbe(ptr ptr ptr ptr) d3dx9_36.D3DXBoxBoundProbe
 @ stdcall D3DXColorAdjustContrast(ptr ptr float) d3dx9_36.D3DXColorAdjustContrast
