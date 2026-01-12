@@ -1865,7 +1865,7 @@ HRESULT WINAPI D3DXSaveTextureToFileInMemory(ID3DXBuffer **dst_buffer, D3DXIMAGE
         IDirect3DBaseTexture9 *src_texture, const PALETTEENTRY *src_palette)
 {
     const struct pixel_format_desc *fmt_desc = NULL;
-    unsigned int levels, file_size, i, j;
+    unsigned int levels, i, j;
     struct d3dx_image image;
     D3DRESOURCETYPE type;
     ID3DXBuffer *buffer;
@@ -1973,23 +1973,9 @@ HRESULT WINAPI D3DXSaveTextureToFileInMemory(ID3DXBuffer **dst_buffer, D3DXIMAGE
     if (is_index_format(fmt_desc) && !src_palette)
         return E_NOTIMPL;
 
-    file_size = d3dx_calculate_layer_pixels_size(fmt_desc->format, size.width, size.height, size.depth, levels);
-    if (type == D3DRTYPE_CUBETEXTURE)
-        file_size *= 6;
-    file_size += is_index_format(fmt_desc) ? sizeof(struct dds_header) + DDS_PALETTE_SIZE : sizeof(struct dds_header);
-
-    hr = D3DXCreateBuffer(file_size, &buffer);
+    hr = d3dx9_create_dds_file_blob(fmt_desc, src_palette, type, &size, levels, &buffer);
     if (FAILED(hr))
         return hr;
-
-    hr = d3dx_init_dds_header((struct dds_header *)ID3DXBuffer_GetBufferPointer(buffer),
-            d3dx_resource_type_from_d3dresourcetype(type), fmt_desc->format, &size, levels);
-    if (FAILED(hr))
-        goto exit;
-
-    if (is_index_format(fmt_desc))
-        memcpy((uint8_t *)ID3DXBuffer_GetBufferPointer(buffer) + sizeof(struct dds_header), src_palette,
-                DDS_PALETTE_SIZE);
 
     hr = d3dx_image_init(ID3DXBuffer_GetBufferPointer(buffer), ID3DXBuffer_GetBufferSize(buffer), &image, 0, 0);
     if (FAILED(hr))

@@ -251,28 +251,28 @@ static const struct
     /* DDS_PF_FOURCC. */
     { { 32, DDS_PF_FOURCC, MAKEFOURCC('U','Y','V','Y') }, D3DX_PIXEL_FORMAT_UYVY },
     { { 32, DDS_PF_FOURCC, MAKEFOURCC('Y','U','Y','2') }, D3DX_PIXEL_FORMAT_YUY2 },
-    { { 32, DDS_PF_FOURCC, MAKEFOURCC('R','G','B','G') }, D3DX_PIXEL_FORMAT_R8G8_B8G8_UNORM },
-    { { 32, DDS_PF_FOURCC, MAKEFOURCC('G','R','G','B') }, D3DX_PIXEL_FORMAT_G8R8_G8B8_UNORM },
-    { { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','1') }, D3DX_PIXEL_FORMAT_DXT1_UNORM },
-    { { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','2') }, D3DX_PIXEL_FORMAT_DXT2_UNORM },
-    { { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','3') }, D3DX_PIXEL_FORMAT_DXT3_UNORM },
-    { { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','4') }, D3DX_PIXEL_FORMAT_DXT4_UNORM },
-    { { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','5') }, D3DX_PIXEL_FORMAT_DXT5_UNORM },
-    { { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','4','U') }, D3DX_PIXEL_FORMAT_BC4_UNORM },
-    { { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','4','S') }, D3DX_PIXEL_FORMAT_BC4_SNORM },
+    { { 32, DDS_PF_FOURCC, MAKEFOURCC('R','G','B','G'), 16 }, D3DX_PIXEL_FORMAT_R8G8_B8G8_UNORM },
+    { { 32, DDS_PF_FOURCC, MAKEFOURCC('G','R','G','B'), 16 }, D3DX_PIXEL_FORMAT_G8R8_G8B8_UNORM },
+    { { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','1'), 4 }, D3DX_PIXEL_FORMAT_DXT1_UNORM },
+    { { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','2') },    D3DX_PIXEL_FORMAT_DXT2_UNORM },
+    { { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','3'), 4 }, D3DX_PIXEL_FORMAT_DXT3_UNORM },
+    { { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','4') },    D3DX_PIXEL_FORMAT_DXT4_UNORM },
+    { { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','5'), 8 }, D3DX_PIXEL_FORMAT_DXT5_UNORM },
+    { { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','4','U'), 8 }, D3DX_PIXEL_FORMAT_BC4_UNORM },
+    { { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','4','S'), 8 }, D3DX_PIXEL_FORMAT_BC4_SNORM },
     /* ATI2 is treated identically to BC5U in d3dx10+. */
-    { { 32, DDS_PF_FOURCC, MAKEFOURCC('A','T','I','2') }, D3DX_PIXEL_FORMAT_BC5_UNORM },
-    { { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','5','U') }, D3DX_PIXEL_FORMAT_BC5_UNORM },
-    { { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','5','S') }, D3DX_PIXEL_FORMAT_BC5_SNORM },
+    { { 32, DDS_PF_FOURCC, MAKEFOURCC('A','T','I','2'), 8 }, D3DX_PIXEL_FORMAT_BC5_UNORM },
+    { { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','5','U'), 8 }, D3DX_PIXEL_FORMAT_BC5_UNORM },
+    { { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','5','S'), 8 }, D3DX_PIXEL_FORMAT_BC5_SNORM },
     /* These aren't actually fourcc values, they're just D3DFMT values. */
-    { { 32, DDS_PF_FOURCC, 0x24 }, D3DX_PIXEL_FORMAT_R16G16B16A16_UNORM },
-    { { 32, DDS_PF_FOURCC, 0x6e }, D3DX_PIXEL_FORMAT_U16V16W16Q16_SNORM },
-    { { 32, DDS_PF_FOURCC, 0x6f }, D3DX_PIXEL_FORMAT_R16_FLOAT },
-    { { 32, DDS_PF_FOURCC, 0x70 }, D3DX_PIXEL_FORMAT_R16G16_FLOAT },
-    { { 32, DDS_PF_FOURCC, 0x71 }, D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT },
-    { { 32, DDS_PF_FOURCC, 0x72 }, D3DX_PIXEL_FORMAT_R32_FLOAT },
-    { { 32, DDS_PF_FOURCC, 0x73 }, D3DX_PIXEL_FORMAT_R32G32_FLOAT },
-    { { 32, DDS_PF_FOURCC, 0x74 }, D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT },
+    { { 32, DDS_PF_FOURCC, 0x24, 64  }, D3DX_PIXEL_FORMAT_R16G16B16A16_UNORM },
+    { { 32, DDS_PF_FOURCC, 0x6e, 64  }, D3DX_PIXEL_FORMAT_U16V16W16Q16_SNORM },
+    { { 32, DDS_PF_FOURCC, 0x6f, 16  }, D3DX_PIXEL_FORMAT_R16_FLOAT },
+    { { 32, DDS_PF_FOURCC, 0x70, 32  }, D3DX_PIXEL_FORMAT_R16G16_FLOAT },
+    { { 32, DDS_PF_FOURCC, 0x71, 64  }, D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT },
+    { { 32, DDS_PF_FOURCC, 0x72, 32  }, D3DX_PIXEL_FORMAT_R32_FLOAT },
+    { { 32, DDS_PF_FOURCC, 0x73, 64  }, D3DX_PIXEL_FORMAT_R32G32_FLOAT },
+    { { 32, DDS_PF_FOURCC, 0x74, 128 }, D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT },
     { { 32, DDS_PF_FOURCC, 0x75 }, D3DX_PIXEL_FORMAT_U8V8_SNORM_Cx },
     /* DDS_PF_RGB. */
     { { 32, DDS_PF_RGB,  0, 8,  0xe0,       0x1c,       0x03,       0x00       }, D3DX_PIXEL_FORMAT_B2G3R3_UNORM },
@@ -553,8 +553,8 @@ uint32_t d3dx_calculate_layer_pixels_size(enum d3dx_pixel_format_id format, uint
     return layer_size;
 }
 
-HRESULT d3dx_init_dds_header(struct dds_header *header, enum d3dx_resource_type resource_type,
-        enum d3dx_pixel_format_id format, const struct volume *size, uint32_t mip_levels)
+static HRESULT d3dx_init_dds_header(struct dds_header *header, enum d3dx_resource_type resource_type,
+        enum d3dx_pixel_format_id format, const struct volume *size, uint32_t mip_levels, unsigned int d3dx_version)
 {
     HRESULT hr;
 
@@ -562,27 +562,21 @@ HRESULT d3dx_init_dds_header(struct dds_header *header, enum d3dx_resource_type 
     header->signature = MAKEFOURCC('D','D','S',' ');
     /* The signature is not really part of the DDS header. */
     header->size = sizeof(*header) - FIELD_OFFSET(struct dds_header, size);
-    hr = dds_pixel_format_from_d3dx_pixel_format_id(&header->pixel_format, format);
-    if (FAILED(hr))
-        return hr;
 
-    header->flags = DDS_CAPS | DDS_HEIGHT | DDS_WIDTH | DDS_PIXELFORMAT;
+    header->flags = DDS_HEIGHT | DDS_WIDTH;
     header->height = size->height;
     header->width = size->width;
+    header->depth = (size->depth > 1) ? size->depth : 0;
+    header->miplevels = (mip_levels > 1) ? mip_levels : 0;
     header->caps = DDS_CAPS_TEXTURE;
     if (size->depth > 1)
     {
         header->flags |= DDS_DEPTH;
-        header->depth = size->depth;
         header->caps2 |= DDS_CAPS2_VOLUME;
     }
 
     if (mip_levels > 1)
-    {
-        header->flags |= DDS_MIPMAPCOUNT;
-        header->caps |= (DDS_CAPS_MIPMAP | DDS_CAPS_COMPLEX);
-        header->miplevels = mip_levels;
-    }
+        header->caps |= DDS_CAPS_MIPMAP;
 
     if (resource_type == D3DX_RESOURCE_TYPE_CUBE_TEXTURE)
     {
@@ -590,10 +584,50 @@ HRESULT d3dx_init_dds_header(struct dds_header *header, enum d3dx_resource_type 
         header->caps2 |= (DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES);
     }
 
-    if (header->pixel_format.flags & DDS_PF_ALPHA || header->pixel_format.flags & DDS_PF_ALPHA_ONLY)
-        header->caps |= DDSCAPS_ALPHA;
-    if (header->pixel_format.flags & DDS_PF_INDEXED)
-        header->caps |= DDSCAPS_PALETTE;
+    if (d3dx_version > 9)
+    {
+        uint32_t row_pitch, slice_pitch;
+        struct dds_pixel_format pf;
+
+        hr = dds_pixel_format_from_d3dx_pixel_format_id(&pf, format);
+        if (FAILED(hr))
+            return hr;
+
+        if (pf.flags == DDS_PF_BUMPDUDV || pf.flags == DDS_PF_BUMPLUMINANCE)
+            return E_NOTIMPL;
+
+        header->pixel_format = pf;
+        hr = d3dx_calculate_pixels_size(format, size->width, size->height, &row_pitch, &slice_pitch);
+        if (FAILED(hr))
+            return hr;
+
+        /* Always sets mip levels and row pitch in header. */
+        header->pitch_or_linear_size = row_pitch;
+        header->miplevels = mip_levels;
+        if (header->caps2)
+            header->caps |= DDS_CAPS_COMPLEX;
+    }
+    else
+    {
+        hr = dds_pixel_format_from_d3dx_pixel_format_id(&header->pixel_format, format);
+        if (FAILED(hr))
+            return hr;
+
+        /* d3dx10+ sets the bpp field for fourCC pixel formats, d3dx9 does not. */
+        if (header->pixel_format.flags == DDS_PF_FOURCC)
+            header->pixel_format.bpp = 0;
+
+        header->flags |= DDS_CAPS | DDS_PIXELFORMAT;
+        if (header->pixel_format.flags & DDS_PF_ALPHA || header->pixel_format.flags & DDS_PF_ALPHA_ONLY)
+            header->caps |= DDSCAPS_ALPHA;
+        if (header->pixel_format.flags & DDS_PF_INDEXED)
+            header->caps |= DDSCAPS_PALETTE;
+        if (mip_levels > 1)
+        {
+            header->flags |= DDS_MIPMAPCOUNT;
+            header->caps |= DDS_CAPS_COMPLEX;
+        }
+    }
 
     return D3D_OK;
 }
@@ -973,6 +1007,7 @@ HRESULT d3dx_save_pixels_to_memory(struct d3dx_pixels *src_pixels, const struct 
             struct dds_header *header;
             uint32_t header_size;
 
+            assert(wrapper->d3dx_version < 10); /* This path shouldn't be used for d3dx10+. */
             header_size = is_index_format(dst_fmt_desc) ? sizeof(*header) + DDS_PALETTE_SIZE : sizeof(*header);
             hr = wrapper->d3dx_buffer_create((dst_slice_pitch * src_pixels->size.depth) + header_size, dst_buffer);
             if (FAILED(hr))
@@ -980,7 +1015,8 @@ HRESULT d3dx_save_pixels_to_memory(struct d3dx_pixels *src_pixels, const struct 
 
             header = dst_buffer->buffer_data;
             pixels = (uint8_t *)dst_buffer->buffer_data + header_size;
-            hr = d3dx_init_dds_header(header, D3DX_RESOURCE_TYPE_TEXTURE_2D, dst_format, &src_pixels->size, 1);
+            hr = d3dx_init_dds_header(header, D3DX_RESOURCE_TYPE_TEXTURE_2D, dst_format, &src_pixels->size, 1,
+                    wrapper->d3dx_version);
             if (FAILED(hr))
                 goto exit;
             if (is_index_format(dst_fmt_desc))
@@ -1074,6 +1110,37 @@ exit:
     free(tmp_buf);
     if (FAILED(hr))
         wrapper->d3dx_buffer_destroy(dst_buffer);
+    return hr;
+}
+
+HRESULT d3dx_create_dds_file_blob(enum d3dx_pixel_format_id format, const PALETTEENTRY *palette,
+        enum d3dx_resource_type resource_type, const struct volume *size, uint32_t mip_levels, uint32_t layers,
+        const struct d3dx_buffer_wrapper *wrapper, struct d3dx_buffer *dst_buffer)
+{
+    const struct pixel_format_desc *fmt_desc = get_d3dx_pixel_format_info(format);
+    uint32_t header_size, pixels_size;
+    struct dds_header header;
+    uint8_t *buf_ptr;
+    HRESULT hr;
+
+    hr = d3dx_init_dds_header(&header, resource_type, format, size, mip_levels, wrapper->d3dx_version);
+    if (FAILED(hr))
+        return hr;
+
+    pixels_size = d3dx_calculate_layer_pixels_size(format, size->width, size->height, size->depth, mip_levels) * layers;
+    header_size = sizeof(header);
+    if (is_index_format(fmt_desc))
+        header_size += DDS_PALETTE_SIZE;
+
+    hr = wrapper->d3dx_buffer_create(header_size + pixels_size, dst_buffer);
+    if (FAILED(hr))
+        return hr;
+
+    buf_ptr = dst_buffer->buffer_data;
+    memcpy(buf_ptr, &header, sizeof(header));
+    if (is_index_format(fmt_desc))
+        memcpy(buf_ptr + sizeof(header), palette, DDS_PALETTE_SIZE);
+
     return hr;
 }
 

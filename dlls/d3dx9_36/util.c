@@ -274,6 +274,7 @@ static const struct d3dx_buffer_wrapper d3dx9_buffer_wrapper =
 {
     d3dx9_buffer_create,
     d3dx9_buffer_destroy,
+    9
 };
 
 HRESULT d3dx9_save_pixels_to_memory(struct d3dx_pixels *src_pixels, const struct pixel_format_desc *src_fmt_desc,
@@ -285,6 +286,22 @@ HRESULT d3dx9_save_pixels_to_memory(struct d3dx_pixels *src_pixels, const struct
     *dst_buffer = NULL;
     hr = d3dx_save_pixels_to_memory(src_pixels, src_fmt_desc,
             d3dx_image_file_format_from_d3dximage_fileformat(file_format), &d3dx9_buffer_wrapper, &buffer);
+    if (SUCCEEDED(hr))
+        *dst_buffer = (ID3DXBuffer *)buffer.buffer_iface;
+
+    return hr;
+}
+
+HRESULT d3dx9_create_dds_file_blob(const struct pixel_format_desc *fmt_desc, const PALETTEENTRY *palette,
+        D3DRESOURCETYPE resource_type, const struct volume *size, uint32_t mip_levels, ID3DXBuffer **dst_buffer)
+{
+    uint32_t layers = (resource_type == D3DRTYPE_CUBETEXTURE) ? 6 : 1;
+    struct d3dx_buffer buffer;
+    HRESULT hr;
+
+    *dst_buffer = NULL;
+    hr = d3dx_create_dds_file_blob(fmt_desc->format, palette, d3dx_resource_type_from_d3dresourcetype(resource_type),
+            size, mip_levels, layers, &d3dx9_buffer_wrapper, &buffer);
     if (SUCCEEDED(hr))
         *dst_buffer = (ID3DXBuffer *)buffer.buffer_iface;
 
