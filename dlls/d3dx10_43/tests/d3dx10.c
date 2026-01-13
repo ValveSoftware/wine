@@ -5181,9 +5181,11 @@ static void test_get_image_info(void)
 #if D3DX10_SDK_VERSION >= 40
     check_dds_dxt10_format(DXGI_FORMAT_B8G8R8X8_UNORM, DXGI_FORMAT_B8G8R8X8_UNORM, FALSE);
     check_dds_dxt10_format(DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM, FALSE);
+    check_dds_dxt10_format(DXGI_FORMAT_B8G8R8A8_UNORM_SRGB, DXGI_FORMAT_B8G8R8A8_UNORM_SRGB, FALSE);
 #else
     todo_wine check_dds_dxt10_format_unsupported(DXGI_FORMAT_B8G8R8X8_UNORM, E_FAIL);
     todo_wine check_dds_dxt10_format_unsupported(DXGI_FORMAT_B8G8R8A8_UNORM, E_FAIL);
+    todo_wine check_dds_dxt10_format_unsupported(DXGI_FORMAT_B8G8R8A8_UNORM_SRGB, E_FAIL);
 #endif
 
     /* D3DX10GetImageInfoFromResource tests */
