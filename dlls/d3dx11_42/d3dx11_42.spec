@@ -12,7 +12,7 @@
 @ stdcall -import D3DX11CreateAsyncResourceLoaderA(long str ptr)
 @ stdcall -import D3DX11CreateAsyncResourceLoaderW(long wstr ptr)
 @ stub D3DX11CreateAsyncShaderPreprocessProcessor
-@ stub D3DX11CreateAsyncShaderResourceViewProcessor
+@ stdcall -import D3DX11CreateAsyncShaderResourceViewProcessor(ptr ptr ptr)
 @ stdcall -import D3DX11CreateAsyncTextureInfoProcessor(ptr ptr)
 @ stdcall -import D3DX11CreateAsyncTextureProcessor(ptr ptr ptr)
 @ stub D3DX11CreateShaderResourceViewFromFileA

@@ -47,6 +47,8 @@ HRESULT WINAPI D3DX11CompileFromFileW(const WCHAR *filename, const D3D10_SHADER_
 HRESULT WINAPI D3DX11CreateAsyncTextureProcessor(ID3D11Device *device, D3DX11_IMAGE_LOAD_INFO *info,
         ID3DX11DataProcessor **processor);
 HRESULT WINAPI D3DX11CreateAsyncTextureInfoProcessor(D3DX11_IMAGE_INFO *info, ID3DX11DataProcessor **processor);
+HRESULT WINAPI D3DX11CreateAsyncShaderResourceViewProcessor(ID3D11Device *device, D3DX11_IMAGE_LOAD_INFO *info,
+        ID3DX11DataProcessor **processor);
 
 #ifdef __cplusplus
 }
