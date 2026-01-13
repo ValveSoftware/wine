@@ -173,6 +173,7 @@ static const struct
     { &GUID_WICPixelFormat2bppIndexed, D3DX_PIXEL_FORMAT_P2_UINT },
     { &GUID_WICPixelFormat4bppIndexed, D3DX_PIXEL_FORMAT_P4_UINT },
     { &GUID_WICPixelFormat8bppGray,    D3DX_PIXEL_FORMAT_L8_UNORM },
+    { &GUID_WICPixelFormat16bppGray,   D3DX_PIXEL_FORMAT_L16_UNORM },
     { &GUID_WICPixelFormat16bppBGR555, D3DX_PIXEL_FORMAT_B5G5R5X1_UNORM },
     { &GUID_WICPixelFormat16bppBGR565, D3DX_PIXEL_FORMAT_B5G6R5_UNORM },
     { &GUID_WICPixelFormat24bppBGR,    D3DX_PIXEL_FORMAT_B8G8R8_UNORM },
@@ -895,200 +896,26 @@ exit:
     return hr;
 }
 
-static const enum d3dx_pixel_format_id tga_save_pixel_formats[] =
-{
-    D3DX_PIXEL_FORMAT_B8G8R8_UNORM,
-    D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM
-};
-
-static const enum d3dx_pixel_format_id png_save_pixel_formats[] =
-{
-    D3DX_PIXEL_FORMAT_B8G8R8_UNORM,
-    D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM,
-    D3DX_PIXEL_FORMAT_R16G16B16A16_UNORM
-};
-
-static const enum d3dx_pixel_format_id jpg_save_pixel_formats[] =
-{
-    D3DX_PIXEL_FORMAT_B8G8R8_UNORM,
-};
-
-static const enum d3dx_pixel_format_id bmp_save_pixel_formats[] =
-{
-    D3DX_PIXEL_FORMAT_B5G5R5X1_UNORM,
-    D3DX_PIXEL_FORMAT_B5G6R5_UNORM,
-    D3DX_PIXEL_FORMAT_B8G8R8_UNORM,
-    D3DX_PIXEL_FORMAT_B8G8R8X8_UNORM,
-    D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM,
-    D3DX_PIXEL_FORMAT_P8_UINT,
-};
-
-static const enum d3dx_pixel_format_id unimplemented_bmp_save_pixel_formats[] =
-{
-    D3DX_PIXEL_FORMAT_A8_UNORM,
-    D3DX_PIXEL_FORMAT_P8_UINT_A8_UNORM,
-    D3DX_PIXEL_FORMAT_L8A8_UNORM,
-    D3DX_PIXEL_FORMAT_L16_UNORM,
-    D3DX_PIXEL_FORMAT_B2G3R3_UNORM,
-    D3DX_PIXEL_FORMAT_R16_FLOAT,
-    D3DX_PIXEL_FORMAT_R16G16_FLOAT,
-    D3DX_PIXEL_FORMAT_R16G16_UNORM,
-    D3DX_PIXEL_FORMAT_R32_FLOAT,
-    D3DX_PIXEL_FORMAT_R32G32_FLOAT,
-    D3DX_PIXEL_FORMAT_B4G4R4X4_UNORM,
-    D3DX_PIXEL_FORMAT_B4G4R4A4_UNORM,
-    D3DX_PIXEL_FORMAT_B2G3R3A8_UNORM,
-    D3DX_PIXEL_FORMAT_B5G5R5A1_UNORM,
-    D3DX_PIXEL_FORMAT_R8G8B8X8_UNORM,
-    D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM,
-    D3DX_PIXEL_FORMAT_B10G10R10A2_UNORM,
-    D3DX_PIXEL_FORMAT_R10G10B10A2_UNORM,
-};
-
-static enum d3dx_pixel_format_id d3dx_get_closest_d3dx_pixel_format_id(const enum d3dx_pixel_format_id *format_ids,
-        uint32_t format_ids_size, enum d3dx_pixel_format_id format_id)
-{
-    const struct pixel_format_desc *fmt, *curfmt, *bestfmt = NULL;
-    int bestscore = INT_MIN, rgb_channels, a_channel, i, j;
-    BOOL alpha_only, rgb_only;
-
-    for (i = 0; i < format_ids_size; ++i)
-    {
-        if (format_ids[i] == format_id)
-            return format_id;
-    }
-
-    TRACE("Requested format is not directly supported, looking for the best alternative.\n");
-    switch (format_id)
-    {
-        case D3DX_PIXEL_FORMAT_P8_UINT:
-        case D3DX_PIXEL_FORMAT_P8_UINT_A8_UNORM:
-        case D3DX_PIXEL_FORMAT_DXT1_UNORM:
-        case D3DX_PIXEL_FORMAT_DXT2_UNORM:
-        case D3DX_PIXEL_FORMAT_DXT3_UNORM:
-        case D3DX_PIXEL_FORMAT_DXT4_UNORM:
-        case D3DX_PIXEL_FORMAT_DXT5_UNORM:
-            fmt = get_d3dx_pixel_format_info(D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM);
-            break;
-
-        default:
-            fmt = get_d3dx_pixel_format_info(format_id);
-            break;
-    }
-
-    alpha_only = rgb_only = FALSE;
-    if (fmt->a_type != CTYPE_EMPTY && fmt->rgb_type == CTYPE_EMPTY)
-        alpha_only = TRUE;
-    else if (fmt->a_type == CTYPE_EMPTY && fmt->rgb_type != CTYPE_EMPTY)
-        rgb_only = TRUE;
-
-    if (fmt->rgb_type == CTYPE_LUMA)
-        rgb_channels = 3;
-    else
-        rgb_channels = !!fmt->bits[1] + !!fmt->bits[2] + !!fmt->bits[3];
-    a_channel = !!fmt->bits[0];
-    for (i = 0; i < format_ids_size; ++i)
-    {
-        int cur_rgb_channels, cur_a_channel, score;
-
-        curfmt = get_d3dx_pixel_format_info(format_ids[i]);
-        if (!is_conversion_to_supported(curfmt))
-            continue;
-        if (alpha_only && curfmt->a_type == CTYPE_EMPTY)
-            continue;
-        if (rgb_only && curfmt->rgb_type == CTYPE_EMPTY)
-            continue;
-        if ((fmt->rgb_type == CTYPE_SNORM && curfmt->rgb_type != CTYPE_SNORM)
-                || (fmt->rgb_type == CTYPE_SHILO && curfmt->rgb_type != CTYPE_SHILO))
-            continue;
-
-        cur_rgb_channels = !!curfmt->bits[1] + !!curfmt->bits[2] + !!curfmt->bits[3];
-        cur_a_channel = !!curfmt->bits[0];
-        /* Calculate a score for this format. */
-        score = 512 * (format_types_match(curfmt, fmt));
-        score -= 32 * abs(cur_a_channel - a_channel);
-        score -= 32 * abs(cur_rgb_channels - rgb_channels);
-        for (j = 0; j < 4; ++j)
-        {
-            int diff = curfmt->bits[j] - fmt->bits[j];
-
-            score -= (diff < 0 ? -diff * 8 : diff) * (j == 0 ? 1 : 2);
-        }
-
-        if (score > bestscore)
-        {
-            bestscore = score;
-            bestfmt = curfmt;
-        }
-    }
-
-    return (bestfmt) ? bestfmt->format : D3DX_PIXEL_FORMAT_COUNT;
-}
-
 HRESULT d3dx_save_pixels_to_memory(struct d3dx_pixels *src_pixels, const struct pixel_format_desc *src_fmt_desc,
-        enum d3dx_image_file_format file_format, const struct d3dx_buffer_wrapper *wrapper,
-        struct d3dx_buffer *dst_buffer)
+        enum d3dx_image_file_format file_format, enum d3dx_pixel_format_id dst_format,
+        const struct d3dx_buffer_wrapper *wrapper, struct d3dx_buffer *dst_buffer)
 {
-    enum d3dx_pixel_format_id dst_format = src_fmt_desc->format;
     const struct pixel_format_desc *dst_fmt_desc;
     uint32_t dst_row_pitch, dst_slice_pitch;
     struct d3dx_pixels dst_pixels;
     uint8_t *pixels, *tmp_buf;
     HRESULT hr;
 
+    if (file_format == D3DX_IMAGE_FILE_FORMAT_DDS)
+    {
+        assert(wrapper->d3dx_version < 10); /* This path shouldn't be used for d3dx10+. */
+        hr = dds_pixel_format_from_d3dx_pixel_format_id(NULL, dst_format);
+        if (FAILED(hr))
+            return hr;
+    }
+
     memset(dst_buffer, 0, sizeof(*dst_buffer));
     pixels = tmp_buf = NULL;
-    switch (file_format)
-    {
-        case D3DX_IMAGE_FILE_FORMAT_DDS:
-            hr = dds_pixel_format_from_d3dx_pixel_format_id(NULL, dst_format);
-            if (FAILED(hr))
-                return hr;
-            break;
-
-        case D3DX_IMAGE_FILE_FORMAT_TGA:
-            dst_format = d3dx_get_closest_d3dx_pixel_format_id(tga_save_pixel_formats, ARRAY_SIZE(tga_save_pixel_formats),
-                    dst_format);
-            break;
-
-        case D3DX_IMAGE_FILE_FORMAT_PNG:
-            dst_format = d3dx_get_closest_d3dx_pixel_format_id(png_save_pixel_formats, ARRAY_SIZE(png_save_pixel_formats),
-                    dst_format);
-            break;
-
-        case D3DX_IMAGE_FILE_FORMAT_JPG:
-            dst_format = d3dx_get_closest_d3dx_pixel_format_id(jpg_save_pixel_formats, ARRAY_SIZE(jpg_save_pixel_formats),
-                    dst_format);
-            break;
-
-        case D3DX_IMAGE_FILE_FORMAT_BMP:
-        case D3DX_IMAGE_FILE_FORMAT_DIB:
-        {
-            unsigned int i;
-
-            for (i = 0; i < ARRAY_SIZE(unimplemented_bmp_save_pixel_formats); ++i)
-            {
-                if (unimplemented_bmp_save_pixel_formats[i] == dst_format)
-                {
-                    FIXME("Saving pixel format %d to BMP files is currently unsupported.\n", dst_format);
-                    return E_NOTIMPL;
-                }
-            }
-            dst_format = d3dx_get_closest_d3dx_pixel_format_id(bmp_save_pixel_formats, ARRAY_SIZE(bmp_save_pixel_formats),
-                    dst_format);
-            break;
-        }
-
-        default:
-            assert(0 && "Unexpected file format.");
-            return E_FAIL;
-    }
-
-    if (dst_format == D3DX_PIXEL_FORMAT_COUNT)
-    {
-        WARN("Failed to find adequate replacement format for saving.\n");
-        return D3DERR_INVALIDCALL;
-    }
 
     if (dst_format != src_fmt_desc->format && !is_conversion_from_supported(src_fmt_desc))
     {
@@ -1110,7 +937,6 @@ HRESULT d3dx_save_pixels_to_memory(struct d3dx_pixels *src_pixels, const struct 
             struct dds_header *header;
             uint32_t header_size;
 
-            assert(wrapper->d3dx_version < 10); /* This path shouldn't be used for d3dx10+. */
             header_size = is_index_format(dst_fmt_desc) ? sizeof(*header) + DDS_PALETTE_SIZE : sizeof(*header);
             hr = wrapper->d3dx_buffer_create((dst_slice_pitch * src_pixels->size.depth) + header_size, dst_buffer);
             if (FAILED(hr))
@@ -1149,6 +975,7 @@ HRESULT d3dx_save_pixels_to_memory(struct d3dx_pixels *src_pixels, const struct 
              break;
         }
 
+        case D3DX_IMAGE_FILE_FORMAT_TIFF:
         case D3DX_IMAGE_FILE_FORMAT_PNG:
         case D3DX_IMAGE_FILE_FORMAT_JPG:
         case D3DX_IMAGE_FILE_FORMAT_BMP:

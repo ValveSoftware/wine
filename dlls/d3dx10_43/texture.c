@@ -17,6 +17,7 @@
  */
 
 #include "wine/debug.h"
+#include "assert.h"
 
 #define COBJMACROS
 
@@ -1649,6 +1650,83 @@ static HRESULT d3dx10_create_dds_file_blob(const struct pixel_format_desc *fmt_d
     return hr;
 }
 
+static HRESULT d3dx10_get_save_format_for_file_format(D3DX10_IMAGE_FILE_FORMAT iff, enum d3dx_pixel_format_id src_fmt,
+        enum d3dx_pixel_format_id *save_fmt)
+{
+    *save_fmt = D3DX_PIXEL_FORMAT_COUNT;
+    switch (iff)
+    {
+        case D3DX10_IFF_JPG:
+            switch (src_fmt)
+            {
+                case D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM:
+                case D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT:
+                case D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT:
+                    *save_fmt = D3DX_PIXEL_FORMAT_B8G8R8_UNORM;
+                    break;
+
+                case D3DX_PIXEL_FORMAT_R16_UNORM:
+                    *save_fmt = D3DX_PIXEL_FORMAT_L8_UNORM;
+                    break;
+
+                default:
+                    return E_FAIL;
+            }
+            break;
+
+        case D3DX10_IFF_PNG:
+        case D3DX10_IFF_TIFF:
+            switch (src_fmt)
+            {
+                case D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM:
+                    *save_fmt = D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM;
+                    break;
+
+                case D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT:
+                case D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT:
+                    *save_fmt = D3DX_PIXEL_FORMAT_R16G16B16A16_UNORM;
+                    break;
+
+                case D3DX_PIXEL_FORMAT_R16_UNORM:
+                    *save_fmt = D3DX_PIXEL_FORMAT_L16_UNORM;
+                    break;
+
+                default:
+                    return E_FAIL;
+            }
+            break;
+
+        case D3DX10_IFF_BMP:
+            switch (src_fmt)
+            {
+                case D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM:
+                    *save_fmt = D3DX_PIXEL_FORMAT_B8G8R8X8_UNORM;
+                    break;
+
+                case D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT:
+                case D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT:
+                case D3DX_PIXEL_FORMAT_R16_UNORM:
+                    FIXME("Encoding of BMP files to WICPixelFormat64bppRGBAFixedPoint unimplemented, using default instead.\n");
+                    *save_fmt = D3DX_PIXEL_FORMAT_B8G8R8X8_UNORM;
+                    break;
+
+                default:
+                    return E_FAIL;
+            }
+            break;
+
+        case D3DX10_IFF_WMP:
+            FIXME("Saving to WMP is currently unimplemented.\n");
+            return E_NOTIMPL;
+
+        default:
+            assert(0);
+            break;
+    }
+
+    return S_OK;
+}
+
 HRESULT WINAPI D3DX10SaveTextureToMemory(ID3D10Resource *texture, D3DX10_IMAGE_FILE_FORMAT format, ID3D10Blob **buffer,
         UINT flags)
 {
@@ -1663,11 +1741,11 @@ HRESULT WINAPI D3DX10SaveTextureToMemory(ID3D10Resource *texture, D3DX10_IMAGE_F
 
     TRACE("texture %p, format %u, buffer %p, flags %#x.\n", texture, format, buffer, flags);
 
-    if (!texture || !buffer)
+    if (!texture || !buffer || format == D3DX10_IFF_GIF)
         return E_INVALIDARG;
 
     out_buffer = *buffer = NULL;
-    if (format != D3DX10_IFF_DDS)
+    if (format == D3DX10_IFF_WMP)
     {
         FIXME("Saving to file format %u is currently unimplemented.\n", format);
         return E_NOTIMPL;
@@ -1689,9 +1767,37 @@ HRESULT WINAPI D3DX10SaveTextureToMemory(ID3D10Resource *texture, D3DX10_IMAGE_F
             return E_NOTIMPL;
     }
 
+    if (format != D3DX10_IFF_DDS && rsrc_dim != D3D10_RESOURCE_DIMENSION_TEXTURE2D)
+        return E_INVALIDARG;
+
     hr = d3dx_d3d10_texture_init(texture, 0, 0, D3D10_MAP_READ, NULL, &src_tex);
     if (FAILED(hr))
         return hr;
+
+    if (format != D3DX10_IFF_DDS)
+    {
+        enum d3dx_pixel_format_id dst_format;
+        struct d3dx_pixels src_pixels;
+        struct d3dx_buffer dst_buffer;
+
+        hr = d3dx10_get_save_format_for_file_format(format, src_tex.fmt_desc->format, &dst_format);
+        if (FAILED(hr))
+            goto exit;
+
+        hr = d3dx_d3d10_texture_map(&src_tex, 0, 0, &src_pixels);
+        if (FAILED(hr))
+            goto exit;
+
+        hr = d3dx_save_pixels_to_memory(&src_pixels, src_tex.fmt_desc, (enum d3dx_image_file_format)format, dst_format,
+                &d3dx10_buffer_wrapper, &dst_buffer);
+        d3dx_d3d10_texture_unmap(&src_tex, 0, 0);
+        if (SUCCEEDED(hr))
+            *buffer = out_buffer = (ID3D10Blob *)dst_buffer.buffer_iface;
+        else
+            WARN("Failed with hr %#lx.\n", hr);
+
+        goto exit;
+    }
 
     if (src_tex.is_cubemap)
         d3dx_rtype = D3DX_RESOURCE_TYPE_CUBE_TEXTURE;

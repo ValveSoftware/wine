@@ -458,7 +458,8 @@ struct d3dx_buffer_wrapper
 };
 
 HRESULT d3dx_save_pixels_to_memory(struct d3dx_pixels *src_pixels, const struct pixel_format_desc *src_fmt_desc,
-        enum d3dx_image_file_format file_format, const struct d3dx_buffer_wrapper *wrapper, struct d3dx_buffer *dst_buffer);
+        enum d3dx_image_file_format file_format, enum d3dx_pixel_format_id dst_format,
+        const struct d3dx_buffer_wrapper *wrapper, struct d3dx_buffer *dst_buffer);
 HRESULT d3dx_create_dds_file_blob(enum d3dx_pixel_format_id format, const PALETTEENTRY *palette,
         enum d3dx_resource_type resource_type, const struct volume *size, uint32_t mip_levels, uint32_t layers,
         const struct d3dx_buffer_wrapper *wrapper, struct d3dx_buffer *dst_buffer);

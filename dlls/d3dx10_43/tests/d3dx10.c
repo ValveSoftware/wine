@@ -8820,9 +8820,9 @@ static void test_save_texture_to_iffs(void)
 
             /* GIF saving is never supported, regardless of texture format. */
             if (test_iffs[j] == D3DX10_IFF_GIF)
-                todo_wine ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
+                ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
             else
-                todo_wine ok(hr == expected_hr, "Unexpected hr %#lx.\n", hr);
+                todo_wine_if(test_iffs[j] == D3DX10_IFF_WMP) ok(hr == expected_hr, "Unexpected hr %#lx.\n", hr);
             if (SUCCEEDED(hr))
             {
                 check_image_wic_pixel_format(factory, ID3D10Blob_GetBufferPointer(buffer), ID3D10Blob_GetBufferSize(buffer),
