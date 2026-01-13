@@ -402,7 +402,7 @@ HRESULT get_image_info(const void *data, SIZE_T size, D3DX11_IMAGE_INFO *img_inf
     return S_OK;
 }
 
-static void init_load_info(const D3DX11_IMAGE_LOAD_INFO *load_info, D3DX11_IMAGE_LOAD_INFO *out)
+void init_load_info(const D3DX11_IMAGE_LOAD_INFO *load_info, D3DX11_IMAGE_LOAD_INFO *out)
 {
     if (load_info)
     {

@@ -3132,6 +3132,145 @@ static void test_D3DX11CreateAsyncTextureInfoProcessor(void)
     CoUninitialize();
 }
 
+static void test_D3DX11CreateAsyncTextureProcessor(void)
+{
+    ID3DX11DataProcessor *dp;
+    ID3D11Resource *resource;
+    ID3D11Device *device;
+    HRESULT hr;
+    int i;
+
+    device = create_device();
+    if (!device)
+    {
+        skip("Failed to create device, skipping tests.\n");
+        return;
+    }
+
+    CoInitialize(NULL);
+
+    hr = D3DX11CreateAsyncTextureProcessor(device, NULL, NULL);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11CreateAsyncTextureProcessor(NULL, NULL, &dp);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11CreateAsyncTextureProcessor(device, NULL, &dp);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX11DataProcessor_Process(dp, (void *)test_image[0].data, 0);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX11DataProcessor_Process(dp, NULL, test_image[0].size);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX11DataProcessor_Destroy(dp);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+    for (i = 0; i < ARRAY_SIZE(test_image); ++i)
+    {
+        D3DX11_IMAGE_LOAD_INFO load_info;
+        D3DX11_IMAGE_INFO info;
+
+        winetest_push_context("Test %u", i);
+
+        hr = D3DX11CreateAsyncTextureProcessor(device, NULL, &dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        hr = ID3DX11DataProcessor_Process(dp, (void *)test_image[i].data, test_image[i].size);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX11_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            hr = ID3DX11DataProcessor_CreateDeviceObject(dp, (void **)&resource);
+            ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+            check_resource_info(resource, test_image + i, __LINE__);
+            check_resource_data(resource, test_image + i, __LINE__);
+            ID3D11Resource_Release(resource);
+        }
+
+        hr = ID3DX11DataProcessor_Destroy(dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        /* Test behavior with load_info structure values set to defaults. */
+        load_info = d3dx11_default_load_info;
+
+        hr = D3DX11CreateAsyncTextureProcessor(device, &load_info, &dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        hr = ID3DX11DataProcessor_Process(dp, (void *)test_image[i].data, test_image[i].size);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX11_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            hr = ID3DX11DataProcessor_CreateDeviceObject(dp, (void **)&resource);
+            ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+            check_resource_info(resource, test_image + i, __LINE__);
+            check_resource_data(resource, test_image + i, __LINE__);
+            ID3D11Resource_Release(resource);
+        }
+
+        hr = ID3DX11DataProcessor_Destroy(dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        /* Check that passed in D3DX11_IMAGE_INFO structure is filled. */
+        memset(&info, 0, sizeof(info));
+        load_info = d3dx11_default_load_info;
+        load_info.pSrcInfo = &info;
+
+        hr = D3DX11CreateAsyncTextureProcessor(device, &load_info, &dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        hr = ID3DX11DataProcessor_Process(dp, (void *)test_image[i].data, test_image[i].size);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX11_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            ok(!memcmp(&test_image[i].expected_info, &info, sizeof(info)), "Unexpected image info.\n");
+            hr = ID3DX11DataProcessor_CreateDeviceObject(dp, (void **)&resource);
+            ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+            check_resource_info(resource, test_image + i, __LINE__);
+            check_resource_data(resource, test_image + i, __LINE__);
+            ID3D11Resource_Release(resource);
+        }
+
+        hr = ID3DX11DataProcessor_Destroy(dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        winetest_pop_context();
+    }
+
+    for (i = 0; i < ARRAY_SIZE(test_invalid_image_load_info); ++i)
+    {
+        const struct test_invalid_image_load_info *test = &test_invalid_image_load_info[i];
+        D3DX11_IMAGE_LOAD_INFO load_info = test->load_info;
+
+        winetest_push_context("Test %u", i);
+
+        hr = D3DX11CreateAsyncTextureProcessor(device, &load_info, &dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        hr = ID3DX11DataProcessor_Process(dp, (void *)test->data, test->size);
+        todo_wine_if(test->todo_process_hr)
+            ok(hr == test->expected_process_hr, "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+        {
+            resource = NULL;
+            hr = ID3DX11DataProcessor_CreateDeviceObject(dp, (void **)&resource);
+            todo_wine_if(test->todo_create_device_object_hr)
+                ok(hr == test->expected_create_device_object_hr, "Got unexpected hr %#lx.\n", hr);
+            if (SUCCEEDED(hr))
+                ID3D11Resource_Release(resource);
+        }
+
+        hr = ID3DX11DataProcessor_Destroy(dp);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+        winetest_pop_context();
+    }
+
+    CoUninitialize();
+
+    ok(!ID3D11Device_Release(device), "Unexpected refcount.\n");
+}
+
 static void check_dds_pixel_format_image_info(unsigned int line, DWORD flags, DWORD fourcc, DWORD bpp,
         DWORD rmask, DWORD gmask, DWORD bmask, DWORD amask, HRESULT expected_hr, DXGI_FORMAT expected_format)
 {
@@ -4644,6 +4783,7 @@ START_TEST(d3dx11)
     test_D3DX11CreateAsyncFileLoader();
     test_D3DX11CreateAsyncResourceLoader();
     test_D3DX11CreateAsyncTextureInfoProcessor();
+    test_D3DX11CreateAsyncTextureProcessor();
     test_D3DX11CompileFromFile();
     test_get_image_info();
     test_create_texture();
