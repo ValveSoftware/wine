@@ -1693,13 +1693,6 @@ HRESULT WINAPI D3DX10SaveTextureToMemory(ID3D10Resource *texture, D3DX10_IMAGE_F
     if (FAILED(hr))
         return hr;
 
-    if ((src_tex.texture.layer_count > 1 && !src_tex.is_cubemap) || (src_tex.is_cubemap && src_tex.texture.layer_count > 6))
-    {
-        FIXME("Texture arrays are currently unimplemented.\n");
-        hr = E_NOTIMPL;
-        goto exit;
-    }
-
     if (src_tex.is_cubemap)
         d3dx_rtype = D3DX_RESOURCE_TYPE_CUBE_TEXTURE;
     hr = d3dx10_create_dds_file_blob(src_tex.fmt_desc, d3dx_rtype, &src_tex.texture.size, src_tex.texture.mip_levels,

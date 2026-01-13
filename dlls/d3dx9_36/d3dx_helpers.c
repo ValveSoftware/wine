@@ -464,6 +464,55 @@ enum d3dx_pixel_format_id d3dx_pixel_format_id_from_dxgi_format(uint32_t format)
     }
 }
 
+static DXGI_FORMAT dxgi_format_from_d3dx_pixel_format_id(enum d3dx_pixel_format_id format)
+{
+    switch (format)
+    {
+        case D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM_SRGB:     return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+        case D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM:          return DXGI_FORMAT_R8G8B8A8_UNORM;
+        case D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM:          return DXGI_FORMAT_B8G8R8A8_UNORM;
+        case D3DX_PIXEL_FORMAT_B8G8R8X8_UNORM:          return DXGI_FORMAT_B8G8R8X8_UNORM;
+        case D3DX_PIXEL_FORMAT_B5G6R5_UNORM:            return DXGI_FORMAT_B5G6R5_UNORM;
+        case D3DX_PIXEL_FORMAT_B5G5R5A1_UNORM:          return DXGI_FORMAT_B5G5R5A1_UNORM;
+        case D3DX_PIXEL_FORMAT_B4G4R4A4_UNORM:          return DXGI_FORMAT_B4G4R4A4_UNORM;
+        case D3DX_PIXEL_FORMAT_R10G10B10A2_UNORM:       return DXGI_FORMAT_R10G10B10A2_UNORM;
+        case D3DX_PIXEL_FORMAT_R16G16B16A16_UNORM:      return DXGI_FORMAT_R16G16B16A16_UNORM;
+        case D3DX_PIXEL_FORMAT_R8_UNORM:                return DXGI_FORMAT_R8_UNORM;
+        case D3DX_PIXEL_FORMAT_R8_SNORM:                return DXGI_FORMAT_R8_SNORM;
+        case D3DX_PIXEL_FORMAT_R8G8_UNORM:              return DXGI_FORMAT_R8G8_UNORM;
+        case D3DX_PIXEL_FORMAT_R16_UNORM:               return DXGI_FORMAT_R16_UNORM;
+        case D3DX_PIXEL_FORMAT_R16G16_UNORM:            return DXGI_FORMAT_R16G16_UNORM;
+        case D3DX_PIXEL_FORMAT_A8_UNORM:                return DXGI_FORMAT_A8_UNORM;
+        case D3DX_PIXEL_FORMAT_R16_FLOAT:               return DXGI_FORMAT_R16_FLOAT;
+        case D3DX_PIXEL_FORMAT_R16G16_FLOAT:            return DXGI_FORMAT_R16G16_FLOAT;
+        case D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT:      return DXGI_FORMAT_R16G16B16A16_FLOAT;
+        case D3DX_PIXEL_FORMAT_R32_FLOAT:               return DXGI_FORMAT_R32_FLOAT;
+        case D3DX_PIXEL_FORMAT_R32G32_FLOAT:            return DXGI_FORMAT_R32G32_FLOAT;
+        case D3DX_PIXEL_FORMAT_R32G32B32_FLOAT:         return DXGI_FORMAT_R32G32B32_FLOAT;
+        case D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT:      return DXGI_FORMAT_R32G32B32A32_FLOAT;
+        case D3DX_PIXEL_FORMAT_G8R8_G8B8_UNORM:         return DXGI_FORMAT_G8R8_G8B8_UNORM;
+        case D3DX_PIXEL_FORMAT_R8G8_B8G8_UNORM:         return DXGI_FORMAT_R8G8_B8G8_UNORM;
+        case D3DX_PIXEL_FORMAT_BC1_UNORM:               return DXGI_FORMAT_BC1_UNORM;
+        case D3DX_PIXEL_FORMAT_BC1_UNORM_SRGB:          return DXGI_FORMAT_BC1_UNORM_SRGB;
+        case D3DX_PIXEL_FORMAT_BC2_UNORM:               return DXGI_FORMAT_BC2_UNORM;
+        case D3DX_PIXEL_FORMAT_BC2_UNORM_SRGB:          return DXGI_FORMAT_BC2_UNORM_SRGB;
+        case D3DX_PIXEL_FORMAT_BC3_UNORM:               return DXGI_FORMAT_BC3_UNORM;
+        case D3DX_PIXEL_FORMAT_BC3_UNORM_SRGB:          return DXGI_FORMAT_BC3_UNORM_SRGB;
+        case D3DX_PIXEL_FORMAT_BC4_UNORM:               return DXGI_FORMAT_BC4_UNORM;
+        case D3DX_PIXEL_FORMAT_BC4_SNORM:               return DXGI_FORMAT_BC4_SNORM;
+        case D3DX_PIXEL_FORMAT_BC5_UNORM:               return DXGI_FORMAT_BC5_UNORM;
+        case D3DX_PIXEL_FORMAT_BC5_SNORM:               return DXGI_FORMAT_BC5_SNORM;
+        case D3DX_PIXEL_FORMAT_R8G8B8A8_SNORM:          return DXGI_FORMAT_R8G8B8A8_SNORM;
+        case D3DX_PIXEL_FORMAT_R8G8_SNORM:              return DXGI_FORMAT_R8G8_SNORM;
+        case D3DX_PIXEL_FORMAT_R16G16_SNORM:            return DXGI_FORMAT_R16G16_SNORM;
+        case D3DX_PIXEL_FORMAT_R16G16B16A16_SNORM:      return DXGI_FORMAT_R16G16B16A16_SNORM;
+
+        default:
+            FIXME("Unhandled d3dx_pixel_format_id %#x.\n", format);
+            return DXGI_FORMAT_UNKNOWN;
+    }
+}
+
 void d3dx_get_next_mip_level_size(struct volume *size)
 {
     size->width  = max(size->width  / 2, 1);
@@ -553,8 +602,58 @@ uint32_t d3dx_calculate_layer_pixels_size(enum d3dx_pixel_format_id format, uint
     return layer_size;
 }
 
+/* These defines match D3D10/D3D11 values. */
+#define DDS_RESOURCE_MISC_TEXTURECUBE 0x04
+#define DDS_RESOURCE_DIMENSION_UNKNOWN   0
+#define DDS_RESOURCE_DIMENSION_TEXTURE1D 2
+#define DDS_RESOURCE_DIMENSION_TEXTURE2D 3
+#define DDS_RESOURCE_DIMENSION_TEXTURE3D 4
+struct dds_header_dxt10
+{
+    uint32_t dxgi_format;
+    uint32_t resource_dimension;
+    uint32_t misc_flags;
+    uint32_t array_size;
+    uint32_t misc_flags2;
+};
+
+static void set_dds_header_dxt10(struct dds_header_dxt10 *dxt10, uint32_t dxgi_format, uint32_t resource_dimension,
+        uint32_t misc_flags, uint32_t array_size, uint32_t misc_flags2)
+{
+    dxt10->dxgi_format = dxgi_format;
+    dxt10->resource_dimension = resource_dimension;
+    dxt10->misc_flags = misc_flags;
+    dxt10->array_size = array_size;
+    dxt10->misc_flags2 = misc_flags2;
+}
+
+static uint32_t dxt10_resource_dimension_from_d3dx_resource_type(enum d3dx_resource_type resource_type)
+{
+    switch (resource_type)
+    {
+        case D3DX_RESOURCE_TYPE_TEXTURE_1D: return DDS_RESOURCE_DIMENSION_TEXTURE1D;
+        case D3DX_RESOURCE_TYPE_TEXTURE_2D: return DDS_RESOURCE_DIMENSION_TEXTURE2D;
+        case D3DX_RESOURCE_TYPE_TEXTURE_3D: return DDS_RESOURCE_DIMENSION_TEXTURE3D;
+        case D3DX_RESOURCE_TYPE_CUBE_TEXTURE: return DDS_RESOURCE_DIMENSION_TEXTURE2D;
+
+        default:
+            break;
+    }
+
+    FIXME("Unhandled d3dx resource type %u.\n", resource_type);
+    return DDS_RESOURCE_DIMENSION_UNKNOWN;
+}
+
+static BOOL has_extended_header(const struct dds_header *header)
+{
+    return (header->pixel_format.flags & DDS_PF_FOURCC) &&
+           (header->pixel_format.fourcc == MAKEFOURCC('D', 'X', '1', '0'));
+}
+
+static const struct dds_pixel_format dxt10_pf = { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0') };
 static HRESULT d3dx_init_dds_header(struct dds_header *header, enum d3dx_resource_type resource_type,
-        enum d3dx_pixel_format_id format, const struct volume *size, uint32_t mip_levels, unsigned int d3dx_version)
+        enum d3dx_pixel_format_id format, const struct volume *size, uint32_t mip_levels, uint32_t layer_count,
+        unsigned int d3dx_version)
 {
     HRESULT hr;
 
@@ -590,11 +689,15 @@ static HRESULT d3dx_init_dds_header(struct dds_header *header, enum d3dx_resourc
         struct dds_pixel_format pf;
 
         hr = dds_pixel_format_from_d3dx_pixel_format_id(&pf, format);
-        if (FAILED(hr))
-            return hr;
+        if (FAILED(hr) || pf.flags == DDS_PF_BUMPDUDV || pf.flags == DDS_PF_BUMPLUMINANCE
+                || (resource_type != D3DX_RESOURCE_TYPE_CUBE_TEXTURE && layer_count > 1)
+                || (resource_type == D3DX_RESOURCE_TYPE_CUBE_TEXTURE && layer_count > 6))
+        {
+            if (dxgi_format_from_d3dx_pixel_format_id(format) == DXGI_FORMAT_UNKNOWN)
+                return E_NOTIMPL;
 
-        if (pf.flags == DDS_PF_BUMPDUDV || pf.flags == DDS_PF_BUMPLUMINANCE)
-            return E_NOTIMPL;
+            pf = dxt10_pf;
+        }
 
         header->pixel_format = pf;
         hr = d3dx_calculate_pixels_size(format, size->width, size->height, &row_pitch, &slice_pitch);
@@ -1015,7 +1118,7 @@ HRESULT d3dx_save_pixels_to_memory(struct d3dx_pixels *src_pixels, const struct 
 
             header = dst_buffer->buffer_data;
             pixels = (uint8_t *)dst_buffer->buffer_data + header_size;
-            hr = d3dx_init_dds_header(header, D3DX_RESOURCE_TYPE_TEXTURE_2D, dst_format, &src_pixels->size, 1,
+            hr = d3dx_init_dds_header(header, D3DX_RESOURCE_TYPE_TEXTURE_2D, dst_format, &src_pixels->size, 1, 1,
                     wrapper->d3dx_version);
             if (FAILED(hr))
                 goto exit;
@@ -1119,11 +1222,12 @@ HRESULT d3dx_create_dds_file_blob(enum d3dx_pixel_format_id format, const PALETT
 {
     const struct pixel_format_desc *fmt_desc = get_d3dx_pixel_format_info(format);
     uint32_t header_size, pixels_size;
+    struct dds_header_dxt10 dxt10;
     struct dds_header header;
     uint8_t *buf_ptr;
     HRESULT hr;
 
-    hr = d3dx_init_dds_header(&header, resource_type, format, size, mip_levels, wrapper->d3dx_version);
+    hr = d3dx_init_dds_header(&header, resource_type, format, size, mip_levels, layers, wrapper->d3dx_version);
     if (FAILED(hr))
         return hr;
 
@@ -1131,6 +1235,16 @@ HRESULT d3dx_create_dds_file_blob(enum d3dx_pixel_format_id format, const PALETT
     header_size = sizeof(header);
     if (is_index_format(fmt_desc))
         header_size += DDS_PALETTE_SIZE;
+    if (has_extended_header(&header))
+    {
+        const BOOL is_cubemap = resource_type == D3DX_RESOURCE_TYPE_CUBE_TEXTURE;
+
+        set_dds_header_dxt10(&dxt10, dxgi_format_from_d3dx_pixel_format_id(format),
+                dxt10_resource_dimension_from_d3dx_resource_type(resource_type),
+                is_cubemap ? DDS_RESOURCE_MISC_TEXTURECUBE : 0,
+                is_cubemap ? layers / 6 : layers, 0);
+        header_size += sizeof(dxt10);
+    }
 
     hr = wrapper->d3dx_buffer_create(header_size + pixels_size, dst_buffer);
     if (FAILED(hr))
@@ -1140,6 +1254,8 @@ HRESULT d3dx_create_dds_file_blob(enum d3dx_pixel_format_id format, const PALETT
     memcpy(buf_ptr, &header, sizeof(header));
     if (is_index_format(fmt_desc))
         memcpy(buf_ptr + sizeof(header), palette, DDS_PALETTE_SIZE);
+    else if (has_extended_header(&header))
+        memcpy(buf_ptr + sizeof(header), &dxt10, sizeof(dxt10));
 
     return hr;
 }
@@ -1210,20 +1326,6 @@ static BOOL d3dx_get_image_file_format_from_file_signature(const void *src_data,
     return FALSE;
 }
 
-/* These defines match D3D10/D3D11 values. */
-#define DDS_RESOURCE_MISC_TEXTURECUBE 0x04
-#define DDS_RESOURCE_DIMENSION_TEXTURE1D 2
-#define DDS_RESOURCE_DIMENSION_TEXTURE2D 3
-#define DDS_RESOURCE_DIMENSION_TEXTURE3D 4
-struct dds_header_dxt10
-{
-    uint32_t dxgi_format;
-    uint32_t resource_dimension;
-    uint32_t misc_flags;
-    uint32_t array_size;
-    uint32_t misc_flags2;
-};
-
 static enum d3dx_resource_type dxt10_resource_dimension_to_d3dx_resource_type(uint32_t resource_dimension)
 {
     switch (resource_dimension)
@@ -1238,12 +1340,6 @@ static enum d3dx_resource_type dxt10_resource_dimension_to_d3dx_resource_type(ui
 
     FIXME("Unhandled DXT10 resource dimension value %u.\n", resource_dimension);
     return D3DX_RESOURCE_TYPE_UNKNOWN;
-}
-
-static BOOL has_extended_header(const struct dds_header *header)
-{
-    return (header->pixel_format.flags & DDS_PF_FOURCC) &&
-           (header->pixel_format.fourcc == MAKEFOURCC('D', 'X', '1', '0'));
 }
 
 static HRESULT d3dx_initialize_image_from_dds(const void *src_data, uint32_t src_data_size,
