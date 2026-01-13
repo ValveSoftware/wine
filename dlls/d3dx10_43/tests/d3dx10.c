@@ -18,6 +18,7 @@
 
 #define COBJMACROS
 #include "initguid.h"
+#include "wincodec.h"
 #include "d3d10_1.h"
 #include "d3dx10.h"
 #include "wine/wined3d.h"
@@ -8659,6 +8660,194 @@ static void test_save_texture_to_dds(void)
     ok(!ID3D10Device_Release(device), "Unexpected refcount.\n");
 }
 
+static void check_image_wic_pixel_format(IWICImagingFactory *factory, const void *data, unsigned int size,
+        const GUID *expected_fmt, BOOL todo)
+{
+    IWICBitmapFrameDecode *frame = NULL;
+    IWICBitmapDecoder *decoder = NULL;
+    IWICStream *stream = NULL;
+    HRESULT hr;
+    GUID fmt;
+
+    hr = IWICImagingFactory_CreateStream(factory, &stream);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = IWICStream_InitializeFromMemory(stream, (BYTE *)data, size);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = IWICImagingFactory_CreateDecoderFromStream(factory, (IStream *)stream, NULL, 0, &decoder);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = IWICBitmapDecoder_GetFrame(decoder, 0, &frame);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = IWICBitmapFrameDecode_GetPixelFormat(frame, &fmt);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    todo_wine_if(todo) ok(IsEqualGUID(expected_fmt, &fmt), "Unexpected WIC format %s.\n", debugstr_guid(&fmt));
+
+    IWICBitmapFrameDecode_Release(frame);
+    IWICBitmapDecoder_Release(decoder);
+    IWICStream_Release(stream);
+}
+
+static void test_save_texture_to_iffs(void)
+{
+    static const enum D3DX10_IMAGE_FILE_FORMAT test_iffs[] = { D3DX10_IFF_BMP, D3DX10_IFF_JPG, D3DX10_IFF_PNG,
+                                                               D3DX10_IFF_TIFF, D3DX10_IFF_GIF, D3DX10_IFF_WMP };
+    static const char *test_iff_str[] = { "D3DX10_IFF_BMP", "D3DX10_IFF_JPG", "D3DX10_IFF_PNG",
+                                          "D3DX10_IFF_TIFF", "D3DX10_IFF_GIF", "D3DX10_IFF_WMP" };
+    struct wic_expected
+    {
+        const GUID *fmt;
+        BOOL todo;
+    };
+    static const struct
+    {
+        DXGI_FORMAT format;
+        BOOL supported;
+        struct wic_expected wic_expected[ARRAY_SIZE(test_iffs)];
+    } save_tests[] =
+    {
+        { DXGI_FORMAT_R8G8B8A8_UNORM, TRUE,
+          { { &GUID_WICPixelFormat32bppBGR,  FALSE },
+            { &GUID_WICPixelFormat24bppBGR,  FALSE },
+            { &GUID_WICPixelFormat32bppBGRA, FALSE },
+            { &GUID_WICPixelFormat32bppBGRA, FALSE },
+            { NULL },
+            { &GUID_WICPixelFormat32bppBGRA, FALSE },
+          },
+        },
+        { DXGI_FORMAT_R16G16B16A16_FLOAT, TRUE,
+          { { &GUID_WICPixelFormat64bppRGBAFixedPoint, TRUE },
+            { &GUID_WICPixelFormat24bppBGR,  FALSE },
+            { &GUID_WICPixelFormat64bppRGBA, FALSE },
+            { &GUID_WICPixelFormat64bppRGBA, FALSE },
+            { NULL },
+            { &GUID_WICPixelFormat64bppRGBAHalf, FALSE },
+          },
+        },
+        { DXGI_FORMAT_R32G32B32A32_FLOAT, TRUE,
+          { { &GUID_WICPixelFormat64bppRGBAFixedPoint, TRUE },
+            { &GUID_WICPixelFormat24bppBGR,  FALSE },
+            { &GUID_WICPixelFormat64bppRGBA, FALSE },
+            { &GUID_WICPixelFormat64bppRGBA, FALSE },
+            { NULL },
+            { &GUID_WICPixelFormat128bppRGBAFloat, FALSE },
+          },
+        },
+        { DXGI_FORMAT_R16_UNORM, TRUE,
+          { { &GUID_WICPixelFormat64bppRGBAFixedPoint, TRUE },
+            { &GUID_WICPixelFormat8bppGray,  FALSE },
+            { &GUID_WICPixelFormat16bppGray, FALSE },
+            { &GUID_WICPixelFormat16bppGray, FALSE },
+            { NULL },
+            { &GUID_WICPixelFormat16bppGrayFixedPoint, FALSE },
+          },
+        },
+        { DXGI_FORMAT_R10G10B10A2_UNORM, FALSE },
+        { DXGI_FORMAT_R16G16B16A16_UNORM, FALSE },
+        { DXGI_FORMAT_R16G16_UNORM, FALSE },
+        { DXGI_FORMAT_A8_UNORM, FALSE },
+        { DXGI_FORMAT_R16_FLOAT, FALSE },
+        { DXGI_FORMAT_R16G16_FLOAT, FALSE },
+        { DXGI_FORMAT_R32_FLOAT, FALSE },
+        { DXGI_FORMAT_R32G32_FLOAT, FALSE },
+        { DXGI_FORMAT_G8R8_G8B8_UNORM, FALSE },
+        { DXGI_FORMAT_R8G8_B8G8_UNORM, FALSE },
+        { DXGI_FORMAT_BC1_UNORM, FALSE },
+        { DXGI_FORMAT_BC2_UNORM, FALSE },
+        { DXGI_FORMAT_BC3_UNORM, FALSE },
+        { DXGI_FORMAT_BC4_UNORM, FALSE },
+        { DXGI_FORMAT_BC4_SNORM, FALSE },
+        { DXGI_FORMAT_BC5_UNORM, FALSE },
+        { DXGI_FORMAT_BC5_SNORM, FALSE },
+        { DXGI_FORMAT_R16G16B16A16_SNORM, FALSE },
+        { DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, FALSE },
+        { DXGI_FORMAT_R8_UNORM, FALSE },
+        { DXGI_FORMAT_R8_SNORM, FALSE },
+        { DXGI_FORMAT_R8G8_UNORM, FALSE },
+        { DXGI_FORMAT_R32G32B32_FLOAT, FALSE },
+        { DXGI_FORMAT_BC1_UNORM_SRGB, FALSE },
+        { DXGI_FORMAT_BC2_UNORM_SRGB, FALSE },
+        { DXGI_FORMAT_BC3_UNORM_SRGB, FALSE },
+        { DXGI_FORMAT_R8G8B8A8_SNORM, FALSE },
+        { DXGI_FORMAT_R8G8_SNORM, FALSE },
+        { DXGI_FORMAT_R16G16_SNORM, FALSE },
+    };
+    IWICImagingFactory *factory = NULL;
+    D3DX10_IMAGE_INFO img_info;
+    ID3D10Device *device;
+    ID3D10Resource *tex;
+    ID3D10Blob *buffer;
+    unsigned int i, j;
+    HRESULT hr;
+
+    device = create_device();
+    if (!device)
+    {
+        skip("Failed to create device, skipping tests.\n");
+        return;
+    }
+
+    CoInitialize(NULL);
+
+    hr = CoCreateInstance(&CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
+            &IID_IWICImagingFactory, (void **)&factory);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    for (i = 0; i < ARRAY_SIZE(save_tests); ++i)
+    {
+        if (!strcmp(winetest_platform, "wine") && (save_tests[i].format == DXGI_FORMAT_G8R8_G8B8_UNORM
+                    || save_tests[i].format == DXGI_FORMAT_R8G8_B8G8_UNORM))
+        {
+            skip("Skipping unsupported format on Wine.\n");
+            continue;
+        }
+
+        hr = d3d10_create_texture_2d(device, 8, 8, 4, 1, save_tests[i].format, 1, 0, D3D10_USAGE_DEFAULT,
+                D3D10_BIND_SHADER_RESOURCE, 0, 0, (ID3D10Texture2D **)&tex);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        if (FAILED(hr))
+            continue;
+
+        winetest_push_context("Test %u", i);
+        for (j = 0; j < ARRAY_SIZE(test_iffs); ++j)
+        {
+            const HRESULT expected_hr = save_tests[i].supported ? S_OK : E_FAIL;
+
+            winetest_push_context("Image format %s", test_iff_str[j]);
+            hr = D3DX10SaveTextureToMemory(tex, test_iffs[j], &buffer, 0);
+
+            /* GIF saving is never supported, regardless of texture format. */
+            if (test_iffs[j] == D3DX10_IFF_GIF)
+                todo_wine ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
+            else
+                todo_wine ok(hr == expected_hr, "Unexpected hr %#lx.\n", hr);
+            if (SUCCEEDED(hr))
+            {
+                check_image_wic_pixel_format(factory, ID3D10Blob_GetBufferPointer(buffer), ID3D10Blob_GetBufferSize(buffer),
+                        save_tests[i].wic_expected[j].fmt, save_tests[i].wic_expected[j].todo);
+
+                hr = D3DX10GetImageInfoFromMemory(ID3D10Blob_GetBufferPointer(buffer), ID3D10Blob_GetBufferSize(buffer), NULL,
+                        &img_info, NULL);
+                ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+                check_image_info_values(&img_info, 8, 8, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM,
+                        D3D10_RESOURCE_DIMENSION_TEXTURE2D, test_iffs[j], FALSE);
+                ID3D10Blob_Release(buffer);
+            }
+            winetest_pop_context();
+        }
+
+        ID3D10Resource_Release(tex);
+        winetest_pop_context();
+    }
+
+    IWICImagingFactory_Release(factory);
+    CoUninitialize();
+    ok(!ID3D10Device_Release(device), "Unexpected refcount.\n");
+}
+
 static void test_save_texture(void)
 {
     D3D10_SUBRESOURCE_DATA sub_resource_data[4] = { 0 };
@@ -10190,6 +10379,7 @@ START_TEST(d3dx10)
     test_create_texture();
     test_create_shader_resource_view();
     test_save_texture_to_dds();
+    test_save_texture_to_iffs();
     test_save_texture();
     test_font();
     test_sprite();
