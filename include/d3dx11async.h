@@ -44,6 +44,8 @@ HRESULT WINAPI D3DX11CompileFromFileW(const WCHAR *filename, const D3D10_SHADER_
         ID3D10Include *include, const char *entry_point, const char *target, UINT sflags, UINT eflags,
         ID3DX11ThreadPump *pump, ID3D10Blob **shader, ID3D10Blob **error_messages, HRESULT *hresult);
 
+HRESULT WINAPI D3DX11CreateAsyncTextureInfoProcessor(D3DX11_IMAGE_INFO *info, ID3DX11DataProcessor **processor);
+
 #ifdef __cplusplus
 }
 #endif

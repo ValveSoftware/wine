@@ -3074,6 +3074,64 @@ static void test_D3DX11CreateAsyncResourceLoader(void)
     ok(hr == D3DX11_ERR_INVALID_DATA, "Got unexpected hr %#lx.\n", hr);
 }
 
+static void test_D3DX11CreateAsyncTextureInfoProcessor(void)
+{
+    ID3DX11DataProcessor *dp;
+    D3DX11_IMAGE_INFO info;
+    HRESULT hr;
+    int i;
+
+    CoInitialize(NULL);
+
+    hr = D3DX11CreateAsyncTextureInfoProcessor(NULL, NULL);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11CreateAsyncTextureInfoProcessor(&info, NULL);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11CreateAsyncTextureInfoProcessor(NULL, &dp);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+    if (0)
+    {
+        /* Crashes on native. */
+        hr = ID3DX11DataProcessor_Process(dp, (void *)test_image[0].data, test_image[0].size);
+        ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+    }
+
+    hr = ID3DX11DataProcessor_Destroy(dp);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11CreateAsyncTextureInfoProcessor(&info, &dp);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+    hr = ID3DX11DataProcessor_Process(dp, (void *)test_image[0].data, 0);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+    hr = ID3DX11DataProcessor_Process(dp, NULL, test_image[0].size);
+    ok(hr == E_FAIL, "Got unexpected hr %#lx.\n", hr);
+
+    for (i = 0; i < ARRAY_SIZE(test_image); ++i)
+    {
+        winetest_push_context("Test %u", i);
+
+        hr = ID3DX11DataProcessor_Process(dp, (void *)test_image[i].data, test_image[i].size);
+        ok(hr == S_OK || broken(hr == E_FAIL && test_image[i].expected_info.ImageFileFormat == D3DX11_IFF_WMP),
+                "Got unexpected hr %#lx.\n", hr);
+        if (hr == S_OK)
+            check_image_info(&info, test_image + i, __LINE__);
+
+        winetest_pop_context();
+    }
+
+    hr = ID3DX11DataProcessor_CreateDeviceObject(dp, NULL);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+    hr = ID3DX11DataProcessor_Destroy(dp);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+    CoUninitialize();
+}
+
 static void check_dds_pixel_format_image_info(unsigned int line, DWORD flags, DWORD fourcc, DWORD bpp,
         DWORD rmask, DWORD gmask, DWORD bmask, DWORD amask, HRESULT expected_hr, DXGI_FORMAT expected_format)
 {
@@ -4585,6 +4643,7 @@ START_TEST(d3dx11)
     test_D3DX11CreateAsyncMemoryLoader();
     test_D3DX11CreateAsyncFileLoader();
     test_D3DX11CreateAsyncResourceLoader();
+    test_D3DX11CreateAsyncTextureInfoProcessor();
     test_D3DX11CompileFromFile();
     test_get_image_info();
     test_create_texture();

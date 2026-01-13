@@ -28,8 +28,8 @@
 
 #include "d3d11.h"
 #include "d3dx11core.h"
-#include "d3dx11async.h"
 #include "d3dx11tex.h"
+#include "d3dx11async.h"
 
 #define _FACDD 0x876
 #define MAKE_DDHRESULT(code) MAKE_HRESULT(SEVERITY_ERROR, _FACDD, code)
