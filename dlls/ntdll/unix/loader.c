@@ -1425,6 +1425,7 @@ static const unixlib_entry_t unix_call_funcs[] =
     unix__wine_dbg_ftrace,
     steamclient_setup_trampolines,
     debugstr_pc,
+    unixcall_compat_wine_nt_to_unix_file_name,
 };
 
 
@@ -1501,6 +1502,13 @@ static NTSTATUS wow64_debugstr_pc( void *args )
                ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 }
 
+static NTSTATUS wow64_compat_wine_nt_to_unix_file_name( void *args )
+{
+    FIXME( "Not supported.\n" );
+
+    return STATUS_NOT_SUPPORTED;
+}
+
 const unixlib_entry_t unix_call_wow64_funcs[] =
 {
     wow64_load_so_dll,
@@ -1516,6 +1524,7 @@ const unixlib_entry_t unix_call_wow64_funcs[] =
     wow64___wine_dbg_ftrace,
     wow64_steamclient_setup_trampolines,
     wow64_debugstr_pc,
+    wow64_compat_wine_nt_to_unix_file_name,
 };
 
 #endif  /* _WIN64 */

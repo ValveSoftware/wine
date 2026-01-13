@@ -3580,6 +3580,19 @@ NTSTATUS WINAPI compat___wine_unix_call( unixlib_handle_t handle, unsigned int c
     return __wine_unix_call( handle, code, args );
 }
 
+NTSTATUS WINAPI compat_wine_nt_to_unix_file_name( const OBJECT_ATTRIBUTES *attr, char *nameA, ULONG *size,
+                                                  UINT disposition )
+{
+    struct compat_wine_nt_to_unix_file_name_params params =
+    {
+        .attr = attr,
+        .nameA = nameA,
+        .size = size,
+        .disposition = disposition,
+    };
+
+    return WINE_UNIX_CALL( unix_compat_wine_nt_to_unix_file_name, &params );
+}
 
 /***********************************************************************
  *           __wine_unix_spawnvp

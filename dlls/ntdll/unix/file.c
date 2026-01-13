@@ -8401,3 +8401,48 @@ NTSTATUS WINAPI NtSetInformationObject( HANDLE handle, OBJECT_INFORMATION_CLASS 
     }
     return status;
 }
+
+
+NTSTATUS WINAPI unixcall_compat_wine_nt_to_unix_file_name( void *args )
+{
+    struct compat_wine_nt_to_unix_file_name_params *p = args;
+    const OBJECT_ATTRIBUTES *attr = p->attr;
+    char *nameA = p->nameA;
+    ULONG *size = p->size;
+    UINT disposition = p->disposition;
+
+    char *buffer = NULL;
+    NTSTATUS status;
+    UNICODE_STRING nt_name;
+    OBJECT_ATTRIBUTES new_attr = *attr;
+
+    static int once;
+
+    if (!once++) FIXME( "called.\n" );
+
+    status = get_nt_and_unix_names( &new_attr, &nt_name, &buffer, disposition, FALSE );
+    if (!status || status == STATUS_NO_SUCH_FILE)
+    {
+        struct stat st1, st2;
+        char *name = buffer;
+
+        /* remove dosdevices prefix for z: drive if it points to the Unix root */
+        if (!strncmp( buffer, config_dir, strlen(config_dir) ) &&
+            !strncmp( buffer + strlen(config_dir), "/dosdevices/z:/", 15 ))
+        {
+            char *p = buffer + strlen(config_dir) + 14;
+            *p = 0;
+            if (!stat( buffer, &st1 ) && !stat( "/", &st2 ) &&
+                st1.st_dev == st2.st_dev && st1.st_ino == st2.st_ino)
+                name = p;
+            *p = '/';
+        }
+
+        if (*size > strlen(name)) strcpy( nameA, name );
+        else status = STATUS_BUFFER_TOO_SMALL;
+        *size = strlen(name) + 1;
+    }
+    free( buffer );
+    free( nt_name.Buffer );
+    return status;
+}

@@ -379,6 +379,7 @@ extern NTSTATUS errno_to_status( int err );
 extern NTSTATUS get_nt_and_unix_names( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *nt_name,
                                        char **unix_name, UINT disposition, BOOL open_reparse );
 extern NTSTATUS unix_to_nt_file_name( const char *unix_name, WCHAR **nt, UINT disposition );
+extern NTSTATUS WINAPI unixcall_compat_wine_nt_to_unix_file_name( void *args );
 extern NTSTATUS get_full_path( char *name, const WCHAR *curdir, UNICODE_STRING *nt_name );
 extern NTSTATUS get_nt_path( const WCHAR *name, UNICODE_STRING *nt_name );
 extern NTSTATUS open_unix_file( HANDLE *handle, const char *unix_name, ACCESS_MASK access,

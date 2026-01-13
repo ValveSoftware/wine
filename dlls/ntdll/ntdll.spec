@@ -1756,6 +1756,7 @@
 @ extern -private __wine_unixlib_handle
 @ stdcall __wine_get_unix_env(ptr ptr long)
 @ stdcall __wine_set_unix_env(ptr ptr)
+@ stdcall wine_nt_to_unix_file_name(ptr ptr ptr long) compat_wine_nt_to_unix_file_name
 
 # Debugging
 @ stdcall -norelay __wine_dbg_write(ptr long)

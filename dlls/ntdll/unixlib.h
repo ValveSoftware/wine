@@ -100,6 +100,14 @@ struct debugstr_pc_args
     unsigned int size;
 };
 
+struct compat_wine_nt_to_unix_file_name_params
+{
+    const OBJECT_ATTRIBUTES *attr;
+    char *nameA;
+    ULONG *size;
+    unsigned int disposition;
+};
+
 enum ntdll_unix_funcs
 {
     unix_load_so_dll,
@@ -115,6 +123,7 @@ enum ntdll_unix_funcs
     unix_wine_dbg_ftrace,
     unix_steamclient_setup_trampolines,
     unix_debugstr_pc,
+    unix_compat_wine_nt_to_unix_file_name,
 };
 
 extern unixlib_handle_t __wine_unixlib_handle;
