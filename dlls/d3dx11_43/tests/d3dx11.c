@@ -4164,7 +4164,7 @@ static void test_create_texture(void)
     add_work_item_count = 0;
     hr = D3DX11CreateTextureFromMemory(device, test_image[0].data, test_image[0].size,
             NULL, &thread_pump, &resource, &hr2);
-    todo_wine ok(add_work_item_count == 1, "Got unexpected add_work_item_count %u.\n", add_work_item_count);
+    ok(add_work_item_count == 1, "Got unexpected add_work_item_count %u.\n", add_work_item_count);
     ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
     ok(hr == hr2, "Got unexpected hr2 %#lx.\n", hr2);
     check_resource_info(resource, test_image, __LINE__);
