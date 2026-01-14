@@ -18,6 +18,7 @@
 
 #define COBJMACROS
 #include "initguid.h"
+#include "wincodec.h"
 #include "d3d11.h"
 #include "d3dx11.h"
 #include "wine/wined3d.h"
@@ -53,6 +54,7 @@ static const D3DX11_IMAGE_LOAD_INFO d3dx11_default_load_info =
 #define DDSCAPS_ALPHA    0x00000002
 #define DDS_CAPS_COMPLEX 0x00000008
 #define DDS_CAPS_TEXTURE 0x00001000
+#define DDSCAPS_MIPMAP   0x00400000
 
 /* dds_header.caps2 */
 #define DDS_CAPS2_VOLUME  0x00200000
@@ -6243,6 +6245,1699 @@ static void test_D3DX11FilterTexture(void)
     ok(!ID3D11Device_Release(device), "Unexpected refcount.\n");
 }
 
+static HRESULT d3d11_create_texture_1d(ID3D11Device *device, uint32_t width, uint32_t mip_levels, uint32_t array_size,
+        DXGI_FORMAT format, D3D11_USAGE usage, uint32_t bind_flags, uint32_t cpu_access_flags, uint32_t misc_flags,
+        ID3D11Texture1D **tex)
+{
+    const D3D11_TEXTURE1D_DESC desc = { width, mip_levels, array_size, format, usage, bind_flags, cpu_access_flags,
+                                        misc_flags };
+
+    return ID3D11Device_CreateTexture1D(device, &desc, NULL, tex);
+}
+
+static HRESULT d3d11_create_texture_2d(ID3D11Device *device, uint32_t width, uint32_t height, uint32_t mip_levels,
+        uint32_t array_size, DXGI_FORMAT format, uint32_t sample_count, uint32_t sample_quality, D3D11_USAGE usage,
+        uint32_t bind_flags, uint32_t cpu_access_flags, uint32_t misc_flags, ID3D11Texture2D **tex)
+{
+    const D3D11_TEXTURE2D_DESC desc = { width, height, mip_levels, array_size, format, { sample_count, sample_quality },
+                                        usage, bind_flags, cpu_access_flags, misc_flags };
+
+    return ID3D11Device_CreateTexture2D(device, &desc, NULL, tex);
+}
+
+static HRESULT d3d11_create_texture_3d(ID3D11Device *device, uint32_t width, uint32_t height, uint32_t depth,
+        uint32_t mip_levels, DXGI_FORMAT format, D3D11_USAGE usage, uint32_t bind_flags, uint32_t cpu_access_flags,
+        uint32_t misc_flags, ID3D11Texture3D **tex)
+{
+    const D3D11_TEXTURE3D_DESC desc = { width, height, depth, mip_levels, format, usage, bind_flags, cpu_access_flags,
+                                        misc_flags };
+
+    return ID3D11Device_CreateTexture3D(device, &desc, NULL, tex);
+}
+
+enum texture_type
+{
+    TEXTURE_2D,
+    TEXTURE_2D_ARRAY,
+    TEXTURE_3D,
+    TEXTURE_CUBE,
+    TEXTURE_1D,
+    TEXTURE_1D_ARRAY,
+    TEXTURE_TYPE_COUNT,
+};
+
+static void test_save_texture_to_dds(void)
+{
+    struct dds_expected
+    {
+        struct dds_header header;
+        struct dds_header_dxt10 dxt10;
+        BOOL todo;
+    };
+    static const struct
+    {
+        DXGI_FORMAT format;
+        struct dds_expected dds_expected[TEXTURE_TYPE_COUNT];
+    } save_tests[] =
+    {
+        { DXGI_FORMAT_R8G8B8A8_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_RGB | DDS_PF_ALPHA, 0, 32, 0xff, 0xff00, 0xff0000, 0xff000000 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_RGB | DDS_PF_ALPHA, 0, 32, 0xff, 0xff00, 0xff0000, 0xff000000 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_RGB | DDS_PF_ALPHA, 0, 32, 0xff, 0xff00, 0xff0000, 0xff000000 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R10G10B10A2_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_RGB | DDS_PF_ALPHA, 0, 32, 0x3ff00000, 0xffc00, 0x3ff, 0xc0000000 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R10G10B10A2_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_RGB | DDS_PF_ALPHA, 0, 32, 0x3ff00000, 0xffc00, 0x3ff, 0xc0000000 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_RGB | DDS_PF_ALPHA, 0, 32, 0x3ff00000, 0xffc00, 0x3ff, 0xc0000000 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R10G10B10A2_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R10G10B10A2_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R16G16B16A16_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 64, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x24, 64, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 64, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16B16A16_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 64, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x24, 64, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 64, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x24, 64, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 64, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16B16A16_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 64, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16B16A16_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R16G16_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_RGB, 0, 32, 0xffff, 0xffff0000, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_RGB, 0, 32, 0xffff, 0xffff0000, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_RGB, 0, 32, 0xffff, 0xffff0000, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_A8_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 8, 0, 4, { 0 },
+                { 32, DDS_PF_ALPHA_ONLY, 0, 8, 0, 0, 0, 0xff },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 8, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 8, 8, 4, { 0 },
+                { 32, DDS_PF_ALPHA_ONLY, 0, 8, 0, 0, 0, 0xff },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 8, 0, 4, { 0 },
+                { 32, DDS_PF_ALPHA_ONLY, 0, 8, 0, 0, 0, 0xff },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 8, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 8, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        /* 5. */
+        { DXGI_FORMAT_R16_FLOAT,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x6f, 16, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 16, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x6f, 16, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x6f, 16, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 16, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 16, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R16G16_FLOAT,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x70, 32, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x70, 32, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x70, 32, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R16G16B16A16_FLOAT,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 64, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x71, 64, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 64, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 64, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x71, 64, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 64, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x71, 64, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 64, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 64, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R32_FLOAT,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x72, 32, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x72, 32, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x72, 32, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R32G32_FLOAT,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 64, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x73, 64, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 64, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32G32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 64, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x73, 64, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 64, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x73, 64, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 64, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32G32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 64, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32G32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        /* 10. */
+        { DXGI_FORMAT_R32G32B32A32_FLOAT,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 128, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x74, 128, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 128, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32G32B32A32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 128, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x74, 128, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 128, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x74, 128, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 128, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32G32B32A32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 128, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32G32B32A32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_G8R8_G8B8_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('G','R','G','B'), 16, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_G8R8_G8B8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 16, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('G','R','G','B'), 16, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('G','R','G','B'), 16, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 16, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_G8R8_G8B8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 16, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_G8R8_G8B8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R8G8_B8G8_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('R','G','B','G'), 16, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8_B8G8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 16, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('R','G','B','G'), 16, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('R','G','B','G'), 16, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 16, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8_B8G8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 16, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8_B8G8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_BC1_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','1'), 4, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC1_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 16, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','1'), 4, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','1'), 4, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+          }
+        },
+        { DXGI_FORMAT_BC2_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','3'), 4, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC2_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','3'), 4, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','3'), 4, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+          }
+        },
+        /* 15. */
+        { DXGI_FORMAT_BC3_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','5'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC3_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','5'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','T','5'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+          }
+        },
+        { DXGI_FORMAT_BC4_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','4','U'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC4_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 16, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','4','U'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','4','U'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+          }
+        },
+        { DXGI_FORMAT_BC4_SNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','4','S'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC4_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 16, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','4','S'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','4','S'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+          }
+        },
+        { DXGI_FORMAT_BC5_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('A','T','I','2'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC5_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('A','T','I','2'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('A','T','I','2'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+          }
+        },
+        { DXGI_FORMAT_BC5_SNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','5','S'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC5_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','5','S'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('B','C','5','S'), 8, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+          }
+        },
+        /* 20. */
+        { DXGI_FORMAT_R16G16B16A16_SNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 64, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x6e, 64, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 64, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16B16A16_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 64, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x6e, 64, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 64, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, 0x6e, 64, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 64, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16B16A16_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 64, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16B16A16_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              { DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              { DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R8_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 8, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 8, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 8, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              { DXGI_FORMAT_R8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 8, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              { DXGI_FORMAT_R8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 8, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 8, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R8_SNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 8, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 8, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 8, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              { DXGI_FORMAT_R8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 8, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              { DXGI_FORMAT_R8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 8, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 8, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        /* 25. */
+        { DXGI_FORMAT_R8G8_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 16, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              { DXGI_FORMAT_R8G8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              { DXGI_FORMAT_R8G8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 16, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 16, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R16_UNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 16, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              { DXGI_FORMAT_R16_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              { DXGI_FORMAT_R16_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 16, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 16, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R32G32B32_FLOAT,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 96, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32G32B32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 96, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32G32B32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 96, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              { DXGI_FORMAT_R32G32B32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 96, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              { DXGI_FORMAT_R32G32B32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 96, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32G32B32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 96, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R32G32B32_FLOAT, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_BC1_UNORM_SRGB,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC1_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC1_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 16, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              { DXGI_FORMAT_BC1_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              { DXGI_FORMAT_BC1_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 1, 0 },
+            },
+          }
+        },
+        { DXGI_FORMAT_BC2_UNORM_SRGB,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC2_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC2_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              { DXGI_FORMAT_BC2_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              { DXGI_FORMAT_BC2_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 1, 0 },
+            },
+          }
+        },
+        /* 30. */
+        { DXGI_FORMAT_BC3_UNORM_SRGB,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC3_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_BC3_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              { DXGI_FORMAT_BC3_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              { DXGI_FORMAT_BC3_UNORM_SRGB, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 1, 0 },
+            },
+          }
+        },
+        { DXGI_FORMAT_R8G8B8A8_SNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8B8A8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8B8A8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              { DXGI_FORMAT_R8G8B8A8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              { DXGI_FORMAT_R8G8B8A8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8B8A8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8B8A8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R8G8_SNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 16, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              { DXGI_FORMAT_R8G8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 16, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              { DXGI_FORMAT_R8G8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 16, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 16, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R8G8_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+        { DXGI_FORMAT_R16G16_SNORM,
+          { { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, 0, 2, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH | DDS_DEPTH, 8, 8, 32, 8, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_VOLUME, 0, 0
+              },
+              { DXGI_FORMAT_R16G16_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE3D, 0, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 8, 8, 32, 0, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_COMPLEX | DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+                DDS_CAPS2_CUBEMAP | DDS_CAPS2_CUBEMAP_ALL_FACES, 0, 0
+              },
+              { DXGI_FORMAT_R16G16_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D, DDS_RESOURCE_MISC_TEXTURECUBE, 1, 0 },
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 1, 0 },
+              .todo = TRUE
+            },
+            { { 124, DDS_HEIGHT | DDS_WIDTH, 1, 8, 32, 1, 4, { 0 },
+                { 32, DDS_PF_FOURCC, MAKEFOURCC('D','X','1','0'), 0, 0, 0, 0, 0 },
+                DDS_CAPS_TEXTURE | DDSCAPS_MIPMAP,
+              },
+              { DXGI_FORMAT_R16G16_SNORM, D3D11_RESOURCE_DIMENSION_TEXTURE1D, 0, 2, 0 },
+              .todo = TRUE
+            },
+          }
+        },
+    };
+    ID3D11Device *device = create_device();
+    ID3D11DeviceContext *context;
+    D3DX11_IMAGE_INFO img_info;
+    ID3D11Resource *tex;
+    ID3D10Blob *buffer;
+    unsigned int i, j;
+    HRESULT hr;
+    struct
+    {
+        DWORD magic;
+        struct dds_header header;
+        struct dds_header_dxt10 dxt10;
+    } *dds;
+
+    if (!device)
+    {
+        skip("Failed to create device, skipping tests.\n");
+        return;
+    }
+
+    CoInitialize(NULL);
+    ID3D11Device_GetImmediateContext(device, &context);
+
+    for (i = 0; i < ARRAY_SIZE(save_tests); ++i)
+    {
+        if (!strcmp(winetest_platform, "wine") && (save_tests[i].format == DXGI_FORMAT_G8R8_G8B8_UNORM
+                    || save_tests[i].format == DXGI_FORMAT_R8G8_B8G8_UNORM))
+        {
+            skip("Skipping unsupported texture format on Wine.\n");
+            continue;
+        }
+
+        winetest_push_context("Test %u", i);
+        for (j = 0; j < TEXTURE_TYPE_COUNT; ++j)
+        {
+            const struct dds_expected *dds_expected = &save_tests[i].dds_expected[j];
+
+            /* Cannot create a block compressed 1D texture. */
+            if (is_block_compressed(save_tests[i].format) && (j >= TEXTURE_1D))
+                continue;
+
+            switch (j)
+            {
+                case TEXTURE_1D:
+                    hr = d3d11_create_texture_1d(device, 8, 4, 1, save_tests[i].format, D3D11_USAGE_DEFAULT,
+                            D3D11_BIND_SHADER_RESOURCE, 0, 0, (ID3D11Texture1D **)&tex);
+                    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+                    break;
+
+                case TEXTURE_1D_ARRAY:
+                    hr = d3d11_create_texture_1d(device, 8, 4, 2, save_tests[i].format, D3D11_USAGE_DEFAULT,
+                            D3D11_BIND_SHADER_RESOURCE, 0, 0, (ID3D11Texture1D **)&tex);
+                    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+                    break;
+
+                case TEXTURE_2D:
+                    hr = d3d11_create_texture_2d(device, 8, 8, 4, 1, save_tests[i].format, 1, 0, D3D11_USAGE_DEFAULT,
+                            D3D11_BIND_SHADER_RESOURCE, 0, 0, (ID3D11Texture2D **)&tex);
+                    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+                    break;
+
+                case TEXTURE_2D_ARRAY:
+                    hr = d3d11_create_texture_2d(device, 8, 8, 4, 2, save_tests[i].format, 1, 0, D3D11_USAGE_DEFAULT,
+                            D3D11_BIND_SHADER_RESOURCE, 0, 0, (ID3D11Texture2D **)&tex);
+                    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+                    break;
+
+                case TEXTURE_3D:
+                    if (wined3d_opengl && is_block_compressed(save_tests[i].format))
+                    {
+                        skip("Skipping compressed format 3D texture saving test.\n");
+                        continue;
+                    }
+                    hr = d3d11_create_texture_3d(device, 8, 8, 8, 4, save_tests[i].format, D3D11_USAGE_DEFAULT,
+                            D3D11_BIND_SHADER_RESOURCE, 0, 0, (ID3D11Texture3D **)&tex);
+                    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+                    break;
+
+                case TEXTURE_CUBE:
+                    hr = d3d11_create_texture_2d(device, 8, 8, 4, 6, save_tests[i].format, 1, 0, D3D11_USAGE_DEFAULT,
+                            D3D11_BIND_SHADER_RESOURCE, 0, D3D11_RESOURCE_MISC_TEXTURECUBE, (ID3D11Texture2D **)&tex);
+                    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+                    break;
+            }
+
+            if (FAILED(hr))
+                continue;
+
+            winetest_push_context("Texture type %u", j);
+            hr = D3DX11SaveTextureToMemory(context, tex, D3DX11_IFF_DDS, &buffer, 0);
+            todo_wine_if(dds_expected->todo) ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+            if (SUCCEEDED(hr))
+            {
+                dds = ID3D10Blob_GetBufferPointer(buffer);
+
+                hr = D3DX11GetImageInfoFromMemory(ID3D10Blob_GetBufferPointer(buffer), ID3D10Blob_GetBufferSize(buffer), NULL,
+                        &img_info, NULL);
+                ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+                ok(!memcmp(&dds_expected->header, &dds->header, sizeof(dds->header)), "Header mismatch.\n");
+                if (dds->header.pixel_format.fourcc == MAKEFOURCC('D','X','1','0'))
+                    ok(!memcmp(&dds_expected->dxt10, &dds->dxt10, sizeof(dds->dxt10)), "DXT10 header mismatch.\n");
+                switch (j)
+                {
+                    case TEXTURE_1D:
+                        check_image_info_values(&img_info, 8, 1, 1, 1, 4, 0, save_tests[i].format,
+                                D3D11_RESOURCE_DIMENSION_TEXTURE1D, D3DX11_IFF_DDS, FALSE);
+                        break;
+
+                    case TEXTURE_1D_ARRAY:
+                        check_image_info_values(&img_info, 8, 1, 1, 2, 4, 0, save_tests[i].format,
+                                D3D11_RESOURCE_DIMENSION_TEXTURE1D, D3DX11_IFF_DDS, FALSE);
+                        break;
+
+                    case TEXTURE_2D:
+                        check_image_info_values(&img_info, 8, 8, 1, 1, 4, 0, save_tests[i].format,
+                                D3D11_RESOURCE_DIMENSION_TEXTURE2D, D3DX11_IFF_DDS, FALSE);
+                        break;
+
+                    case TEXTURE_2D_ARRAY:
+                        check_image_info_values(&img_info, 8, 8, 1, 2, 4, 0, save_tests[i].format,
+                                D3D11_RESOURCE_DIMENSION_TEXTURE2D, D3DX11_IFF_DDS, FALSE);
+                        break;
+
+                    case TEXTURE_3D:
+                        check_image_info_values(&img_info, 8, 8, 8, 1, 4, 0, save_tests[i].format,
+                                D3D11_RESOURCE_DIMENSION_TEXTURE3D, D3DX11_IFF_DDS, FALSE);
+                        break;
+
+                    case TEXTURE_CUBE:
+                        check_image_info_values(&img_info, 8, 8, 1, 6, 4, D3D11_RESOURCE_MISC_TEXTURECUBE,
+                                save_tests[i].format, D3D11_RESOURCE_DIMENSION_TEXTURE2D, D3DX11_IFF_DDS, FALSE);
+                        break;
+                }
+
+                ID3D10Blob_Release(buffer);
+            }
+            ID3D11Resource_Release(tex);
+            winetest_pop_context();
+        }
+        winetest_pop_context();
+    }
+
+    ID3D11DeviceContext_Release(context);
+    CoUninitialize();
+    ok(!ID3D11Device_Release(device), "Unexpected refcount.\n");
+}
+
+static void check_image_wic_pixel_format(IWICImagingFactory *factory, const void *data, unsigned int size,
+        const GUID *expected_fmt, BOOL todo)
+{
+    IWICBitmapFrameDecode *frame = NULL;
+    IWICBitmapDecoder *decoder = NULL;
+    IWICStream *stream = NULL;
+    HRESULT hr;
+    GUID fmt;
+
+    hr = IWICImagingFactory_CreateStream(factory, &stream);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = IWICStream_InitializeFromMemory(stream, (BYTE *)data, size);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = IWICImagingFactory_CreateDecoderFromStream(factory, (IStream *)stream, NULL, 0, &decoder);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = IWICBitmapDecoder_GetFrame(decoder, 0, &frame);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = IWICBitmapFrameDecode_GetPixelFormat(frame, &fmt);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    todo_wine_if(todo) ok(IsEqualGUID(expected_fmt, &fmt), "Unexpected WIC format %s.\n", debugstr_guid(&fmt));
+
+    IWICBitmapFrameDecode_Release(frame);
+    IWICBitmapDecoder_Release(decoder);
+    IWICStream_Release(stream);
+}
+
+static void test_save_texture_to_iffs(void)
+{
+    static const enum D3DX11_IMAGE_FILE_FORMAT test_iffs[] = { D3DX11_IFF_BMP, D3DX11_IFF_JPG, D3DX11_IFF_PNG,
+                                                               D3DX11_IFF_TIFF, D3DX11_IFF_GIF, D3DX11_IFF_WMP };
+    static const char *test_iff_str[] = { "D3DX11_IFF_BMP", "D3DX11_IFF_JPG", "D3DX11_IFF_PNG",
+                                          "D3DX11_IFF_TIFF", "D3DX11_IFF_GIF", "D3DX11_IFF_WMP" };
+    struct wic_expected
+    {
+        const GUID *fmt;
+        BOOL todo;
+    };
+    static const struct
+    {
+        DXGI_FORMAT format;
+        BOOL supported;
+        struct wic_expected wic_expected[ARRAY_SIZE(test_iffs)];
+    } save_tests[] =
+    {
+        { DXGI_FORMAT_R8G8B8A8_UNORM, TRUE,
+          { { &GUID_WICPixelFormat32bppBGR,  FALSE },
+            { &GUID_WICPixelFormat24bppBGR,  FALSE },
+            { &GUID_WICPixelFormat32bppBGRA, FALSE },
+            { &GUID_WICPixelFormat32bppBGRA, FALSE },
+            { NULL },
+            { &GUID_WICPixelFormat32bppBGRA, FALSE },
+          },
+        },
+        { DXGI_FORMAT_R16G16B16A16_FLOAT, TRUE,
+          { { &GUID_WICPixelFormat64bppRGBAFixedPoint, TRUE },
+            { &GUID_WICPixelFormat24bppBGR,  FALSE },
+            { &GUID_WICPixelFormat64bppRGBA, FALSE },
+            { &GUID_WICPixelFormat64bppRGBA, FALSE },
+            { NULL },
+            { &GUID_WICPixelFormat64bppRGBAHalf, FALSE },
+          },
+        },
+        { DXGI_FORMAT_R32G32B32A32_FLOAT, TRUE,
+          { { &GUID_WICPixelFormat64bppRGBAFixedPoint, TRUE },
+            { &GUID_WICPixelFormat24bppBGR,  FALSE },
+            { &GUID_WICPixelFormat64bppRGBA, FALSE },
+            { &GUID_WICPixelFormat64bppRGBA, FALSE },
+            { NULL },
+            { &GUID_WICPixelFormat128bppRGBAFloat, FALSE },
+          },
+        },
+        { DXGI_FORMAT_R16_UNORM, TRUE,
+          { { &GUID_WICPixelFormat64bppRGBAFixedPoint, TRUE },
+            { &GUID_WICPixelFormat8bppGray,  FALSE },
+            { &GUID_WICPixelFormat16bppGray, FALSE },
+            { &GUID_WICPixelFormat16bppGray, FALSE },
+            { NULL },
+            { &GUID_WICPixelFormat16bppGrayFixedPoint, FALSE },
+          },
+        },
+        { DXGI_FORMAT_R10G10B10A2_UNORM, FALSE },
+        { DXGI_FORMAT_R16G16B16A16_UNORM, FALSE },
+        { DXGI_FORMAT_R16G16_UNORM, FALSE },
+        { DXGI_FORMAT_A8_UNORM, FALSE },
+        { DXGI_FORMAT_R16_FLOAT, FALSE },
+        { DXGI_FORMAT_R16G16_FLOAT, FALSE },
+        { DXGI_FORMAT_R32_FLOAT, FALSE },
+        { DXGI_FORMAT_R32G32_FLOAT, FALSE },
+        { DXGI_FORMAT_G8R8_G8B8_UNORM, FALSE },
+        { DXGI_FORMAT_R8G8_B8G8_UNORM, FALSE },
+        { DXGI_FORMAT_BC1_UNORM, FALSE },
+        { DXGI_FORMAT_BC2_UNORM, FALSE },
+        { DXGI_FORMAT_BC3_UNORM, FALSE },
+        { DXGI_FORMAT_BC4_UNORM, FALSE },
+        { DXGI_FORMAT_BC4_SNORM, FALSE },
+        { DXGI_FORMAT_BC5_UNORM, FALSE },
+        { DXGI_FORMAT_BC5_SNORM, FALSE },
+        { DXGI_FORMAT_R16G16B16A16_SNORM, FALSE },
+        { DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, FALSE },
+        { DXGI_FORMAT_R8_UNORM, FALSE },
+        { DXGI_FORMAT_R8_SNORM, FALSE },
+        { DXGI_FORMAT_R8G8_UNORM, FALSE },
+        { DXGI_FORMAT_R32G32B32_FLOAT, FALSE },
+        { DXGI_FORMAT_BC1_UNORM_SRGB, FALSE },
+        { DXGI_FORMAT_BC2_UNORM_SRGB, FALSE },
+        { DXGI_FORMAT_BC3_UNORM_SRGB, FALSE },
+        { DXGI_FORMAT_R8G8B8A8_SNORM, FALSE },
+        { DXGI_FORMAT_R8G8_SNORM, FALSE },
+        { DXGI_FORMAT_R16G16_SNORM, FALSE },
+    };
+    IWICImagingFactory *factory = NULL;
+    ID3D11DeviceContext *context;
+    D3DX11_IMAGE_INFO img_info;
+    ID3D11Device *device;
+    ID3D11Resource *tex;
+    ID3D10Blob *buffer;
+    unsigned int i, j;
+    HRESULT hr;
+
+    device = create_device();
+    if (!device)
+    {
+        skip("Failed to create device, skipping tests.\n");
+        return;
+    }
+
+    CoInitialize(NULL);
+    ID3D11Device_GetImmediateContext(device, &context);
+
+    hr = CoCreateInstance(&CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
+            &IID_IWICImagingFactory, (void **)&factory);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    for (i = 0; i < ARRAY_SIZE(save_tests); ++i)
+    {
+        if (!strcmp(winetest_platform, "wine") && (save_tests[i].format == DXGI_FORMAT_G8R8_G8B8_UNORM
+                    || save_tests[i].format == DXGI_FORMAT_R8G8_B8G8_UNORM))
+        {
+            skip("Skipping unsupported format on Wine.\n");
+            continue;
+        }
+
+        hr = d3d11_create_texture_2d(device, 8, 8, 4, 1, save_tests[i].format, 1, 0, D3D11_USAGE_DEFAULT,
+                D3D11_BIND_SHADER_RESOURCE, 0, 0, (ID3D11Texture2D **)&tex);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        if (FAILED(hr))
+            continue;
+
+        winetest_push_context("Test %u", i);
+        for (j = 0; j < ARRAY_SIZE(test_iffs); ++j)
+        {
+            const HRESULT expected_hr = save_tests[i].supported ? S_OK : E_FAIL;
+
+            winetest_push_context("Image format %s", test_iff_str[j]);
+            hr = D3DX11SaveTextureToMemory(context, tex, test_iffs[j], &buffer, 0);
+
+            /* GIF saving is never supported, regardless of texture format. */
+            if (test_iffs[j] == D3DX11_IFF_GIF)
+                ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
+            else
+                todo_wine_if(test_iffs[j] == D3DX11_IFF_WMP) ok(hr == expected_hr, "Unexpected hr %#lx.\n", hr);
+            if (SUCCEEDED(hr))
+            {
+                check_image_wic_pixel_format(factory, ID3D10Blob_GetBufferPointer(buffer), ID3D10Blob_GetBufferSize(buffer),
+                        save_tests[i].wic_expected[j].fmt, save_tests[i].wic_expected[j].todo);
+
+                hr = D3DX11GetImageInfoFromMemory(ID3D10Blob_GetBufferPointer(buffer), ID3D10Blob_GetBufferSize(buffer), NULL,
+                        &img_info, NULL);
+                ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+                check_image_info_values(&img_info, 8, 8, 1, 1, 1, 0, DXGI_FORMAT_R8G8B8A8_UNORM,
+                        D3D11_RESOURCE_DIMENSION_TEXTURE2D, test_iffs[j], FALSE);
+                ID3D10Blob_Release(buffer);
+            }
+            winetest_pop_context();
+        }
+
+        ID3D11Resource_Release(tex);
+        winetest_pop_context();
+    }
+
+    IWICImagingFactory_Release(factory);
+    ID3D11DeviceContext_Release(context);
+    CoUninitialize();
+    ok(!ID3D11Device_Release(device), "Unexpected refcount.\n");
+}
+
+static void test_save_texture(void)
+{
+    D3D11_SUBRESOURCE_DATA sub_resource_data[4] = { 0 };
+    D3D11_TEXTURE2D_DESC tex_2d_desc;
+    ID3D11DeviceContext *context;
+    D3DX11_IMAGE_INFO img_info;
+    ID3D11Texture2D *tex_2d;
+    uint8_t tmp_buf[1024];
+    ID3D11Device *device;
+    ID3D10Blob *buffer;
+    HRESULT hr;
+
+    device = create_device();
+    if (!device)
+    {
+        skip("Failed to create device, skipping tests.\n");
+        return;
+    }
+
+    CoInitialize(NULL);
+    ID3D11Device_GetImmediateContext(device, &context);
+
+    set_d3d11_2d_texture_desc(&tex_2d_desc, 8, 8, 4, 1, DXGI_FORMAT_R8G8B8A8_UNORM, 1, 0, D3D11_USAGE_DEFAULT,
+            D3D11_BIND_SHADER_RESOURCE, 0, 0);
+    memset(tmp_buf, 0, sizeof(tmp_buf));
+    memcpy(tmp_buf, bc1_to_bc3_8_8_decompressed, sizeof(bc1_to_bc3_8_8_decompressed));
+    init_subresource_data(sub_resource_data, (const void *)tmp_buf, tex_2d_desc.Width, tex_2d_desc.Height, 1,
+            tex_2d_desc.MipLevels, tex_2d_desc.ArraySize, tex_2d_desc.Format);
+
+    hr = ID3D11Device_CreateTexture2D(device, &tex_2d_desc, sub_resource_data, &tex_2d);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11SaveTextureToMemory(context, (ID3D11Resource *)tex_2d, D3DX11_IFF_DDS, &buffer, 0);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11GetImageInfoFromMemory(ID3D10Blob_GetBufferPointer(buffer), ID3D10Blob_GetBufferSize(buffer), NULL,
+            &img_info, NULL);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    check_image_info_values(&img_info, 8, 8, 1, 1, 4, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D,
+            D3DX11_IFF_DDS, FALSE);
+
+    ID3D10Blob_Release(buffer);
+
+    hr = D3DX11SaveTextureToFileA(context, (ID3D11Resource *)tex_2d, D3DX11_IFF_DDS, "test_a.dds");
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11GetImageInfoFromFileA("test_a.dds", NULL, &img_info, NULL);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    check_image_info_values(&img_info, 8, 8, 1, 1, 4, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D,
+            D3DX11_IFF_DDS, FALSE);
+    DeleteFileA("test_a.dds");
+
+    hr = D3DX11SaveTextureToFileW(context, (ID3D11Resource *)tex_2d, D3DX11_IFF_DDS, L"test_w.dds");
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = D3DX11GetImageInfoFromFileW(L"test_w.dds", NULL, &img_info, NULL);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    check_image_info_values(&img_info, 8, 8, 1, 1, 4, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_RESOURCE_DIMENSION_TEXTURE2D,
+            D3DX11_IFF_DDS, FALSE);
+    DeleteFileW(L"test_w.dds");
+
+    ID3D11Texture2D_Release(tex_2d);
+
+    ID3D11DeviceContext_Release(context);
+    CoUninitialize();
+
+    ok(!ID3D11Device_Release(device), "Unexpected refcount.\n");
+}
+
 static BOOL create_directory(const WCHAR *dir)
 {
     WCHAR path[MAX_PATH];
@@ -6416,6 +8111,9 @@ START_TEST(d3dx11)
     test_get_image_info();
     test_create_texture();
     test_create_shader_resource_view();
+    test_save_texture_to_dds();
+    test_save_texture_to_iffs();
+    test_save_texture();
     test_legacy_dds_header_image_info();
     test_dxt10_dds_header_image_info();
     test_image_filters();
