@@ -481,6 +481,7 @@ HRESULT d3dx_create_subresource_data_for_texture(uint32_t width, uint32_t height
 /*
  * File/resource loading helper functions.
  */
+HRESULT d3dx_write_buffer_to_file(const WCHAR *dst_filename, void *buffer, unsigned int buffer_size);
 HRESULT d3dx_load_file(const WCHAR *path, void **data, uint32_t *size);
 HRESULT d3dx_load_resource_init_a(HMODULE module, const char *resource, HRSRC *rsrc);
 HRESULT d3dx_load_resource_init_w(HMODULE module, const WCHAR *resource, HRSRC *rsrc);

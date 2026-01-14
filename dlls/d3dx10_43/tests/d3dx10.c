@@ -8891,6 +8891,24 @@ static void test_save_texture(void)
 
     ID3D10Blob_Release(buffer);
 
+    hr = D3DX10SaveTextureToFileA((ID3D10Resource *)tex_2d, D3DX10_IFF_DDS, "test_a.dds");
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = D3DX10GetImageInfoFromFileA("test_a.dds", NULL, &img_info, NULL);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    check_image_info_values(&img_info, 8, 8, 1, 1, 4, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D,
+            D3DX10_IFF_DDS, FALSE);
+    DeleteFileA("test_a.dds");
+
+    hr = D3DX10SaveTextureToFileW((ID3D10Resource *)tex_2d, D3DX10_IFF_DDS, L"test_w.dds");
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = D3DX10GetImageInfoFromFileW(L"test_w.dds", NULL, &img_info, NULL);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    check_image_info_values(&img_info, 8, 8, 1, 1, 4, 0, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_RESOURCE_DIMENSION_TEXTURE2D,
+            D3DX10_IFF_DDS, FALSE);
+    DeleteFileW(L"test_w.dds");
+
     ID3D10Texture2D_Release(tex_2d);
 
     CoUninitialize();

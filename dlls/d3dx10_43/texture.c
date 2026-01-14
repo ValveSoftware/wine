@@ -1593,20 +1593,6 @@ HRESULT WINAPI D3DX10FilterTexture(ID3D10Resource *texture, UINT src_level, UINT
     return D3DX10LoadTextureFromTexture(texture, &load_info, texture);
 }
 
-HRESULT WINAPI D3DX10SaveTextureToFileW(ID3D10Resource *texture, D3DX10_IMAGE_FILE_FORMAT format, const WCHAR *filename)
-{
-    FIXME("texture %p, format %u, filename %s stub!\n", texture, format, debugstr_w(filename));
-
-    return E_NOTIMPL;
-}
-
-HRESULT WINAPI D3DX10SaveTextureToFileA(ID3D10Resource *texture, D3DX10_IMAGE_FILE_FORMAT format, const char *filename)
-{
-    FIXME("texture %p, format %u, filename %s stub!\n", texture, format, debugstr_a(filename));
-
-    return E_NOTIMPL;
-}
-
 static void d3dx10_buffer_destroy(struct d3dx_buffer *d3dx_buffer)
 {
     ID3D10Blob *buffer_iface = (ID3D10Blob *)d3dx_buffer->buffer_iface;
@@ -1849,4 +1835,49 @@ exit:
         ID3D10Blob_Release(out_buffer);
     d3dx_d3d10_texture_release(&src_tex);
     return SUCCEEDED(hr) ? S_OK : hr;
+}
+
+HRESULT WINAPI D3DX10SaveTextureToFileW(ID3D10Resource *texture, D3DX10_IMAGE_FILE_FORMAT format, const WCHAR *filename)
+{
+    ID3D10Blob *buffer;
+    HRESULT hr;
+
+    TRACE("texture %p, format %u, filename %s.\n", texture, format, debugstr_w(filename));
+
+    if (!filename)
+        return E_FAIL;
+
+    hr = D3DX10SaveTextureToMemory(texture, format, &buffer, 0);
+    if (SUCCEEDED(hr))
+    {
+        hr = d3dx_write_buffer_to_file(filename, ID3D10Blob_GetBufferPointer(buffer), ID3D10Blob_GetBufferSize(buffer));
+        ID3D10Blob_Release(buffer);
+    }
+
+    return hr;
+}
+
+HRESULT WINAPI D3DX10SaveTextureToFileA(ID3D10Resource *texture, D3DX10_IMAGE_FILE_FORMAT format, const char *filename)
+{
+    WCHAR *buffer;
+    int str_len;
+    HRESULT hr;
+
+    TRACE("texture %p, format %u, filename %s.\n", texture, format, debugstr_a(filename));
+
+    if (!filename)
+        return E_FAIL;
+
+    str_len = MultiByteToWideChar(CP_ACP, 0, filename, -1, NULL, 0);
+    if (!str_len)
+        return HRESULT_FROM_WIN32(GetLastError());
+
+    buffer = malloc(str_len * sizeof(*buffer));
+    if (!buffer)
+        return E_OUTOFMEMORY;
+
+    MultiByteToWideChar(CP_ACP, 0, filename, -1, buffer, str_len);
+    hr = D3DX10SaveTextureToFileW(texture, format, buffer);
+    free(buffer);
+    return hr;
 }

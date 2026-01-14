@@ -3556,6 +3556,22 @@ exit:
 /*
  * File/resource loading helper functions.
  */
+HRESULT d3dx_write_buffer_to_file(const WCHAR *dst_filename, void *buffer, unsigned int buffer_size)
+{
+    HANDLE file = CreateFileW(dst_filename, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    DWORD bytes_written;
+    HRESULT hr = S_OK;
+
+    if (file == INVALID_HANDLE_VALUE)
+        return HRESULT_FROM_WIN32(GetLastError());
+
+    if (!WriteFile(file, buffer, buffer_size, &bytes_written, NULL))
+        hr = HRESULT_FROM_WIN32(GetLastError());
+
+    CloseHandle(file);
+    return hr;
+}
+
 HRESULT d3dx_load_file(const WCHAR *path, void **data, uint32_t *size)
 {
     DWORD read_len;
