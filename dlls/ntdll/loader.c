@@ -3673,7 +3673,7 @@ NTSTATUS WINAPI DECLSPEC_HOTPATCH LdrLoadDll(LPCWSTR search_path, DWORD *load_fl
             wm = NULL;
         }
     }
-    *hModule = (wm) ? wm->ldr.DllBase : NULL;
+    if (wm) *hModule = wm->ldr.DllBase;
 
     RtlLeaveCriticalSection( &loader_section );
     RtlFreeHeap( GetProcessHeap(), 0, dllname );
