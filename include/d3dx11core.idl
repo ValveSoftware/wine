@@ -63,3 +63,5 @@ interface ID3DX11ThreadPump : IUnknown
     HRESULT PurgeAllItems();
     HRESULT GetQueueStatus([in] UINT *io_queue, [in] UINT *process_queue, [in] UINT *device_queue);
 }
+
+cpp_quote("HRESULT WINAPI D3DX11CreateThreadPump(UINT io_threads, UINT proc_threads, ID3DX11ThreadPump **pump);")
