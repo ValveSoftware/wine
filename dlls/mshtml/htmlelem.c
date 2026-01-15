@@ -1168,6 +1168,17 @@ static HRESULT WINAPI HTMLElement_setAttribute(IHTMLElement *iface, BSTR strAttr
 
     TRACE("(%p)->(%s %s %08lx)\n", This, debugstr_w(strAttributeName), debugstr_variant(&AttributeValue), lFlags);
 
+    /* Event handler attributes (onclick, onload, etc.) need to go through Wine's event system
+     * even in IE9+ mode, since Gecko doesn't dispatch events through our event handlers. */
+    if(compat_mode >= COMPAT_MODE_IE9 && This->dom_element &&
+       strAttributeName[0] && (strAttributeName[0] == 'o' || strAttributeName[0] == 'O') &&
+       strAttributeName[1] && (strAttributeName[1] == 'n' || strAttributeName[1] == 'N')) {
+        hres = set_node_event_handler_by_attr(&This->node, strAttributeName, &val);
+        if(SUCCEEDED(hres))
+            goto done;
+        /* If the event isn't recognized, fall through to the normal attribute handling */
+    }
+
     if(compat_mode < COMPAT_MODE_IE9 || !This->dom_element) {
         hres = dispex_get_id(&This->node.event_target.dispex, translate_attr_name(strAttributeName, compat_mode),
                 (lFlags&ATTRFLAG_CASESENSITIVE ? fdexNameCaseSensitive : fdexNameCaseInsensitive) | fdexNameEnsure, &dispid);

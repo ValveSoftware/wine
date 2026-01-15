@@ -384,12 +384,13 @@ static const tid_t NodeList_iface_tids[] = {
     0
 };
 
+/* Note: init_info intentionally omitted - NodeList should not expose JSObject
+ * property that HTMLDOMNode_init_dispex_info would add via HTMLDOMNode. */
 dispex_static_data_t NodeList_dispex = {
     .id         = PROT_NodeList,
     .vtbl       = &HTMLDOMChildrenCollection_dispex_vtbl,
     .disp_tid   = DispDOMChildrenCollection_tid,
     .iface_tids = NodeList_iface_tids,
-    .init_info  = HTMLDOMNode_init_dispex_info,
     .js_flags   = HOSTOBJ_VOLATILE_PROPS
 };
 

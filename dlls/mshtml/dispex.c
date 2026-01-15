@@ -2315,7 +2315,10 @@ static HRESULT WINAPI DispatchEx_InvokeEx(IWineJSDispatchHost *iface, DISPID id,
     if(!ensure_real_info(This))
         return E_OUTOFMEMORY;
 
-    if(This->jsdisp)
+    /* Don't delegate dynamic property DISPIDs to jscript - they are mshtml-specific
+     * and jscript doesn't know about them. This is needed for native code that
+     * creates properties on window via GetDispID+InvokeEx (e.g. Adobe installer's JSObject). */
+    if(This->jsdisp && !is_dynamic_dispid(id))
         return IWineJSDispatch_InvokeEx(This->jsdisp, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 
     switch(wFlags) {
