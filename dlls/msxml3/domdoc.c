@@ -499,11 +499,415 @@ static void sax_serror(void* ctx, const xmlError* err)
     LIBXML2_CALLBACK_SERROR(doparse, err);
 }
 
+/* Check if ptr points to "<?xml" in UTF-8 or UTF-16LE format */
+static int is_xml_decl(const char *ptr, int len, int is_utf16)
+{
+    if (is_utf16)
+    {
+        /* UTF-16LE: each char is 2 bytes, second byte is 0 for ASCII */
+        if (len < 10) return 0;
+        return ptr[0] == '<' && ptr[1] == 0 &&
+               ptr[2] == '?' && ptr[3] == 0 &&
+               ptr[4] == 'x' && ptr[5] == 0 &&
+               ptr[6] == 'm' && ptr[7] == 0 &&
+               ptr[8] == 'l' && ptr[9] == 0;
+    }
+    else
+    {
+        if (len < 5) return 0;
+        return !strncmp(ptr, "<?xml", 5);
+    }
+}
+
+/* Check if char is whitespace (handles UTF-16LE) */
+static int is_ws(const char *ptr, int is_utf16)
+{
+    char c = ptr[0];
+    if (is_utf16 && ptr[1] != 0) return 0;
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
+/* Check if ptr points to "</" in UTF-8 or UTF-16LE format */
+static int is_close_tag(const char *ptr, int len, int is_utf16)
+{
+    if (is_utf16)
+    {
+        if (len < 4) return 0;
+        return ptr[0] == '<' && ptr[1] == 0 && ptr[2] == '/' && ptr[3] == 0;
+    }
+    else
+    {
+        if (len < 2) return 0;
+        return ptr[0] == '<' && ptr[1] == '/';
+    }
+}
+
+/* Check if ptr points to "<" followed by a letter (start tag) */
+static int is_start_tag(const char *ptr, int len, int is_utf16)
+{
+    char c;
+    if (is_utf16)
+    {
+        if (len < 4) return 0;
+        if (ptr[0] != '<' || ptr[1] != 0) return 0;
+        c = ptr[2];
+        if (ptr[3] != 0) return 0;
+    }
+    else
+    {
+        if (len < 2) return 0;
+        if (ptr[0] != '<') return 0;
+        c = ptr[1];
+    }
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+/* Check if ptr points to ">" */
+static int is_gt(const char *ptr, int is_utf16)
+{
+    if (is_utf16)
+        return ptr[0] == '>' && ptr[1] == 0;
+    return ptr[0] == '>';
+}
+
+/* Check if ptr points to "/>" (self-closing tag end) */
+static int is_self_close(const char *ptr, int len, int is_utf16)
+{
+    if (is_utf16)
+    {
+        if (len < 4) return 0;
+        return ptr[0] == '/' && ptr[1] == 0 && ptr[2] == '>' && ptr[3] == 0;
+    }
+    if (len < 2) return 0;
+    return ptr[0] == '/' && ptr[1] == '>';
+}
+
+/* Check if ptr points to "<!" (comment, CDATA, DOCTYPE, etc.) */
+static int is_markup_decl(const char *ptr, int len, int is_utf16)
+{
+    if (is_utf16)
+    {
+        if (len < 4) return 0;
+        return ptr[0] == '<' && ptr[1] == 0 && ptr[2] == '!' && ptr[3] == 0;
+    }
+    if (len < 2) return 0;
+    return ptr[0] == '<' && ptr[1] == '!';
+}
+
+/* Check if ptr points to "<?" (PI like <?xml) */
+static int is_pi(const char *ptr, int len, int is_utf16)
+{
+    if (is_utf16)
+    {
+        if (len < 4) return 0;
+        return ptr[0] == '<' && ptr[1] == 0 && ptr[2] == '?' && ptr[3] == 0;
+    }
+    if (len < 2) return 0;
+    return ptr[0] == '<' && ptr[1] == '?';
+}
+
+/* Check if element name ends with "XMLData" (case-sensitive).
+ * ptr points to first char after '<', len is remaining buffer length.
+ * Returns 1 if element name ends with XMLData, 0 otherwise. */
+static int is_xmldata_element(const char *ptr, int len, int is_utf16)
+{
+    const char *p = ptr;
+    const char *end = ptr + len;
+    const char *name_end = NULL;
+    int char_size = is_utf16 ? 2 : 1;
+    int name_len;
+    const char *suffix_check;
+
+    /* Find end of element name (whitespace, >, or /) */
+    while (p + char_size <= end)
+    {
+        char c = p[0];
+        if (is_utf16 && p[1] != 0) { p += char_size; continue; }
+        if (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '>' || c == '/')
+        {
+            name_end = p;
+            break;
+        }
+        p += char_size;
+    }
+    if (!name_end) return 0;
+
+    name_len = (name_end - ptr) / char_size;
+    if (name_len < 7) return 0; /* "XMLData" is 7 chars */
+
+    /* Check if name ends with "XMLData" */
+    suffix_check = name_end - (7 * char_size);
+    if (is_utf16)
+    {
+        return suffix_check[0] == 'X' && suffix_check[1] == 0 &&
+               suffix_check[2] == 'M' && suffix_check[3] == 0 &&
+               suffix_check[4] == 'L' && suffix_check[5] == 0 &&
+               suffix_check[6] == 'D' && suffix_check[7] == 0 &&
+               suffix_check[8] == 'a' && suffix_check[9] == 0 &&
+               suffix_check[10] == 't' && suffix_check[11] == 0 &&
+               suffix_check[12] == 'a' && suffix_check[13] == 0;
+    }
+    else
+    {
+        return !strncmp(suffix_check, "XMLData", 7);
+    }
+}
+
+/* Wrap embedded XML content in CDATA so it becomes text, not parsed elements.
+ * Windows MSXML tolerates embedded <?xml?> declarations but libxml2 does not.
+ * Returns a newly allocated buffer that must be freed, or NULL if no changes needed. */
+static char *wrap_embedded_xml_in_cdata(const char *ptr, int len, int *new_len, xmlCharEncoding encoding)
+{
+    const char *p, *decl_start, *content_start, *content_end = NULL, *end;
+    char *result, *dst;
+    int skip_first = 0;
+    int is_utf16 = (encoding == XML_CHAR_ENCODING_UTF16LE); /* BE not handled - Windows uses LE */
+    int char_size = is_utf16 ? 2 : 1;
+    int decl_size = is_utf16 ? 10 : 5; /* "<?xml" */
+    int nesting;
+
+    TRACE("len=%d encoding=%d is_utf16=%d\n", len, encoding, is_utf16);
+
+    end = ptr + len;
+
+    /* Check if document starts with XML declaration - if so, skip it for search */
+    p = ptr;
+    while (p + char_size <= end && is_ws(p, is_utf16))
+        p += char_size;
+    if (p + decl_size <= end && is_xml_decl(p, end - p, is_utf16))
+        skip_first = 1;
+
+    /* Search for embedded <?xml declarations */
+    decl_start = NULL;
+    for (p = ptr; p + decl_size <= end; p += char_size)
+    {
+        if (is_xml_decl(p, end - p, is_utf16))
+        {
+            if (skip_first)
+            {
+                skip_first = 0;
+                continue;
+            }
+            decl_start = p;
+            break;
+        }
+    }
+
+    if (!decl_start)
+    {
+        /* No <?xml found - also check for *XMLData elements whose content should be wrapped.
+         * Pattern: <*XMLData><Element>... where Element content should remain as text. */
+        const char *xmldata_start = NULL;
+        const char *xmldata_content = NULL;
+
+        for (p = ptr; p + char_size <= end; p += char_size)
+        {
+            if (is_start_tag(p, end - p, is_utf16))
+            {
+                /* Check if this element name ends with "XMLData" */
+                if (is_xmldata_element(p + char_size, end - p - char_size, is_utf16))
+                {
+                    /* Found *XMLData element - find end of its start tag */
+                    const char *tag_end;
+                    for (tag_end = p + char_size; tag_end + char_size <= end; tag_end += char_size)
+                    {
+                        if (is_gt(tag_end, is_utf16))
+                        {
+                            xmldata_content = tag_end + char_size;
+                            break;
+                        }
+                        if (is_self_close(tag_end, end - tag_end, is_utf16))
+                            break; /* Self-closing, no content */
+                    }
+                    if (xmldata_content)
+                    {
+                        /* Check if content starts with an element (needs CDATA wrapping) */
+                        const char *content_check = xmldata_content;
+                        /* Skip whitespace */
+                        while (content_check + char_size <= end && is_ws(content_check, is_utf16))
+                            content_check += char_size;
+                        /* Check for element start that's not <? or <! */
+                        if (is_start_tag(content_check, end - content_check, is_utf16) &&
+                            !is_pi(content_check, end - content_check, is_utf16) &&
+                            !is_markup_decl(content_check, end - content_check, is_utf16))
+                        {
+                            xmldata_start = p;
+                            content_start = xmldata_content;
+                            TRACE("found *XMLData element with element content\n");
+                            break;
+                        }
+                    }
+                    xmldata_content = NULL;
+                }
+            }
+        }
+
+        if (!xmldata_start)
+        {
+            TRACE("no embedded declarations found\n");
+            return NULL;
+        }
+
+        /* Find the matching close tag for the *XMLData element */
+        nesting = 0;
+        for (p = content_start; p + char_size <= end; p += char_size)
+        {
+            if (is_start_tag(p, end - p, is_utf16))
+            {
+                const char *tag_end;
+                int is_selfclose = 0;
+                for (tag_end = p + char_size; tag_end + char_size <= end; tag_end += char_size)
+                {
+                    if (is_self_close(tag_end, end - tag_end, is_utf16))
+                    {
+                        is_selfclose = 1;
+                        break;
+                    }
+                    if (is_gt(tag_end, is_utf16))
+                        break;
+                }
+                if (!is_selfclose)
+                    nesting++;
+            }
+            else if (is_close_tag(p, end - p, is_utf16))
+            {
+                if (nesting == 0)
+                {
+                    content_end = p;
+                    break;
+                }
+                nesting--;
+            }
+        }
+        if (!content_end)
+        {
+            TRACE("could not find *XMLData element end\n");
+            return NULL;
+        }
+        goto do_wrap;
+    }
+
+    /* Find the > before the embedded declaration (end of parent start tag) */
+    content_start = NULL;
+    for (p = decl_start - char_size; p >= ptr; p -= char_size)
+    {
+        if (is_gt(p, is_utf16))
+        {
+            content_start = p + char_size;
+            break;
+        }
+    }
+    if (!content_start)
+    {
+        TRACE("could not find parent element start\n");
+        return NULL;
+    }
+
+    /* Find the matching closing tag by tracking nesting level */
+    nesting = 0;  /* Start at 0 - we're inside parent, looking for its close tag */
+    content_end = NULL;
+    for (p = decl_start; p + char_size <= end; p += char_size)
+    {
+        if (is_start_tag(p, end - p, is_utf16))
+        {
+            /* Check if this is a self-closing tag by scanning for /> or > */
+            const char *tag_end;
+            int is_selfclose = 0;
+            for (tag_end = p + char_size; tag_end + char_size <= end; tag_end += char_size)
+            {
+                if (is_self_close(tag_end, end - tag_end, is_utf16))
+                {
+                    is_selfclose = 1;
+                    break;
+                }
+                if (is_gt(tag_end, is_utf16))
+                    break;
+            }
+            if (!is_selfclose)
+                nesting++;
+        }
+        else if (is_close_tag(p, end - p, is_utf16))
+        {
+            if (nesting == 0)
+            {
+                /* This close tag is for our parent element */
+                content_end = p;
+                break;
+            }
+            nesting--;
+        }
+    }
+    if (!content_end)
+    {
+        TRACE("could not find parent element end\n");
+        return NULL;
+    }
+
+do_wrap:
+    TRACE("wrapping content in CDATA: start=%d end=%d\n",
+          (int)(content_start - ptr), (int)(content_end - ptr));
+
+    /* Create result with CDATA wrapper: <![CDATA[ ... ]]> */
+    /* Extra space: 9 chars for <![CDATA[ and 3 for ]]> = 12, doubled for UTF-16 */
+    result = malloc(len + 24 * char_size + char_size);
+    if (!result)
+        return NULL;
+
+    dst = result;
+    /* Copy everything up to content_start */
+    for (p = ptr; p < content_start; p++)
+        *dst++ = *p;
+    /* Insert <![CDATA[ */
+    if (is_utf16)
+    {
+        *dst++ = '<'; *dst++ = 0;
+        *dst++ = '!'; *dst++ = 0;
+        *dst++ = '['; *dst++ = 0;
+        *dst++ = 'C'; *dst++ = 0;
+        *dst++ = 'D'; *dst++ = 0;
+        *dst++ = 'A'; *dst++ = 0;
+        *dst++ = 'T'; *dst++ = 0;
+        *dst++ = 'A'; *dst++ = 0;
+        *dst++ = '['; *dst++ = 0;
+    }
+    else
+    {
+        memcpy(dst, "<![CDATA[", 9);
+        dst += 9;
+    }
+    /* Copy the content */
+    for (p = content_start; p < content_end; p++)
+        *dst++ = *p;
+    /* Insert ]]> */
+    if (is_utf16)
+    {
+        *dst++ = ']'; *dst++ = 0;
+        *dst++ = ']'; *dst++ = 0;
+        *dst++ = '>'; *dst++ = 0;
+    }
+    else
+    {
+        memcpy(dst, "]]>", 3);
+        dst += 3;
+    }
+    /* Copy the rest */
+    for (p = content_end; p < end; p++)
+        *dst++ = *p;
+
+    if (is_utf16)
+        *dst++ = 0;
+    *dst = '\0';
+    *new_len = dst - result - (is_utf16 ? 1 : 0);
+    return result;
+}
+
 static xmlDocPtr doparse(domdoc* This, char const* ptr, int len, xmlCharEncoding encoding)
 {
     char *ctx_encoding;
     xmlDocPtr doc = NULL;
     xmlParserCtxtPtr pctx;
+    char *modified_ptr = NULL;
+    int modified_len;
     static xmlSAXHandler sax_handler = {
         xmlSAX2InternalSubset,          /* internalSubset */
         xmlSAX2IsStandalone,            /* isStandalone */
@@ -539,10 +943,19 @@ static xmlDocPtr doparse(domdoc* This, char const* ptr, int len, xmlCharEncoding
         sax_serror                      /* serror */
     };
 
+    /* Wrap embedded XML declarations in CDATA - Windows MSXML tolerates these but libxml2 rejects them */
+    modified_ptr = wrap_embedded_xml_in_cdata(ptr, len, &modified_len, encoding);
+    if (modified_ptr)
+    {
+        ptr = modified_ptr;
+        len = modified_len;
+    }
+
     pctx = xmlCreateMemoryParserCtxt(ptr, len);
     if (!pctx)
     {
         ERR("Failed to create parser context\n");
+        free(modified_ptr);
         return NULL;
     }
 
@@ -569,6 +982,7 @@ static xmlDocPtr doparse(domdoc* This, char const* ptr, int len, xmlCharEncoding
     ctx_encoding = (char *)pctx->encoding;
     pctx->encoding = NULL;
     xmlFreeParserCtxt(pctx);
+    free(modified_ptr);
 
     /* TODO: put this in one of the SAX callbacks */
     /* create first child as a <?xml...?> */
