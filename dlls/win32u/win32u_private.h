@@ -200,8 +200,6 @@ extern BOOL get_float_gamma_ramp( float *ramp, LONG *serial );
 extern BOOL get_global_gamma_ramp( void *data );
 extern BOOL set_global_gamma_ramp( void *data );
 
-extern void fixup_device_id( const struct pci_id **pci_id );
-
 /* d3dkmtc. */
 
 struct gpu_info
