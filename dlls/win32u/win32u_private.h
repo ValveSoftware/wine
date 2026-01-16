@@ -195,7 +195,7 @@ extern void user_lock(void);
 extern void user_unlock(void);
 extern void user_check_not_lock(void);
 extern BOOL get_gpu_uuid_from_luid( const LUID *luid, GUID *uuid );
-extern BOOL get_gpu_luid_from_uuid( const GUID *uuid, LUID *luid, UINT32 *node_mask );
+extern BOOL get_gpu_info_from_uuid( const GUID *uuid, LUID *luid, UINT32 *node_mask, char *name );
 extern BOOL get_float_gamma_ramp( float *ramp, LONG *serial );
 extern BOOL get_global_gamma_ramp( void *data );
 extern BOOL set_global_gamma_ramp( void *data );
@@ -408,6 +408,13 @@ static inline UINT asciiz_to_unicode( WCHAR *dst, const char *src )
     WCHAR *p = dst;
     while ((*p++ = *src++));
     return (p - dst) * sizeof(WCHAR);
+}
+
+static inline UINT unicodez_to_ascii( char *dst, const WCHAR *src )
+{
+    char *p = dst;
+    while ((*p++ = *src++));
+    return p - dst;
 }
 
 static inline BOOL is_win9x(void)
