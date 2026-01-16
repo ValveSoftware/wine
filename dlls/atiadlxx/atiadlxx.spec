@@ -882,7 +882,7 @@
 @ stub ADL_Display_LCDRefreshRate_Set
 @ stub ADL_Display_Limits_Get
 @ stub ADL_Display_MVPUCaps_Get
-@ stub ADL_Display_MVPUStatus_Get
+@ cdecl ADL_Display_MVPUStatus_Get(long ptr)
 @ stub ADL_Display_ModeTimingOverrideInfo_Get
 @ stub ADL_Display_ModeTimingOverrideListX2_Get
 @ stub ADL_Display_ModeTimingOverrideList_Get

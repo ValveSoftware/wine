@@ -279,6 +279,23 @@ typedef struct ADLDDCInfo2
     int iReserved[2];
 } ADLDDCInfo2;
 
+#define ADL_DL_MAX_MVPU_ADAPTERS   4
+
+typedef struct ADLAdapterLocation
+{
+    int iBus;
+    int iDevice;
+    int iFunction;
+} ADLAdapterLocation, ADLBdf;
+
+typedef struct ADLMVPUStatus
+{
+  int iSize;
+  int iActiveAdapterCount;
+  int iStatus;
+  ADLAdapterLocation aAdapterLocation[ADL_DL_MAX_MVPU_ADAPTERS];
+} ADLMVPUStatus;
+
 static const ADLVersionsInfo version = {
     "99.19.02-230831a-396538C-AMD-Software-Adrenalin-Edition",
     "",
@@ -1075,4 +1092,12 @@ int CDECL ADL_Display_DisplayMapConfig_Get(int adapter_index, int *display_map_c
 
     return ADL2_Display_DisplayMapConfig_Get(default_ctx, adapter_index, display_map_count, display_maps,
             display_target_count, display_targets, options);
+}
+
+int CDECL ADL_Display_MVPUStatus_Get(int adapter_index, ADLMVPUStatus *mvpu_status)
+{
+    TRACE("adapter_index %d, mvpu_status %p.\n", adapter_index, mvpu_status);
+
+    memset(&mvpu_status->iActiveAdapterCount, 0, sizeof(*mvpu_status) - offsetof(ADLMVPUStatus, iActiveAdapterCount));
+    return ADL_OK;
 }
