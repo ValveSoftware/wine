@@ -537,7 +537,12 @@ BOOL X11DRV_ProcessEvents( DWORD mask )
         }
 
         count++;
-        if (overlay_enabled && filter_event( data->display, &event, (char *)overlay_filter )) continue;
+        if (overlay_enabled && filter_event( data->display, &event, (char *)overlay_filter ))
+        {
+            get_event_data( &event );
+            free_event_data( &event );
+            continue;
+        }
         if (XFilterEvent( &event, None )) continue;
         if (host_window_filter_event( &event, &prev_event )) continue;
 
