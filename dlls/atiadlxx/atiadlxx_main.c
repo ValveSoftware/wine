@@ -296,6 +296,28 @@ typedef struct ADLMVPUStatus
   ADLAdapterLocation aAdapterLocation[ADL_DL_MAX_MVPU_ADAPTERS];
 } ADLMVPUStatus;
 
+typedef struct ADLODClockSetting
+{
+    int iDefaultClock;
+    int iCurrentClock;
+    int iMaxClock;
+    int iMinClock;
+    int iRequestedClock;
+    int iStepClock;
+} ADLODClockSetting;
+
+#define ADL_DL_CLOCKINFO_FLAG_FULLSCREEN3DONLY   0x00000001
+#define ADL_DL_CLOCKINFO_FLAG_ALWAYSFULLSCREEN3D 0x00000002
+#define ADL_DL_CLOCKINFO_FLAG_VPURECOVERYREDUCED 0x00000004
+#define ADL_DL_CLOCKINFO_FLAG_THERMALPROTECTION  0x00000008
+typedef struct ADLAdapterODClockInfo
+{
+    int iSize;
+    int iFlags;
+    ADLODClockSetting sMemoryClock;
+    ADLODClockSetting sEngineClock;
+} ADLAdapterODClockInfo;
+
 static const ADLVersionsInfo version = {
     "99.19.02-230831a-396538C-AMD-Software-Adrenalin-Edition",
     "",
@@ -1099,5 +1121,20 @@ int CDECL ADL_Display_MVPUStatus_Get(int adapter_index, ADLMVPUStatus *mvpu_stat
     TRACE("adapter_index %d, mvpu_status %p.\n", adapter_index, mvpu_status);
 
     memset(&mvpu_status->iActiveAdapterCount, 0, sizeof(*mvpu_status) - offsetof(ADLMVPUStatus, iActiveAdapterCount));
+    return ADL_OK;
+}
+
+int CDECL ADL_Display_ODClockInfo_Get(int adapter_index, ADLAdapterODClockInfo *clock_info)
+{
+    FIXME("adapter_index %d, clock_info %p stub.\n", adapter_index, clock_info);
+
+    clock_info->iFlags = ADL_DL_CLOCKINFO_FLAG_ALWAYSFULLSCREEN3D;
+    clock_info->sMemoryClock.iStepClock = 500;
+    clock_info->sMemoryClock.iDefaultClock = 210000;
+    clock_info->sMemoryClock.iMaxClock = 210000;
+    clock_info->sMemoryClock.iMinClock = 210000;
+    clock_info->sMemoryClock.iCurrentClock = 210000;
+    clock_info->sMemoryClock.iRequestedClock = 210000;
+    clock_info->sEngineClock = clock_info->sMemoryClock;
     return ADL_OK;
 }
