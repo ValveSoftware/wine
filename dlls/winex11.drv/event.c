@@ -514,7 +514,12 @@ static BOOL process_events( Display *display, Bool (*filter)(Display*, XEvent*,X
     while (XCheckIfEvent( display, &event, filter, (char *)arg ))
     {
         count++;
-        if (overlay_enabled && filter_event( display, &event, (char *)overlay_filter )) continue;
+        if (overlay_enabled && filter_event( display, &event, (char *)overlay_filter )) 
+        {
+            get_event_data( &event );
+            free_event_data( &event );
+            continue;
+        }
         if (XFilterEvent( &event, None ))
         {
             /*
