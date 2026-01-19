@@ -1883,6 +1883,23 @@ static HRESULT media_engine_set_current_time(struct media_engine *engine, double
         return S_OK;
     }
 
+    /* HACK: Don't seek if the time delta is too small. */
+    do
+    {
+        const char *game_id = getenv("SteamGameId");
+        MFTIME clocktime;
+
+        if (game_id && !strcmp(game_id, "3185890"))
+        {
+            if (IMFMediaEngineEx_IsPaused(&engine->IMFMediaEngineEx_iface)
+                    || FAILED(IMFPresentationClock_GetTime(engine->clock, &clocktime)))
+                break;
+
+            if (fabs(mftime_to_seconds(clocktime) - seektime) < 0.01)
+                return S_OK;
+        }
+    } while(0);
+
     engine->next_seek = NAN;
 
     position.vt = VT_I8;
