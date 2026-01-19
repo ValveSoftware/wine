@@ -176,6 +176,7 @@ struct hid_joystick
 {
     struct dinput_device base;
     BOOL wgi_device;
+    BOOL is_gamepad;
 
     HANDLE device;
     OVERLAPPED read_ovl;
@@ -1331,7 +1332,14 @@ static BOOL read_device_state_value( struct dinput_device *device, UINT index, s
         if (instance->dwType & DIDFT_POV) value = -1;
         else if (instance->dwType & DIDFT_AXIS)
         {
-            if (!properties->range_min) value = properties->range_max / 2;
+            if (!properties->range_min)
+            {
+                if (impl->is_gamepad && instance->wUsagePage == HID_USAGE_PAGE_GENERIC &&
+                        (instance->wUsage == HID_USAGE_GENERIC_Z || instance->wUsage == HID_USAGE_GENERIC_RZ))
+                    value = properties->range_min;
+                else
+                    value = properties->range_max / 2;
+            }
             else value = round( (properties->range_min + properties->range_max) / 2.0 );
         }
     }
@@ -2128,6 +2136,16 @@ static BOOL init_pid_caps( struct dinput_device *device, UINT index, struct hid_
     return DIENUM_CONTINUE;
 }
 
+static BOOL hid_joystick_is_gamepad(DWORD type, DWORD version)
+{
+    const DWORD joystick_type = DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8) | DIDEVTYPE_HID;
+
+    if (version >= 0x0800)
+        return (GET_DIDEVICE_TYPE(type) == DI8DEVTYPE_GAMEPAD);
+
+    return type == joystick_type;
+}
+
 HRESULT hid_joystick_create_device( struct dinput *dinput, const GUID *guid, IDirectInputDevice8W **out )
 {
     static const DIPROPHEADER filter =
@@ -2182,6 +2200,7 @@ HRESULT hid_joystick_create_device( struct dinput *dinput, const GUID *guid, IDi
     if (hr != DI_OK) goto failed;
 
     impl->base.caps.dwDevType = impl->base.instance.dwDevType;
+    impl->is_gamepad = hid_joystick_is_gamepad(impl->base.caps.dwDevType, dinput->dwVersion);
     impl->attrs = attrs;
     list_init( &impl->effect_list );
 
