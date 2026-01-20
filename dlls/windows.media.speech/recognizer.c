@@ -22,6 +22,7 @@
 #include "initguid.h"
 #include "audioclient.h"
 #include "mmdeviceapi.h"
+#include "devpkey.h"
 
 #include "wine/debug.h"
 
@@ -1959,10 +1960,12 @@ static HRESULT recognizer_factory_create_audio_capture(struct session *session)
 {
     const REFERENCE_TIME buffer_duration = 5000000; /* 0.5 second */
     IMMDeviceEnumerator *mm_enum = NULL;
+    IPropertyStore *mm_propstore = NULL;
     IMMDevice *mm_device = NULL;
     WAVEFORMATEX wfx = { 0 };
     WCHAR *str = NULL;
     HRESULT hr = S_OK;
+    PROPVARIANT pv;
 
     if (!(session->audio_buf_event = CreateEventW(NULL, FALSE, FALSE, NULL)))
         return HRESULT_FROM_WIN32(GetLastError());
@@ -1973,11 +1976,16 @@ static HRESULT recognizer_factory_create_audio_capture(struct session *session)
     if (FAILED(hr = IMMDeviceEnumerator_GetDefaultAudioEndpoint(mm_enum, eCapture, eMultimedia, &mm_device)))
         goto cleanup;
 
+    if (FAILED(hr = IMMDevice_OpenPropertyStore(mm_device, STGM_READ, &mm_propstore)))
+        goto cleanup;
+
     if (FAILED(hr = IMMDevice_Activate(mm_device, &IID_IAudioClient, CLSCTX_INPROC_SERVER, NULL, (void **)&session->audio_client)))
         goto cleanup;
 
-    hr = IMMDevice_GetId(mm_device, &str);
-    TRACE("selected capture device ID: %s, hr %#lx\n", debugstr_w(str), hr);
+    PropVariantInit(&pv);
+    IPropertyStore_GetValue(mm_propstore, (const PROPERTYKEY*)&DEVPKEY_Device_FriendlyName, &pv);
+    IMMDevice_GetId(mm_device, &str);
+    TRACE("selected capture device ID: %s, name %s.\n", debugstr_w(str), debugstr_w(pv.pwszVal));
 
     wfx.wFormatTag = WAVE_FORMAT_PCM;
     wfx.nSamplesPerSec = 16000;
@@ -1999,8 +2007,10 @@ static HRESULT recognizer_factory_create_audio_capture(struct session *session)
     session->capture_wfx = wfx;
 
 cleanup:
+    if (mm_propstore) IPropertyStore_Release(mm_propstore);
     if (mm_device) IMMDevice_Release(mm_device);
     if (mm_enum) IMMDeviceEnumerator_Release(mm_enum);
+    PropVariantClear(&pv);
     CoTaskMemFree(str);
     return hr;
 }
