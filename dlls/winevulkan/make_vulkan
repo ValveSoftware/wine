@@ -64,7 +64,7 @@ from enum import Enum
 LOGGER = logging.Logger("vulkan")
 LOGGER.addHandler(logging.StreamHandler())
 
-VK_XML_VERSION = "1.4.339"
+VK_XML_VERSION = "1.4.340"
 WINE_VK_VERSION = (1, 4)
 
 # Filenames to create.
@@ -168,6 +168,8 @@ PERF_CRITICAL_FUNCTIONS = [
     "vkUpdateDescriptorSets",
     "vkUpdateDescriptorSetWithTemplate",
     "vkGetDescriptorEXT",
+    "vkWriteResourceDescriptorsEXT",
+    "vkWriteSamplerDescriptorsEXT",
 ]
 
 # Table of functions for which we have a special implementation.
@@ -2164,6 +2166,9 @@ class StructConversionFunction(object):
             body += "static void {0}(".format(self.name)
 
             params = ["const {0} *in".format(self.type), "{0} *out".format(self.type)]
+
+            if self.operand.union:
+                params.append("VkFlags selector")
 
             # Generate parameter list
             if needs_alloc:
