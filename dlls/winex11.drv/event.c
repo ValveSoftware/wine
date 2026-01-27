@@ -700,7 +700,7 @@ static void set_focus( Display *display, HWND focus, Time time )
 
     TRACE( "setting foreground window to %p\n", focus );
 
-    if (X11DRV_HasWindowManager( "steamcompmgr" ) || !is_net_supported( x11drv_atom(_NET_ACTIVE_WINDOW) ))
+    if (!is_net_supported( x11drv_atom(_NET_ACTIVE_WINDOW) ))
     {
         NtUserSetForegroundWindow( focus );
 
@@ -969,8 +969,7 @@ static void focus_out( Display *display , HWND hwnd )
     /* don't reset the foreground window, if the window which is
        getting the focus is a Wine window */
 
-    if ((X11DRV_HasWindowManager( "steamcompmgr" ) || !is_net_supported( x11drv_atom(_NET_ACTIVE_WINDOW) ))
-            && !is_current_process_focused())
+    if (!is_net_supported( x11drv_atom(_NET_ACTIVE_WINDOW) ) && !is_current_process_focused())
     {
         /* Abey : 6-Oct-99. Check again if the focus out window is the
            Foreground window, because in most cases the messages sent
