@@ -2268,16 +2268,11 @@ static void test_topology_loader(void)
         ATTR_UINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, 1),
         ATTR_UINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 8),
     };
-    static const media_type_desc audio_float_44100_stereo =
+    static const media_type_desc audio_float_44100_no_ch =
     {
         ATTR_GUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio),
         ATTR_GUID(MF_MT_SUBTYPE, MFAudioFormat_Float),
-        ATTR_UINT32(MF_MT_AUDIO_NUM_CHANNELS, 2),
-        ATTR_UINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, 2 * 4),
-        ATTR_UINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, 44100),
-        ATTR_UINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, 2 * 4 * 44100),
         ATTR_UINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 4 * 8),
-        ATTR_UINT32(MF_MT_AUDIO_CHANNEL_MASK, 3, .todo = TRUE),
         ATTR_UINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, 1),
     };
     static const media_type_desc video_i420_1280 =
@@ -2468,9 +2463,9 @@ static void test_topology_loader(void)
             .expected_result = S_OK, .decoder_class = CLSID_CMP3DecMediaObject,
         },
         {
-            /* MP3 -> PCM, need both decoder and converter */
+            /* MP3 -> float, need both decoder and converter */
             .input_type = &audio_mp3_44100, .output_type = &audio_float_48000, .sink_method = MF_CONNECT_ALLOW_DECODER, .source_method = -1,
-            .current_input = &audio_mp3_44100, .decoded_type = &audio_float_44100_stereo,
+            .current_input = &audio_mp3_44100, .decoded_type = &audio_float_44100_no_ch,
             .expected_result = S_OK, .decoder_class = CLSID_CMP3DecMediaObject, .converter_class = CLSID_CResamplerMediaObject,
         },
 
