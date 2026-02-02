@@ -248,7 +248,7 @@ static void test_CM_Get_Device_ID_List(void)
         ok(!ret, "got %#lx.\n", ret);
         ok(!wcscmp(id, instances[i].id), "got %s, expected %s.\n", debugstr_w(id), debugstr_w(instances[i].id));
         size = len;
-        ret = CM_Get_DevNode_PropertyW(instances[i].inst, &DEVPROPKEY_GPU_LUID, &type, wbuf, &size, 0);
+        ret = CM_Get_DevNode_PropertyW(instances[i].inst, &DEVPROPKEY_GPU_LUID, &type, (BYTE *)wbuf, &size, 0);
         ok(!ret || ret == CR_NO_SUCH_VALUE, "got %#lx.\n", ret);
         if (!ret)
             ok(type == DEVPROP_TYPE_UINT64, "got %#lx.\n", type);

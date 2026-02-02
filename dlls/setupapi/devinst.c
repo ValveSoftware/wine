@@ -5516,7 +5516,7 @@ CONFIGRET WINAPI CM_Get_DevNode_Property_ExW(DEVINST devnode, const DEVPROPKEY *
  *              CM_Get_DevNode_PropertyW (SETUPAPI.@)
  */
 CONFIGRET WINAPI CM_Get_DevNode_PropertyW(DEVINST dev, const DEVPROPKEY *key, DEVPROPTYPE *type,
-    PVOID buf, PULONG len, ULONG flags)
+    BYTE *buf, PULONG len, ULONG flags)
 {
     return CM_Get_DevNode_Property_ExW(dev, key, type, buf, len, flags, NULL);
 }
