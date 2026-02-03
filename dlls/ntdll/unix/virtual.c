@@ -994,11 +994,22 @@ static void load_steam_overlay(const char *unix_lib_path)
 }
 
 /***********************************************************************
+ *           get_unixlib_funcs
+ */
+static NTSTATUS get_unixlib_funcs( void *so_handle, BOOL wow, const void **funcs )
+{
+    const char *name = wow ? "__wine_unix_call_wow64_funcs" : "__wine_unix_call_funcs";
+
+    *funcs = dlsym( so_handle, name );
+    return *funcs ? STATUS_SUCCESS : STATUS_ENTRYPOINT_NOT_FOUND;
+}
+
+
+/***********************************************************************
  *           load_builtin_unixlib
  */
 static NTSTATUS load_builtin_unixlib( void *module, BOOL wow, const void **funcs )
 {
-    const char *ptr_name = wow ? "__wine_unix_call_wow64_funcs" : "__wine_unix_call_funcs";
     sigset_t sigset;
     NTSTATUS status = STATUS_DLL_NOT_FOUND;
     struct builtin_module *builtin;
@@ -1013,11 +1024,7 @@ static NTSTATUS load_builtin_unixlib( void *module, BOOL wow, const void **funcs
             if (!builtin->unix_handle)
                 WARN_(module)( "failed to load %s: %s\n", debugstr_a(builtin->unix_path), dlerror() );
         }
-        if (builtin->unix_handle)
-        {
-            *funcs = dlsym( builtin->unix_handle, ptr_name );
-            status = *funcs ? STATUS_SUCCESS : STATUS_ENTRYPOINT_NOT_FOUND;
-        }
+        if (builtin->unix_handle) status = get_unixlib_funcs( builtin->unix_handle, wow, funcs );
     }
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
     return status;
