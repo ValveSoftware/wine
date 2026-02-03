@@ -988,9 +988,9 @@ static void load_steam_overlay(const char *unix_lib_path)
 }
 
 /***********************************************************************
- *           get_builtin_unix_funcs
+ *           load_builtin_unixlib
  */
-static NTSTATUS get_builtin_unix_funcs( void *module, BOOL wow, const void **funcs )
+static NTSTATUS load_builtin_unixlib( void *module, BOOL wow, const void **funcs )
 {
     const char *ptr_name = wow ? "__wine_unix_call_wow64_funcs" : "__wine_unix_call_funcs";
     sigset_t sigset;
@@ -1021,9 +1021,9 @@ static NTSTATUS get_builtin_unix_funcs( void *module, BOOL wow, const void **fun
 
 
 /***********************************************************************
- *           load_builtin_unixlib
+ *           set_builtin_unixlib_name
  */
-NTSTATUS load_builtin_unixlib( void *module, const char *name )
+NTSTATUS set_builtin_unixlib_name( void *module, const char *name )
 {
     sigset_t sigset;
     NTSTATUS status = STATUS_SUCCESS;
@@ -6601,15 +6601,15 @@ NTSTATUS WINAPI NtQueryVirtualMemory( HANDLE process, LPCVOID addr,
         case MemoryImageInformation:
             return get_memory_image_info( process, addr, buffer, len, res_len );
 
-        case MemoryWineUnixFuncs:
-        case MemoryWineUnixWow64Funcs:
+        case MemoryWineLoadUnixLib:
+        case MemoryWineLoadUnixLibWow64:
             if (len != sizeof(unixlib_handle_t)) return STATUS_INFO_LENGTH_MISMATCH;
             if (process == GetCurrentProcess())
             {
                 void *module = (void *)addr;
                 const void *funcs = NULL;
 
-                status = get_builtin_unix_funcs( module, info_class == MemoryWineUnixWow64Funcs, &funcs );
+                status = load_builtin_unixlib( module, info_class == MemoryWineLoadUnixLibWow64, &funcs );
                 if (!status) *(unixlib_handle_t *)buffer = (UINT_PTR)funcs;
                 return status;
             }

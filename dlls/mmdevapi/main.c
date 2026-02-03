@@ -89,7 +89,7 @@ static BOOL load_driver(const WCHAR *name, DriverFuncs *driver)
         return FALSE;
     }
 
-    if ((status = NtQueryVirtualMemory(GetCurrentProcess(), driver->module, MemoryWineUnixFuncs,
+    if ((status = NtQueryVirtualMemory(GetCurrentProcess(), driver->module, MemoryWineLoadUnixLib,
         &driver->module_unixlib, sizeof(driver->module_unixlib), NULL))) {
         ERR("Unable to load UNIX functions: %lx\n", status);
         goto fail;

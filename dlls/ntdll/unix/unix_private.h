@@ -332,7 +332,7 @@ extern void virtual_set_large_address_space(void);
 extern void virtual_fill_image_information( const struct pe_image_info *pe_info,
                                             SECTION_IMAGE_INFORMATION *info );
 extern void *get_builtin_so_handle( void *module );
-extern NTSTATUS load_builtin_unixlib( void *module, const char *name );
+extern NTSTATUS set_builtin_unixlib_name( void *module, const char *name );
 extern BOOL is_emulated_code( ULONG_PTR ptr );
 
 extern NTSTATUS get_thread_ldt_entry( HANDLE handle, THREAD_DESCRIPTOR_INFORMATION *info, ULONG len );

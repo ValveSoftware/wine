@@ -91,6 +91,6 @@ NTSTATUS __attribute__((naked)) __wine_unix_call_arm64ec( unixlib_handle_t handl
 
 NTSTATUS WINAPI __wine_init_unix_call(void)
 {
-    return NtQueryVirtualMemory( GetCurrentProcess(), image_base(), MemoryWineUnixFuncs,
+    return NtQueryVirtualMemory( GetCurrentProcess(), image_base(), MemoryWineLoadUnixLib,
                                  &__wine_unixlib_handle, sizeof(__wine_unixlib_handle), NULL );
 }
