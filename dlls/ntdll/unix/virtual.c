@@ -919,25 +919,33 @@ static void add_builtin_module( void *module, void *handle )
 
 
 /***********************************************************************
- *           release_builtin_module
+ *           get_builtin_module
  */
-static void release_builtin_module( void *module )
+static struct builtin_module *get_builtin_module( void *module )
 {
     struct builtin_module *builtin;
 
     LIST_FOR_EACH_ENTRY( builtin, &builtin_modules, struct builtin_module, entry )
-    {
-        if (builtin->module != module) continue;
-        if (!--builtin->refcount)
-        {
-            list_remove( &builtin->entry );
-            if (builtin->handle) dlclose( builtin->handle );
-            if (builtin->unix_handle) dlclose( builtin->unix_handle );
-            free( builtin->unix_path );
-            free( builtin );
-        }
-        break;
-    }
+        if (builtin->module == module) return builtin;
+
+    return NULL;
+}
+
+
+/***********************************************************************
+ *           release_builtin_module
+ */
+static void release_builtin_module( void *module )
+{
+    struct builtin_module *builtin = get_builtin_module( module );
+
+    if (!builtin) return;
+    if (--builtin->refcount) return;
+    list_remove( &builtin->entry );
+    if (builtin->handle) dlclose( builtin->handle );
+    if (builtin->unix_handle) dlclose( builtin->unix_handle );
+    free( builtin->unix_path );
+    free( builtin );
 }
 
 
@@ -951,12 +959,10 @@ void *get_builtin_so_handle( void *module )
     struct builtin_module *builtin;
 
     server_enter_uninterrupted_section( &virtual_mutex, &sigset );
-    LIST_FOR_EACH_ENTRY( builtin, &builtin_modules, struct builtin_module, entry )
+    if ((builtin = get_builtin_module( module )))
     {
-        if (builtin->module != module) continue;
         ret = builtin->handle;
         if (ret) builtin->refcount++;
-        break;
     }
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
     return ret;
@@ -998,9 +1004,8 @@ static NTSTATUS load_builtin_unixlib( void *module, BOOL wow, const void **funcs
     struct builtin_module *builtin;
 
     server_enter_uninterrupted_section( &virtual_mutex, &sigset );
-    LIST_FOR_EACH_ENTRY( builtin, &builtin_modules, struct builtin_module, entry )
+    if ((builtin = get_builtin_module( module )))
     {
-        if (builtin->module != module) continue;
         if (builtin->unix_path && !builtin->unix_handle)
         {
             load_steam_overlay(builtin->unix_path);
@@ -1013,7 +1018,6 @@ static NTSTATUS load_builtin_unixlib( void *module, BOOL wow, const void **funcs
             *funcs = dlsym( builtin->unix_handle, ptr_name );
             status = *funcs ? STATUS_SUCCESS : STATUS_ENTRYPOINT_NOT_FOUND;
         }
-        break;
     }
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
     return status;
@@ -1030,9 +1034,8 @@ NTSTATUS set_builtin_unixlib_name( void *module, const char *name )
     struct builtin_module *builtin;
 
     server_enter_uninterrupted_section( &virtual_mutex, &sigset );
-    LIST_FOR_EACH_ENTRY( builtin, &builtin_modules, struct builtin_module, entry )
+    if ((builtin = get_builtin_module( module )))
     {
-        if (builtin->module != module) continue;
         if (!builtin->unix_path) builtin->unix_path = strdup( name );
         else status = STATUS_IMAGE_ALREADY_LOADED;
         if (!builtin->unix_handle)
@@ -1040,7 +1043,6 @@ NTSTATUS set_builtin_unixlib_name( void *module, const char *name )
             load_steam_overlay(builtin->unix_path);
             builtin->unix_handle = dlopen( builtin->unix_path, RTLD_NOW );
         }
-        break;
     }
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
     return status;
@@ -6889,18 +6891,14 @@ static NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr, ULONG flags )
     }
     if (view->protect & VPROT_SYSTEM)
     {
-        struct builtin_module *builtin;
+        struct builtin_module *builtin = get_builtin_module( view->base );
 
-        LIST_FOR_EACH_ENTRY( builtin, &builtin_modules, struct builtin_module, entry )
+        if (builtin && builtin->refcount > 1)
         {
-            if (builtin->module != view->base) continue;
-            if (builtin->refcount > 1)
-            {
-                TRACE( "not freeing in-use builtin %p\n", view->base );
-                builtin->refcount--;
-                server_leave_uninterrupted_section( &virtual_mutex, &sigset );
-                return STATUS_SUCCESS;
-            }
+            TRACE( "not freeing in-use builtin %p\n", view->base );
+            builtin->refcount--;
+            server_leave_uninterrupted_section( &virtual_mutex, &sigset );
+            return STATUS_SUCCESS;
         }
     }
 
