@@ -495,7 +495,7 @@ static void set_property( struct window *win, atom_t atom, lparam_t data, enum p
     }
 
     /* need to add an entry */
-    if (!grab_atom( table, atom )) return;
+    if (type == PROP_TYPE_STRING && !grab_atom( table, atom )) return;
     if (free == -1)
     {
         /* no free entry */
@@ -506,7 +506,7 @@ static void set_property( struct window *win, atom_t atom, lparam_t data, enum p
                                        sizeof(*new_props) * (win->prop_alloc + 16) )))
             {
                 set_error( STATUS_NO_MEMORY );
-                release_atom( table, atom );
+                if (type == PROP_TYPE_STRING) release_atom( table, atom );
                 return;
             }
             win->prop_alloc += 16;
@@ -527,12 +527,13 @@ static lparam_t remove_property( struct window *win, atom_t atom )
 
     for (i = 0; i < win->prop_inuse; i++)
     {
-        if (win->properties[i].type == PROP_TYPE_FREE) continue;
-        if (win->properties[i].atom == atom)
+        struct property *prop = win->properties + i;
+        if (prop->type == PROP_TYPE_FREE) continue;
+        if (prop->atom == atom)
         {
-            release_atom( table, atom );
-            win->properties[i].type = PROP_TYPE_FREE;
-            return win->properties[i].data;
+            if (prop->type == PROP_TYPE_STRING) release_atom( table, atom );
+            prop->type = PROP_TYPE_FREE;
+            return prop->data;
         }
     }
     /* FIXME: last error? */
@@ -562,8 +563,9 @@ static inline void destroy_properties( struct window *win )
     if (!win->properties) return;
     for (i = 0; i < win->prop_inuse; i++)
     {
-        if (win->properties[i].type == PROP_TYPE_FREE) continue;
-        release_atom( table, win->properties[i].atom );
+        struct property *prop = win->properties + i;
+        if (prop->type == PROP_TYPE_FREE) continue;
+        if (prop->type == PROP_TYPE_STRING) release_atom( table, prop->atom );
     }
     free( win->properties );
 }

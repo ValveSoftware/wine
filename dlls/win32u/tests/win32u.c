@@ -396,9 +396,9 @@ static void test_class(void)
     todo_wine ok( status == STATUS_INVALID_HANDLE, "NtQueryInformationAtom returned %#lx\n", status );
 
     ret = SetPropW( hwnd, MAKEINTRESOURCEW(0xc000), (void *)0xdeadbeef );
-    todo_wine ok( ret, "SetPropW returned %lu\n", ret );
+    ok( ret, "SetPropW returned %lu\n", ret );
     prop = GetPropW( hwnd, MAKEINTRESOURCEW(0xc000) );
-    todo_wine ok( prop == (void *)0xdeadbeef, "GetPropW returned %p\n", prop );
+    ok( prop == (void *)0xdeadbeef, "GetPropW returned %p\n", prop );
     prop = GetPropW( hwnd, MAKEINTRESOURCEW(0xc001) );
     ok( !prop, "GetPropW returned %p\n", prop );
 
