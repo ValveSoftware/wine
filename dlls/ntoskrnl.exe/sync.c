@@ -429,7 +429,8 @@ LONG WINAPI KeReleaseMutex( PRKMUTEX mutex, BOOLEAN wait )
 /***********************************************************************
  *           KeInitializeGuardedMutex   (NTOSKRNL.EXE.@)
  */
-void WINAPI KeInitializeGuardedMutex(PKGUARDED_MUTEX mutex)
+DEFINE_FASTCALL1_WRAPPER(KeInitializeGuardedMutex)
+void FASTCALL KeInitializeGuardedMutex(PKGUARDED_MUTEX mutex)
 {
     TRACE("mutex %p.\n", mutex);
     mutex->Count = FM_LOCK_BIT;

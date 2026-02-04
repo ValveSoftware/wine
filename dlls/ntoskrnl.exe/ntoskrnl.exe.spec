@@ -587,7 +587,7 @@
 @ stub KeInitializeInterrupt
 @ stub KeInitializeMutant
 @ stdcall KeInitializeMutex(ptr long)
-@ stdcall KeInitializeGuardedMutex(ptr)
+@ stdcall -fastcall KeInitializeGuardedMutex(ptr)
 @ stub KeInitializeQueue
 @ stdcall KeInitializeSemaphore(ptr long long)
 @ stdcall KeInitializeSpinLock(ptr) NTOSKRNL_KeInitializeSpinLock
