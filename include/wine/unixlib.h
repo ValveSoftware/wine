@@ -28,6 +28,7 @@
 #include <winternl.h>
 
 typedef UINT64 unixlib_handle_t;
+typedef UINT64 unixlib_module_t;
 
 #ifdef WINE_UNIX_LIB
 

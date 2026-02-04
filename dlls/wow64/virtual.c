@@ -694,10 +694,17 @@ NTSTATUS WINAPI wow64_NtQueryVirtualMemory( UINT *args )
     }
 
     case MemoryWineLoadUnixLibWow64:
+    case MemoryWineLoadUnixLibByNameWow64:
         return STATUS_INVALID_INFO_CLASS;
 
     case MemoryWineLoadUnixLib:
         status = NtQueryVirtualMemory( handle, addr, MemoryWineLoadUnixLibWow64, ptr, len, &res_len );
+        break;
+    case MemoryWineLoadUnixLibByName:
+        status = NtQueryVirtualMemory( handle, addr, MemoryWineLoadUnixLibByNameWow64, ptr, len, &res_len );
+        break;
+    case MemoryWineUnloadUnixLib:
+        status = NtQueryVirtualMemory( handle, addr, class, ptr, len, &res_len );
         break;
 
     default:
