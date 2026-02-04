@@ -1640,6 +1640,7 @@ size_t server_init_process(void)
     sigaddset( &server_block_set, SIGIO );
     sigaddset( &server_block_set, SIGINT );
     sigaddset( &server_block_set, SIGHUP );
+    sigaddset( &server_block_set, SIGQUIT );
     sigaddset( &server_block_set, SIGUSR1 );
     sigaddset( &server_block_set, SIGUSR2 );
     sigaddset( &server_block_set, SIGCHLD );
