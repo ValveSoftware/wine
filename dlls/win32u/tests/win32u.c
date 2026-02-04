@@ -338,14 +338,18 @@ static void test_class(void)
         "NtUserGetClassName returned %lx %lu\n", ret, GetLastError() );
 
     SetPropW( hwnd, L"WineTestProp", (void *)0xdeadbeef );
+    prop = GetPropW( hwnd, L"WineTestProp" );
+    ok( prop == (void *)0xdeadbeef, "GetPropW returned %p\n", prop );
 
     status = NtFindAtom( L"WineTestProp", sizeof(L"WineTestProp") - sizeof(WCHAR), &global );
     ok( !status, "NtFindAtom returned %#lx\n", status );
 
     for (ATOM atom = 0xc000; atom != 0; atom++)
     {
+        name.MaximumLength = sizeof(buf);
         memset( name.Buffer, 0xcc, name.MaximumLength );
         ret = NtUserGetAtomName( atom, &name );
+        ok( ret == 0 || ret == wcslen( buf ), "NtUserGetAtomName %#x returned %lu\n", atom, ret );
         ok( wcscmp( buf, L"WineTestProp" ), "buf = %s\n", debugstr_w(buf) );
     }
 
@@ -358,6 +362,9 @@ static void test_class(void)
     status = NtDeleteAtom( global );
     ok( !status, "NtDeleteAtom returned %#lx\n", status );
 
+    status = NtFindAtom( L"WineTestProp", sizeof(L"WineTestProp") - sizeof(WCHAR), &global );
+    ok( !status, "NtFindAtom returned %#lx\n", status );
+
     cls.lpszClassName = L"WineTestProp";
     class = RegisterClassW( &cls );
     ok( class != 0, "RegisterClassW returned %#x\n", class );
@@ -367,7 +374,33 @@ static void test_class(void)
     ok( ret, "UnregisterClassW failed: %lu\n", GetLastError() );
     cls.lpszClassName = L"test";
 
+    status = NtFindAtom( L"WineTestProp", sizeof(L"WineTestProp") - sizeof(WCHAR), &global );
+    ok( !status, "NtFindAtom returned %#lx\n", status );
+
     RemovePropW( hwnd, L"WineTestProp" );
+
+    status = NtFindAtom( L"WineTestProp", sizeof(L"WineTestProp") - sizeof(WCHAR), &global );
+    ok( status == STATUS_OBJECT_NAME_NOT_FOUND, "NtFindAtom returned %#lx\n", status );
+
+    status = NtQueryInformationAtom( global, AtomBasicInformation, abi, sizeof(abi_buf), NULL );
+    todo_wine ok( status == STATUS_INVALID_HANDLE, "NtQueryInformationAtom returned %#lx\n", status );
+
+    prop = NtUserGetProp( hwnd, MAKEINTRESOURCEW(global) );
+    ok( prop == NULL, "NtUserGetProp returned %p\n", prop );
+    ret = NtUserSetProp( hwnd, MAKEINTRESOURCEW(global), (void *)0xdeadbeef );
+    ok( ret, "NtUserSetProp returned %lu\n", ret );
+    prop = NtUserGetProp( hwnd, MAKEINTRESOURCEW(global) );
+    todo_wine ok( prop == (void *)0xdeadbeef, "NtUserGetProp returned %p\n", prop );
+
+    status = NtQueryInformationAtom( global, AtomBasicInformation, abi, sizeof(abi_buf), NULL );
+    todo_wine ok( status == STATUS_INVALID_HANDLE, "NtQueryInformationAtom returned %#lx\n", status );
+
+    ret = SetPropW( hwnd, MAKEINTRESOURCEW(0xc000), (void *)0xdeadbeef );
+    todo_wine ok( ret, "SetPropW returned %lu\n", ret );
+    prop = GetPropW( hwnd, MAKEINTRESOURCEW(0xc000) );
+    todo_wine ok( prop == (void *)0xdeadbeef, "GetPropW returned %p\n", prop );
+    prop = GetPropW( hwnd, MAKEINTRESOURCEW(0xc001) );
+    ok( !prop, "GetPropW returned %p\n", prop );
 
     DestroyWindow( hwnd );
 
