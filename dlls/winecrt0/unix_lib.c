@@ -94,3 +94,22 @@ NTSTATUS WINAPI __wine_init_unix_call(void)
     return NtQueryVirtualMemory( GetCurrentProcess(), image_base(), MemoryWineLoadUnixLib,
                                  &__wine_unixlib_handle, sizeof(__wine_unixlib_handle), NULL );
 }
+
+NTSTATUS WINAPI __wine_load_unix_lib( const UNICODE_STRING *name, unixlib_module_t *lib,
+                                      unixlib_handle_t *handle )
+{
+    UINT64 res[2];
+    NTSTATUS status = NtQueryVirtualMemory( GetCurrentProcess(), name, MemoryWineLoadUnixLibByName,
+                                            res, handle ? sizeof(res) : sizeof(res[0]), NULL );
+    if (!status)
+    {
+        if (lib) *lib = res[0];
+        if (handle) *handle = res[1];
+    }
+    return status;
+}
+
+NTSTATUS WINAPI __wine_unload_unix_lib( unixlib_module_t lib )
+{
+    return NtQueryVirtualMemory( GetCurrentProcess(), &lib, MemoryWineUnloadUnixLib, NULL, 0, NULL );
+}
