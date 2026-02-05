@@ -216,6 +216,7 @@ enum glx_swap_control_method
 static struct glx_pixel_format *pixel_formats;
 static int nb_pixel_formats, nb_onscreen_formats;
 static const struct egl_platform *egl;
+static EGLContext egl_fallback_context;
 static BOOL (*p_egl_describe_pixel_format)( int format, struct wgl_pixel_format *pf );
 
 /* Selects the preferred GLX swap control method for use by wglSwapIntervalEXT */
@@ -1511,7 +1512,16 @@ static BOOL x11drv_egl_surface_swap( struct opengl_drawable *base )
 
     TRACE( "%s\n", debugstr_opengl_drawable( base ) );
 
-    funcs->p_eglSwapBuffers( egl->display, gl->base.surface );
+    if (!funcs->p_eglSwapBuffers( egl->display, gl->base.surface ) && funcs->p_eglGetError() == EGL_BAD_SURFACE
+        && !funcs->p_eglGetCurrentContext())
+    {
+        if (!egl_fallback_context)
+            egl_fallback_context = funcs->p_eglCreateContext( egl->display, EGL_NO_CONFIG_KHR, EGL_NO_CONTEXT, NULL );
+
+        funcs->p_eglMakeCurrent( egl->display, gl->base.surface, gl->base.surface, egl_fallback_context );
+        funcs->p_eglSwapBuffers( egl->display, gl->base.surface );
+        funcs->p_eglMakeCurrent( egl->display, EGL_NO_CONTEXT, EGL_NO_SURFACE, EGL_NO_CONTEXT );
+    }
 
     if (InterlockedCompareExchange( &base->client->offscreen, 0, 0 ))
         XFlush( gdi_display );
