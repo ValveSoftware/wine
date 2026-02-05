@@ -2092,6 +2092,7 @@ static struct opengl_drawable *get_updated_drawable( HDC hdc, int format, struct
 static BOOL context_sync_drawables( struct wgl_context *context, HDC draw_hdc, HDC read_hdc )
 {
     struct opengl_drawable *new_draw, *new_read, *old_draw = NULL, *old_read = NULL, *draw, *read;
+    static pthread_mutex_t reserved_tx_mutex = PTHREAD_MUTEX_INITIALIZER;
     struct wgl_context *previous = NtCurrentTeb()->glContext;
     BOOL ret = FALSE;
 
@@ -2121,6 +2122,7 @@ static BOOL context_sync_drawables( struct wgl_context *context, HDC draw_hdc, H
 
     if (!ret && (ret = driver_funcs->p_make_current( draw, read, context->driver_private )))
     {
+        const struct opengl_funcs *funcs = &display_funcs;
         NtCurrentTeb()->glContext = context;
 
         if (old_draw && old_draw != new_draw && old_draw != new_read && old_draw->client)
@@ -2132,10 +2134,17 @@ static BOOL context_sync_drawables( struct wgl_context *context, HDC draw_hdc, H
         if (old_draw) opengl_drawable_release( old_draw );
         if (old_read) opengl_drawable_release( old_read );
 
+        pthread_mutex_lock(&reserved_tx_mutex);
+
+        if (!context->reserved_textures)
+        {
+            /* shared contexts may initialise the reserved textures */
+            context->reserved_textures = funcs->p_glIsTexture(WINE_OPENGL_RESERVED_TEXTURE0);
+        }
+
         if (!context->reserved_textures)
         {
             GLuint dummy[WINE_OPENGL_RESERVED_TEXTURE0 - 1], textures[WINE_OPENGL_RESERVED_TEXTURE7 - WINE_OPENGL_RESERVED_TEXTURE0 + 1];
-            const struct opengl_funcs *funcs = &display_funcs;
 
             /* create some reserved textures for internal usage */
             funcs->p_glGenTextures( ARRAY_SIZE(dummy), dummy );
@@ -2145,6 +2154,8 @@ static BOOL context_sync_drawables( struct wgl_context *context, HDC draw_hdc, H
 
             context->reserved_textures = TRUE;
         }
+
+        pthread_mutex_unlock(&reserved_tx_mutex);
 
         opengl_drawable_set_context( new_read, context );
         if (new_read != new_draw) opengl_drawable_set_context( new_draw, context );
