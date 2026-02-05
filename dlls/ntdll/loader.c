@@ -1206,6 +1206,7 @@ static BOOL import_dll( WINE_MODREF *wm, const IMAGE_IMPORT_DESCRIPTOR *descr, L
         {
             TRACE("%s -> ntdll.\n", name);
             name = "ntdll.dll";
+            len = strlen(name);
         }
     }
 
