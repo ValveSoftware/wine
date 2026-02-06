@@ -447,6 +447,7 @@ struct fs_hack_gl_state
     GLboolean clip_distance[8];
     GLboolean color_mask[4];
     GLuint sampler;
+    GLenum draw_buffer, read_buffer;
 };
 
 #define SET 0
@@ -475,11 +476,15 @@ static void fs_hack_handle_fbo_state( int mode, struct wgl_context *ctx, struct 
     {
         funcs->p_glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, (GLint *)&state->draw_fbo );
         funcs->p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)&state->read_fbo );
+        funcs->p_glGetIntegerv( GL_DRAW_BUFFER, (GLint *)&state->draw_buffer );
+        funcs->p_glGetIntegerv( GL_READ_BUFFER, (GLint *)&state->read_buffer );
     }
     else
     {
         funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, state->draw_fbo );
         funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, state->read_fbo );
+        funcs->p_glDrawBuffer( state->draw_buffer );
+        funcs->p_glReadBuffer( state->read_buffer );
     }
 }
 
@@ -672,21 +677,25 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
         general_state_handlers[i]( SET, ctx, &state );
 
     funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
-    funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, surface->base.read_fbo );
 
+    /* the target default framebuffer should be swapped after. We are always presenting framebuffer's surface
+     * front while the color attachment textures are swapped on framebuffer surface swap before blit. */
+    funcs->p_glDrawBuffer( GL_BACK );
     if (!needs_gamma)
     {
+        funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, surface->base.read_fbo );
+        funcs->p_glReadBuffer( GL_COLOR_ATTACHMENT0 );
         funcs->p_glBlitFramebuffer( 0, 0, src.right, src.bottom, 0, 0, dst.right, dst.bottom, GL_COLOR_BUFFER_BIT,
                                     ctx->integer_scaling ? GL_NEAREST : GL_LINEAR );
     }
     else
     {
-        UINT front = surface->base.doublebuffer ? (surface->frame & 1) : 1;
+        UINT fb_texture = surface->base.doublebuffer ? (surface->frame & 1) : 1;
 
         for (int i = 0; i < ARRAY_SIZE(draw_state_handlers); i++)
             draw_state_handlers[i]( SET, ctx, &state );
 
-        funcs->p_glBindTexture( GL_TEXTURE_2D, WINE_OPENGL_RESERVED_TEXTURE0 + (1 - front) );
+        funcs->p_glBindTexture( GL_TEXTURE_2D, WINE_OPENGL_RESERVED_TEXTURE0 + (1 - fb_texture) );
 
         if (ctx->has_GL_ARB_viewport_array) funcs->p_glViewportIndexedf( 0, 0, 0, dst.right, dst.bottom );
         else funcs->p_glViewport( 0, 0, dst.right, dst.bottom );
@@ -715,10 +724,10 @@ static void framebuffer_surface_flush( struct opengl_drawable *drawable, UINT fl
     TRACE( "%s, flags %#x\n", debugstr_opengl_drawable( drawable ), flags );
 
     if (flags & GL_FLUSH_UPDATED && drawable->read_fbo) framebuffer_surface_resize( drawable );
-    if (surface->target)
+    if (surface->target && !(flags & GL_FLUSH_FORCE_SWAP))
     {
         blit_framebuffer_surface( surface );
-        opengl_drawable_flush( surface->target, surface->target->interval, flags );
+        opengl_drawable_swap( surface->target );
     }
 }
 
