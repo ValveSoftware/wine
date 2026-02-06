@@ -509,7 +509,14 @@ sub generate_unix_thunk($$$$)
 
             if ($ptype ne "PTR32")
             {
-                $call_args .= " params->$pname,";
+                if (grep(/^$pname/, @{$map_default_fbo_thunks{$name}}))
+                {
+                    $call_args .= " $pname,";
+                }
+                else
+                {
+                    $call_args .= " params->$pname,";
+                }
             }
             elsif (defined $pointer_array_count{$_} && ($arg_type =~ /\*.*\*/ || $arg_type =~ /(sizei|int)ptr.*\*/))
             {
@@ -593,11 +600,27 @@ sub generate_unix_thunk($$$$)
             }
             else
             {
-                $call_args .= " params->$pname,";
+                if (grep(/^$pname/, @{$map_default_fbo_thunks{$name}}))
+                {
+                    $call_args .= " $pname,";
+                }
+                else
+                {
+                    $call_args .= " params->$pname,";
+                }
             }
         }
         $ret .= "    struct $name\_params *params = args;\n";
     }
+    foreach my $arg (@{$func->[1]})
+    {
+        my $pname = get_arg_name( $arg );
+        if (grep(/^$pname/, @{$map_default_fbo_thunks{$name}}))
+        {
+            $ret .= "    GLuint $pname = params->$pname;\n";
+        }
+    }
+
     $ret .= $vars;
     if ($use_dc)
     {
@@ -627,7 +650,7 @@ sub generate_unix_thunk($$$$)
         my $target = "GL_DRAW_FRAMEBUFFER";
         $target = "GL_READ_FRAMEBUFFER" if $arg =~ "readFramebuffer";
         $target = "params->target" if $call_args =~ "params->target";
-        $ret .= "    if (!params->$arg) params->$arg = get_default_fbo( $teb, $target );\n";
+        $ret .= "    if (!$arg) $arg = get_default_fbo( $teb, $target );\n";
     }
     $ret .= "    resolve_default_fbo( $teb, TRUE );\n" if defined $resolve_default_fbo_thunks{$name};
     $ret .= "    push_default_fbo( $teb );\n" if defined $hide_default_fbo_thunks{$name};
