@@ -1617,6 +1617,8 @@ static void make_context_current( TEB *teb, const struct opengl_funcs *funcs, HD
     ctx->base.has_GL_ARB_vertex_program = !ctx->base.is_core && is_extension_supported( ctx, "GL_ARB_vertex_program" );
     ctx->base.integer_scaling = fs_hack_is_integer();
     fs_hack_setup_gamma_shader( &ctx->base, funcs );
+    /* Drawable's FBO could've changed in driver. */
+    pop_default_fbo( teb );
 }
 
 BOOL wrap_wglMakeCurrent( TEB *teb, HDC hdc, HGLRC hglrc )
@@ -1743,6 +1745,9 @@ static void flush_context( TEB *teb, void (*flush)(void) )
         /* default implementation: call the functions directly */
         if (flush) flush();
     }
+
+    /* Drawable could've changed in p_wgl_context_flush(). */
+    pop_default_fbo( teb );
 
     if (flags & GL_FLUSH_FORCE_SWAP)
     {
