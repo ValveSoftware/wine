@@ -1505,7 +1505,11 @@ typedef struct _KNONVOLATILE_CONTEXT_POINTERS
 #define XSTATE_AVX512_ZMM_H          6
 #define XSTATE_AVX512_ZMM            7
 #define XSTATE_IPT                   8
+#define XSTATE_PASID                 10
 #define XSTATE_CET_U                 11
+#define XSTATE_CET_S                 12
+#define XSTATE_AMX_TILE_CONFIG       17
+#define XSTATE_AMX_TILE_DATA         18
 #define XSTATE_LWP                   62
 #define MAXIMUM_XSTATE_FEATURES      64
 
@@ -1513,6 +1517,16 @@ typedef struct _KNONVOLATILE_CONTEXT_POINTERS
 #define XSTATE_MASK_LEGACY_SSE              (1 << XSTATE_LEGACY_SSE)
 #define XSTATE_MASK_LEGACY                  (XSTATE_MASK_LEGACY_FLOATING_POINT | XSTATE_MASK_LEGACY_SSE)
 #define XSTATE_MASK_GSSE                    (1 << XSTATE_GSSE)
+#define XSTATE_MASK_AVX                     XSTATE_MASK_GSSE
+#define XSTATE_MASK_MPX                     ((1 << XSTATE_MPX_BNDREGS) | (1 << XSTATE_MPX_BNDCSR))
+#define XSTATE_MASK_AVX512                  ((1 << XSTATE_AVX512_KMASK) | (1 << XSTATE_AVX512_ZMM_H) | (1 << XSTATE_AVX512_ZMM))
+#define XSTATE_MASK_IPT                     (1 << XSTATE_IPT)
+#define XSTATE_MASK_PASID                   (1 << XSTATE_PASID)
+#define XSTATE_MASK_CET_U                   (1 << XSTATE_CET_U)
+#define XSTATE_MASK_CET_S                   (1 << XSTATE_CET_S)
+#define XSTATE_MASK_AMX_TILE_CONFIG         (1 << XSTATE_AMX_TILE_CONFIG)
+#define XSTATE_MASK_AMX_TILE_DATA           (1 << XSTATE_AMX_TILE_DATA)
+#define XSTATE_MASK_LWP                     ((UINT64)1 << XSTATE_LWP)
 
 typedef struct _XSTATE_FEATURE
 {
