@@ -724,7 +724,9 @@ static void framebuffer_surface_flush( struct opengl_drawable *drawable, UINT fl
     TRACE( "%s, flags %#x\n", debugstr_opengl_drawable( drawable ), flags );
 
     if (flags & GL_FLUSH_UPDATED && drawable->read_fbo) framebuffer_surface_resize( drawable );
-    if (surface->target && !(flags & GL_FLUSH_FORCE_SWAP))
+    if (!surface->target) return;
+
+    if (flags & GL_FLUSH_PRESENT)
     {
         blit_framebuffer_surface( surface );
         opengl_drawable_swap( surface->target );
