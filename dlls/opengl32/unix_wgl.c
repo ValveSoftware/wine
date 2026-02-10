@@ -56,6 +56,8 @@ static BOOL is_wow64(void)
     return !!NtCurrentTeb()->WowTebOffset;
 }
 
+static void pop_default_fbo_buffers( TEB *teb );
+
 static UINT64 call_gl_debug_message_callback;
 pthread_mutex_t wgl_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -149,6 +151,7 @@ struct context
     const char **extension_array;  /* array of supported extensions */
     size_t extension_count;        /* size of supported extensions */
     BOOL use_pinned_memory;        /* use GL_AMD_pinned_memory to emulate persistent maps */
+    BOOL has_been_current;         /* was current at least once and thus has drawable-specific defaults initialized */
 
     /* semi-stub state tracker for wglCopyContext */
     GLbitfield used;                            /* context state used bits */
@@ -329,12 +332,14 @@ static BOOL copy_context_attributes( TEB *teb, const struct opengl_funcs *funcs,
 
     funcs->p_wglMakeCurrent( dst->hdc, &dst->base );
 
+    dst->has_been_current = src->has_been_current;
     if (mask & GL_COLOR_BUFFER_BIT)
     {
         const GLfloat *floats = src->color_buffer.clear_color;
         funcs->p_glClearColor( floats[0], floats[1], floats[2], floats[3] );
-        dst->color_buffer = src->color_buffer;
     }
+    dst->color_buffer = src->color_buffer;
+    dst->pixel_mode = src->pixel_mode;
     if (mask & GL_DEPTH_BUFFER_BIT)
     {
         funcs->p_glDepthFunc( src->depth_buffer.depth_func );
@@ -1510,7 +1515,18 @@ static void make_context_current( TEB *teb, const struct opengl_funcs *funcs, HD
     teb->glReserved1[1] = read_hdc;
     teb->glCurrentRC = hglrc;
     teb->glTable = (void *)funcs;
+    if (!ctx->has_been_current)
+    {
+        struct opengl_drawable *draw, *read;
+        if (get_current_context( teb, &draw, &read ))
+        {
+            ctx->has_been_current = TRUE;
+            ctx->color_buffer.draw_buffers[0] = draw->doublebuffer ? GL_BACK : GL_FRONT;
+            ctx->pixel_mode.read_buffer = read->doublebuffer ? GL_BACK : GL_FRONT;
+        }
+    }
     pop_default_fbo( teb );
+    pop_default_fbo_buffers( teb );
 
     if (ctx->major_version) return; /* already synced */
 
@@ -1750,6 +1766,7 @@ static void flush_context( TEB *teb, void (*flush)(void) )
 
     /* Drawable could've changed in p_wgl_context_flush(). */
     pop_default_fbo( teb );
+    pop_default_fbo_buffers( teb );
 
     if (flags & GL_FLUSH_FORCE_SWAP)
     {
@@ -2206,6 +2223,45 @@ static GLenum *set_default_fbo_draw_buffers( struct context *ctx, struct opengl_
     }
 
     return dst;
+}
+
+static void pop_default_fbo_buffers( TEB *teb )
+{
+    const struct opengl_funcs *funcs = teb->glTable;
+    struct opengl_drawable *draw, *read;
+    GLenum dst[MAX_DRAW_BUFFERS], buf;
+    struct context *ctx;
+    unsigned int i, n;
+    BOOL change = FALSE;
+
+    if (!(ctx = get_current_context( teb, &draw, &read ))) return;
+    if (!funcs->p_glDrawBuffers)
+    {
+        void **func_ptr = (void **)&funcs->p_glDrawBuffers;
+        *func_ptr = funcs->p_wglGetProcAddress( "glDrawBuffers" );
+        if (!*func_ptr) ERR( "glDrawBuffers not found.\n" );
+    }
+    if (!funcs->p_glReadBuffer)
+    {
+        void **func_ptr = (void **)&funcs->p_glReadBuffer;
+        *func_ptr = funcs->p_wglGetProcAddress( "glReadBuffer" );
+        if (!*func_ptr) ERR( "glReadBuffer not found.\n" );
+    }
+    if (!ctx->draw_fbo)
+    {
+        funcs->p_glGetIntegerv( GL_MAX_DRAW_BUFFERS, (GLint *)&n );
+        n = min( n, MAX_DRAW_BUFFERS );
+        for (i = 0; i < n; ++i)
+        {
+            dst[i] = drawable_buffer_from_buffer( draw, ctx->color_buffer.draw_buffers[i] );
+            funcs->p_glGetIntegerv( GL_DRAW_BUFFER0 + i, (GLint *)&buf );
+            if (!dst[i]) dst[i] = buf;
+            if (dst[i] != buf) change = TRUE;
+        }
+        if (change) funcs->p_glDrawBuffers( n, dst );
+    }
+    if (!ctx->read_fbo && (buf = drawable_buffer_from_buffer( read, ctx->pixel_mode.read_buffer )))
+        funcs->p_glReadBuffer( buf );
 }
 
 void wrap_glDrawBuffers( TEB *teb, GLsizei n, const GLenum *bufs )
