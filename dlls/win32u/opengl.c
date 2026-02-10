@@ -3141,6 +3141,8 @@ static void display_funcs_init(void)
     display_funcs.p_wgl_context_reset = win32u_wgl_context_reset;
     display_funcs.p_wgl_context_flush = win32u_wgl_context_flush;
 
+    register_extension( wgl_extensions, ARRAY_SIZE(wgl_extensions), "WGL_ARB_multisample" );
+
     register_extension( wgl_extensions, ARRAY_SIZE(wgl_extensions), "WGL_ARB_pixel_format" );
     display_funcs.p_wglChoosePixelFormatARB      = (void *)1; /* never called */
     display_funcs.p_wglGetPixelFormatAttribfvARB = (void *)1; /* never called */
