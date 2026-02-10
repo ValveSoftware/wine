@@ -174,6 +174,18 @@ static BOOL opengl_drawable_swap( struct opengl_drawable *drawable )
     return drawable->funcs->swap( drawable );
 }
 
+static int get_window_swap_interval( HWND hwnd )
+{
+    int interval;
+    WND *win;
+
+    if (!(win = get_win_ptr( hwnd )) || win == WND_DESKTOP || win == WND_OTHER_PROCESS) return 0;
+    interval = win->swap_interval;
+    release_win_ptr( win );
+
+    return interval;
+}
+
 #ifdef SONAME_LIBEGL
 
 struct framebuffer_surface
@@ -720,12 +732,17 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
 static void framebuffer_surface_flush( struct opengl_drawable *drawable, UINT flags )
 {
     struct framebuffer_surface *surface = framebuffer_from_opengl_drawable( drawable );
+    UINT interval;
 
     TRACE( "%s, flags %#x\n", debugstr_opengl_drawable( drawable ), flags );
 
     if (flags & GL_FLUSH_UPDATED && drawable->read_fbo) framebuffer_surface_resize( drawable );
     if (!surface->target) return;
 
+    interval = get_window_swap_interval( drawable->client->hwnd );
+    if (flags & GL_FLUSH_PRESENT) interval = 0;
+
+    opengl_drawable_flush( surface->target, interval, flags & ~GL_FLUSH_PRESENT );
     if (flags & GL_FLUSH_PRESENT)
     {
         blit_framebuffer_surface( surface );
@@ -2627,18 +2644,6 @@ static BOOL win32u_wglSetPbufferAttribARB( struct wgl_pbuffer *pbuffer, const in
 
     return driver_funcs->p_pbuffer_updated( pbuffer->hdc, pbuffer->drawable, pbuffer->cube_face,
                                             max( pbuffer->mipmap_level, 0 ) );
-}
-
-static int get_window_swap_interval( HWND hwnd )
-{
-    int interval;
-    WND *win;
-
-    if (!(win = get_win_ptr( hwnd )) || win == WND_DESKTOP || win == WND_OTHER_PROCESS) return 0;
-    interval = win->swap_interval;
-    release_win_ptr( win );
-
-    return interval;
 }
 
 static BOOL win32u_wgl_context_reset( struct wgl_context *context, HDC hdc, struct wgl_context *share, const int *attribs )
