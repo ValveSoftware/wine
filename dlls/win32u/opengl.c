@@ -194,6 +194,8 @@ struct framebuffer_surface
     struct opengl_drawable *target;
     UINT frame;
     LONG last_gamma_serial;
+    int width, height;
+    LONG64 serial;
 };
 
 static struct framebuffer_surface *framebuffer_from_opengl_drawable( struct opengl_drawable *base )
@@ -391,8 +393,9 @@ static void framebuffer_surface_destroy( struct opengl_drawable *drawable )
     if (surface->target) opengl_drawable_release( surface->target );
 }
 
-static void framebuffer_surface_resize( struct opengl_drawable *drawable )
+static void framebuffer_surface_resize( struct framebuffer_surface *surface )
 {
+    struct opengl_drawable *drawable = &surface->base;
     struct wgl_pixel_format draw_desc = pixel_formats[drawable->format - 1], read_desc = draw_desc;
     RECT rect;
 
@@ -400,6 +403,15 @@ static void framebuffer_surface_resize( struct opengl_drawable *drawable )
     if (!rect.right) rect.right = 1;
     if (!rect.bottom) rect.bottom = 1;
 
+    if (rect.right == surface->width && rect.bottom == surface->height)
+    {
+        /* Surface format or context format should not change so the only reason to recreate the FBO data
+         * is dimensions change or new FBOs created (in which case the surface dimensions should be 0x0). */
+        return;
+    }
+
+    surface->width = rect.right;
+    surface->height = rect.bottom;
     read_desc.samples = read_desc.sample_buffers = 0;
 
     TRACE( "Resizing drawable %p/%u to %ux%u\n", drawable, drawable->read_fbo, rect.right, rect.bottom );
@@ -415,31 +427,74 @@ static void framebuffer_surface_resize( struct opengl_drawable *drawable )
 static void framebuffer_surface_set_context( struct opengl_drawable *drawable, void *private )
 {
     struct wgl_pixel_format draw_desc = pixel_formats[drawable->format - 1], read_desc = draw_desc;
+    struct framebuffer_surface *surface = framebuffer_from_opengl_drawable( drawable );
+    struct wgl_context *ctx = NtCurrentTeb()->glContext;
+
     read_desc.samples = read_desc.sample_buffers = 0;
 
     TRACE( "%s, private %p\n", debugstr_opengl_drawable( drawable ), private );
 
-    if (!private)
+    if (!private) return;
+
+    if (ctx->last_framebuffer.serial != surface->serial)
     {
-        if (drawable->draw_fbo != drawable->read_fbo)
-        {
-            destroy_framebuffer( drawable, &draw_desc, drawable->draw_fbo );
-            drawable->draw_fbo = 0;
-        }
-        destroy_framebuffer( drawable, &read_desc, drawable->read_fbo );
+        /* The context could've been used with the other framebuffer surface, free the FBOs in any, they will
+         * be replaced with drawable's FBOs. */
+        TRACE( "serials %lu, %lu, destroying surface FBOs %d / %d.\n", (long)ctx->last_framebuffer.serial,
+               (long)surface->serial, ctx->last_framebuffer.draw_fbo, ctx->last_framebuffer.read_fbo );
+
+        if (ctx->last_framebuffer.draw_fbo && ctx->last_framebuffer.draw_fbo != ctx->last_framebuffer.read_fbo)
+            destroy_framebuffer( drawable, &draw_desc, ctx->last_framebuffer.draw_fbo );
+        if (ctx->last_framebuffer.read_fbo)
+            destroy_framebuffer( drawable, &read_desc, ctx->last_framebuffer.read_fbo );
+        ctx->last_framebuffer.draw_fbo = 0;
+        ctx->last_framebuffer.read_fbo = 0;
+        ctx->last_framebuffer.serial = 0;
+        /* Our drawable's FBOs must have been destroyed when attching previous framebuffer surface to context. */
+        drawable->draw_fbo = 0;
         drawable->read_fbo = 0;
+        surface->width = 0;
+        surface->height = 0;
     }
-    else
+    else if (ctx->last_framebuffer.serial == surface->serial)
     {
+        TRACE( "serial %lu, using context FBOs %d / %d, surface prev FBOs %d / %d.\n", (long)ctx->last_framebuffer.serial,
+               ctx->last_framebuffer.draw_fbo, ctx->last_framebuffer.read_fbo,
+               drawable->draw_fbo, drawable->read_fbo );
+
+        /* Our surface was the last one on this context while the other context could be associated with our
+         * surface, get FBOs from the context. */
+        drawable->draw_fbo = ctx->last_framebuffer.draw_fbo;
+        drawable->read_fbo = ctx->last_framebuffer.read_fbo;
+        surface->width = ctx->last_framebuffer.width;
+        surface->height = ctx->last_framebuffer.height;
+    }
+
+    if (!drawable->read_fbo)
+    {
+        /* First time around or the context had another framebuffer surface previously. */
+
         drawable->read_fbo = create_framebuffer( drawable, &read_desc );
         if (!drawable->read_fbo) ERR( "Failed to create read framebuffer object\n" );
 
-        if (!draw_desc.sample_buffers) drawable->draw_fbo = drawable->read_fbo;
+        if (!draw_desc.samples) drawable->draw_fbo = drawable->read_fbo;
         else drawable->draw_fbo = create_framebuffer( drawable, &draw_desc );
         if (!drawable->draw_fbo) ERR( "Failed to create draw framebuffer object\n" );
+        surface->width = 0;
+        surface->height = 0;
 
-        framebuffer_surface_resize( drawable );
+        TRACE( "serials %lu, %lu, created new surface FBOs %d / %d.\n", (long)ctx->last_framebuffer.serial,
+               (long)surface->serial, drawable->draw_fbo, drawable->read_fbo );
     }
+
+    ctx->last_framebuffer.serial = surface->serial;
+    ctx->last_framebuffer.draw_fbo = drawable->draw_fbo;
+    ctx->last_framebuffer.read_fbo = drawable->read_fbo;
+
+    framebuffer_surface_resize( framebuffer_from_opengl_drawable( drawable ));
+
+    ctx->last_framebuffer.width = surface->width;
+    ctx->last_framebuffer.height = surface->height;
 }
 
 struct fs_hack_gl_state
@@ -736,7 +791,7 @@ static void framebuffer_surface_flush( struct opengl_drawable *drawable, UINT fl
 
     TRACE( "%s, flags %#x\n", debugstr_opengl_drawable( drawable ), flags );
 
-    if (flags & GL_FLUSH_UPDATED && drawable->read_fbo) framebuffer_surface_resize( drawable );
+    if (flags & GL_FLUSH_UPDATED && drawable->read_fbo) framebuffer_surface_resize( surface );
     if (!surface->target) return;
 
     interval = get_window_swap_interval( drawable->client->hwnd );
@@ -802,6 +857,7 @@ static const struct opengl_drawable_funcs framebuffer_surface_funcs =
 
 static struct opengl_drawable *framebuffer_surface_create( int format, struct client_surface *client, struct opengl_drawable *target )
 {
+    static LONG64 last_serial;
     struct framebuffer_surface *surface;
 
     if (!(surface = opengl_drawable_create( sizeof(*surface), &framebuffer_surface_funcs, format, client ))) return NULL;
@@ -825,6 +881,7 @@ static struct opengl_drawable *framebuffer_surface_create( int format, struct cl
     surface->base.buffer_map[GL_RIGHT - GL_FRONT_LEFT] = surface->base.buffer_map[1]; /* only front right */
     surface->base.buffer_map[GL_FRONT_AND_BACK - GL_FRONT_LEFT] = surface->base.buffer_map[0]; /* only front left */
 
+    surface->serial = InterlockedIncrement64( &last_serial );
     return &surface->base;
 }
 

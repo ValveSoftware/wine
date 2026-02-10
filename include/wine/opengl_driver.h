@@ -74,6 +74,15 @@ struct wgl_pbuffer;
 #define WINE_OPENGL_RESERVED_TEXTURE0  0x10000
 #define WINE_OPENGL_RESERVED_TEXTURE7  0x10007
 
+struct wgl_framebuffer_surface_state
+{
+    LONG64  serial;
+    GLuint  draw_fbo;
+    GLuint  read_fbo;
+    int     width;
+    int     height;
+};
+
 struct wgl_context
 {
     void                   *driver_private;     /* driver context / private data */
@@ -93,6 +102,7 @@ struct wgl_context
     unsigned                integer_scaling : 1;
     GLuint                  gamma_program;
     GLuint                  gamma_ramp;
+    struct wgl_framebuffer_surface_state last_framebuffer;
 };
 
 /* interface between opengl32 and win32u */
