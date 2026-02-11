@@ -1901,7 +1901,13 @@ HGLRC wrap_wglCreateContextAttribsARB( TEB *teb, HDC hdc, HGLRC share, const int
 
 HGLRC wrap_wglCreateContext( TEB *teb, HDC hdc )
 {
-    return wrap_wglCreateContextAttribsARB( teb, hdc, NULL, NULL );
+    static const int attribs[] =
+    {
+        WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+        0, 0,
+    };
+
+    return wrap_wglCreateContextAttribsARB( teb, hdc, NULL, attribs );
 }
 
 HPBUFFERARB wrap_wglCreatePbufferARB( TEB *teb, HDC hdc, int format, int width, int height, const int *attribs )
