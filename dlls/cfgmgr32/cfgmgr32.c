@@ -39,6 +39,14 @@ static const WCHAR *guid_string( const GUID *guid, WCHAR *buffer, UINT length )
     return buffer;
 }
 
+static const WCHAR *propkey_string( const DEVPROPKEY *key, const WCHAR *prefix, WCHAR *buffer, UINT length )
+{
+    swprintf( buffer, length, L"%s{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}\\%04X", prefix,
+              key->fmtid.Data1, key->fmtid.Data2, key->fmtid.Data3, key->fmtid.Data4[0], key->fmtid.Data4[1], key->fmtid.Data4[2],
+              key->fmtid.Data4[3], key->fmtid.Data4[4], key->fmtid.Data4[5], key->fmtid.Data4[6], key->fmtid.Data4[7], key->pid );
+    return buffer;
+}
+
 static const WCHAR control_classW[]  = L"System\\CurrentControlSet\\Control\\Class\\";
 static const WCHAR device_classesW[] = L"System\\CurrentControlSet\\Control\\DeviceClasses\\";
 static const WCHAR enum_rootW[]      = L"System\\CurrentControlSet\\Enum\\";
@@ -106,6 +114,17 @@ struct property
     DWORD *size;
 };
 
+static LSTATUS init_property( struct property *prop, const DEVPROPKEY *key, DEVPROPTYPE *type, void *buffer, DWORD *size )
+{
+    if (!key) return ERROR_INVALID_PARAMETER;
+    if (!(prop->type = type) || !(prop->size = size)) return ERROR_INVALID_USER_BUFFER;
+    if (!(prop->buffer = buffer) && (*prop->size)) return ERROR_INVALID_USER_BUFFER;
+    prop->ansi = FALSE;
+    prop->key = *key;
+    prop->reg_type = NULL;
+    return ERROR_SUCCESS;
+}
+
 static LSTATUS init_registry_property( struct property *prop, const DEVPROPKEY *base, UINT property, DWORD *type, void *buffer, DWORD *size, BOOL ansi )
 {
     if (!(prop->size = size)) return ERROR_INVALID_USER_BUFFER;
@@ -116,6 +135,22 @@ static LSTATUS init_registry_property( struct property *prop, const DEVPROPKEY *
     prop->key.pid = property + 1;
     prop->reg_type = type;
     return ERROR_SUCCESS;
+}
+
+static LSTATUS query_property( HKEY root, const WCHAR *prefix, DEVPROPTYPE type, struct property *prop )
+{
+    WCHAR path[MAX_PATH];
+    ULONG reg_type;
+    LSTATUS err;
+
+    err = RegQueryValueExW( root, propkey_string( &prop->key, prefix, path, ARRAY_SIZE(path) ),
+                            NULL, &reg_type, prop->buffer, prop->size );
+    if (type == DEVPROP_TYPE_EMPTY) type = reg_type & 0xffff;
+
+    if (!err && !prop->buffer) err = ERROR_MORE_DATA;
+    if ((!err || err == ERROR_MORE_DATA) && prop->type) *prop->type = type;
+    if (err == ERROR_FILE_NOT_FOUND) return ERROR_NOT_FOUND;
+    return err;
 }
 
 static LSTATUS query_named_property( HKEY hkey, const WCHAR *nameW, DEVPROPTYPE type, struct property *prop )
@@ -145,6 +180,9 @@ struct property_desc
 
 static const struct property_desc class_properties[] =
 {
+    { &DEVPKEY_DeviceClass_ClassName,          DEVPROP_TYPE_STRING,                     L"Class" },
+    { &DEVPKEY_DeviceClass_Name,               DEVPROP_TYPE_STRING,                     L"" },
+    { &DEVPKEY_NAME,                           DEVPROP_TYPE_STRING,                     L"" },
     /* ansi-compatible CM_CRP properties */
     { &DEVPKEY_DeviceClass_UpperFilters,       DEVPROP_TYPE_STRING,                     L"UpperFilters" },
     { &DEVPKEY_DeviceClass_LowerFilters,       DEVPROP_TYPE_STRING,                     L"LowerFilters" },
@@ -153,6 +191,18 @@ static const struct property_desc class_properties[] =
     { &DEVPKEY_DeviceClass_DevType,            DEVPROP_TYPE_UINT32,                     L"DevType" },
     { &DEVPKEY_DeviceClass_Exclusive,          DEVPROP_TYPE_BOOLEAN,                    L"Exclusive" },
     { &DEVPKEY_DeviceClass_Characteristics,    DEVPROP_TYPE_INT32,                      L"Characteristics" },
+    /* unicode-only properties */
+    { &DEVPKEY_DeviceClass_Icon,               DEVPROP_TYPE_STRING },
+    { &DEVPKEY_DeviceClass_ClassInstaller,     DEVPROP_TYPE_STRING,                     L"Installer32" },
+    { &DEVPKEY_DeviceClass_DefaultService,     DEVPROP_TYPE_STRING,                     L"Default Service" },
+    { &DEVPKEY_DeviceClass_IconPath,           DEVPROP_TYPE_STRING_LIST,                L"IconPath" },
+    { &DEVPKEY_DeviceClass_NoDisplayClass,     DEVPROP_TYPE_BOOLEAN,                    L"NoDisplayClass" },
+    { &DEVPKEY_DeviceClass_NoInstallClass,     DEVPROP_TYPE_BOOLEAN,                    L"NoInstallClass" },
+    { &DEVPKEY_DeviceClass_NoUseClass,         DEVPROP_TYPE_BOOLEAN,                    L"NoUseClass" },
+    { &DEVPKEY_DeviceClass_PropPageProvider,   DEVPROP_TYPE_STRING,                     L"EnumPropPages32" },
+    { &DEVPKEY_DeviceClass_SilentInstall,      DEVPROP_TYPE_BOOLEAN,                    L"SilentInstall" },
+    { &DEVPKEY_DeviceClass_DHPRebalanceOptOut, DEVPROP_TYPE_BOOLEAN },
+    { &DEVPKEY_DeviceClass_ClassCoInstallers,  DEVPROP_TYPE_STRING_LIST },
 };
 
 static LSTATUS query_class_property( HKEY hkey, struct property *prop )
@@ -161,10 +211,17 @@ static LSTATUS query_class_property( HKEY hkey, struct property *prop )
     {
         const struct property_desc *desc = class_properties + i;
         if (memcmp( desc->key, &prop->key, sizeof(prop->key) )) continue;
+        if (!desc->name) return query_property( hkey, L"Properties\\", desc->type, prop );
         return query_named_property( hkey, desc->name, desc->type, prop );
     }
 
-    return ERROR_UNKNOWN_PROPERTY;
+    if (!memcmp( &DEVPKEY_DeviceClass_UpperFilters, &prop->key, sizeof(prop->key.fmtid) ))
+    {
+        FIXME( "property %#lx not implemented\n", prop->key.pid - 1 );
+        return ERROR_UNKNOWN_PROPERTY;
+    }
+
+    return query_property( hkey, L"Properties\\", DEVPROP_TYPE_EMPTY, prop );
 }
 
 static LSTATUS get_class_property( const GUID *class, struct property *prop )
@@ -219,6 +276,7 @@ static CONFIGRET map_error( LSTATUS err )
 {
     switch (err)
     {
+    case ERROR_INVALID_PARAMETER:                 return CR_FAILURE;
     case ERROR_INVALID_USER_BUFFER:               return CR_INVALID_POINTER;
     case ERROR_FILE_NOT_FOUND:                    return CR_NO_SUCH_REGISTRY_KEY;
     case ERROR_MORE_DATA:                         return CR_BUFFER_SMALL;
@@ -491,6 +549,31 @@ CONFIGRET WINAPI CM_Get_Class_Registry_PropertyA( GUID *class, ULONG property, U
     if ((err = init_registry_property( &prop, &DEVPKEY_DeviceClass_UpperFilters, property, type, buffer, len, TRUE ))) return map_error( err );
 
     return map_error( get_class_property( class, &prop ) );
+}
+
+/***********************************************************************
+ *           CM_Get_Class_Property_ExW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Class_Property_ExW( const GUID *class, const DEVPROPKEY *key, DEVPROPTYPE *type, BYTE *buffer, ULONG *size, ULONG flags, HMACHINE machine )
+{
+    struct property prop;
+    LSTATUS err;
+
+    TRACE( "class %s, key %s, type %p, buffer %p, size %p, flags %#lx, machine %p\n", debugstr_guid(class), debugstr_DEVPROPKEY(key), type, buffer, size, flags, machine );
+    if (machine) FIXME( "machine %p not implemented!\n", machine );
+    if (flags) FIXME( "flags %#lx not implemented!\n", flags );
+
+    if (!class) return CR_INVALID_POINTER;
+    if ((err = init_property( &prop, key, type, buffer, size ))) return map_error( err );
+    return map_error( get_class_property( class, &prop ) );
+}
+
+/***********************************************************************
+ *           CM_Get_Class_PropertyW (cfgmgr32.@)
+ */
+CONFIGRET WINAPI CM_Get_Class_PropertyW( const GUID *class, const DEVPROPKEY *key, DEVPROPTYPE *type, BYTE *buffer, ULONG *size, ULONG flags )
+{
+    return CM_Get_Class_Property_ExW( class, key, type, buffer, size, flags, NULL );
 }
 
 /***********************************************************************
