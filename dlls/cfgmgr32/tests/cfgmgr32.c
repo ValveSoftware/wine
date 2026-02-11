@@ -2268,6 +2268,179 @@ static void test_CM_Get_Class_Registry_Property(void)
     ok_x4( ret, ==, CR_NO_SUCH_VALUE );
 }
 
+static void test_CM_Get_Class_Property(void)
+{
+    GUID guid = GUID_DEVCLASS_DISPLAY;
+    BYTE buffer[1024];
+    DWORD type, len;
+    CONFIGRET ret;
+
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Name, NULL, NULL, NULL, 0, NULL );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ret = CM_Get_Class_Property_ExW( NULL, &DEVPKEY_DeviceClass_Name, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ret = CM_Get_Class_Property_ExW( &guid, NULL, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_FAILURE );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Name, &type, buffer, NULL, 0, NULL );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    len = 1;
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Name, &type, NULL, &len, 0, NULL );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Name, NULL, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_INVALID_POINTER );
+
+    len = 0;
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Name, &type, NULL, &len, 0, NULL );
+    ok_x4( ret, ==, CR_BUFFER_SMALL );
+    ok_x4( len, ==, 0x22 );
+    len = 1;
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Name, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_BUFFER_SMALL );
+    ok_x4( len, ==, 0x22 );
+
+    len = sizeof(buffer);
+    memset( &guid, 0xcd, sizeof(guid) );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Name, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_NO_SUCH_REGISTRY_KEY );
+    ok_x4( len, ==, 0 );
+
+
+    guid = GUID_DEVCLASS_DISPLAY;
+    len = sizeof(buffer);
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceInterface_Enabled, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+
+    type = 0xdeadbeef;
+    len = sizeof(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Name, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_x4( type, ==, DEVPROP_TYPE_STRING );
+    ok_x4( len, ==, 0x22 );
+    ok_wcs( L"Display adapters", (WCHAR *)buffer );
+
+    type = 0xdeadbeef;
+    len = sizeof(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_NAME, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_x4( type, ==, DEVPROP_TYPE_STRING );
+    ok_x4( len, ==, 0x22 );
+    ok_wcs( L"Display adapters", (WCHAR *)buffer );
+
+    type = 0xdeadbeef;
+    len = sizeof(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_ClassName, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_x4( type, ==, DEVPROP_TYPE_STRING );
+    ok_x4( len, ==, 0x10 );
+    ok_wcs( L"Display", (WCHAR *)buffer );
+
+    len = sizeof(buffer);
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_UpperFilters, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+    ok_x4( len, ==, 0 );
+
+    len = sizeof(buffer);
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_LowerFilters, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+    ok_x4( len, ==, 0 );
+
+    type = 0xdeadbeef;
+    len = sizeof(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Security, &type, buffer, &len, 0, NULL );
+    todo_wine ok_x4( ret, ==, CR_SUCCESS );
+    todo_wine ok_x4( type, ==, DEVPROP_TYPE_SECURITY_DESCRIPTOR );
+    todo_wine ok_x4( len, ==, 0x30 );
+
+    type = 0xdeadbeef;
+    len = sizeof(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_SecuritySDS, &type, buffer, &len, 0, NULL );
+    todo_wine ok_x4( ret, ==, CR_SUCCESS );
+    todo_wine ok_x4( type, ==, DEVPROP_TYPE_SECURITY_DESCRIPTOR_STRING );
+    todo_wine ok_x4( len, ==, 0x20 );
+    todo_wine ok_wcs( L"D:P(A;;GA;;;SY)", (WCHAR *)buffer );
+
+
+    type = 0xdeadbeef;
+    len = sizeof(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_DevType, &type, buffer, &len, 0, NULL );
+    todo_wine ok_x4( ret, ==, CR_SUCCESS );
+    todo_wine ok_x4( type, ==, DEVPROP_TYPE_UINT32 );
+    todo_wine ok_x4( len, ==, 4 );
+    todo_wine ok_x4( *(DWORD *)buffer, ==, 0x23 /* FILE_DEVICE_VIDEO */ );
+
+    len = sizeof(buffer);
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Exclusive, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+    ok_x4( len, ==, 0 );
+
+    type = 0xdeadbeef;
+    len = sizeof(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Characteristics, &type, buffer, &len, 0, NULL );
+    todo_wine ok_x4( ret, ==, CR_SUCCESS );
+    todo_wine ok_x4( type, ==, DEVPROP_TYPE_UINT32 );
+    todo_wine ok_x4( len, ==, 4 );
+    todo_wine ok_x4( *(DWORD *)buffer, ==, 0x100 );
+
+
+    guid = GUID_DEVCLASS_HIDCLASS;
+
+    type = 0xdeadbeef;
+    len = sizeof(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Name, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_x4( type, ==, DEVPROP_TYPE_STRING );
+    ok_x4( len, ==, 0x30 );
+    ok_wcs( L"Human Interface Devices", (WCHAR *)buffer );
+
+    type = 0xdeadbeef;
+    len = sizeof(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_NAME, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_x4( type, ==, DEVPROP_TYPE_STRING );
+    ok_x4( len, ==, 0x30 );
+    ok_wcs( L"Human Interface Devices", (WCHAR *)buffer );
+
+    type = 0xdeadbeef;
+    len = sizeof(buffer);
+    memset( buffer, 0xcd, sizeof(buffer) );
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_ClassName, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_SUCCESS );
+    ok_x4( type, ==, DEVPROP_TYPE_STRING );
+    ok_x4( len, ==, 0x12 );
+    ok_wcs( L"HIDClass", (WCHAR *)buffer );
+
+    len = sizeof(buffer);
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_UpperFilters, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+    len = sizeof(buffer);
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_LowerFilters, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+    len = sizeof(buffer);
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Security, &type, buffer, &len, 0, NULL );
+    todo_wine ok_x4( ret, ==, CR_SUCCESS );
+    len = sizeof(buffer);
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_SecuritySDS, &type, buffer, &len, 0, NULL );
+    todo_wine ok_x4( ret, ==, CR_SUCCESS );
+    len = sizeof(buffer);
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_DevType, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+    len = sizeof(buffer);
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Exclusive, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+    len = sizeof(buffer);
+    ret = CM_Get_Class_Property_ExW( &guid, &DEVPKEY_DeviceClass_Characteristics, &type, buffer, &len, 0, NULL );
+    ok_x4( ret, ==, CR_NO_SUCH_VALUE );
+}
+
 static void test_CM_Open_Device_Interface_Key(void)
 {
     WCHAR iface[4096], name[MAX_PATH], expect[MAX_PATH], buffer[39], *refstr;
@@ -2325,6 +2498,7 @@ START_TEST(cfgmgr32)
     test_CM_Get_Class_Key_Name();
     test_CM_Open_Class_Key();
     test_CM_Get_Class_Registry_Property();
+    test_CM_Get_Class_Property();
     test_CM_Open_Device_Interface_Key();
     test_CM_Get_Device_ID_List();
     test_CM_Register_Notification();
