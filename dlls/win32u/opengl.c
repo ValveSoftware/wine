@@ -2198,8 +2198,14 @@ static void push_internal_context( struct wgl_context *context, HDC hdc, int for
 
 static void pop_internal_context( struct wgl_context *context )
 {
+    struct opengl_drawable *draw, *read;
+
     TRACE( "context %p\n", context );
-    driver_funcs->p_make_current( context->draw, context->read, context->driver_private );
+
+    if ((draw = context->draw) && draw->funcs == &framebuffer_surface_funcs) draw = framebuffer_from_opengl_drawable( draw )->target;
+    if ((read = context->read) && read->funcs == &framebuffer_surface_funcs) read = framebuffer_from_opengl_drawable( read )->target;
+
+    driver_funcs->p_make_current( draw, read, context->driver_private );
 }
 
 static BOOL win32u_wglMakeContextCurrentARB( HDC draw_hdc, HDC read_hdc, struct wgl_context *context )
