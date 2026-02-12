@@ -634,7 +634,7 @@ static NTSTATUS gl_glCopyPixels( void *args )
     struct glCopyPixels_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyPixels) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( params->teb, TRUE );
+    resolve_default_fbo( params->teb );
     funcs->p_glCopyPixels( params->x, params->y, params->width, params->height, params->type );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -645,7 +645,7 @@ static NTSTATUS gl_glCopyTexImage1D( void *args )
     struct glCopyTexImage1D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTexImage1D) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( params->teb, TRUE );
+    resolve_default_fbo( params->teb );
     funcs->p_glCopyTexImage1D( params->target, params->level, params->internalformat, params->x, params->y, params->width, params->border );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -656,7 +656,7 @@ static NTSTATUS gl_glCopyTexImage2D( void *args )
     struct glCopyTexImage2D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTexImage2D) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( params->teb, TRUE );
+    resolve_default_fbo( params->teb );
     funcs->p_glCopyTexImage2D( params->target, params->level, params->internalformat, params->x, params->y, params->width, params->height, params->border );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -667,7 +667,7 @@ static NTSTATUS gl_glCopyTexSubImage1D( void *args )
     struct glCopyTexSubImage1D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTexSubImage1D) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( params->teb, TRUE );
+    resolve_default_fbo( params->teb );
     funcs->p_glCopyTexSubImage1D( params->target, params->level, params->xoffset, params->x, params->y, params->width );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -678,7 +678,7 @@ static NTSTATUS gl_glCopyTexSubImage2D( void *args )
     struct glCopyTexSubImage2D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTexSubImage2D) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( params->teb, TRUE );
+    resolve_default_fbo( params->teb );
     funcs->p_glCopyTexSubImage2D( params->target, params->level, params->xoffset, params->yoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -2445,7 +2445,7 @@ static NTSTATUS gl_glReadBuffer( void *args )
 static NTSTATUS gl_glReadPixels( void *args )
 {
     struct glReadPixels_params *params = args;
-    resolve_default_fbo( params->teb, TRUE );
+    resolve_default_fbo( params->teb );
     wrap_glReadPixels( params->teb, params->x, params->y, params->width, params->height, params->format, params->type, params->pixels );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6333,7 +6333,7 @@ static NTSTATUS ext_glCopyColorTable( void *args )
     struct glCopyColorTable_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyColorTable) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( params->teb, TRUE );
+    resolve_default_fbo( params->teb );
     funcs->p_glCopyColorTable( params->target, params->internalformat, params->x, params->y, params->width );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6524,7 +6524,7 @@ static NTSTATUS ext_glCopyTexSubImage3D( void *args )
     struct glCopyTexSubImage3D_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTexSubImage3D) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( params->teb, TRUE );
+    resolve_default_fbo( params->teb );
     funcs->p_glCopyTexSubImage3D( params->target, params->level, params->xoffset, params->yoffset, params->zoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6568,7 +6568,7 @@ static NTSTATUS ext_glCopyTextureSubImage1D( void *args )
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTextureSubImage1D) return STATUS_NOT_IMPLEMENTED;
     assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
-    resolve_default_fbo( params->teb, TRUE );
+    resolve_default_fbo( params->teb );
     funcs->p_glCopyTextureSubImage1D( params->texture, params->level, params->xoffset, params->x, params->y, params->width );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6591,7 +6591,7 @@ static NTSTATUS ext_glCopyTextureSubImage2D( void *args )
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTextureSubImage2D) return STATUS_NOT_IMPLEMENTED;
     assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
-    resolve_default_fbo( params->teb, TRUE );
+    resolve_default_fbo( params->teb );
     funcs->p_glCopyTextureSubImage2D( params->texture, params->level, params->xoffset, params->yoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -6614,7 +6614,7 @@ static NTSTATUS ext_glCopyTextureSubImage3D( void *args )
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glCopyTextureSubImage3D) return STATUS_NOT_IMPLEMENTED;
     assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
-    resolve_default_fbo( params->teb, TRUE );
+    resolve_default_fbo( params->teb );
     funcs->p_glCopyTextureSubImage3D( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -34841,7 +34841,7 @@ static NTSTATUS wow64_gl_glCopyPixels( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyPixels) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( teb, TRUE );
+    resolve_default_fbo( teb );
     funcs->p_glCopyPixels( params->x, params->y, params->width, params->height, params->type );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -34863,7 +34863,7 @@ static NTSTATUS wow64_gl_glCopyTexImage1D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTexImage1D) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( teb, TRUE );
+    resolve_default_fbo( teb );
     funcs->p_glCopyTexImage1D( params->target, params->level, params->internalformat, params->x, params->y, params->width, params->border );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -34886,7 +34886,7 @@ static NTSTATUS wow64_gl_glCopyTexImage2D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTexImage2D) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( teb, TRUE );
+    resolve_default_fbo( teb );
     funcs->p_glCopyTexImage2D( params->target, params->level, params->internalformat, params->x, params->y, params->width, params->height, params->border );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -34907,7 +34907,7 @@ static NTSTATUS wow64_gl_glCopyTexSubImage1D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTexSubImage1D) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( teb, TRUE );
+    resolve_default_fbo( teb );
     funcs->p_glCopyTexSubImage1D( params->target, params->level, params->xoffset, params->x, params->y, params->width );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -34930,7 +34930,7 @@ static NTSTATUS wow64_gl_glCopyTexSubImage2D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTexSubImage2D) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( teb, TRUE );
+    resolve_default_fbo( teb );
     funcs->p_glCopyTexSubImage2D( params->target, params->level, params->xoffset, params->yoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -37811,7 +37811,7 @@ static NTSTATUS wow64_gl_glReadPixels( void *args )
         PTR32 pixels;
     } *params = args;
     TEB *teb = get_teb64( params->teb );
-    resolve_default_fbo( teb, TRUE );
+    resolve_default_fbo( teb );
     wrap_glReadPixels( teb, params->x, params->y, params->width, params->height, params->format, params->type, ULongToPtr(params->pixels) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -44668,7 +44668,7 @@ static NTSTATUS wow64_ext_glCopyColorTable( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyColorTable) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( teb, TRUE );
+    resolve_default_fbo( teb );
     funcs->p_glCopyColorTable( params->target, params->internalformat, params->x, params->y, params->width );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -45080,7 +45080,7 @@ static NTSTATUS wow64_ext_glCopyTexSubImage3D( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTexSubImage3D) return STATUS_NOT_IMPLEMENTED;
-    resolve_default_fbo( teb, TRUE );
+    resolve_default_fbo( teb );
     funcs->p_glCopyTexSubImage3D( params->target, params->level, params->xoffset, params->yoffset, params->zoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -45172,7 +45172,7 @@ static NTSTATUS wow64_ext_glCopyTextureSubImage1D( void *args )
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTextureSubImage1D) return STATUS_NOT_IMPLEMENTED;
     assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
-    resolve_default_fbo( teb, TRUE );
+    resolve_default_fbo( teb );
     funcs->p_glCopyTextureSubImage1D( params->texture, params->level, params->xoffset, params->x, params->y, params->width );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -45218,7 +45218,7 @@ static NTSTATUS wow64_ext_glCopyTextureSubImage2D( void *args )
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTextureSubImage2D) return STATUS_NOT_IMPLEMENTED;
     assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
-    resolve_default_fbo( teb, TRUE );
+    resolve_default_fbo( teb );
     funcs->p_glCopyTextureSubImage2D( params->texture, params->level, params->xoffset, params->yoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -45267,7 +45267,7 @@ static NTSTATUS wow64_ext_glCopyTextureSubImage3D( void *args )
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glCopyTextureSubImage3D) return STATUS_NOT_IMPLEMENTED;
     assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );
-    resolve_default_fbo( teb, TRUE );
+    resolve_default_fbo( teb );
     funcs->p_glCopyTextureSubImage3D( params->texture, params->level, params->xoffset, params->yoffset, params->zoffset, params->x, params->y, params->width, params->height );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;

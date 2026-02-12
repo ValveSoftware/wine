@@ -1710,25 +1710,6 @@ static GLenum drawable_buffer_from_buffer( struct opengl_drawable *drawable, GLe
     return drawable->buffer_map[buffer - GL_FRONT_LEFT];
 }
 
-static BOOL context_draws_back( struct context *ctx )
-{
-    for (int i = 0; i < ARRAY_SIZE(ctx->color_buffer.draw_buffers); i++)
-    {
-        switch (ctx->color_buffer.draw_buffers[i])
-        {
-        case GL_LEFT:
-        case GL_RIGHT:
-        case GL_BACK:
-        case GL_FRONT_AND_BACK:
-        case GL_BACK_LEFT:
-        case GL_BACK_RIGHT:
-            return TRUE;
-        }
-    }
-
-    return FALSE;
-}
-
 static BOOL context_draws_front( struct context *ctx )
 {
     for (int i = 0; i < ARRAY_SIZE(ctx->color_buffer.draw_buffers); i++)
@@ -2141,59 +2122,46 @@ void pop_default_fbo( TEB *teb )
     }
 }
 
-void resolve_default_fbo( TEB *teb, BOOL read )
+void resolve_default_fbo( TEB *teb )
 {
+    GLint curr_draw_buffer, curr_read_buffer, curr_read_fbo, curr_draw_fbo;
     const struct opengl_funcs *funcs = teb->glTable;
     struct opengl_drawable *drawable;
     struct context *ctx;
+    RECT rect;
 
-    if (!(ctx = get_current_context( teb, read ? NULL : &drawable, read ? &drawable : NULL )) || !drawable) return;
+    if (!(ctx = get_current_context( teb, NULL, &drawable )) || !drawable) return;
 
-    if (drawable->draw_fbo && drawable->read_fbo && drawable->draw_fbo != drawable->read_fbo)
+    if (!(drawable->draw_fbo && !ctx->read_fbo && drawable->read_fbo && drawable->draw_fbo != drawable->read_fbo))
+        return;
+
+    funcs->p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &curr_read_fbo );
+    funcs->p_glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, &curr_draw_fbo );
+    funcs->p_glGetIntegerv( GL_READ_BUFFER, (GLint *)&curr_read_buffer );
+    funcs->p_glGetIntegerv( GL_DRAW_BUFFER, (GLint *)&curr_draw_buffer );
+
+    if (curr_read_fbo != drawable->read_fbo)
     {
-        GLenum mask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT;
-        RECT rect;
-
-        NtUserGetClientRect( drawable->client->hwnd, &rect, NtUserGetDpiForWindow( drawable->client->hwnd ) );
-
-        funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, drawable->draw_fbo );
-        funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, drawable->read_fbo );
-
-        if (context_draws_front( ctx ))
-        {
-            funcs->p_glReadBuffer( GL_COLOR_ATTACHMENT0 );
-            funcs->p_glDrawBuffer( GL_COLOR_ATTACHMENT0 );
-            funcs->p_glBlitFramebuffer( 0, 0, 0, 0, rect.right, rect.bottom, rect.right, rect.bottom, mask, GL_NEAREST );
-            mask &= ~(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-        }
-
-        if ((drawable->doublebuffer && context_draws_back( ctx )) || (!drawable->doublebuffer && drawable->stereo && context_draws_front( ctx )))
-        {
-            funcs->p_glReadBuffer( GL_COLOR_ATTACHMENT1 );
-            funcs->p_glDrawBuffer( GL_COLOR_ATTACHMENT1 );
-            funcs->p_glBlitFramebuffer( 0, 0, 0, 0, rect.right, rect.bottom, rect.right, rect.bottom, mask, GL_NEAREST );
-            mask &= ~(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-        }
-
-        if (drawable->doublebuffer && drawable->stereo && context_draws_front( ctx ))
-        {
-            funcs->p_glReadBuffer( GL_COLOR_ATTACHMENT2 );
-            funcs->p_glDrawBuffer( GL_COLOR_ATTACHMENT2 );
-            funcs->p_glBlitFramebuffer( 0, 0, 0, 0, rect.right, rect.bottom, rect.right, rect.bottom, mask, GL_NEAREST );
-            mask &= ~(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-        }
-
-        if (drawable->doublebuffer && drawable->stereo && context_draws_back( ctx ))
-        {
-            funcs->p_glReadBuffer( GL_COLOR_ATTACHMENT3 );
-            funcs->p_glDrawBuffer( GL_COLOR_ATTACHMENT3 );
-            funcs->p_glBlitFramebuffer( 0, 0, 0, 0, rect.right, rect.bottom, rect.right, rect.bottom, mask, GL_NEAREST );
-            mask &= ~(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-        }
-
-        funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->read_fbo );
-        funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->draw_fbo );
+        ERR( "drawable %p, Unexpected curr_read_fbo %d, drawable->read_fbo %d.\n",
+             drawable, curr_read_fbo, drawable->read_fbo );
     }
+    if (!(curr_read_buffer >= GL_COLOR_ATTACHMENT0 && curr_read_buffer <= GL_COLOR_ATTACHMENT3))
+    {
+        ERR( "drawable %p, Unexpected read buffer %#x on default FBO.\n", drawable, curr_read_buffer );
+        return;
+    }
+
+    NtUserGetClientRect( drawable->client->hwnd, &rect, NtUserGetDpiForWindow( drawable->client->hwnd ) );
+    funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, drawable->draw_fbo );
+    funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, drawable->read_fbo );
+    funcs->p_glReadBuffer( curr_read_buffer );
+    funcs->p_glDrawBuffer( curr_read_buffer );
+    funcs->p_glBlitFramebuffer( 0, 0, rect.right, rect.bottom, 0, 0, rect.right, rect.bottom,
+                                GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST );
+    funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, curr_read_fbo );
+    funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, curr_draw_fbo );
+    funcs->p_glReadBuffer( curr_read_buffer );
+    funcs->p_glDrawBuffer( curr_draw_buffer );
 }
 
 static GLenum *set_default_fbo_draw_buffers( struct context *ctx, struct opengl_drawable *draw,
