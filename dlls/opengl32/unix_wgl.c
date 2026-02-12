@@ -1405,9 +1405,11 @@ static const float *fs_hack_get_default_gamma_ramp(void)
 static void fs_hack_setup_gamma_shader( struct wgl_context *ctx, const struct opengl_funcs *funcs )
 {
     GLint success;
-    GLuint vshader, fshader, program, ramp_index, tex_loc;
+    GLuint vshader, fshader, program, prev_program, ramp_index, tex_loc;
     char errstr[512];
     const float *default_gamma_ramp = fs_hack_get_default_gamma_ramp();
+
+    funcs->p_glGetIntegerv( GL_CURRENT_PROGRAM, (GLint *)&prev_program );
 
     vshader = funcs->p_glCreateShader( GL_VERTEX_SHADER );
     if (vshader == 0)
@@ -1490,7 +1492,7 @@ static void fs_hack_setup_gamma_shader( struct wgl_context *ctx, const struct op
     funcs->p_glUniform1i( tex_loc, 0 );
 
     ctx->gamma_program = program;
-    funcs->p_glUseProgram( 0 );
+    funcs->p_glUseProgram( prev_program );
 }
 
 static void make_context_current( TEB *teb, const struct opengl_funcs *funcs, HDC draw_hdc, HDC read_hdc,
@@ -1616,7 +1618,7 @@ static void make_context_current( TEB *teb, const struct opengl_funcs *funcs, HD
     ctx->base.has_GL_ARB_fragment_program = !ctx->base.is_core && is_extension_supported( ctx, "GL_ARB_fragment_program" );
     ctx->base.has_GL_ARB_vertex_program = !ctx->base.is_core && is_extension_supported( ctx, "GL_ARB_vertex_program" );
     ctx->base.integer_scaling = fs_hack_is_integer();
-    fs_hack_setup_gamma_shader( &ctx->base, funcs );
+    if (!ctx->base.gamma_program) fs_hack_setup_gamma_shader( &ctx->base, funcs );
     /* Drawable's FBO could've changed in driver. */
     pop_default_fbo( teb );
 }
