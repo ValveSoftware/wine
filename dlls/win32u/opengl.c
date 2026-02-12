@@ -2276,6 +2276,19 @@ static void pop_internal_context( struct wgl_context *context )
     driver_funcs->p_make_current( draw, read, context->driver_private );
 }
 
+static int check_drawable_format_for_context(void)
+{
+    static int cached = -1;
+    const char *sgi;
+
+    if (cached == -1)
+    {
+        if (!(cached = !(sgi = getenv( "SteamGameId" )) || strcmp( sgi, "32370" )))
+            ERR( "HACK: skipping context format check.\n" );
+    }
+    return cached;
+}
+
 static BOOL win32u_wglMakeContextCurrentARB( HDC draw_hdc, HDC read_hdc, struct wgl_context *context )
 {
     struct wgl_context *prev_context = NtCurrentTeb()->glContext;
@@ -2309,7 +2322,7 @@ static BOOL win32u_wglMakeContextCurrentARB( HDC draw_hdc, HDC read_hdc, struct 
         else RtlSetLastWin32Error( ERROR_INVALID_HANDLE );
         return FALSE;
     }
-    if (context->format != format)
+    if (check_drawable_format_for_context() && context->format != format)
     {
         WARN( "Mismatched draw_hdc %p format %u, context %p format %u\n", draw_hdc, format, context, context->format );
         RtlSetLastWin32Error( ERROR_INVALID_PIXEL_FORMAT );
