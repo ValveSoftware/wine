@@ -761,6 +761,17 @@ static BOOL framebuffer_surface_swap( struct opengl_drawable *drawable )
     {
         UINT front = surface->frame & 1;
 
+        if (surface->base.draw_fbo != surface->base.read_fbo)
+        {
+            GLint name1, name2;
+
+            TRACE( "swapping renderbuffers.\n" );
+            funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.draw_fbo, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, (GLint *)&name1 );
+            funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.draw_fbo, GL_COLOR_ATTACHMENT1, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, (GLint *)&name2 );
+            funcs->p_glNamedFramebufferRenderbuffer( surface->base.draw_fbo, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, name2 );
+            funcs->p_glNamedFramebufferRenderbuffer( surface->base.draw_fbo, GL_COLOR_ATTACHMENT1, GL_RENDERBUFFER, name1 );
+        }
+
         funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT0, WINE_OPENGL_RESERVED_TEXTURE0 + front, 0 );
         funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT1, WINE_OPENGL_RESERVED_TEXTURE0 + (1 - front), 0 );
 
