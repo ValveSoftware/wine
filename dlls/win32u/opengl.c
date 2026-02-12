@@ -693,7 +693,7 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
     /* the target default framebuffer should be swapped after. We are always presenting framebuffer's surface
      * front while the color attachment textures are swapped on framebuffer surface swap before blit. */
     funcs->p_glDrawBuffer( GL_BACK );
-    if (!needs_gamma)
+    if (surface->base.read_fbo == surface->base.draw_fbo && !needs_gamma)
     {
         funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, surface->base.read_fbo );
         funcs->p_glReadBuffer( GL_COLOR_ATTACHMENT0 );
