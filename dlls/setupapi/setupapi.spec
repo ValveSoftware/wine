@@ -55,10 +55,10 @@
 @ stub CM_Free_Res_Des_Handle
 @ stdcall CM_Get_Child(ptr long long)
 @ stdcall CM_Get_Child_Ex(ptr long long ptr)
-@ stub CM_Get_Class_Key_NameA
-@ stub CM_Get_Class_Key_NameW
-@ stub CM_Get_Class_Key_Name_ExA
-@ stub CM_Get_Class_Key_Name_ExW
+@ stdcall CM_Get_Class_Key_NameA(ptr ptr ptr long) cfgmgr32.CM_Get_Class_Key_NameA
+@ stdcall CM_Get_Class_Key_NameW(ptr ptr ptr long) cfgmgr32.CM_Get_Class_Key_NameW
+@ stdcall CM_Get_Class_Key_Name_ExA(ptr ptr ptr long ptr) cfgmgr32.CM_Get_Class_Key_Name_ExA
+@ stdcall CM_Get_Class_Key_Name_ExW(ptr ptr ptr long ptr) cfgmgr32.CM_Get_Class_Key_Name_ExW
 @ stub CM_Get_Class_NameA
 @ stub CM_Get_Class_NameW
 @ stub CM_Get_Class_Name_ExA
