@@ -640,7 +640,9 @@ static HRESULT clock_change_state(struct presentation_clock *clock, enum clock_c
 
     LIST_FOR_EACH_ENTRY(sink, &clock->sinks, struct clock_sink, entry)
     {
-        clock_notify_async_sink(clock, system_time, param, notification, sink->state_sink);
+        /* Don't notify a sink that is also the time source */
+        if (clock->time_source_sink != sink->state_sink)
+            clock_notify_async_sink(clock, system_time, param, notification, sink->state_sink);
     }
 
     return S_OK;
