@@ -63,8 +63,8 @@
 @ stub CM_Get_Class_NameW
 @ stub CM_Get_Class_Name_ExA
 @ stub CM_Get_Class_Name_ExW
-@ stdcall CM_Get_Class_Registry_PropertyA(ptr long ptr ptr long long ptr)
-@ stdcall CM_Get_Class_Registry_PropertyW(ptr long ptr ptr long long ptr)
+@ stdcall CM_Get_Class_Registry_PropertyA(ptr long ptr ptr long long ptr) cfgmgr32.CM_Get_Class_Registry_PropertyA
+@ stdcall CM_Get_Class_Registry_PropertyW(ptr long ptr ptr long long ptr) cfgmgr32.CM_Get_Class_Registry_PropertyW
 @ stub CM_Get_Depth
 @ stub CM_Get_Depth_Ex
 @ stdcall CM_Get_DevNode_PropertyW(long ptr ptr ptr ptr long)

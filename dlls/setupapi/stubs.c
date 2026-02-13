@@ -345,26 +345,6 @@ CONFIGRET WINAPI CM_Get_DevNode_Status_Ex(ULONG *status, ULONG *problem, DEVINST
 }
 
 /***********************************************************************
- *      CM_Get_Class_Registry_PropertyA (SETUPAPI.@)
- */
-CONFIGRET WINAPI CM_Get_Class_Registry_PropertyA(LPGUID class, ULONG prop, PULONG regdatatype,
-                                                 PVOID buf, ULONG *len, ULONG flags, HMACHINE machine)
-{
-    FIXME("%p %lu %p %p %p 0x%08lx %p: stub\n", class, prop, regdatatype, buf, len, flags, machine);
-    return CR_FAILURE;
-}
-
-/***********************************************************************
- *      CM_Get_Class_Registry_PropertyW (SETUPAPI.@)
- */
-CONFIGRET WINAPI CM_Get_Class_Registry_PropertyW(LPGUID class, ULONG prop, PULONG regdatatype,
-                                                 PVOID buf, ULONG *len, ULONG flags, HMACHINE machine)
-{
-    FIXME("%p %lu %p %p %p 0x%08lx %p: stub\n", class, prop, regdatatype, buf, len, flags, machine);
-    return CR_FAILURE;
-}
-
-/***********************************************************************
  *             CM_Get_Sibling  (SETUPAPI.@)
  */
 CONFIGRET WINAPI CM_Get_Sibling(
