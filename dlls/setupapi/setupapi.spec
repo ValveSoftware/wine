@@ -142,10 +142,10 @@
 @ stub CM_Move_DevNode
 @ stub CM_Move_DevNode_Ex
 @ stub CM_Next_Range
-@ stub CM_Open_Class_KeyA
-@ stub CM_Open_Class_KeyW
-@ stub CM_Open_Class_Key_ExA
-@ stub CM_Open_Class_Key_ExW
+@ stdcall CM_Open_Class_KeyA(ptr str long long ptr long) cfgmgr32.CM_Open_Class_KeyA
+@ stdcall CM_Open_Class_KeyW(ptr wstr long long ptr long) cfgmgr32.CM_Open_Class_KeyW
+@ stdcall CM_Open_Class_Key_ExA(ptr str long long ptr long ptr) cfgmgr32.CM_Open_Class_Key_ExA
+@ stdcall CM_Open_Class_Key_ExW(ptr wstr long long ptr long ptr) cfgmgr32.CM_Open_Class_Key_ExW
 @ stdcall CM_Open_DevNode_Key(long long long long ptr long)
 @ stub CM_Open_DevNode_Key_Ex
 @ stub CM_Query_And_Remove_SubTreeA
