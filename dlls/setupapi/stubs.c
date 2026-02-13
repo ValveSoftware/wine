@@ -345,15 +345,6 @@ CONFIGRET WINAPI CM_Get_DevNode_Status_Ex(ULONG *status, ULONG *problem, DEVINST
 }
 
 /***********************************************************************
- *      CM_Enumerate_Classes (SETUPAPI.@)
- */
-CONFIGRET WINAPI CM_Enumerate_Classes(ULONG index, LPGUID class, ULONG flags)
-{
-    FIXME("%lu %p 0x%08lx: stub\n", index, class, flags);
-    return CR_NO_SUCH_VALUE;
-}
-
-/***********************************************************************
  *      CM_Get_Class_Registry_PropertyA (SETUPAPI.@)
  */
 CONFIGRET WINAPI CM_Get_Class_Registry_PropertyA(LPGUID class, ULONG prop, PULONG regdatatype,

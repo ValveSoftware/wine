@@ -38,8 +38,8 @@
 @ stub CM_Dup_Range_List
 @ stub CM_Enable_DevNode
 @ stub CM_Enable_DevNode_Ex
-@ stdcall CM_Enumerate_Classes(long ptr long)
-@ stub CM_Enumerate_Classes_Ex
+@ stdcall CM_Enumerate_Classes(long ptr long) cfgmgr32.CM_Enumerate_Classes
+@ stdcall CM_Enumerate_Classes_Ex(long ptr long ptr) cfgmgr32.CM_Enumerate_Classes_Ex
 @ stub CM_Enumerate_EnumeratorsA
 @ stub CM_Enumerate_EnumeratorsW
 @ stub CM_Enumerate_Enumerators_ExA
