@@ -1787,14 +1787,12 @@ static void flush_context( TEB *teb, void (*flush)(void) )
 void wrap_glFinish( TEB *teb )
 {
     const struct opengl_funcs *funcs = teb->glTable;
-    resolve_default_fbo( teb, FALSE );
     flush_context( teb, funcs->p_glFinish );
 }
 
 void wrap_glFlush( TEB *teb )
 {
     const struct opengl_funcs *funcs = teb->glTable;
-    resolve_default_fbo( teb, FALSE );
     flush_context( teb, funcs->p_glFlush );
 }
 
@@ -1803,7 +1801,6 @@ void wrap_glClear( TEB *teb, GLbitfield mask )
     const struct opengl_funcs *funcs = teb->glTable;
     flush_context( teb, NULL );
     funcs->p_glClear( mask );
-    resolve_default_fbo( teb, FALSE );
 }
 
 void wrap_glDrawPixels( TEB *teb, GLsizei width, GLsizei height, GLenum format, GLenum type, const void *pixels )
@@ -1811,7 +1808,6 @@ void wrap_glDrawPixels( TEB *teb, GLsizei width, GLsizei height, GLenum format, 
     const struct opengl_funcs *funcs = teb->glTable;
     flush_context( teb, NULL );
     funcs->p_glDrawPixels( width, height, format, type, pixels );
-    resolve_default_fbo( teb, FALSE );
 }
 
 void wrap_glReadPixels( TEB *teb, GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void *pixels )
@@ -1826,15 +1822,12 @@ void wrap_glViewport( TEB *teb, GLint x, GLint y, GLsizei width, GLsizei height 
     const struct opengl_funcs *funcs = teb->glTable;
     flush_context( teb, NULL );
     funcs->p_glViewport( x, y, width, height );
-    resolve_default_fbo( teb, FALSE );
 }
 
 BOOL wrap_wglSwapBuffers( TEB *teb, HDC hdc )
 {
     const struct opengl_funcs *funcs = get_dc_funcs( hdc );
     BOOL ret;
-
-    resolve_default_fbo( teb, FALSE );
 
     if (!(ret = funcs->p_wglSwapBuffers( hdc )))
     {

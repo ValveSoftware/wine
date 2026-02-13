@@ -743,6 +743,16 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
     for (int i = 0; i < ARRAY_SIZE(general_state_handlers); i++)
         general_state_handlers[i]( SET, ctx, &state );
 
+    if (surface->base.read_fbo != surface->base.draw_fbo)
+    {
+        funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, surface->base.draw_fbo );
+        funcs->p_glReadBuffer( GL_COLOR_ATTACHMENT0 );
+        funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, surface->base.read_fbo );
+        funcs->p_glDrawBuffer( GL_COLOR_ATTACHMENT0 );
+        funcs->p_glBlitFramebuffer( 0, 0, src.right, src.bottom, 0, 0, src.right, src.bottom, GL_COLOR_BUFFER_BIT,
+                                    GL_NEAREST );
+    }
+
     funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
 
     /* the target default framebuffer should be swapped after. We are always presenting framebuffer's surface
