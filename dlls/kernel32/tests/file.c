@@ -2740,8 +2740,12 @@ static void test_FindFirstFileA(void)
     int err;
     char buffer[5] = "C:\\";
     char buffer2[100];
-    char nonexistent[MAX_PATH];
+    FILE_FULL_EA_INFORMATION *ea_info = (void *)buffer2;
+    char nonexistent[MAX_PATH], temp[MAX_PATH];
+    IO_STATUS_BLOCK io;
     BOOL found = FALSE;
+    NTSTATUS status;
+    BOOL ret;
 
     /* try FindFirstFileA on "C:\" */
     buffer[0] = get_windows_drive();
@@ -2931,6 +2935,33 @@ static void test_FindFirstFileA(void)
     err = GetLastError();
     ok ( handle == INVALID_HANDLE_VALUE, "FindFirstFile on %s should fail\n", buffer2 );
     ok ( err == ERROR_PATH_NOT_FOUND, "Bad Error number %d\n", err );
+
+    /* Test a file with EA. */
+    GetTempPathA(ARRAY_SIZE(temp), temp);
+    strcat(temp, "winetest_ea");
+    handle = CreateFileA(temp, GENERIC_ALL, 0, NULL, CREATE_ALWAYS, 0, 0);
+    ok(handle != INVALID_HANDLE_VALUE, "failed to create %s, error %lu\n",
+            debugstr_a(temp), GetLastError());
+
+    ea_info->NextEntryOffset = 0;
+    ea_info->Flags = 0;
+    ea_info->EaNameLength = 3;
+    ea_info->EaValueLength = 3;
+    strcpy(ea_info->EaName, "foo");
+    strcpy(ea_info->EaName + 4, "bar");
+    status = NtSetEaFile(handle, &io, ea_info, offsetof(FILE_FULL_EA_INFORMATION, EaName[8]));
+    todo_wine ok(!status, "got %#lx\n", status);
+    CloseHandle(handle);
+
+    handle = FindFirstFileA(temp, &data);
+    ok(handle != INVALID_HANDLE_VALUE, "got error %lu\n", GetLastError());
+    ok((data.dwFileAttributes & ~FILE_ATTRIBUTE_NOT_CONTENT_INDEXED) == FILE_ATTRIBUTE_ARCHIVE,
+            "got attributes %#lx\n", data.dwFileAttributes);
+    ok(!data.dwReserved0, "got reserved0 %#lx\n", data.dwReserved0);
+    FindClose(handle);
+
+    ret = DeleteFileA(temp);
+    ok(ret == TRUE, "got error %lu\n", GetLastError());
 }
 
 static void test_FindNextFileA(void)
