@@ -21305,6 +21305,7 @@ static NTSTATUS ext_glReadnPixels( void *args )
     struct glReadnPixels_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glReadnPixels) return STATUS_NOT_IMPLEMENTED;
+    resolve_default_fbo( params->teb );
     funcs->p_glReadnPixels( params->x, params->y, params->width, params->height, params->format, params->type, params->bufSize, params->data );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
@@ -71077,6 +71078,7 @@ static NTSTATUS wow64_ext_glReadnPixels( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glReadnPixels) return STATUS_NOT_IMPLEMENTED;
+    resolve_default_fbo( teb );
     funcs->p_glReadnPixels( params->x, params->y, params->width, params->height, params->format, params->type, params->bufSize, ULongToPtr(params->data) );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;

@@ -257,6 +257,7 @@ my %resolve_default_fbo_thunks =
      "glCopyTextureSubImage2D" => 1,
      "glCopyTextureSubImage3D" => 1,
      "glReadPixels" => 1,
+     "glReadnPixels" => 1,
     );
 my %map_default_fbo_thunks =
     (
