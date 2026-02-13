@@ -1687,7 +1687,7 @@ static void test_info_classes(void)
         {
             const FILE_ID_EXTD_BOTH_DIRECTORY_INFORMATION *info = (void *)buffer;
             todo_wine ok( info->EaSize >= 8 && info->EaSize <= 16, "got %#lx\n", info->EaSize );
-            todo_wine ok( !info->ReparsePointTag, "got tag %#lx\n", info->ReparsePointTag );
+            ok( !info->ReparsePointTag, "got tag %#lx\n", info->ReparsePointTag );
             check_string( info->FileName, info->FileNameLength, L"file2" );
             break;
         }

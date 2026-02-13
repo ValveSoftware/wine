@@ -1804,6 +1804,7 @@ static int get_file_info( const char *path, struct stat *st, ULONG *attr, ULONG 
     *attr = 0;
     ret = lstat( path, st );
     if (ret == -1) return ret;
+    if (reparse_tag) *reparse_tag = 0;
     if (S_ISLNK( st->st_mode ))
     {
         ret = stat( path, st );
