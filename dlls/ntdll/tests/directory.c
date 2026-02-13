@@ -1623,7 +1623,7 @@ static void test_info_classes(void)
             const FILE_ID_EXTD_BOTH_DIRECTORY_INFORMATION *info = (void *)buffer;
             ok( !info->EaSize, "got %#lx\n", info->EaSize );
             ok( info->ReparsePointTag == 0xbeef, "got tag %#lx\n", info->ReparsePointTag );
-            todo_wine ok( !memcmp( &info->FileId, &id_info.FileId, sizeof( info->FileId )), "ID didn't match\n" );
+            ok( !memcmp( &info->FileId, &id_info.FileId, sizeof( info->FileId )), "ID didn't match\n" );
             check_string( info->ShortName, info->ShortNameLength, L"" );
             check_string( info->FileName, info->FileNameLength, L"file" );
             break;

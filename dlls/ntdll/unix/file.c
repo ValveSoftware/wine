@@ -2110,6 +2110,7 @@ static NTSTATUS fill_file_info( const struct stat *st, ULONG attr, void *ptr,
     case FileIdExtdBothDirectoryInformation:
         {
             FILE_ID_EXTD_BOTH_DIRECTORY_INFORMATION *info = ptr;
+            memset( &info->FileId, 0, sizeof(info->FileId) );
             *(ULONGLONG *)&info->FileId = st->st_ino;
             fill_file_info( st, attr, info, FileDirectoryInformation );
         }
