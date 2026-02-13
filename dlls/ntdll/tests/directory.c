@@ -1603,7 +1603,7 @@ static void test_info_classes(void)
             static const GUID zero_guid;
             ok( !memcmp( &info->FileId, &id_info.FileId, sizeof( info->FileId )),
                     "expected ID %#I64x, got %#I64x\n", *(ULONGLONG *)&id_info.FileId, info->FileId.QuadPart);
-            todo_wine ok( !memcmp( &info->LockingTransactionId, &zero_guid, sizeof( info->LockingTransactionId )),
+            ok( !memcmp( &info->LockingTransactionId, &zero_guid, sizeof( info->LockingTransactionId )),
                     "GUID didn't match\n" );
             ok( !info->TxInfoFlags, "got %lu\n", info->TxInfoFlags );
             check_string( info->FileName, info->FileNameLength, L"file" );

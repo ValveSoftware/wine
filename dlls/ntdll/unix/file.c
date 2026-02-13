@@ -2523,6 +2523,7 @@ static NTSTATUS get_dir_data_entry( struct dir_data *dir_data, void *info_ptr, I
 
     case FileIdGlobalTxDirectoryInformation:
         info->id_tx.TxInfoFlags = 0;
+        memset( &info->id_tx.LockingTransactionId, 0, sizeof(GUID) );
         info->id_tx.FileNameLength = name_len;
         break;
 
