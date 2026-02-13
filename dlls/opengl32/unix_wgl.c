@@ -2400,6 +2400,88 @@ void wrap_glNamedFramebufferReadBuffer( TEB *teb, GLuint fbo, GLenum src )
     funcs->p_glNamedFramebufferReadBuffer( fbo, src );
 }
 
+void wrap_glBlitNamedFramebuffer( TEB *teb, GLuint readFramebuffer, GLuint drawFramebuffer, GLint srcX0, GLint srcY0,
+                                  GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1,
+                                  GLbitfield mask, GLenum filter )
+{
+    const struct opengl_funcs *funcs = teb->glTable;
+    struct opengl_drawable *read;
+    struct context *ctx;
+    GLenum buf;
+
+    if (!drawFramebuffer) drawFramebuffer = get_default_fbo( teb, GL_DRAW_FRAMEBUFFER );
+    if (!readFramebuffer && (ctx = get_current_context( teb, NULL, &read ))
+        && read->draw_fbo)
+    {
+        /* Use draw_fbo for read framebuffer, read_fbo is stale and resolve is not needed. */
+        readFramebuffer = read->draw_fbo;
+        if (read->draw_fbo != read->read_fbo)
+        {
+            if (!funcs->p_glNamedFramebufferReadBuffer)
+            {
+                void **func_ptr = (void **)&funcs->p_glNamedFramebufferReadBuffer;
+                *func_ptr = funcs->p_wglGetProcAddress( "glNamedFramebufferReadBuffer" );
+            }
+            /* ctx->pixel_mode.read_buffer always corresponds to default FBO and not the current FBO, so it can
+             * be used here. Don't need to restore read buffer on draw_fbo (which is distinct from read_fbo). */
+            if ((buf = drawable_buffer_from_buffer( read, ctx->pixel_mode.read_buffer )))
+                funcs->p_glNamedFramebufferReadBuffer( readFramebuffer, buf );
+        }
+    }
+    funcs->p_glBlitNamedFramebuffer( readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
+                                     dstX0, dstY0, dstX1, dstY1, mask, filter );
+}
+
+void wrap_glBlitFramebuffer( TEB *teb, GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0,
+                             GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter )
+{
+    const struct opengl_funcs *funcs = teb->glTable;
+    struct opengl_drawable *read = NULL;
+    struct context *ctx;
+    GLenum buf;
+
+    if ((ctx = get_current_context( teb, NULL, &read )) && !ctx->read_fbo && read->draw_fbo != read->read_fbo)
+    {
+        /* Blit directlty from read->draw_fbo, read_fbo is stale and resolve is not needed. */
+        funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, read->draw_fbo );
+        if (!funcs->p_glReadBuffer)
+        {
+            void **func_ptr = (void **)&funcs->p_glReadBuffer;
+            *func_ptr = funcs->p_wglGetProcAddress( "glReadBuffer" );
+        }
+        if ((buf = drawable_buffer_from_buffer( read, ctx->pixel_mode.read_buffer )))
+            funcs->p_glReadBuffer( buf );
+    }
+    funcs->p_glBlitFramebuffer( srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter );
+    if (ctx && !ctx->read_fbo && read->draw_fbo != read->read_fbo)
+        funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, read->read_fbo );
+}
+
+void wrap_glBlitFramebufferEXT( TEB *teb, GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0,
+                             GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter )
+{
+    const struct opengl_funcs *funcs = teb->glTable;
+    struct opengl_drawable *read = NULL;
+    struct context *ctx;
+    GLenum buf;
+
+    if ((ctx = get_current_context( teb, NULL, &read )) && !ctx->read_fbo && read->draw_fbo != read->read_fbo)
+    {
+        /* Blit directlty from read->draw_fbo, read_fbo is stale and resolve is not needed. */
+        funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, read->draw_fbo );
+        if (!funcs->p_glReadBuffer)
+        {
+            void **func_ptr = (void **)&funcs->p_glReadBuffer;
+            *func_ptr = funcs->p_wglGetProcAddress( "glReadBuffer" );
+        }
+        if ((buf = drawable_buffer_from_buffer( read, ctx->pixel_mode.read_buffer )))
+            funcs->p_glReadBuffer( buf );
+    }
+    funcs->p_glBlitFramebufferEXT( srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter );
+    if (ctx && !ctx->read_fbo && read->draw_fbo != read->read_fbo)
+        funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, read->read_fbo );
+}
+
 void wrap_glGetIntegerv( TEB *teb, GLenum pname, GLint *data )
 {
     const struct opengl_funcs *funcs = teb->glTable;

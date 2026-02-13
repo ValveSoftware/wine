@@ -188,6 +188,9 @@ my %manual_win_thunks =
     );
 my %manual_unix_thunks =
     (
+     "glBlitFramebuffer" => 1,
+     "glBlitFramebufferEXT" => 1,
+     "glBlitNamedFramebuffer" => 1,
      "glClear" => 1,
      "glDebugMessageCallback" => 1,
      "glDebugMessageCallbackAMD" => 1,
@@ -259,7 +262,6 @@ my %map_default_fbo_thunks =
     (
      "glBindFramebuffer" => [ "framebuffer" ],
      "glBindFramebufferEXT" => [ "framebuffer" ],
-     "glBlitNamedFramebuffer" => [ "readFramebuffer", "drawFramebuffer" ],
      "glCheckNamedFramebufferStatus" => [ "framebuffer" ],
      "glCheckNamedFramebufferStatusEXT" => [ "framebuffer" ],
      "glClearNamedFramebufferfi" => [ "framebuffer" ],

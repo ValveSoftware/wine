@@ -4720,7 +4720,7 @@ static NTSTATUS ext_glBlitFramebuffer( void *args )
     struct glBlitFramebuffer_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBlitFramebuffer) return STATUS_NOT_IMPLEMENTED;
-    funcs->p_glBlitFramebuffer( params->srcX0, params->srcY0, params->srcX1, params->srcY1, params->dstX0, params->dstY0, params->dstX1, params->dstY1, params->mask, params->filter );
+    wrap_glBlitFramebuffer( params->teb, params->srcX0, params->srcY0, params->srcX1, params->srcY1, params->dstX0, params->dstY0, params->dstX1, params->dstY1, params->mask, params->filter );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
 }
@@ -4730,7 +4730,7 @@ static NTSTATUS ext_glBlitFramebufferEXT( void *args )
     struct glBlitFramebufferEXT_params *params = args;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBlitFramebufferEXT) return STATUS_NOT_IMPLEMENTED;
-    funcs->p_glBlitFramebufferEXT( params->srcX0, params->srcY0, params->srcX1, params->srcY1, params->dstX0, params->dstY0, params->dstX1, params->dstY1, params->mask, params->filter );
+    wrap_glBlitFramebufferEXT( params->teb, params->srcX0, params->srcY0, params->srcX1, params->srcY1, params->dstX0, params->dstY0, params->dstX1, params->dstY1, params->mask, params->filter );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
 }
@@ -4758,13 +4758,9 @@ static NTSTATUS ext_glBlitFramebufferLayersEXT( void *args )
 static NTSTATUS ext_glBlitNamedFramebuffer( void *args )
 {
     struct glBlitNamedFramebuffer_params *params = args;
-    GLuint readFramebuffer = params->readFramebuffer;
-    GLuint drawFramebuffer = params->drawFramebuffer;
     const struct opengl_funcs *funcs = params->teb->glTable;
     if (!funcs->p_glBlitNamedFramebuffer) return STATUS_NOT_IMPLEMENTED;
-    if (!readFramebuffer) readFramebuffer = get_default_fbo( params->teb, GL_READ_FRAMEBUFFER );
-    if (!drawFramebuffer) drawFramebuffer = get_default_fbo( params->teb, GL_DRAW_FRAMEBUFFER );
-    funcs->p_glBlitNamedFramebuffer( readFramebuffer, drawFramebuffer, params->srcX0, params->srcY0, params->srcX1, params->srcY1, params->dstX0, params->dstY0, params->dstX1, params->dstY1, params->mask, params->filter );
+    wrap_glBlitNamedFramebuffer( params->teb, params->readFramebuffer, params->drawFramebuffer, params->srcX0, params->srcY0, params->srcX1, params->srcY1, params->dstX0, params->dstY0, params->dstX1, params->dstY1, params->mask, params->filter );
     set_context_attribute( params->teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
 }
@@ -41634,7 +41630,7 @@ static NTSTATUS wow64_ext_glBlitFramebuffer( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBlitFramebuffer) return STATUS_NOT_IMPLEMENTED;
-    funcs->p_glBlitFramebuffer( params->srcX0, params->srcY0, params->srcX1, params->srcY1, params->dstX0, params->dstY0, params->dstX1, params->dstY1, params->mask, params->filter );
+    wrap_glBlitFramebuffer( teb, params->srcX0, params->srcY0, params->srcX1, params->srcY1, params->dstX0, params->dstY0, params->dstX1, params->dstY1, params->mask, params->filter );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
 }
@@ -41658,7 +41654,7 @@ static NTSTATUS wow64_ext_glBlitFramebufferEXT( void *args )
     TEB *teb = get_teb64( params->teb );
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBlitFramebufferEXT) return STATUS_NOT_IMPLEMENTED;
-    funcs->p_glBlitFramebufferEXT( params->srcX0, params->srcY0, params->srcX1, params->srcY1, params->dstX0, params->dstY0, params->dstX1, params->dstY1, params->mask, params->filter );
+    wrap_glBlitFramebufferEXT( teb, params->srcX0, params->srcY0, params->srcX1, params->srcY1, params->dstX0, params->dstY0, params->dstX1, params->dstY1, params->mask, params->filter );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
 }
@@ -41732,13 +41728,9 @@ static NTSTATUS wow64_ext_glBlitNamedFramebuffer( void *args )
         GLenum filter;
     } *params = args;
     TEB *teb = get_teb64( params->teb );
-    GLuint readFramebuffer = params->readFramebuffer;
-    GLuint drawFramebuffer = params->drawFramebuffer;
     const struct opengl_funcs *funcs = teb->glTable;
     if (!funcs->p_glBlitNamedFramebuffer) return STATUS_NOT_IMPLEMENTED;
-    if (!readFramebuffer) readFramebuffer = get_default_fbo( teb, GL_READ_FRAMEBUFFER );
-    if (!drawFramebuffer) drawFramebuffer = get_default_fbo( teb, GL_DRAW_FRAMEBUFFER );
-    funcs->p_glBlitNamedFramebuffer( readFramebuffer, drawFramebuffer, params->srcX0, params->srcY0, params->srcX1, params->srcY1, params->dstX0, params->dstY0, params->dstX1, params->dstY1, params->mask, params->filter );
+    wrap_glBlitNamedFramebuffer( teb, params->readFramebuffer, params->drawFramebuffer, params->srcX0, params->srcY0, params->srcX1, params->srcY1, params->dstX0, params->dstY0, params->dstX1, params->dstY1, params->mask, params->filter );
     set_context_attribute( teb, -1 /* unsupported */, NULL, 0 );
     return STATUS_SUCCESS;
 }
