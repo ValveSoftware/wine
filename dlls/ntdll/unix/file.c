@@ -2487,30 +2487,32 @@ static NTSTATUS get_dir_data_entry( struct dir_data *dir_data, void *info_ptr, I
         break;
 
     case FileFullDirectoryInformation:
-        info->full.EaSize = 0; /* FIXME */
+        /* non-Extd classes return the reparse tag in EaSize if there is one */
+        info->full.EaSize = reparse_tag;
         info->full.FileNameLength = name_len;
         break;
 
     case FileIdFullDirectoryInformation:
-        info->id_full.EaSize = 0; /* FIXME */
+        info->id_full.EaSize = reparse_tag;
         info->id_full.FileNameLength = name_len;
         break;
 
     case FileBothDirectoryInformation:
-        info->both.EaSize = 0; /* FIXME */
+        info->both.EaSize = reparse_tag;
         info->both.ShortNameLength = wcslen( names->short_name ) * sizeof(WCHAR);
         memcpy( info->both.ShortName, names->short_name, info->both.ShortNameLength );
         info->both.FileNameLength = name_len;
         break;
 
     case FileIdBothDirectoryInformation:
-        info->id_both.EaSize = 0; /* FIXME */
+        info->id_both.EaSize = reparse_tag;
         info->id_both.ShortNameLength = wcslen( names->short_name ) * sizeof(WCHAR);
         memcpy( info->id_both.ShortName, names->short_name, info->id_both.ShortNameLength );
         info->id_both.FileNameLength = name_len;
         break;
 
     case FileIdExtdBothDirectoryInformation:
+        /* Extd classes do *not* return the reparse tag in EaSize */
         info->extd_both.EaSize = 0; /* FIXME */
         info->extd_both.ReparsePointTag = reparse_tag;
         info->extd_both.ShortNameLength = wcslen( names->short_name ) * sizeof(WCHAR);
