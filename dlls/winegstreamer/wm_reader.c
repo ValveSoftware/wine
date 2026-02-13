@@ -1527,9 +1527,10 @@ static void free_streams(struct wm_reader *reader)
         if (stream->stream_allocator)
             IWMReaderAllocatorEx_Release(stream->stream_allocator);
         stream->stream_allocator = NULL;
-
-        free(stream);
     }
+
+    free(reader->streams);
+    reader->streams = NULL;
 }
 
 static HRESULT init_stream(struct wm_reader *reader)
