@@ -40,10 +40,10 @@
 @ stub CM_Enable_DevNode_Ex
 @ stdcall CM_Enumerate_Classes(long ptr long) cfgmgr32.CM_Enumerate_Classes
 @ stdcall CM_Enumerate_Classes_Ex(long ptr long ptr) cfgmgr32.CM_Enumerate_Classes_Ex
-@ stub CM_Enumerate_EnumeratorsA
-@ stub CM_Enumerate_EnumeratorsW
-@ stub CM_Enumerate_Enumerators_ExA
-@ stub CM_Enumerate_Enumerators_ExW
+@ stdcall CM_Enumerate_EnumeratorsA(long ptr ptr long) cfgmgr32.CM_Enumerate_EnumeratorsA
+@ stdcall CM_Enumerate_EnumeratorsW(long ptr ptr long) cfgmgr32.CM_Enumerate_EnumeratorsW
+@ stdcall CM_Enumerate_Enumerators_ExA(long ptr ptr long ptr) cfgmgr32.CM_Enumerate_Enumerators_ExA
+@ stdcall CM_Enumerate_Enumerators_ExW(long ptr ptr long ptr) cfgmgr32.CM_Enumerate_Enumerators_ExW
 @ stub CM_Find_Range
 @ stub CM_First_Range
 @ stub CM_Free_Log_Conf
