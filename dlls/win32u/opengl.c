@@ -804,8 +804,8 @@ static void framebuffer_surface_flush( struct opengl_drawable *drawable, UINT fl
     if (flags & GL_FLUSH_UPDATED && drawable->read_fbo) framebuffer_surface_resize( surface );
     if (!surface->target) return;
 
-    interval = get_window_swap_interval( drawable->client->hwnd );
-    if (flags & GL_FLUSH_PRESENT) interval = 0;
+    if (flags & GL_FLUSH_PRESENT) drawable->interval = 0;
+    interval = drawable->interval;
 
     opengl_drawable_flush( surface->target, interval, flags & ~GL_FLUSH_PRESENT );
     if (flags & GL_FLUSH_PRESENT)
