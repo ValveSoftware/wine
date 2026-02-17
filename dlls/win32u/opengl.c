@@ -161,7 +161,7 @@ static void opengl_drawable_flush( struct opengl_drawable *drawable, int interva
     if (interval != drawable->interval)
     {
         drawable->interval = interval;
-        flags = GL_FLUSH_INTERVAL;
+        flags |= GL_FLUSH_INTERVAL;
     }
 
     if (flags) drawable->funcs->flush( drawable, flags );
