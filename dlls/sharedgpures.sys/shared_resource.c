@@ -364,6 +364,10 @@ static NTSTATUS shared_resource_get_info(struct shared_resource *res, void *buff
 
 static NTSTATUS WINAPI dispatch_create(DEVICE_OBJECT *device, IRP *irp)
 {
+    IO_STACK_LOCATION *stack = IoGetCurrentIrpStackLocation(irp);
+
+    stack->FileObject->FsContext = (void *)(UINT_PTR)-1;
+
     irp->IoStatus.u.Status = STATUS_SUCCESS;
     IoCompleteRequest(irp, IO_NO_INCREMENT);
     return STATUS_SUCCESS;
@@ -372,9 +376,18 @@ static NTSTATUS WINAPI dispatch_create(DEVICE_OBJECT *device, IRP *irp)
 static NTSTATUS WINAPI dispatch_close(DEVICE_OBJECT *device, IRP *irp)
 {
     IO_STACK_LOCATION *stack = IoGetCurrentIrpStackLocation(irp);
-    struct shared_resource *res = &resource_pool[ (UINT_PTR) stack->FileObject->FsContext ];
+    struct shared_resource *res;
 
-    TRACE("Freeing shared resouce %p.\n", res);
+    if ((UINT_PTR)stack->FileObject->FsContext == (UINT_PTR)-1)
+    {
+        irp->IoStatus.u.Status = STATUS_SUCCESS;
+        IoCompleteRequest(irp, IO_NO_INCREMENT);
+        return STATUS_SUCCESS;
+    }
+
+    res = &resource_pool[ (UINT_PTR) stack->FileObject->FsContext ];
+
+    TRACE("Freeing shared resource %p.\n", res);
 
     if (res)
     {
