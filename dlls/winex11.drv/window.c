@@ -2207,7 +2207,6 @@ void set_net_active_window( HWND hwnd, HWND previous )
     xev.xclient.data.l[3] = 0;
     xev.xclient.data.l[4] = 0;
 
-    data->pending_state.net_active_window = window;
     data->net_active_window_serial = NextRequest( data->display );
 
     if (withdrawn)
@@ -2217,6 +2216,7 @@ void set_net_active_window( HWND hwnd, HWND previous )
         XNoOp( data->display );
         return;
     }
+    data->pending_state.net_active_window = window;
 
     TRACE( "requesting _NET_ACTIVE_WINDOW %p/%lx serial %lu\n", hwnd, window, data->net_active_window_serial );
     XSendEvent( data->display, DefaultRootWindow( data->display ), False,
