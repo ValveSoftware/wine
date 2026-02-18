@@ -22,10 +22,12 @@ struct shared_resource
 {
     unsigned int ref_count;
     void *unix_resource;
+    HANDLE unix_resource_khandle;
     WCHAR *name;
     void *metadata;
     SIZE_T metadata_size;
     void **object_pool;
+    HANDLE *object_pool_khandles;
     unsigned int object_pool_count;
     UINT64 resource_size;
 };
@@ -34,7 +36,7 @@ static struct shared_resource *resource_pool;
 static unsigned int resource_pool_size;
 
 /* TODO: If/when ntoskrnl gets support for referencing user handles directly, remove this function */
-static void *reference_client_handle(obj_handle_t handle)
+static void *reference_client_handle(obj_handle_t handle, HANDLE *out_khandle)
 {
     HANDLE client_process, kernel_handle;
     OBJECT_ATTRIBUTES attr;
@@ -64,7 +66,11 @@ static void *reference_client_handle(obj_handle_t handle)
     ObReferenceObjectByHandle(kernel_handle, 0, NULL, KernelMode, &object, NULL);
 
     NtClose(client_process);
-    NtClose(kernel_handle);
+
+    /* Keep kernel_handle alive so that open_client_handle() can duplicate it
+     * into client processes via NtDuplicateObject. The caller must store this
+     * handle and close it when the shared resource is freed. */
+    *out_khandle = kernel_handle;
 
     return object;
 }
@@ -81,6 +87,7 @@ struct shared_resource_create
 static NTSTATUS shared_resource_create(struct shared_resource **res, void *buff, SIZE_T insize, IO_STATUS_BLOCK *iosb)
 {
     struct shared_resource_create *input = buff;
+    HANDLE unix_resource_khandle;
     void *unix_resource;
     unsigned int i;
     LPWSTR name;
@@ -91,7 +98,7 @@ static NTSTATUS shared_resource_create(struct shared_resource **res, void *buff,
     if (input->name[ ((insize - offsetof(struct shared_resource_create, name)) / sizeof(WCHAR)) - 1 ])
         return STATUS_INVALID_PARAMETER;
 
-    if (!(unix_resource = reference_client_handle(input->unix_handle)))
+    if (!(unix_resource = reference_client_handle(input->unix_handle, &unix_resource_khandle)))
         return STATUS_INVALID_HANDLE;
 
     if (insize == sizeof(*input))
@@ -126,6 +133,7 @@ static NTSTATUS shared_resource_create(struct shared_resource **res, void *buff,
     *res = &resource_pool[i];
     (*res)->ref_count = 1;
     (*res)->unix_resource = unix_resource;
+    (*res)->unix_resource_khandle = unix_resource_khandle;
     (*res)->name = name;
     (*res)->resource_size = input->resource_size;
 
@@ -209,10 +217,12 @@ static NTSTATUS shared_resource_getkmt(struct shared_resource *res, void *buff, 
     return STATUS_SUCCESS;
 }
 
-/* TODO: If/when ntoskrnl gets support for opening user handles directly, remove this function */
-static obj_handle_t open_client_handle(void *object)
+/* Duplicate a stored kernel handle into the calling client process.
+ * The kernel_handle must have been created with OBJ_KERNEL_HANDLE
+ * during reference_client_handle(). */
+static obj_handle_t open_client_handle(HANDLE kernel_handle)
 {
-    HANDLE client_process, kernel_handle, handle = NULL;
+    HANDLE client_process, handle = NULL;
     OBJECT_ATTRIBUTES attr;
     CLIENT_ID cid;
 
@@ -229,17 +239,14 @@ static obj_handle_t open_client_handle(void *object)
     if (NtOpenProcess(&client_process, PROCESS_ALL_ACCESS, &attr, &cid) != STATUS_SUCCESS)
         return 0;
 
-    if (ObOpenObjectByPointer(object, 0, NULL, GENERIC_ALL, NULL, KernelMode, &kernel_handle) != STATUS_SUCCESS)
+    if (NtDuplicateObject(NtCurrentProcess(), kernel_handle, client_process, &handle,
+                            0, 0, DUPLICATE_SAME_ACCESS) != STATUS_SUCCESS)
     {
         NtClose(client_process);
         return 0;
     }
 
-    NtDuplicateObject(NtCurrentProcess(), kernel_handle, client_process, &handle,
-                        0, 0, DUPLICATE_SAME_ACCESS);
-
     NtClose(client_process);
-    NtClose(kernel_handle);
 
     return wine_server_obj_handle(handle);
 }
@@ -251,7 +258,7 @@ static NTSTATUS shared_resource_get_unix_resource(struct shared_resource *res, v
     if (outsize < sizeof(obj_handle_t))
         return STATUS_INFO_LENGTH_MISMATCH;
 
-    *((obj_handle_t *)buff) = open_client_handle(res->unix_resource);
+    *((obj_handle_t *)buff) = open_client_handle(res->unix_resource_khandle);
 
     iosb->Information = sizeof(obj_handle_t);
     return STATUS_SUCCESS;
@@ -295,34 +302,45 @@ struct shared_resource_set_object
 static NTSTATUS shared_resource_set_object(struct shared_resource *res, void *buff, SIZE_T insize, IO_STATUS_BLOCK *iosb)
 {
     struct shared_resource_set_object *params = buff;
+    HANDLE khandle;
     void *object;
 
     if (insize < sizeof(*params))
         return STATUS_INFO_LENGTH_MISMATCH;
 
-    if (!(object = reference_client_handle(params->handle)))
+    if (!(object = reference_client_handle(params->handle, &khandle)))
         return STATUS_INVALID_HANDLE;
 
     if (params->index >= res->object_pool_count)
     {
-        void **expanded_pool = ExAllocatePoolWithTag(NonPagedPool, (params->index + 1) * sizeof(void *), 0);
+        unsigned int new_count = params->index + 1;
+        void **expanded_pool = ExAllocatePoolWithTag(NonPagedPool, new_count * sizeof(void *), 0);
+        HANDLE *expanded_khandles = ExAllocatePoolWithTag(NonPagedPool, new_count * sizeof(HANDLE), 0);
 
         if (res->object_pool)
         {
             memcpy(expanded_pool, res->object_pool, res->object_pool_count * sizeof(void *));
+            memcpy(expanded_khandles, res->object_pool_khandles, res->object_pool_count * sizeof(HANDLE));
             ExFreePoolWithTag(res->object_pool, 0);
+            ExFreePoolWithTag(res->object_pool_khandles, 0);
         }
 
-        memset(&expanded_pool[res->object_pool_count], 0, (params->index + 1 - res->object_pool_count) * sizeof (void *));
+        memset(&expanded_pool[res->object_pool_count], 0, (new_count - res->object_pool_count) * sizeof(void *));
+        memset(&expanded_khandles[res->object_pool_count], 0, (new_count - res->object_pool_count) * sizeof(HANDLE));
 
         res->object_pool = expanded_pool;
-        res->object_pool_count = params->index + 1;
+        res->object_pool_khandles = expanded_khandles;
+        res->object_pool_count = new_count;
     }
 
     if (res->object_pool[params->index])
+    {
         ObDereferenceObject(res->object_pool[params->index]);
+        NtClose(res->object_pool_khandles[params->index]);
+    }
 
     res->object_pool[params->index] = object;
+    res->object_pool_khandles[params->index] = khandle;
 
     iosb->Information = 0;
     return STATUS_SUCCESS;
@@ -342,7 +360,7 @@ static NTSTATUS shared_resource_get_object(struct shared_resource *res, void *bu
     if (index >= res->object_pool_count || !res->object_pool[index])
         return STATUS_INVALID_PARAMETER;
 
-    *((obj_handle_t *)buff) = open_client_handle(res->object_pool[index]);
+    *((obj_handle_t *)buff) = open_client_handle(res->object_pool_khandles[index]);
 
     iosb->Information = sizeof(obj_handle_t);
     return STATUS_SUCCESS;
@@ -385,7 +403,9 @@ static NTSTATUS WINAPI dispatch_close(DEVICE_OBJECT *device, IRP *irp)
             {
                 /* TODO: see if its possible to destroy the object here (unlink?) */
                 ObDereferenceObject(res->unix_resource);
+                NtClose(res->unix_resource_khandle);
                 res->unix_resource = NULL;
+                res->unix_resource_khandle = NULL;
             }
             if (res->metadata)
             {
@@ -398,10 +418,15 @@ static NTSTATUS WINAPI dispatch_close(DEVICE_OBJECT *device, IRP *irp)
                 for (i = 0; i < res->object_pool_count; i++)
                 {
                     if (res->object_pool[i])
+                    {
                         ObDereferenceObject(res->object_pool[i]);
+                        NtClose(res->object_pool_khandles[i]);
+                    }
                 }
                 ExFreePoolWithTag(res->object_pool, 0);
+                ExFreePoolWithTag(res->object_pool_khandles, 0);
                 res->object_pool = NULL;
+                res->object_pool_khandles = NULL;
                 res->object_pool_count = 0;
             }
         }
