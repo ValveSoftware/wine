@@ -277,7 +277,29 @@ static GLenum depth_format_from_pfd( const struct wgl_pixel_format *desc )
     return 0;
 }
 
-static GLuint create_framebuffer( struct opengl_drawable *drawable, const struct wgl_pixel_format *desc )
+static void resize_texture( GLuint name, const struct wgl_pixel_format *desc, int width, int height )
+{
+    const struct opengl_funcs *funcs = &display_funcs;
+    GLuint prev;
+
+    funcs->p_glGetIntegerv( GL_TEXTURE_BINDING_2D, (GLint *)&prev );
+    funcs->p_glBindTexture( GL_TEXTURE_2D, name );
+    funcs->p_glTexImage2D( GL_TEXTURE_2D, 0, color_format_from_pfd( desc ), width, height, 0, format_from_pfd( desc ), GL_BYTE, NULL );
+    funcs->p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0 );
+    funcs->p_glBindTexture( GL_TEXTURE_2D, prev );
+}
+
+static void get_drawable_size( struct opengl_drawable *drawable, int *width, int *height )
+{
+    RECT rect;
+
+    NtUserGetClientRect( drawable->client->hwnd, &rect, NtUserGetDpiForWindow( drawable->client->hwnd ) );
+    *width = max( rect.right, 1 );
+    *height = max( rect.bottom, 1 );
+}
+
+static GLuint create_framebuffer( struct opengl_drawable *drawable, const struct wgl_pixel_format *desc,
+                                  int width, int height )
 {
     const struct opengl_funcs *funcs = &display_funcs;
     GLuint count = 1, fbo, name;
@@ -292,22 +314,25 @@ static GLuint create_framebuffer( struct opengl_drawable *drawable, const struct
         if (desc->samples)
         {
             funcs->p_glCreateRenderbuffers( 1, &name );
+            funcs->p_glNamedRenderbufferStorageMultisample( name, desc->samples, color_format_from_pfd( desc ), width, height );
             funcs->p_glNamedFramebufferRenderbuffer( fbo, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, name );
         }
         else
         {
             name = WINE_OPENGL_RESERVED_TEXTURE0 + i;
+            resize_texture( name, desc, width, height );
             funcs->p_glNamedFramebufferTexture( fbo, GL_COLOR_ATTACHMENT0 + i, name, 0 );
         }
-        TRACE( "drawable %p/%u created color buffer %#x/%u\n", drawable, fbo, GL_COLOR_ATTACHMENT0 + i, name );
+        TRACE( "drawable %p/%u created color buffer %#x/%u, %dx%d\n", drawable, fbo, GL_COLOR_ATTACHMENT0 + i, name, width, height );
     }
 
     if (desc->pfd.cDepthBits)
     {
         funcs->p_glCreateRenderbuffers( 1, &name );
+        funcs->p_glNamedRenderbufferStorageMultisample( name, desc->samples, depth_format_from_pfd( desc ), width, height );
         funcs->p_glNamedFramebufferRenderbuffer( fbo, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, name );
         if (desc->pfd.cStencilBits) funcs->p_glNamedFramebufferRenderbuffer( fbo, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, name );
-        TRACE( "drawable %p/%u created depth buffer %u\n", drawable, fbo, name );
+        TRACE( "drawable %p/%u created depth buffer %u, %dx%d\n", drawable, fbo, name, width, height );
     }
 
     funcs->p_glNamedFramebufferDrawBuffer( fbo, drawable->doublebuffer ? GL_COLOR_ATTACHMENT1 : GL_COLOR_ATTACHMENT0 );
@@ -315,18 +340,6 @@ static GLuint create_framebuffer( struct opengl_drawable *drawable, const struct
     TRACE( "drawable %p created framebuffer %u\n", drawable, fbo );
 
     return fbo;
-}
-
-static void resize_texture( GLuint name, const struct wgl_pixel_format *desc, int width, int height )
-{
-    const struct opengl_funcs *funcs = &display_funcs;
-    GLuint prev;
-
-    funcs->p_glGetIntegerv( GL_TEXTURE_BINDING_2D, (GLint *)&prev );
-    funcs->p_glBindTexture( GL_TEXTURE_2D, name );
-    funcs->p_glTexImage2D( GL_TEXTURE_2D, 0, color_format_from_pfd( desc ), width, height, 0, format_from_pfd( desc ), GL_BYTE, NULL );
-    funcs->p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0 );
-    funcs->p_glBindTexture( GL_TEXTURE_2D, prev );
 }
 
 static void resize_framebuffer( struct opengl_drawable *drawable, const struct wgl_pixel_format *desc, GLuint fbo,
@@ -397,30 +410,28 @@ static void framebuffer_surface_resize( struct framebuffer_surface *surface )
 {
     struct opengl_drawable *drawable = &surface->base;
     struct wgl_pixel_format draw_desc = pixel_formats[drawable->format - 1], read_desc = draw_desc;
-    RECT rect;
+    int width, height;
 
-    NtUserGetClientRect( drawable->client->hwnd, &rect, NtUserGetDpiForWindow( drawable->client->hwnd ) );
-    if (!rect.right) rect.right = 1;
-    if (!rect.bottom) rect.bottom = 1;
+    get_drawable_size( drawable, &width, &height );
 
-    if (rect.right == surface->width && rect.bottom == surface->height)
+    if (width == surface->width && height == surface->height)
     {
         /* Surface format or context format should not change so the only reason to recreate the FBO data
          * is dimensions change or new FBOs created (in which case the surface dimensions should be 0x0). */
         return;
     }
 
-    surface->width = rect.right;
-    surface->height = rect.bottom;
+    surface->width = width;
+    surface->height = height;
     read_desc.samples = read_desc.sample_buffers = 0;
 
-    TRACE( "Resizing drawable %p/%u to %ux%u\n", drawable, drawable->read_fbo, rect.right, rect.bottom );
-    resize_framebuffer( drawable, &read_desc, drawable->read_fbo, rect.right, rect.bottom );
+    TRACE( "Resizing drawable %p/%u to %ux%u\n", drawable, drawable->read_fbo, width, height );
+    resize_framebuffer( drawable, &read_desc, drawable->read_fbo, width, height );
 
     if (drawable->draw_fbo != drawable->read_fbo)
     {
-        TRACE( "Resizing drawable %p/%u to %ux%u\n", drawable, drawable->draw_fbo, rect.right, rect.bottom );
-        resize_framebuffer( drawable, &draw_desc, drawable->draw_fbo, rect.right, rect.bottom );
+        TRACE( "Resizing drawable %p/%u to %ux%u\n", drawable, drawable->draw_fbo, width, height );
+        resize_framebuffer( drawable, &draw_desc, drawable->draw_fbo, width, height );
     }
 }
 
@@ -429,6 +440,7 @@ static void framebuffer_surface_set_context( struct opengl_drawable *drawable, v
     struct wgl_pixel_format draw_desc = pixel_formats[drawable->format - 1], read_desc = draw_desc;
     struct framebuffer_surface *surface = framebuffer_from_opengl_drawable( drawable );
     struct wgl_context *ctx = NtCurrentTeb()->glContext;
+    int width, height;
 
     read_desc.samples = read_desc.sample_buffers = 0;
 
@@ -474,14 +486,15 @@ static void framebuffer_surface_set_context( struct opengl_drawable *drawable, v
     {
         /* First time around or the context had another framebuffer surface previously. */
 
-        drawable->read_fbo = create_framebuffer( drawable, &read_desc );
+        get_drawable_size( drawable, &width, &height );
+        drawable->read_fbo = create_framebuffer( drawable, &read_desc, width, height );
         if (!drawable->read_fbo) ERR( "Failed to create read framebuffer object\n" );
 
         if (!draw_desc.samples) drawable->draw_fbo = drawable->read_fbo;
-        else drawable->draw_fbo = create_framebuffer( drawable, &draw_desc );
+        else drawable->draw_fbo = create_framebuffer( drawable, &draw_desc, width, height );
         if (!drawable->draw_fbo) ERR( "Failed to create draw framebuffer object\n" );
-        surface->width = 0;
-        surface->height = 0;
+        surface->width = width;
+        surface->height = height;
 
         TRACE( "serials %lu, %lu, created new surface FBOs %d / %d.\n", (long)ctx->last_framebuffer.serial,
                (long)surface->serial, drawable->draw_fbo, drawable->read_fbo );
