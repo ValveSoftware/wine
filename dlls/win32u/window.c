@@ -1617,6 +1617,7 @@ LONG_PTR WINAPI NtUserSetWindowLongPtr( HWND hwnd, INT offset, LONG_PTR newval, 
 BOOL set_window_pixel_format( HWND hwnd, int format, BOOL internal )
 {
     WND *win = get_win_ptr( hwnd );
+    BOOL changed = FALSE;
 
     if (!win || win == WND_DESKTOP || win == WND_OTHER_PROCESS)
     {
@@ -1625,10 +1626,10 @@ BOOL set_window_pixel_format( HWND hwnd, int format, BOOL internal )
         return FALSE;
     }
     if (!internal) win->pixel_format = format;
-    if (format) win->clip_clients = TRUE;
+    if (format && !win->clip_clients) changed = win->clip_clients = TRUE;
     release_win_ptr( win );
 
-    update_window_state( hwnd );
+    if (changed) update_window_state( hwnd );
     return TRUE;
 }
 
