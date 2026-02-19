@@ -293,6 +293,7 @@ static void get_drawable_size( struct opengl_drawable *drawable, int *width, int
 {
     RECT rect;
 
+    memset( &rect, 0, sizeof(rect) );
     NtUserGetClientRect( drawable->client->hwnd, &rect, NtUserGetDpiForWindow( drawable->client->hwnd ) );
     *width = max( rect.right, 1 );
     *height = max( rect.bottom, 1 );
