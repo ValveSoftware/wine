@@ -758,7 +758,50 @@ VkResult wine_vkGetPhysicalDeviceCalibrateableTimeDomainsKHR(VkPhysicalDevice cl
                                     instance->p_vkGetPhysicalDeviceCalibrateableTimeDomainsKHR);
 }
 
+VkResult wine_vkGetSwapchainTimeDomainPropertiesEXT(VkDevice client_device, VkSwapchainKHR client_swapchain, VkSwapchainTimeDomainPropertiesEXT *properties, uint64_t *counter)
+{
+    struct vulkan_swapchain *swapchain = vulkan_swapchain_from_handle(client_swapchain);
+    struct vulkan_device *device = vulkan_device_from_handle(client_device);
+    VkSwapchainTimeDomainPropertiesEXT host_properties = *properties;
+    uint64_t capacity = properties->timeDomainCount;
+    VkResult res;
 
+    TRACE("device %p, swapchain %p, properties %p, counter %p\n", device, swapchain, properties, counter);
+
+    host_properties.timeDomainCount = 0;
+    host_properties.pTimeDomainIds = NULL;
+    host_properties.pTimeDomains = NULL;
+
+    res = device->p_vkGetSwapchainTimeDomainPropertiesEXT(device->host.device, swapchain->host.swapchain, &host_properties, counter);
+    if (res && res != VK_INCOMPLETE) return res;
+
+    if (!(host_properties.pTimeDomainIds = calloc(host_properties.timeDomainCount, sizeof(*host_properties.pTimeDomainIds))))
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    if (!(host_properties.pTimeDomains = calloc(host_properties.timeDomainCount, sizeof(*host_properties.pTimeDomains))))
+    {
+        free(host_properties.pTimeDomainIds);
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+    res = device->p_vkGetSwapchainTimeDomainPropertiesEXT(device->host.device, swapchain->host.swapchain, &host_properties, counter);
+    if (res && res != VK_INCOMPLETE) goto done;
+
+    properties->timeDomainCount = 0;
+    for (uint64_t i = 0; i < host_properties.timeDomainCount; i++)
+    {
+        if (host_properties.pTimeDomains[i] == VK_TIME_DOMAIN_CLOCK_MONOTONIC_KHR) continue;
+        if (host_properties.pTimeDomains[i] == VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_KHR) continue;
+        if (++properties->timeDomainCount > capacity) continue;
+        if (properties->pTimeDomains) properties->pTimeDomains[properties->timeDomainCount - 1] = host_properties.pTimeDomains[i];
+        if (properties->pTimeDomainIds) properties->pTimeDomainIds[properties->timeDomainCount - 1] = host_properties.pTimeDomainIds[i];
+    }
+    if (!properties->pTimeDomains && !properties->pTimeDomainIds) res = VK_SUCCESS;
+    else res = properties->timeDomainCount > capacity ? VK_INCOMPLETE : VK_SUCCESS;
+
+done:
+    free(host_properties.pTimeDomainIds);
+    free(host_properties.pTimeDomains);
+    return res;
+}
 
 void wine_vkGetPhysicalDeviceExternalSemaphoreProperties(VkPhysicalDevice client_physical_device,
                                                          const VkPhysicalDeviceExternalSemaphoreInfo *info,

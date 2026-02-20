@@ -484,6 +484,97 @@ static void test_private_data(VkPhysicalDevice vk_physical_device)
     vkDestroyDevice(vk_device, NULL);
 }
 
+static void test_present_timing(VkInstance instance, VkPhysicalDevice physical_device)
+{
+    static const char *const device_extensions[] = {"VK_KHR_swapchain", "VK_EXT_present_timing"};
+
+    VkSwapchainTimeDomainPropertiesEXT properties = {.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_TIME_DOMAIN_PROPERTIES_EXT};
+    VkCommandBufferAllocateInfo allocate_info = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    VkWin32SurfaceCreateInfoKHR create_info = {.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR};
+    VkCommandPoolCreateInfo pool_create_info = {.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+    PFN_vkGetSwapchainTimeDomainPropertiesEXT p_vkGetSwapchainTimeDomainPropertiesEXT;
+    VkCommandBuffer command_buffer;
+    BOOL has_stage_local = FALSE;
+    uint32_t queue_family_index;
+    VkCommandPool command_pool;
+    VkSwapchainKHR swapchain;
+    VkSurfaceKHR surface;
+    uint64_t counter;
+    VkDevice device;
+    VkQueue queue;
+    VkResult vr;
+    HWND hwnd;
+
+    if ((vr = create_device(physical_device, ARRAY_SIZE(device_extensions), device_extensions, NULL, &device)) < 0)
+    {
+        skip("Failed to create device with VK_EXT_present_timing, VkResult %d.\n", vr);
+        return;
+    }
+
+    p_vkGetSwapchainTimeDomainPropertiesEXT = (void *)vkGetDeviceProcAddr(device, "vkGetSwapchainTimeDomainPropertiesEXT");
+    find_queue_family(physical_device, VK_QUEUE_GRAPHICS_BIT, &queue_family_index);
+    vkGetDeviceQueue(device, queue_family_index, 0, &queue);
+
+    pool_create_info.queueFamilyIndex = queue_family_index;
+    pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    vr = vkCreateCommandPool(device, &pool_create_info, NULL, &command_pool);
+    ok(vr == VK_SUCCESS, "Got unexpected vr %d.\n", vr);
+
+    allocate_info.commandPool = command_pool;
+    allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocate_info.commandBufferCount = 1;
+    vr = vkAllocateCommandBuffers(device, &allocate_info, &command_buffer);
+    ok(vr == VK_SUCCESS, "Got unexpected vr %d.\n", vr);
+
+    hwnd = CreateWindowW(L"static", L"static", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 100, 100, 200, 200,
+            0, 0, 0, NULL);
+    ok(hwnd != 0, "CreateWindowExW failed, error %lu\n", GetLastError());
+
+    surface = 0xdeadbeef;
+    create_info.hwnd = hwnd;
+    vr = vkCreateWin32SurfaceKHR(instance, &create_info, NULL, &surface);
+    ok(vr == VK_SUCCESS, "Got unexpected vr %d.\n", vr);
+    ok(surface != 0xdeadbeef, "Surface not created.\n");
+
+    swapchain = 0xdeadbeef;
+    vr = create_swapchain(physical_device, surface, device, hwnd, &swapchain);
+    ok(vr == VK_SUCCESS, "Got unexpected vr %d.\n", vr);
+    ok(swapchain != 0xdeadbeef, "Swapchain not created.\n");
+
+    vr = p_vkGetSwapchainTimeDomainPropertiesEXT(device, swapchain, &properties, NULL);
+    ok(vr == VK_SUCCESS, "Got unexpected vr %d.\n", vr);
+    ok(properties.timeDomainCount > 0, "got %u\n", properties.timeDomainCount);
+
+    counter = 0xdeadbeef;
+    properties.timeDomainCount = 0;
+    vr = p_vkGetSwapchainTimeDomainPropertiesEXT(device, swapchain, &properties, &counter);
+    ok(vr == VK_SUCCESS, "Got unexpected vr %d.\n", vr);
+    ok(properties.timeDomainCount > 0, "got %u\n", properties.timeDomainCount);
+    ok(counter != 0, "got %I64x\n", counter);
+
+    counter = 0xdeadbeef;
+    properties.pTimeDomainIds = calloc(properties.timeDomainCount, sizeof(*properties.pTimeDomainIds));
+    properties.pTimeDomains = calloc(properties.timeDomainCount, sizeof(*properties.pTimeDomains));
+    vr = p_vkGetSwapchainTimeDomainPropertiesEXT(device, swapchain, &properties, &counter);
+    ok(vr == VK_SUCCESS, "Got unexpected vr %d.\n", vr);
+    ok(properties.timeDomainCount > 0, "got %u\n", properties.timeDomainCount);
+    ok(counter != 0, "got %I64x\n", counter);
+    for (UINT i = 0; i < properties.timeDomainCount; i++)
+    {
+        ok(properties.pTimeDomains[i] != VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT, "got %#x\n", properties.pTimeDomains[i]);
+        ok(properties.pTimeDomains[i] != VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT, "got %#x\n", properties.pTimeDomains[i]);
+        if (properties.pTimeDomains[i] == VK_TIME_DOMAIN_PRESENT_STAGE_LOCAL_EXT) has_stage_local = TRUE;
+    }
+    ok(has_stage_local, "missing VK_TIME_DOMAIN_PRESENT_STAGE_LOCAL_EXT\n");
+
+    vkDestroySwapchainKHR(device, swapchain, NULL);
+
+    vkDestroySurfaceKHR(instance, surface, NULL);
+    DestroyWindow(hwnd);
+
+    vkDestroyDevice(device, NULL);
+}
+
 static const char *test_win32_surface_extensions[] =
 {
     "VK_KHR_surface",
@@ -1085,6 +1176,8 @@ static void test_win32_surface(VkInstance instance, VkPhysicalDevice physical_de
 
     vkDestroyCommandPool(device, command_pool, NULL);
     vkDestroyDevice(device, NULL);
+
+    test_present_timing(instance, physical_device);
 }
 
 static uint32_t find_memory_type(VkPhysicalDevice vk_physical_device, VkMemoryPropertyFlagBits flags, uint32_t mask)
