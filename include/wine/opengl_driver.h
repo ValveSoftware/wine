@@ -79,8 +79,14 @@ struct wgl_framebuffer_surface_state
     LONG64  serial;
     GLuint  draw_fbo;
     GLuint  read_fbo;
-    int     width;
-    int     height;
+};
+
+struct wgl_context_share
+{
+    LONG                    ref;
+    int                     fbo_surface_width;
+    int                     fbo_surface_height;
+    int                     fbo_drawable_format;
 };
 
 struct wgl_context
@@ -103,6 +109,7 @@ struct wgl_context
     GLuint                  gamma_program;
     GLuint                  gamma_ramp;
     struct wgl_framebuffer_surface_state last_framebuffer;
+    struct wgl_context_share *share;
 };
 
 /* interface between opengl32 and win32u */

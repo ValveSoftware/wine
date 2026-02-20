@@ -449,6 +449,7 @@ static void framebuffer_surface_set_context( struct opengl_drawable *drawable, v
 
     if (!private) return;
 
+    assert( ctx->share );
     if (ctx->last_framebuffer.serial != surface->serial)
     {
         /* The context could've been used with the other framebuffer surface, free the FBOs in any, they will
@@ -479,8 +480,17 @@ static void framebuffer_surface_set_context( struct opengl_drawable *drawable, v
          * surface, get FBOs from the context. */
         drawable->draw_fbo = ctx->last_framebuffer.draw_fbo;
         drawable->read_fbo = ctx->last_framebuffer.read_fbo;
-        surface->width = ctx->last_framebuffer.width;
-        surface->height = ctx->last_framebuffer.height;
+        if (surface->base.format == ctx->share->fbo_drawable_format)
+        {
+            surface->width = ctx->share->fbo_surface_width;
+            surface->height = ctx->share->fbo_surface_width;
+        }
+        else
+        {
+            /* Force attachments recreation. */
+            surface->width = 0;
+            surface->height = 0;
+        }
     }
 
     if (!drawable->read_fbo)
@@ -507,8 +517,9 @@ static void framebuffer_surface_set_context( struct opengl_drawable *drawable, v
 
     framebuffer_surface_resize( framebuffer_from_opengl_drawable( drawable ));
 
-    ctx->last_framebuffer.width = surface->width;
-    ctx->last_framebuffer.height = surface->height;
+    ctx->share->fbo_surface_width = surface->width;
+    ctx->share->fbo_surface_height = surface->height;
+    ctx->share->fbo_drawable_format = surface->base.format;
 }
 
 struct fs_hack_gl_state
@@ -753,6 +764,9 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
     if (!NtUserGetClientRect( client->hwnd, &dst, NtUserGetWinMonitorDpi( client->hwnd, MDT_RAW_DPI ) )) return;
 
     TRACE( "hwnd %p src %s dst %s fbo %u\n", client->hwnd, wine_dbgstr_rect(&src), wine_dbgstr_rect(&dst), surface->base.read_fbo );
+
+    if (!ctx->gamma_program || !ctx->gamma_ramp)
+        ERR( "gamma shader is not initialized.\n" );
 
     for (int i = 0; i < ARRAY_SIZE(general_state_handlers); i++)
         general_state_handlers[i]( SET, ctx, &state );
@@ -2773,6 +2787,29 @@ static BOOL win32u_wglSetPbufferAttribARB( struct wgl_pbuffer *pbuffer, const in
                                             max( pbuffer->mipmap_level, 0 ) );
 }
 
+static void context_share_init( struct wgl_context *context, struct wgl_context *shared )
+{
+    if (shared)
+    {
+        assert( shared->share );
+        context->share = shared->share;
+        InterlockedIncrement( &context->share->ref );
+        return;
+    }
+    context->share = calloc( 1, sizeof(*context->share) );
+    context->share->ref = 1;
+}
+
+static void context_share_release( struct wgl_context *context )
+{
+    assert( context->share );
+    if (!InterlockedDecrement( &context->share->ref ))
+    {
+        free( context->share );
+        context->share = NULL;
+    }
+}
+
 static BOOL win32u_wgl_context_reset( struct wgl_context *context, HDC hdc, struct wgl_context *share, const int *attribs )
 {
     void *share_private = share ? share->driver_private : NULL;
@@ -2790,12 +2827,17 @@ static BOOL win32u_wgl_context_reset( struct wgl_context *context, HDC hdc, stru
         WARN( "Failed to destroy driver context %p\n", context->driver_private );
         return FALSE;
     }
+    if (context->driver_private) context_share_release( context );
     context->driver_private = NULL;
+    memset( &context->last_framebuffer, 0, sizeof(context->last_framebuffer) );
+    context->gamma_program = 0;
+    context->gamma_ramp = 0;
     if (!hdc) return TRUE;
 
     if ((format = get_dc_pixel_format( hdc )) <= 0 &&
         (format = get_window_pixel_format( NtUserWindowFromDC( hdc ) )) <= 0)
     {
+        WARN( "No pixel format.\n" );
         if (!format) RtlSetLastWin32Error( ERROR_INVALID_PIXEL_FORMAT );
         else RtlSetLastWin32Error( ERROR_INVALID_HANDLE );
         return FALSE;
@@ -2806,6 +2848,7 @@ static BOOL win32u_wgl_context_reset( struct wgl_context *context, HDC hdc, stru
         return FALSE;
     }
     context->format = format;
+    context_share_init( context, share );
 
     TRACE( "reset context %p, format %u for driver context %p\n", context, format, context->driver_private );
     return TRUE;
