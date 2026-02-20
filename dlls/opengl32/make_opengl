@@ -638,14 +638,14 @@ sub generate_unix_thunk($$$$)
         $ret .= "    if (!funcs->p_$name) return STATUS_NOT_IMPLEMENTED;\n";
     }
     $ret .= $input_conv;
-    $ret .= "    assert( params->texture < WINE_OPENGL_RESERVED_TEXTURE0 || params->texture > WINE_OPENGL_RESERVED_TEXTURE7 );\n" if $has_texture;
+    $ret .= "    assert( !is_wine_reserved_texture( $teb, params->texture ));\n" if $has_texture;
     if (defined $textures_in_thunks{$name})
     {
         my $textures = $is_wow64 ? "UlongToPtr(params->textures)" : "params->textures";
         $ret .= "    if ($textures)\n";
         $ret .= "    {\n";
         $ret .= "        for (const GLuint *tex = $textures, *end = tex + params->$textures_in_thunks{$name}; tex != end; tex++)\n";
-        $ret .= "            assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );\n";
+        $ret .= "            assert( !is_wine_reserved_texture( $teb, *tex ));\n";
         $ret .= "    }\n";
     }
     foreach my $arg (@{$map_default_fbo_thunks{$name}})
@@ -680,7 +680,7 @@ sub generate_unix_thunk($$$$)
     {
         my $textures = $is_wow64 ? "UlongToPtr(params->textures)" : "params->textures";
         $ret .= "    for (const GLuint *tex = $textures, *end = tex + params->$textures_out_thunks{$name}; tex != end; tex++) ";
-        $ret .= "assert( *tex < WINE_OPENGL_RESERVED_TEXTURE0 || *tex > WINE_OPENGL_RESERVED_TEXTURE7 );\n";
+        $ret .= "assert( !is_wine_reserved_texture( $teb, *tex ));\n";
     }
     if (defined $state_attrib_funcs{$name})
     {

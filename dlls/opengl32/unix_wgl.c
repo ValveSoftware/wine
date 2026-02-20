@@ -295,6 +295,11 @@ static struct context_attribute_desc context_attributes[] =
 #undef CONTEXT_ATTRIBUTE_DESC
 };
 
+BOOL is_wine_reserved_texture( TEB *teb, GLuint tex )
+{
+    return tex >= WINE_OPENGL_RESERVED_TEXTURE0 && tex <= WINE_OPENGL_RESERVED_TEXTURE7;
+}
+
 /* GL constants used as indexes should be small, make sure size is reasonable */
 C_ASSERT( sizeof(context_attributes) <= 64 * 1024 );
 
