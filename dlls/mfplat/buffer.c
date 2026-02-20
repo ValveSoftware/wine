@@ -290,14 +290,10 @@ static HRESULT WINAPI memory_1d_2d_buffer_QueryInterface(IMFMediaBuffer *iface, 
     return S_OK;
 }
 
-static HRESULT memory_2d_buffer_lock(struct buffer *buffer, BYTE **scanline0, LONG *pitch,
-        BYTE **buffer_start, DWORD *buffer_length);
-
 static HRESULT WINAPI memory_1d_2d_buffer_Lock(IMFMediaBuffer *iface, BYTE **data, DWORD *max_length, DWORD *current_length)
 {
     struct buffer *buffer = impl_from_IMFMediaBuffer(iface);
     HRESULT hr = S_OK;
-    const char *sgi;
 
     TRACE("%p, %p, %p, %p.\n", iface, data, max_length, current_length);
 
@@ -309,23 +305,8 @@ static HRESULT WINAPI memory_1d_2d_buffer_Lock(IMFMediaBuffer *iface, BYTE **dat
 
     EnterCriticalSection(&buffer->cs);
 
-    if (!buffer->_2d.linear_buffer && buffer->_2d.width == buffer->_2d.pitch
-            && (sgi = getenv("SteamGameId")) && (!strcmp(sgi, "418370") || !strcmp(sgi, "287700")))
-    {
-        BYTE *scanline;
-        LONG pitch;
-
-        /* width and pitch are the same, so this avoids a potentially expensive copy
-         * this is a HACK as it does not match Windows behaviour (Windows will copy the buffer)
-         * this fixes performance regressions for Resident Evil 7 Biohazard (418370) and
-         * Metal Gear Solid V (287700).
-         */
-        hr = memory_2d_buffer_lock(buffer, &scanline, &pitch, data, NULL);
-    }
-    else if (!buffer->_2d.linear_buffer && buffer->_2d.locks)
-    {
+    if (!buffer->_2d.linear_buffer && buffer->_2d.locks)
         hr = MF_E_INVALIDREQUEST;
-    }
     else if (!buffer->_2d.linear_buffer)
     {
         if (!(buffer->_2d.linear_buffer = malloc(buffer->_2d.plane_size)))
@@ -342,14 +323,10 @@ static HRESULT WINAPI memory_1d_2d_buffer_Lock(IMFMediaBuffer *iface, BYTE **dat
         }
     }
 
-    if (SUCCEEDED(hr) && buffer->_2d.linear_buffer)
+    if (SUCCEEDED(hr))
     {
         ++buffer->_2d.locks;
         *data = buffer->_2d.linear_buffer;
-    }
-
-    if (SUCCEEDED(hr))
-    {
         if (max_length)
             *max_length = buffer->_2d.plane_size;
         if (current_length)
@@ -364,22 +341,12 @@ static HRESULT WINAPI memory_1d_2d_buffer_Lock(IMFMediaBuffer *iface, BYTE **dat
 static HRESULT WINAPI memory_1d_2d_buffer_Unlock(IMFMediaBuffer *iface)
 {
     struct buffer *buffer = impl_from_IMFMediaBuffer(iface);
-    HRESULT hr = S_OK;
-    const char *sgi;
 
     TRACE("%p.\n", iface);
 
     EnterCriticalSection(&buffer->cs);
 
-    if (!buffer->_2d.linear_buffer && buffer->_2d.width == buffer->_2d.pitch
-            && (sgi = getenv("SteamGameId")) && (!strcmp(sgi, "418370") || !strcmp(sgi, "287700")))
-    {
-        if (buffer->_2d.locks)
-            --buffer->_2d.locks;
-        else
-            hr = HRESULT_FROM_WIN32(ERROR_WAS_UNLOCKED);
-    }
-    else if (buffer->_2d.linear_buffer && !--buffer->_2d.locks)
+    if (buffer->_2d.linear_buffer && !--buffer->_2d.locks)
     {
         int pitch = buffer->_2d.pitch;
 
@@ -394,7 +361,7 @@ static HRESULT WINAPI memory_1d_2d_buffer_Unlock(IMFMediaBuffer *iface)
 
     LeaveCriticalSection(&buffer->cs);
 
-    return hr;
+    return S_OK;
 }
 
 static const IMFMediaBufferVtbl memory_1d_2d_buffer_vtbl =
