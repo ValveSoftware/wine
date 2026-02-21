@@ -70,10 +70,6 @@ struct opengl_drawable;
 struct wgl_context;
 struct wgl_pbuffer;
 
-/* Wine reserved texture names for internal usage */
-#define WINE_OPENGL_RESERVED_TEXTURE0  0x10000
-#define WINE_OPENGL_RESERVED_TEXTURE7  0x10007
-
 struct wgl_framebuffer_surface_state
 {
     LONG64  serial;
@@ -87,6 +83,8 @@ struct wgl_context_share
     int                     fbo_surface_width;
     int                     fbo_surface_height;
     int                     fbo_drawable_format;
+    BOOL                    reserved_textures;       /* internal texture names have been reserved */
+    GLuint                  framebuffer_textures[8]; /* internal texture names */
 };
 
 struct wgl_context
@@ -97,7 +95,6 @@ struct wgl_context
     struct opengl_drawable *draw;               /* currently bound draw surface */
     struct opengl_drawable *read;               /* currently bound read surface */
     GLenum                  error;              /* wrapped GL error */
-    BOOL                    reserved_textures;  /* internal texture names have been reserved */
 
     unsigned                is_core : 1;
     unsigned                has_GL_ARB_viewport_array : 1;

@@ -300,7 +300,7 @@ static void get_drawable_size( struct opengl_drawable *drawable, int *width, int
 }
 
 static GLuint create_framebuffer( struct opengl_drawable *drawable, const struct wgl_pixel_format *desc,
-                                  int width, int height )
+                                  int width, int height, GLuint *framebuffer_textures )
 {
     const struct opengl_funcs *funcs = &display_funcs;
     GLuint count = 1, fbo, name;
@@ -320,7 +320,7 @@ static GLuint create_framebuffer( struct opengl_drawable *drawable, const struct
         }
         else
         {
-            name = WINE_OPENGL_RESERVED_TEXTURE0 + i;
+            name = framebuffer_textures[i];
             resize_texture( name, desc, width, height );
             funcs->p_glNamedFramebufferTexture( fbo, GL_COLOR_ATTACHMENT0 + i, name, 0 );
         }
@@ -498,11 +498,13 @@ static void framebuffer_surface_set_context( struct opengl_drawable *drawable, v
         /* First time around or the context had another framebuffer surface previously. */
 
         get_drawable_size( drawable, &width, &height );
-        drawable->read_fbo = create_framebuffer( drawable, &read_desc, width, height );
+        drawable->read_fbo = create_framebuffer( drawable, &read_desc, width, height, ctx->share->framebuffer_textures );
         if (!drawable->read_fbo) ERR( "Failed to create read framebuffer object\n" );
 
-        if (!draw_desc.samples) drawable->draw_fbo = drawable->read_fbo;
-        else drawable->draw_fbo = create_framebuffer( drawable, &draw_desc, width, height );
+        if (!draw_desc.samples)
+            drawable->draw_fbo = drawable->read_fbo;
+        else
+            drawable->draw_fbo = create_framebuffer( drawable, &draw_desc, width, height, ctx->share->framebuffer_textures );
         if (!drawable->draw_fbo) ERR( "Failed to create draw framebuffer object\n" );
         surface->width = width;
         surface->height = height;
@@ -800,7 +802,7 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
         for (int i = 0; i < ARRAY_SIZE(draw_state_handlers); i++)
             draw_state_handlers[i]( SET, ctx, &state );
 
-        funcs->p_glBindTexture( GL_TEXTURE_2D, WINE_OPENGL_RESERVED_TEXTURE0 + (1 - fb_texture) );
+        funcs->p_glBindTexture( GL_TEXTURE_2D, ctx->share->framebuffer_textures[1 - fb_texture] );
 
         if (ctx->has_GL_ARB_viewport_array) funcs->p_glViewportIndexedf( 0, 0, 0, dst.right, dst.bottom );
         else funcs->p_glViewport( 0, 0, dst.right, dst.bottom );
@@ -852,26 +854,28 @@ static BOOL framebuffer_surface_swap( struct opengl_drawable *drawable )
 
     if (surface->base.doublebuffer)
     {
-        UINT front = surface->frame & 1;
+        GLint name1, name2;
 
         if (surface->base.draw_fbo != surface->base.read_fbo)
         {
-            GLint name1, name2;
-
             TRACE( "swapping renderbuffers.\n" );
-            funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.draw_fbo, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, (GLint *)&name1 );
-            funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.draw_fbo, GL_COLOR_ATTACHMENT1, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, (GLint *)&name2 );
+            funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.draw_fbo, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &name1 );
+            funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.draw_fbo, GL_COLOR_ATTACHMENT1, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &name2 );
             funcs->p_glNamedFramebufferRenderbuffer( surface->base.draw_fbo, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, name2 );
             funcs->p_glNamedFramebufferRenderbuffer( surface->base.draw_fbo, GL_COLOR_ATTACHMENT1, GL_RENDERBUFFER, name1 );
         }
 
-        funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT0, WINE_OPENGL_RESERVED_TEXTURE0 + front, 0 );
-        funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT1, WINE_OPENGL_RESERVED_TEXTURE0 + (1 - front), 0 );
+        funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.read_fbo, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &name1 );
+        funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.read_fbo, GL_COLOR_ATTACHMENT1, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &name2 );
+        funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT0, name2, 0 );
+        funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT1, name1, 0 );
 
         if (drawable->stereo)
         {
-            funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT2, WINE_OPENGL_RESERVED_TEXTURE0 + 2 + front, 0 );
-            funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT3, WINE_OPENGL_RESERVED_TEXTURE0 + 2 + (1 - front), 0 );
+            funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.read_fbo, GL_COLOR_ATTACHMENT2, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &name1 );
+            funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.read_fbo, GL_COLOR_ATTACHMENT3, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &name2 );
+            funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT2, name2, 0 );
+            funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT3, name1, 0 );
         }
 
         surface->frame++;
@@ -2246,23 +2250,33 @@ static BOOL context_sync_drawables( struct wgl_context *context, HDC draw_hdc, H
 
         pthread_mutex_lock(&reserved_tx_mutex);
 
-        if (!context->reserved_textures)
+        if (!context->share->reserved_textures)
         {
-            /* shared contexts may initialise the reserved textures */
-            context->reserved_textures = funcs->p_glIsTexture(WINE_OPENGL_RESERVED_TEXTURE0);
-        }
+            int profile, i, prev_texture;
 
-        if (!context->reserved_textures)
-        {
-            GLuint dummy[WINE_OPENGL_RESERVED_TEXTURE0 - 1], textures[WINE_OPENGL_RESERVED_TEXTURE7 - WINE_OPENGL_RESERVED_TEXTURE0 + 1];
-
-            /* create some reserved textures for internal usage */
-            funcs->p_glGenTextures( ARRAY_SIZE(dummy), dummy );
-            funcs->p_glCreateTextures( GL_TEXTURE_2D, ARRAY_SIZE(textures), textures );
-            assert( textures[0] == WINE_OPENGL_RESERVED_TEXTURE0 && textures[7] == WINE_OPENGL_RESERVED_TEXTURE7 );
-            funcs->p_glDeleteTextures( ARRAY_SIZE(dummy), dummy );
-
-            context->reserved_textures = TRUE;
+            /* context->is_core exists but it may be not initialized yet. */
+            funcs->p_glGetIntegerv( GL_CONTEXT_PROFILE_MASK, &profile );
+            if (profile & GL_CONTEXT_CORE_PROFILE_BIT)
+            {
+                /* Binding texture names without allocation is not allowed on core profile,
+                 * so just allocate the reserved textures. */
+                funcs->p_glGenTextures( ARRAY_SIZE(context->share->framebuffer_textures), context->share->framebuffer_textures );
+            }
+            else
+            {
+                /* On compat profile the app may use texture names without allocation. Yet it is more common to allocate
+                 * the textures. So use high indexes to make it less likely that an app will want to use those directly
+                 * and allocate those so these names won't be generated for app. */
+                funcs->p_glGetIntegerv( GL_TEXTURE_2D, &prev_texture );
+                for (i = 0; i < ARRAY_SIZE(context->share->framebuffer_textures); ++i)
+                {
+                    context->share->framebuffer_textures[i] = 0x10000 + i;
+                    funcs->p_glBindTexture( GL_TEXTURE_2D, context->share->framebuffer_textures[i] );
+                }
+                funcs->p_glBindTexture( GL_TEXTURE_2D, prev_texture );
+            }
+            TRACE( "reserved textures, profile %#x.\n", profile );
+            context->share->reserved_textures = TRUE;
         }
 
         pthread_mutex_unlock(&reserved_tx_mutex);

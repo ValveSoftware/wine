@@ -297,7 +297,17 @@ static struct context_attribute_desc context_attributes[] =
 
 BOOL is_wine_reserved_texture( TEB *teb, GLuint tex )
 {
-    return tex >= WINE_OPENGL_RESERVED_TEXTURE0 && tex <= WINE_OPENGL_RESERVED_TEXTURE7;
+    struct context *ctx;
+    unsigned int i;
+
+    if (!(ctx = get_current_context( teb, NULL, NULL ))) return FALSE;
+
+    assert( ctx->base.share );
+    assert( ctx->base.share->framebuffer_textures );
+    for (i = 0; i < ARRAY_SIZE(ctx->base.share->framebuffer_textures); ++i)
+        if (ctx->base.share->framebuffer_textures[i] == tex) return TRUE;
+
+    return FALSE;
 }
 
 /* GL constants used as indexes should be small, make sure size is reasonable */
@@ -458,7 +468,6 @@ static void update_handle_context( TEB *teb, HGLRC handle, struct wgl_handle *pt
         ctx->buffers = shared->buffers;
         ctx->buffers->ref++;
     }
-    ctx->base.reserved_textures = shared ? shared->base.reserved_textures : FALSE;
     ctx->share = (HGLRC)-1; /* initial shared context */
     copy_context_attributes( teb, funcs, handle, ctx, handle, ctx, ctx->used );
 }
