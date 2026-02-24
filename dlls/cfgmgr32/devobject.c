@@ -1186,6 +1186,7 @@ HRESULT WINAPI DevGetObjectPropertiesEx( DEV_OBJECT_TYPE type, const WCHAR *id, 
         hr = dev_object_iface_get_props( &obj, set, &iface, props_len, props, !!(flags & DevQueryFlagAllProperties), FALSE );
         *buf = obj.pProperties;
         *buf_len = obj.cPropertyCount;
+        SetupDiDestroyDeviceInfoList( set );
         break;
     }
     default:
