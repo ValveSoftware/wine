@@ -1229,6 +1229,8 @@ HANDLE WINAPI DECLSPEC_HOTPATCH FindFirstFileExA( const char *filename, FINDEX_I
     dataA->ftLastWriteTime  = dataW.ftLastWriteTime;
     dataA->nFileSizeHigh    = dataW.nFileSizeHigh;
     dataA->nFileSizeLow     = dataW.nFileSizeLow;
+    dataA->dwReserved0      = dataW.dwReserved0;
+    dataA->dwReserved1      = dataW.dwReserved1;
     file_name_WtoA( dataW.cFileName, -1, dataA->cFileName, sizeof(dataA->cFileName) );
     file_name_WtoA( dataW.cAlternateFileName, -1, dataA->cAlternateFileName,
                     sizeof(dataA->cAlternateFileName) );
