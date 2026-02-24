@@ -619,6 +619,11 @@ static void test_CM_Get_Device_Interface_Property_Keys(void)
     guid = GUID_DEVINTERFACE_HID;
     ret = CM_Get_Device_Interface_List_SizeW( &size, &guid, NULL, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
     ok_x4( ret, ==, CR_SUCCESS );
+    if (broken( size == 1 ))
+    {
+        skip( "No HID device present, skipping tests\n" );
+        return;
+    }
     iface = malloc( size * sizeof(*iface) );
     ok_ptr( iface, !=, NULL );
     ret = CM_Get_Device_Interface_ListW( &guid, NULL, iface, size, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
@@ -696,6 +701,11 @@ static void test_CM_Get_Device_Interface_PropertyW(void)
     guid = GUID_DEVINTERFACE_HID;
     ret = CM_Get_Device_Interface_List_SizeW( &len, &guid, NULL, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
     ok_x4( ret, ==, CR_SUCCESS );
+    if (broken( len == 1 ))
+    {
+        skip( "No HID device present, skipping tests\n" );
+        return;
+    }
     iface = malloc( len * sizeof(*iface) );
     ok_ptr( iface, !=, NULL );
     ret = CM_Get_Device_Interface_ListW( &guid, NULL, iface, len, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
@@ -2719,6 +2729,11 @@ static void test_CM_Get_Device_Interface_List(void)
 
     ret = CM_Get_Device_Interface_ListW( &guid, NULL, buffer, size, CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
     ok_x4( ret, ==, CR_SUCCESS );
+    if (broken( !*buffer ))
+    {
+        skip( "No HID device present, skipping tests\n" );
+        goto skip_tests;
+    }
     ok( !wcsncmp( buffer, L"\\\\?\\HID#", 8 ), "got %s\n", debugstr_wn( buffer, size ) );
     for (tmp = buffer; *tmp; tmp = tmp + wcslen( tmp ) + 1)
     {
@@ -2777,6 +2792,7 @@ static void test_CM_Get_Device_Interface_List(void)
     free( buffer );
 
 
+skip_tests:
     guid = GUID_DEVINTERFACE_DISPLAY_ADAPTER;
 
     size = 0;
@@ -2823,6 +2839,11 @@ static void test_CM_Open_Device_Interface_Key(void)
 
     guid = GUID_DEVINTERFACE_HID;
     ret = CM_Get_Device_Interface_ListW( &guid, NULL, iface, ARRAY_SIZE(iface), CM_GET_DEVICE_INTERFACE_LIST_PRESENT );
+    if (broken( !*iface ))
+    {
+        skip( "No HID device present, skipping tests\n" );
+        return;
+    }
     ok_x4( ret, ==, CR_SUCCESS );
 
     wcscpy( name, iface + 4 );
