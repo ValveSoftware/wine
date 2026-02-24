@@ -2280,20 +2280,26 @@ static void test_CM_Open_Class_Key(void)
     ret = CM_Open_Class_KeyW( &guid, NULL, KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, CM_OPEN_CLASS_KEY_INSTALLER );
     ok_x4( ret, ==, CR_NO_SUCH_REGISTRY_KEY );
     ret = CM_Open_Class_KeyW( &guid, NULL, KEY_QUERY_VALUE, RegDisposition_OpenAlways, &hkey, CM_OPEN_CLASS_KEY_INSTALLER );
-    ok_x4( ret, ==, CR_SUCCESS );
-    check_object_name( hkey, L"\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Control\\Class\\{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}" );
-    RegCloseKey( hkey );
-    ret = RegDeleteKeyW( HKEY_LOCAL_MACHINE, L"SYSTEM\\ControlSet001\\Control\\Class\\{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}" );
-    ok_x4( ret, ==, ERROR_SUCCESS );
+    if (ret != CR_ACCESS_DENIED)
+    {
+        ok_x4( ret, ==, CR_SUCCESS );
+        check_object_name( hkey, L"\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Control\\Class\\{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}" );
+        RegCloseKey( hkey );
+        ret = RegDeleteKeyW( HKEY_LOCAL_MACHINE, L"SYSTEM\\ControlSet001\\Control\\Class\\{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}" );
+        ok_x4( ret, ==, ERROR_SUCCESS );
+    }
 
     ret = CM_Open_Class_KeyW( &guid, NULL, KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, CM_OPEN_CLASS_KEY_INTERFACE );
     ok_x4( ret, ==, CR_NO_SUCH_REGISTRY_KEY );
     ret = CM_Open_Class_KeyW( &guid, NULL, KEY_QUERY_VALUE, RegDisposition_OpenAlways, &hkey, CM_OPEN_CLASS_KEY_INTERFACE );
-    ok_x4( ret, ==, CR_SUCCESS );
-    check_object_name( hkey, L"\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Control\\DeviceClasses\\{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}" );
-    RegCloseKey( hkey );
-    ret = RegDeleteKeyW( HKEY_LOCAL_MACHINE, L"SYSTEM\\ControlSet001\\Control\\DeviceClasses\\{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}" );
-    ok_x4( ret, ==, ERROR_SUCCESS );
+    if (ret != CR_ACCESS_DENIED)
+    {
+        ok_x4( ret, ==, CR_SUCCESS );
+        check_object_name( hkey, L"\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Control\\DeviceClasses\\{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}" );
+        RegCloseKey( hkey );
+        ret = RegDeleteKeyW( HKEY_LOCAL_MACHINE, L"SYSTEM\\ControlSet001\\Control\\DeviceClasses\\{cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd}" );
+        ok_x4( ret, ==, ERROR_SUCCESS );
+    }
 }
 
 static void test_CM_Get_Class_Registry_Property(void)
@@ -2812,7 +2818,7 @@ static void test_CM_Open_Device_Interface_Key(void)
     ret = CM_Open_Device_Interface_KeyW( L"DISPLAY_ADAPTER", KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, 0 );
     ok_x4( ret, ==, CR_INVALID_DATA );
     ret = CM_Open_Device_Interface_KeyW( L"\\\\?\\WINETEST#WINETEST#0123456#{5b45201d-f2f2-4f3b-85bb-30ff1f953599}", KEY_QUERY_VALUE, RegDisposition_OpenAlways, &hkey, 0 );
-    ok_x4( ret, ==, CR_NO_SUCH_DEVICE_INTERFACE );
+    if (ret != CR_ACCESS_DENIED) ok_x4( ret, ==, CR_NO_SUCH_DEVICE_INTERFACE );
 
     ret = CM_Open_Device_Interface_KeyW( iface, KEY_QUERY_VALUE, RegDisposition_OpenExisting, &hkey, 0 );
     if (ret == CR_NO_SUCH_REGISTRY_KEY) ret = CM_Open_Device_Interface_KeyW( iface, KEY_QUERY_VALUE, RegDisposition_OpenAlways, &hkey, 0 );
