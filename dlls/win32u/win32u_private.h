@@ -162,6 +162,7 @@ extern HBITMAP get_display_bitmap(void);
 extern INT get_display_depth( UNICODE_STRING *name );
 extern RECT get_display_rect( const WCHAR *display );
 extern UINT get_win_monitor_dpi( HWND hwnd, UINT *raw_dpi );
+extern UINT round_fractional_dpi( UINT dpi );
 extern RECT get_primary_monitor_rect( UINT dpi );
 extern DWORD get_process_layout(void);
 extern COLORREF get_sys_color( int index );

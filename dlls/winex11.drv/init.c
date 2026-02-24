@@ -358,7 +358,7 @@ static void x11drv_client_surface_detach( struct client_surface *client )
 
 static void client_surface_update_geometry( HWND hwnd, struct x11drv_client_surface *surface )
 {
-    UINT dpi = surface->raw ? NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI ) : NtUserGetDpiForWindow( hwnd );
+    UINT dpi = surface->raw ? NtUserGetWinMonitorDpi( hwnd, MDT_WINE_RAW_DPI ) : NtUserGetDpiForWindow( hwnd );
     HWND origin = hwnd, toplevel = NtUserGetAncestor( hwnd, GA_ROOT );
     XWindowChanges changes = surface->changes;
     struct x11drv_win_data *data;
@@ -512,8 +512,8 @@ static void X11DRV_client_surface_present( struct client_surface *client, HDC hd
     else
     {
         region = get_dc_monitor_region( hwnd, hdc ); /* otherwise use the window region for clipping rules */
-        if (!NtUserGetClientRect( hwnd, &rect_dst, NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI ) )) goto done;
-        NtUserMapWindowPoints( hwnd, toplevel, (POINT *)&rect_dst, 2, NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI ) );
+        if (!NtUserGetClientRect( hwnd, &rect_dst, NtUserGetWinMonitorDpi( hwnd, MDT_WINE_RAW_DPI ) )) goto done;
+        NtUserMapWindowPoints( hwnd, toplevel, (POINT *)&rect_dst, 2, NtUserGetWinMonitorDpi( hwnd, MDT_WINE_RAW_DPI ) );
     }
     if (IsRectEmpty( &rect_dst ) || IsRectEmpty( &surface->rect )) return;
 
@@ -563,7 +563,7 @@ static BOOL disable_opwr(void)
 
 Window x11drv_client_surface_create( HWND hwnd, BOOL raw, int format, struct client_surface **client )
 {
-    UINT dpi = raw ? NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI ) : NtUserGetDpiForWindow( hwnd );
+    UINT dpi = raw ? NtUserGetWinMonitorDpi( hwnd, MDT_WINE_RAW_DPI ) : NtUserGetDpiForWindow( hwnd );
     struct x11drv_client_surface *surface;
     XVisualInfo visual = default_visual;
     DWORD hwnd_pid, hwnd_thread_id;

@@ -2454,23 +2454,57 @@ static void monitor_virt_to_raw_ratio( struct monitor *monitor, UINT *num, UINT 
     }
 }
 
+static UINT gcd( UINT a, UINT b )
+{
+    int r;
+
+    while (1)
+    {
+        if (!a) return b;
+        if (!b) return a;
+        r = a % b;
+        a = b;
+        b = r;
+    }
+}
+
 /* display_lock must be held */
 static UINT monitor_get_dpi( struct monitor *monitor, MONITOR_DPI_TYPE type, UINT *dpi_x, UINT *dpi_y )
 {
     struct source *source = monitor->source;
-    float scale_x = 1.0, scale_y = 1.0;
-    UINT dpi;
+    UINT dpi, dpi_ret;
 
     if (!source || !(dpi = source->dpi)) dpi = system_dpi;
     if (source && type != MDT_EFFECTIVE_DPI)
     {
-        scale_x = source->physical.dmPelsWidth / (float)source->current.dmPelsWidth;
-        scale_y = source->physical.dmPelsHeight / (float)source->current.dmPelsHeight;
-    }
+        UINT num, den, d;
 
-    *dpi_x = round( dpi * scale_x );
-    *dpi_y = round( dpi * scale_y );
-    return min( *dpi_x, *dpi_y );
+        num = source->physical.dmPelsWidth;
+        den = source->current.dmPelsWidth;
+        d = gcd( num * dpi, den );
+        assert( num * dpi / d < 65536 );
+        assert( den / d < 65536 );
+        den /= d;
+        if (den == 1) den = 0;
+        *dpi_x = (den << 16) | (num * dpi / d);
+
+        num = source->physical.dmPelsHeight;
+        den = source->current.dmPelsHeight;
+        d = gcd( num * dpi, den );
+        assert( num * dpi / d < 65536 );
+        assert( den / d < 65536 );
+        den /= d;
+        if (den == 1) den = 0;
+        *dpi_y = (den << 16) | (num * dpi / d);
+        if (source->physical.dmPelsWidth * source->current.dmPelsHeight <=
+            source->physical.dmPelsHeight * source->current.dmPelsWidth)
+            dpi_ret = *dpi_x;
+        else
+            dpi_ret = *dpi_y;
+    }
+    else dpi_ret = *dpi_x = *dpi_y = dpi;
+
+    return dpi_ret;
 }
 
 /* display_lock must be held */
@@ -2494,7 +2528,7 @@ static RECT map_monitor_rect( struct monitor *monitor, RECT rect, UINT dpi_from,
         if (!dpi_from) dpi_from = dpi;
         if (!dpi_to) dpi_to = dpi;
 
-        if (type_from == MDT_RAW_DPI)
+        if (type_from == MDT_RAW_DPI || type_from == MDT_WINE_RAW_DPI)
         {
             monitor_virt_to_raw_ratio( monitor, &den, &num );
             from[0] = physical_mode.dmPosition.x + physical_mode.dmPelsWidth / 2.0;
@@ -3115,6 +3149,8 @@ static struct monitor *get_monitor_from_rect( RECT rect, UINT flags, UINT dpi, M
 
         if (!is_monitor_active( monitor ) || monitor->is_clone) continue;
         raw_dpi = monitor_get_dpi( monitor, MDT_RAW_DPI, &x, &y );
+        x = round_fractional_dpi( x );
+        y = round_fractional_dpi( y );
         density = raw_dpi * raw_dpi / 96 / 96;
 
         monitor_rect = monitor_get_rect( monitor, dpi, type );
@@ -3382,17 +3418,35 @@ UINT set_thread_dpi_awareness_context( UINT context )
     return prev;
 }
 
+static void get_dpi_num_den( UINT dpi, UINT *num, UINT *den )
+{
+    if (!(*den = (dpi >> 16))) *den = 1;
+    *num = dpi & 0xffff;
+}
+
+UINT round_fractional_dpi( UINT dpi )
+{
+    UINT num, den;
+
+    get_dpi_num_den( dpi, &num, &den );
+    return (num + den / 2) / den;
+}
+
 /**********************************************************************
  *              map_dpi_rect
  */
 RECT map_dpi_rect( RECT rect, UINT dpi_from, UINT dpi_to )
 {
+    UINT from_num, from_den, to_num, to_den;
+
     if (dpi_from && dpi_to && dpi_from != dpi_to)
     {
-        rect.left   = muldiv( rect.left, dpi_to, dpi_from );
-        rect.top    = muldiv( rect.top, dpi_to, dpi_from );
-        rect.right  = muldiv( rect.right, dpi_to, dpi_from );
-        rect.bottom = muldiv( rect.bottom, dpi_to, dpi_from );
+        get_dpi_num_den( dpi_from, &from_num, &from_den );
+        get_dpi_num_den( dpi_to, &to_num, &to_den );
+        rect.left   = muldiv( rect.left, to_num * from_den, from_num * to_den );
+        rect.top    = muldiv( rect.top, to_num * from_den, from_num * to_den );
+        rect.right  = muldiv( rect.right, to_num * from_den, from_num * to_den );
+        rect.bottom = muldiv( rect.bottom, to_num * from_den, from_num * to_den );
     }
     return rect;
 }
@@ -3436,10 +3490,14 @@ struct window_rects map_dpi_window_rects( struct window_rects rects, UINT dpi_fr
  */
 POINT map_dpi_point( POINT pt, UINT dpi_from, UINT dpi_to )
 {
+    UINT from_num, from_den, to_num, to_den;
+
     if (dpi_from && dpi_to && dpi_from != dpi_to)
     {
-        pt.x = muldiv( pt.x, dpi_to, dpi_from );
-        pt.y = muldiv( pt.y, dpi_to, dpi_from );
+        get_dpi_num_den( dpi_from, &from_num, &from_den );
+        get_dpi_num_den( dpi_to, &to_num, &to_den );
+        pt.x = muldiv( pt.x, to_num * from_den, from_num * to_den );
+        pt.y = muldiv( pt.y, to_num * from_den, from_num * to_den );
     }
     return pt;
 }

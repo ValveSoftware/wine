@@ -6244,7 +6244,9 @@ ULONG_PTR WINAPI NtUserCallHwndParam( HWND hwnd, DWORD_PTR param, DWORD code )
     case NtUserCallHwndParam_GetWinMonitorDpi:
     {
         UINT raw_dpi, dpi = get_win_monitor_dpi( hwnd, &raw_dpi );
-        return param == MDT_EFFECTIVE_DPI ? dpi : raw_dpi;
+        if (param == MDT_EFFECTIVE_DPI) return dpi;
+        if (param == MDT_WINE_RAW_DPI) return raw_dpi;
+        return round_fractional_dpi( raw_dpi );
     }
 
     case NtUserCallHwndParam_SetRawWindowPos:

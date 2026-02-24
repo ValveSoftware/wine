@@ -41,6 +41,7 @@ typedef enum MONITOR_DPI_TYPE
     MDT_ANGULAR_DPI     = 1,
     MDT_RAW_DPI         = 2,
     MDT_DEFAULT         = MDT_EFFECTIVE_DPI,
+    MDT_WINE_RAW_DPI    = 0x10001,
 } MONITOR_DPI_TYPE;
 
 typedef NTSTATUS (WINAPI *ntuser_callback)( void *args, ULONG len );

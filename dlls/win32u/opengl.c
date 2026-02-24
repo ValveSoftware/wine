@@ -763,7 +763,7 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
 
     if (!(client = surface->base.client)) return;
     if (!NtUserGetClientRect( client->hwnd, &src, NtUserGetDpiForWindow( client->hwnd ) )) return;
-    if (!NtUserGetClientRect( client->hwnd, &dst, NtUserGetWinMonitorDpi( client->hwnd, MDT_RAW_DPI ) )) return;
+    if (!NtUserGetClientRect( client->hwnd, &dst, NtUserGetWinMonitorDpi( client->hwnd, MDT_WINE_RAW_DPI ) )) return;
 
     TRACE( "hwnd %p src %s dst %s fbo %u\n", client->hwnd, wine_dbgstr_rect(&src), wine_dbgstr_rect(&dst), surface->base.read_fbo );
 

@@ -233,10 +233,24 @@ static inline int point_in_rect( const struct rectangle *rect, int x, int y )
     return (x >= rect->left && x < rect->right && y >= rect->top && y < rect->bottom);
 }
 
+static inline void get_dpi_num_den( UINT dpi, UINT *num, UINT *den )
+{
+    if (!(*den = (dpi >> 16))) *den = 1;
+    *num = dpi & 0xffff;
+}
+
 static inline int scale_dpi( int val, unsigned int dpi_from, unsigned int dpi_to )
 {
-    if (val >= 0) return (val * dpi_to + (dpi_from / 2)) / dpi_from;
-    return (val * dpi_to - (dpi_from / 2)) / dpi_from;
+    unsigned int from_num, from_den, to_num, to_den;
+    unsigned int num, den;
+
+    get_dpi_num_den( dpi_from, &from_num, &from_den );
+    get_dpi_num_den( dpi_to, &to_num, &to_den );
+    num = to_num * from_den;
+    den = from_num * to_den;
+
+    if (val >= 0) return (val * num + (den / 2)) / den;
+    return (val * num - (den / 2)) / den;
 }
 
 static inline void scale_dpi_rect( struct rectangle *rect, unsigned int dpi_from, unsigned int dpi_to )
