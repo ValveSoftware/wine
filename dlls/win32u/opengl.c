@@ -2185,23 +2185,27 @@ static BOOL context_unset_current( struct wgl_context *context )
     return FALSE;
 }
 
+static BOOL needs_framebuffer_update( HWND hwnd, struct opengl_drawable *drawable )
+{
+    return drawable && (drawable->funcs == &framebuffer_surface_funcs) != needs_framebuffer_surface( hwnd );
+}
+
 /* return an updated drawable, recreating one if the window drawables have been invalidated (mostly wineandroid) */
-static struct opengl_drawable *get_updated_drawable( HDC hdc, int format, struct opengl_drawable *drawable )
+static struct opengl_drawable *get_updated_drawable( HDC hdc, int format, struct opengl_drawable *drawable,
+                                                     BOOL *updated )
 {
     HWND hwnd = NULL;
+
+    *updated = FALSE;
 
     /* return the memory DCs drawables directly */
     if (hdc && !(hwnd = NtUserWindowFromDC( hdc ))) return get_dc_opengl_drawable( hdc );
     if (!hdc && drawable && drawable->client) hwnd = drawable->client->hwnd;
     if (!hwnd) return NULL;
 
-    if (drawable && (drawable->funcs == &framebuffer_surface_funcs) != needs_framebuffer_surface( hwnd ))
-    {
-        drawable = NULL;
-    }
-
     /* if the drawable we were using is for the same window, keep using it */
-    if (drawable && is_client_surface_window( drawable->client, hwnd ))
+    if (drawable && is_client_surface_window( drawable->client, hwnd ) &&
+        !(*updated = needs_framebuffer_update( hwnd, drawable )))
     {
         opengl_drawable_add_ref( drawable );
         return drawable;
@@ -2209,7 +2213,16 @@ static struct opengl_drawable *get_updated_drawable( HDC hdc, int format, struct
 
     /* retrieve D3D internal drawables from the DCs if they have any */
     if (!hdc && drawable) hdc = drawable->owner_hdc;
-    if (hdc && (drawable = get_dc_opengl_drawable( hdc ))) return drawable;
+    if (hdc && (drawable = get_dc_opengl_drawable( hdc )))
+    {
+        if ((*updated = needs_framebuffer_update( hwnd, drawable )))
+        {
+            opengl_drawable_release( drawable );
+            drawable = get_window_unused_drawable( hwnd, format );
+            set_dc_opengl_drawable( hdc, drawable );
+        }
+        return drawable;
+    }
 
     /* get an updated drawable with the desired format */
     return get_window_unused_drawable( hwnd, format );
@@ -2220,12 +2233,13 @@ static BOOL context_sync_drawables( struct wgl_context *context, HDC draw_hdc, H
     struct opengl_drawable *new_draw, *new_read, *old_draw = NULL, *old_read = NULL, *draw, *read;
     static pthread_mutex_t reserved_tx_mutex = PTHREAD_MUTEX_INITIALIZER;
     struct wgl_context *previous = NtCurrentTeb()->glContext;
-    BOOL ret = FALSE;
+    BOOL ret = FALSE, draw_updated, read_updated;
 
-    if (!(new_draw = get_updated_drawable( draw_hdc, context->format, context->draw ))) return FALSE;
+    if (!(new_draw = get_updated_drawable( draw_hdc, context->format, context->draw, &draw_updated ))) return FALSE;
+    read_updated = draw_updated;
     if (!draw_hdc && context->draw == context->read) opengl_drawable_add_ref( (new_read = new_draw) );
     else if (draw_hdc && draw_hdc == read_hdc) opengl_drawable_add_ref( (new_read = new_draw) );
-    else new_read = get_updated_drawable( read_hdc, context->format, context->read );
+    else new_read = get_updated_drawable( read_hdc, context->format, context->read, &read_updated );
 
     TRACE( "context %p, new_draw %s, new_read %s\n", context, debugstr_opengl_drawable( new_draw ), debugstr_opengl_drawable( new_read ) );
 
@@ -2251,9 +2265,9 @@ static BOOL context_sync_drawables( struct wgl_context *context, HDC draw_hdc, H
         const struct opengl_funcs *funcs = &display_funcs;
         NtCurrentTeb()->glContext = context;
 
-        if (old_draw && old_draw != new_draw && old_draw != new_read && old_draw->client)
+        if (!draw_updated && old_draw && old_draw != new_draw && old_draw != new_read && old_draw->client)
             set_window_opengl_drawable( old_draw->client->hwnd, old_draw, FALSE );
-        if (old_read && old_read != new_draw && old_read != new_read && old_read->client)
+        if (!read_updated && old_read && old_read != new_draw && old_read != new_read && old_read->client)
             set_window_opengl_drawable( old_read->client->hwnd, old_read, FALSE );
 
         /* all good, release previous context drawables if any */
