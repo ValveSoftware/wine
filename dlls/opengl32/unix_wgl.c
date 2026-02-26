@@ -1747,6 +1747,7 @@ static void flush_context( TEB *teb, void (*flush)(void) )
 {
     struct opengl_drawable *read, *draw;
     struct context *ctx = get_current_context( teb, &read, &draw );
+    HWND draw_hwnd = ctx && draw && draw->client ? draw->client->hwnd : NULL;
     const struct opengl_funcs *funcs = teb->glTable;
     UINT flags = 0;
 
@@ -1770,7 +1771,7 @@ static void flush_context( TEB *teb, void (*flush)(void) )
 
         WARN( "Front buffer rendering emulation, copying front buffer back\n" );
 
-        NtUserGetClientRect( draw->client->hwnd, &rect, NtUserGetDpiForWindow( draw->client->hwnd ) );
+        NtUserGetClientRect( draw_hwnd, &rect, NtUserGetDpiForWindow( draw_hwnd ) );
         if (ctx->read_fbo) funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, 0 );
         funcs->p_glReadBuffer( GL_FRONT_LEFT );
         funcs->p_glBlitFramebuffer( 0, 0, rect.right, rect.bottom, 0, 0, rect.right, rect.bottom, mask, GL_NEAREST );
