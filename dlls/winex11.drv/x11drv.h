@@ -295,6 +295,8 @@ extern BOOL visual_from_pixel_format( int format, XVisualInfo *visual );
 extern UINT X11DRV_OpenGLInit( UINT, const struct opengl_funcs *, const struct opengl_driver_funcs ** );
 extern UINT X11DRV_VulkanInit( UINT, void *, const struct vulkan_driver_funcs ** );
 
+extern char *glx_renderer;
+
 extern struct format_entry *import_xdnd_selection( Display *display, Window win, Atom selection,
                                                    Atom *targets, UINT count,
                                                    size_t *size );

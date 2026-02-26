@@ -185,6 +185,8 @@ static char wglExtensions[4096];
 static int glxVersion[2];
 static int glx_opcode;
 
+char *glx_renderer;
+
 struct glx_pixel_format
 {
     GLXFBConfig fbconfig;
@@ -418,6 +420,8 @@ static BOOL X11DRV_WineGL_InitOpenglInfo(void)
     TRACE("Client GLX version     : %s.\n", pglXGetClientString(gdi_display, GLX_VERSION));
     TRACE("Client GLX vendor:     : %s.\n", pglXGetClientString(gdi_display, GLX_VENDOR));
     TRACE("Direct rendering enabled: %s\n", glx_direct ? "True" : "False");
+
+    glx_renderer = strdup( gl_renderer );
 
     if(!glx_direct)
     {

@@ -3967,6 +3967,12 @@ void net_supporting_wm_check_init( struct x11drv_thread_data *data )
 BOOL X11DRV_HasWindowManager( const char *name )
 {
     struct x11drv_thread_data *data = x11drv_init_thread_data();
+    int opcode, event, error;
+
+    if (!strcmp( name, "xwayland" )) return XQueryExtension( gdi_display, "XWAYLAND", &opcode, &event, &error );
+    if (!strcmp( name, "xwayland_glx_nvidia" ))
+        return XQueryExtension( gdi_display, "XWAYLAND", &opcode, &event, &error ) && glx_renderer
+               && strstr( glx_renderer, "NVIDIA" );
     return data->window_manager && !strcmp( data->window_manager, name );
 }
 

@@ -933,6 +933,23 @@ static BOOL needs_framebuffer_surface( HWND hwnd )
     LONG gamma_serial;
 
     if (!fshack_enabled) return FALSE;
+
+    if (user_driver->pHasWindowManager( "xwayland_glx_nvidia" ))
+    {
+        static int skip_cached = -1;
+        if (skip_cached == -1)
+        {
+            const char *sgi = getenv( "SteamGameId" );
+            skip_cached = sgi && !strcmp( sgi, "582660" );
+        }
+        if (!skip_cached)
+        {
+            /* Force fshack on XWayland / NVidia because drawing to front buffer doesn't get presented there and fshack works
+             * that around as a side effect. */
+            return TRUE;
+        }
+    }
+
     if (NtUserGetDpiForWindow( hwnd ) != NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI )) return TRUE;
     return get_float_gamma_ramp( gamma_ramp, &gamma_serial );
 }
