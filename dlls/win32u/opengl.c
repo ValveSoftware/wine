@@ -1376,7 +1376,13 @@ static const struct opengl_driver_funcs egldrv_funcs =
 static BOOL egl_init( const struct opengl_driver_funcs **driver_funcs )
 {
     struct opengl_funcs *funcs = &display_funcs;
-    const char *extensions;
+    const char *extensions, *env;
+
+    if (!(env = getenv( "WINE_USE_EGL" )) || !atoi( env ))
+    {
+        WARN( "EGL support is disabled.\n" );
+        return FALSE;
+    }
 
     if (!(funcs->egl_handle = dlopen( SONAME_LIBEGL, RTLD_NOW | RTLD_GLOBAL )))
     {
