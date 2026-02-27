@@ -1792,8 +1792,12 @@ HDC WINAPI NtUserBeginPaint( HWND hwnd, PAINTSTRUCT *ps )
  */
 BOOL WINAPI NtUserEndPaint( HWND hwnd, const PAINTSTRUCT *ps )
 {
+    struct window_surface *surface;
+
     NtUserShowCaret( hwnd );
     flush_window_surfaces( FALSE );
+    if ((surface = window_surface_get( hwnd ))) window_surface_release( surface );
+    else                                        user_driver->pProcessEvents( 0 );
     if (!ps) return FALSE;
     release_dc( hwnd, ps->hdc, TRUE );
     return TRUE;
