@@ -4166,9 +4166,14 @@ size_t CDECL fwrite(const void *ptr, size_t size, size_t nmemb, FILE* file)
 size_t CDECL _fwrite_nolock(const void *ptr, size_t size, size_t nmemb, FILE* file)
 {
     size_t wrcnt=size * nmemb;
+    BOOL no_buffer = FALSE;
     int written = 0;
     if (size == 0)
         return 0;
+
+    if(!(file->_flag & (MSVCRT__NOBUF | _IOMYBUF | MSVCRT__USERBUF)))
+        no_buffer = !msvcrt_alloc_buffer(file);
+    no_buffer = no_buffer || (file->_flag & MSVCRT__NOBUF);
 
     while(wrcnt) {
         if(file->_cnt < 0) {
@@ -4183,13 +4188,13 @@ size_t CDECL _fwrite_nolock(const void *ptr, size_t size, size_t nmemb, FILE* fi
             written += pcnt;
             wrcnt -= pcnt;
             ptr = (const char*)ptr + pcnt;
-        } else if((file->_flag & MSVCRT__NOBUF)
+        } else if(no_buffer
                 || ((file->_flag & (_IOMYBUF | MSVCRT__USERBUF)) && wrcnt >= file->_bufsiz)
                 || (!(file->_flag & (_IOMYBUF | MSVCRT__USERBUF)) && wrcnt >= MSVCRT_INTERNAL_BUFSIZ)) {
             size_t pcnt;
             int bufsiz;
 
-            if(file->_flag & MSVCRT__NOBUF)
+            if(no_buffer)
                 bufsiz = 1;
             else if(!(file->_flag & (_IOMYBUF | MSVCRT__USERBUF)))
                 bufsiz = MSVCRT_INTERNAL_BUFSIZ;
