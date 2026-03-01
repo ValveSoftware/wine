@@ -16,6 +16,7 @@ SOURCES = \
 	sac.c \
 	samplegrabber.c \
 	sar.c \
+	svc.c \
 	scheme_handler.c \
 	session.c \
 	topology.c \

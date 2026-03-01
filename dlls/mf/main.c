@@ -761,11 +761,7 @@ HRESULT WINAPI MFEnumDeviceSources(IMFAttributes *attributes, IMFActivate ***sou
         return hr;
 
     if (IsEqualGUID(&source_type, &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID))
-    {
-        FIXME("Not implemented for video capture devices.\n");
-        *ret_count = 0;
-        return S_OK;
-    }
+        return enum_video_capture_sources(attributes, sources, ret_count);
     if (IsEqualGUID(&source_type, &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_GUID))
         return enum_audio_capture_sources(attributes, sources, ret_count);
 
