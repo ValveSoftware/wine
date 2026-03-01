@@ -513,6 +513,16 @@ static HRESULT sample_grabber_sink_get_media_type(struct strmbase_pin *iface,
     AM_MEDIA_TYPE *pmt;
     HRESULT hr;
 
+    if (!IsEqualGUID(&filter->filter_mt.majortype, &GUID_NULL))
+    {
+        if (!index)
+        {
+            CopyMediaType(mt, &filter->filter_mt);
+            return S_OK;
+        }
+        --index;
+    }
+
     if (!filter->source.pin.peer)
         return VFW_E_NOT_CONNECTED;
 
