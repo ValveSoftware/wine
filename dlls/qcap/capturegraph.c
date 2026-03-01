@@ -681,7 +681,11 @@ static HRESULT WINAPI fnCaptureGraphBuilder2_RenderStream(ICaptureGraphBuilder2 
     if (rendererNeedsRelease)
         IBaseFilter_Release(pfRenderer);
     if (SUCCEEDED(hr))
+    {
+        if (return_hr == VFW_S_NOPREVIEWPIN)
+            return S_OK;
         return return_hr;
+    }
     return hr;
 }
 
