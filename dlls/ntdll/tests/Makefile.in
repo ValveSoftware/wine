@@ -23,6 +23,7 @@ SOURCES = \
 	string.c \
 	sync.c \
 	thread.c \
+	threadctx.c \
 	threadpool.c \
 	time.c \
 	unwind.c \
