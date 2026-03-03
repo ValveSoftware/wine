@@ -2923,6 +2923,18 @@ static BOOL check_queue_bits( UINT wake_mask, UINT changed_mask, UINT signal_bit
     BOOL skip = FALSE;
     UINT status;
 
+    {
+        static int force_server_request = -1;
+        const char *sgi;
+
+        if (force_server_request == -1)
+            force_server_request = (sgi = getenv( "SteamGameId" )) &&
+                                   (
+                                    !strcmp( sgi, "32370" )
+                                   );
+        if (force_server_request) return FALSE;
+    }
+
     while ((status = get_shared_queue( &lock, &queue_shm )) == STATUS_PENDING)
     {
         if (internal) skip = !(queue_shm->internal_bits & QS_HARDWARE);
