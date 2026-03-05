@@ -1099,6 +1099,7 @@ NTSTATUS WINAPI NtSetContextThread( HANDLE handle, const CONTEXT *context )
     if (flags & CONTEXT_FLOATING_POINT)
     {
         frame->xsave = context->FltSave;
+        frame->xsave.MxCsr = context->MxCsr;
         frame->xstate.Mask |= XSTATE_MASK_LEGACY;
     }
     if (flags & CONTEXT_XSTATE)
