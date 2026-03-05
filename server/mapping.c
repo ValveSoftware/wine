@@ -388,6 +388,13 @@ static int create_temp_file( file_pos_t size )
     char tmpfn[16];
     int fd;
 
+#ifdef HAVE_MEMFD_CREATE
+    if ((fd = memfd_create( "wine-mapping", 0 )) != -1)
+    {
+        if (grow_file( fd, size )) return fd;
+        close( fd );
+    }
+#endif
     if (temp_dir_fd == -1)
     {
         temp_dir_fd = server_dir_fd;
