@@ -2173,6 +2173,7 @@ AC_CHECK_FUNCS(\
 	getifaddrs \
 	getrandom \
 	kqueue \
+	memfd_create \
 	pipe2 \
 	port_create \
 	posix_fadvise \
