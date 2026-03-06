@@ -434,7 +434,7 @@ static int pull_timeout(gnutls_transport_ptr_t transport, unsigned int timeout)
 
 static NTSTATUS set_priority(schan_credentials *cred, gnutls_session_t session)
 {
-    char priority[128] = "NORMAL:%LATEST_RECORD_VERSION", *p;
+    char priority[160] = "NORMAL:%LATEST_RECORD_VERSION:%NO_SHUFFLE_EXTENSIONS", *p;
     BOOL server = !!(cred->credential_use & SECPKG_CRED_INBOUND);
     const struct protocol_priority_flag *protocols =
         server ? server_protocol_priority_flags : client_protocol_priority_flags;
