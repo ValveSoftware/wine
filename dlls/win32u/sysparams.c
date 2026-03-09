@@ -1299,10 +1299,14 @@ static BOOL write_gpu_to_registry( const struct gpu *gpu, const struct pci_id *p
         set_reg_value( hkey, bufferW, REG_SZ, desc, (lstrlenW( desc ) + 1) * sizeof(WCHAR) );
         if (pci->vendor && pci->device)
         {
+            DWORD val;
+
             asciiz_to_unicode( bufferW, "DeviceId" );
-            set_reg_value( hkey, bufferW, REG_DWORD, &pci->device, sizeof(pci->device) );
+            val = pci->device;
+            set_reg_value( hkey, bufferW, REG_DWORD, &val, sizeof(val) );
             asciiz_to_unicode( bufferW, "VendorId" );
-            set_reg_value( hkey, bufferW, REG_DWORD, &pci->vendor, sizeof(pci->vendor) );
+            val = pci->vendor;
+            set_reg_value( hkey, bufferW, REG_DWORD, &val, sizeof(val) );
         }
         NtClose( hkey );
     }
