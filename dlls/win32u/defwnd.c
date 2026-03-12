@@ -269,6 +269,7 @@ BOOL adjust_window_rect( RECT *rect, DWORD style, BOOL menu, DWORD ex_style, UIN
              && !(sgi && !strcmp( sgi, "1240440" )) /* Bug 23802: Halo Infinite */
              && !(sgi && !strcmp( sgi, "613830" ))  /* Bug 25747: CHRONO TRIGGER */
              && !(sgi && !strcmp( sgi, "3077660" )) /* Bug 26235: Mystery Manor: Hidden Objects */
+             && !(sgi && !strcmp( sgi, "3721960" )) /* Bug 26767: Rei and the Floating City */
             )
             return TRUE;
     }
@@ -1890,6 +1891,7 @@ static void handle_nc_calc_size( HWND hwnd, WPARAM wparam, RECT *win_rect )
             && !(sgi && !strcmp( sgi, "1240440" ))                  /* Bug 23802: Halo Infinite */
             && !(sgi && !strcmp( sgi, "2883280" ))                  /* Bug 24151: Dog Brew */
             && !(sgi && !strcmp( sgi, "613830" ))                   /* Bug 25747: CHRONO TRIGGER */
+            && !(sgi && !strcmp( sgi, "3721960" ))                  /* Bug 26767: Rei and the Floating City */
            )
             return;
     }
