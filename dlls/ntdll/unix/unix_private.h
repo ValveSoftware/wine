@@ -348,6 +348,7 @@ extern void signal_init_threading(void);
 extern NTSTATUS signal_alloc_thread( TEB *teb );
 extern void set_thread_teb( TEB *teb );
 extern void signal_free_thread( TEB *teb );
+extern void signal_disable_syscall_dispatch(void);
 extern void signal_init_process(void);
 extern void DECLSPEC_NORETURN signal_start_thread( PRTL_THREAD_START_ROUTINE entry, void *arg,
                                                    BOOL suspend, TEB *teb );
