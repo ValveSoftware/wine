@@ -646,6 +646,7 @@ NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info 
         int len = strlen( ld_preload );
         char *next, *tmp, *env = malloc( sizeof("LD_PRELOAD=") + len );
 
+        setenv( "EXPLORER_LD_PRELOAD", ld_preload, 1 );
         if (!env) return STATUS_NO_MEMORY;
         strcpy( env, "LD_PRELOAD=" );
         strcat( env, ld_preload );

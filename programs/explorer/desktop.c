@@ -1284,6 +1284,16 @@ void manage_desktop( WCHAR *arg )
     NTSTATUS status;
     HANDLE tabtip = NULL;
 
+    {
+        char s[1024];
+        if (!__wine_get_unix_env("EXPLORER_LD_PRELOAD", s, sizeof(s)))
+        {
+            TRACE("EXPLORER_LD_PRELOAD %s.\n", s);
+            __wine_set_unix_env("LD_PRELOAD", s);
+            __wine_set_unix_env("EXPLORER_LD_PRELOAD", NULL);
+        }
+    }
+
     /* get the rest of the command line (if any) */
     while (*p && !is_whitespace(*p)) p++;
     if (*p)
