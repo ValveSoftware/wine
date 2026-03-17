@@ -924,8 +924,7 @@ static inline ucontext_t *init_handler( void *sigcontext )
     if (fs32_sel)
     {
         struct ntdll_thread_data *thread_data = (struct ntdll_thread_data *)&get_current_teb()->GdiTebBatch;
-        if (((struct amd64_thread_data *)thread_data->cpu_data)->pthread_teb)
-            arch_prctl( ARCH_SET_FS, ((struct amd64_thread_data *)thread_data->cpu_data)->pthread_teb );
+        arch_prctl( ARCH_SET_FS, ((struct amd64_thread_data *)thread_data->cpu_data)->pthread_teb );
     }
 #elif defined __APPLE__
     {
@@ -2168,7 +2167,7 @@ static void install_bpf(struct sigaction *sig_act)
     sigaction(SIGSYS, sig_act, NULL);
 
     test_syscall = mmap((void *)0x600000000000, 0x1000, PROT_EXEC | PROT_READ | PROT_WRITE,
-            MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANON, -1, 0);
+            MAP_PRIVATE | MAP_ANON, -1, 0);
     if (test_syscall != (void *)0x600000000000)
     {
         int ret;
