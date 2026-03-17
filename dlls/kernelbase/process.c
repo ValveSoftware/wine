@@ -814,6 +814,11 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
             }
         }
 
+        if (((product_name && !strcmp( product_name, "Easy Anti-Cheat Bootstrapper (EOS)" ))
+            || wcsstr( app_name, L"\\start_protected_game.exe" ))
+            && __wine_get_unix_env( "WINE_HACK_NATIVE_SYSCALLS", NULL, 0 ) == STATUS_VARIABLE_NOT_FOUND)
+            __wine_set_unix_env( "WINE_HACK_NATIVE_SYSCALLS", "1" );
+
         RtlInitUnicodeString( &name, L"PROTON_EAC_LAUNCHER_PROCESS" );
         RtlInitUnicodeString( &value, L"1" );
         RtlSetEnvironmentVariable( &new_env, &name,

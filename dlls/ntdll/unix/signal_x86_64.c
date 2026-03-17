@@ -2820,7 +2820,6 @@ static void usr1_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     }
 }
 
-
 #if defined(__APPLE__) || defined(__linux__)
 /**********************************************************************
  *		sigsys_handler
@@ -2841,6 +2840,16 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     {
         prctl( PR_SET_SYSCALL_USER_DISPATCH, PR_SYS_DISPATCH_OFF, 0, 0, 0 );
         RIP_sig(ucontext) -= 2;  /* retry the syscall */
+        return;
+    }
+    if (hack_native_syscalls && (RIP_sig(ucontext) >> 32) > 0x7000)
+    {
+        struct amd64_thread_data *thread_data = (struct amd64_thread_data *)&get_current_teb()->GdiTebBatch;
+
+        TRACE_(seh)( "handling native syscall.\n" );
+        prctl( PR_SET_SYSCALL_USER_DISPATCH, PR_SYS_DISPATCH_ON, 0x700100000000, 0x7fffffff0000 - 0x700100000000,
+               &thread_data->syscall_dispatch );
+        RIP_sig(ucontext) -= 2;
         return;
     }
 #endif
