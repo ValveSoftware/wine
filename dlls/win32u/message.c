@@ -3776,8 +3776,21 @@ NTSTATUS send_hardware_message( HWND hwnd, UINT flags, const INPUT *input, LPARA
         switch (input->type)
         {
         case INPUT_MOUSE:
-            req->input.mouse.x     = input->mi.dx;
-            req->input.mouse.y     = input->mi.dy;
+            if (input->mi.dwFlags & MOUSEEVENTF_ABSOLUTE && flags & SEND_HWMSG_NO_RAW)
+            {
+                RECT r = { input->mi.dx, input->mi.dy, input->mi.dx, input->mi.dy };
+                UINT dpi = get_thread_dpi();
+
+                r = map_rect_raw_to_virt( r, dpi );
+                r = map_rect_virt_to_raw( r, dpi );
+                req->input.mouse.x = r.left;
+                req->input.mouse.y = r.top;
+            }
+            else
+            {
+                req->input.mouse.x = input->mi.dx;
+                req->input.mouse.y = input->mi.dy;
+            }
             req->input.mouse.data  = input->mi.mouseData;
             req->input.mouse.flags = input->mi.dwFlags;
             req->input.mouse.time  = input->mi.time;
