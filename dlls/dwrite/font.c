@@ -4370,7 +4370,12 @@ static HRESULT init_font_data(const struct fontface_desc *desc, DWRITE_FONT_FAMI
 
     fontstrings_get_en_string(data->family_names, familyW, ARRAY_SIZE(familyW));
     fontstrings_get_en_string(data->names, faceW, ARRAY_SIZE(faceW));
-
+    if (props.flags & FONT_COLR_V1_ONLY)
+    {
+        FIXME("%s/%s COLRv1 is not supported.\n", debugstr_w(familyW), debugstr_w(faceW));
+        release_font_data(data);
+        return DWRITE_E_FILEFORMAT;
+    }
     if (family_model == DWRITE_FONT_FAMILY_MODEL_WEIGHT_STRETCH_STYLE
             && font_apply_differentiation_rules(data, familyW, faceW))
     {
