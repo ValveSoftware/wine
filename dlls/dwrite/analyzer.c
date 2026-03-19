@@ -364,7 +364,7 @@ system_fallback_config[] =
     { "FF00-FFEF",              L"Malgun Gothic", L"ko" },
     { "FF00-FFEF",              L"MS Gothic" },
 
-    { "1F800-1F8FF",            L"Noto Sans Symbols2, Noto Sans Symbols 2" },
+    { "1F300-1F8FF",            L"Noto Sans Symbols2, Noto Sans Symbols 2, Noto Emoji" },
 };
 
 struct text_source_context
