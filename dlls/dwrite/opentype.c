@@ -2090,6 +2090,7 @@ void opentype_get_font_metrics(struct file_stream_desc *stream_desc, DWRITE_FONT
 void opentype_get_font_properties(const struct file_stream_desc *stream_desc, struct dwrite_font_props *props)
 {
     struct dwrite_fonttable os2, head, post, colr, cpal;
+    const struct colr_header *header;
     BOOL is_symbol, is_monospaced;
 
     opentype_get_font_table(stream_desc, MS_OS2_TAG, &os2);
@@ -2212,12 +2213,18 @@ void opentype_get_font_properties(const struct file_stream_desc *stream_desc, st
 
     /* FONT_IS_COLORED */
     opentype_get_font_table(stream_desc, MS_COLR_TAG, &colr);
-    if (colr.data)
+    if (colr.data && (header = table_read_ensure(&colr, 0, sizeof(*header))))
     {
         opentype_get_font_table(stream_desc, MS_CPAL_TAG, &cpal);
         if (cpal.data)
         {
             props->flags |= FONT_IS_COLORED;
+            /* COLRv1 may still have v0 data for backwards compat, so check num_baseglyph_records. */
+            if (header->version && !header->num_baseglyph_records)
+            {
+                WARN("COLR version %d.\n", GET_BE_WORD(header->version));
+                props->flags |= FONT_COLR_V1_ONLY;
+            }
             IDWriteFontFileStream_ReleaseFileFragment(stream_desc->stream, cpal.context);
         }
 
