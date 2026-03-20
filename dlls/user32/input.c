@@ -858,6 +858,12 @@ BOOL WINAPI GetPointerInfoHistory( UINT32 id, UINT32 *count, POINTER_INFO *info 
     return FALSE;
 }
 
+BOOL WINAPI SkipPointerFrameMessages( UINT32 id )
+{
+    FIXME( "id %u stub.\n", id );
+    return TRUE;
+}
+
 /*******************************************************************
  *           SetForegroundWindow  (USER32.@)
  */
