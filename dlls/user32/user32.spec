@@ -1139,7 +1139,7 @@
 @ stdcall ShutdownBlockReasonDestroy(long)
 # @ stub ShutdownBlockReasonQuery
 # @ stub SignalRedirectionStartComplete
-# @ stub SkipPointerFrameMessages
+@ stdcall SkipPointerFrameMessages(long)
 # @ stub SoftModalMessageBox
 # @ stub SoundSentry
 @ stdcall SubtractRect(ptr ptr ptr)
