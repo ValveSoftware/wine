@@ -856,6 +856,7 @@ static void STATIC_PaintBitmapfn(HWND hwnd, HDC hdc, HBRUSH hbrush, DWORD style 
     HDC hMemDC;
     HBITMAP hBitmap, oldbitmap;
     RECT rcClient;
+    int prev_mode;
 
     GetClientRect( hwnd, &rcClient );
     FillRect( hdc, &rcClient, hbrush );
@@ -887,6 +888,7 @@ static void STATIC_PaintBitmapfn(HWND hwnd, HDC hdc, HBRUSH hbrush, DWORD style 
             rcClient.bottom = rcClient.top + bm.bmHeight;
         }
 
+        prev_mode = SetStretchBltMode( hdc, HALFTONE );
         if (extra->image_has_alpha)
             GdiAlphaBlend(hdc, rcClient.left, rcClient.top, rcClient.right - rcClient.left,
                    rcClient.bottom - rcClient.top, hMemDC,
@@ -895,6 +897,7 @@ static void STATIC_PaintBitmapfn(HWND hwnd, HDC hdc, HBRUSH hbrush, DWORD style 
             StretchBlt(hdc, rcClient.left, rcClient.top, rcClient.right - rcClient.left,
                    rcClient.bottom - rcClient.top, hMemDC,
                    0, 0, bm.bmWidth, bm.bmHeight, SRCCOPY);
+        SetStretchBltMode( hdc, prev_mode );
         SelectObject(hMemDC, oldbitmap);
         DeleteDC(hMemDC);
     }
