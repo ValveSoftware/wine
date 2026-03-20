@@ -851,6 +851,12 @@ BOOL WINAPI GetPointerTouchInfoHistory( UINT32 id, UINT32 *count, POINTER_TOUCH_
     return FALSE;
 }
 
+BOOL WINAPI GetPointerInfoHistory( UINT32 id, UINT32 *count, POINTER_INFO *info )
+{
+    FIXME( "id %u, count %p, info %p stub.\n", id, count, info );
+    SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
+    return FALSE;
+}
 
 /*******************************************************************
  *           SetForegroundWindow  (USER32.@)
