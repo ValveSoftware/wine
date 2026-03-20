@@ -640,7 +640,7 @@
 # @ stub GetPointerFrameTouchInfo
 # @ stub GetPointerFrameTouchInfoHistory
 @ stdcall GetPointerInfo(long ptr)
-# @ stub GetPointerInfoHistory
+@ stub GetPointerInfoHistory(long ptr ptr)
 # @ stub GetPointerInputTransform
 @ stdcall GetPointerPenInfo(long ptr)
 # @ stub GetPointerPenInfoHistory
