@@ -192,7 +192,6 @@ struct framebuffer_surface
 {
     struct opengl_drawable base;
     struct opengl_drawable *target;
-    UINT frame;
     LONG last_gamma_serial;
     int width, height;
     LONG64 serial;
@@ -797,12 +796,14 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
     }
     else
     {
-        UINT fb_texture = surface->base.doublebuffer ? (surface->frame & 1) : 1;
+        GLint front_texture;
 
         for (int i = 0; i < ARRAY_SIZE(draw_state_handlers); i++)
             draw_state_handlers[i]( SET, ctx, &state );
 
-        funcs->p_glBindTexture( GL_TEXTURE_2D, ctx->share->framebuffer_textures[1 - fb_texture] );
+        funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.read_fbo, GL_COLOR_ATTACHMENT0,
+                                                             GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &front_texture );
+        funcs->p_glBindTexture( GL_TEXTURE_2D, front_texture );
 
         if (ctx->has_GL_ARB_viewport_array) funcs->p_glViewportIndexedf( 0, 0, 0, dst.right, dst.bottom );
         else funcs->p_glViewport( 0, 0, dst.right, dst.bottom );
@@ -877,8 +878,6 @@ static BOOL framebuffer_surface_swap( struct opengl_drawable *drawable )
             funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT2, name2, 0 );
             funcs->p_glNamedFramebufferTexture( surface->base.read_fbo, GL_COLOR_ATTACHMENT3, name1, 0 );
         }
-
-        surface->frame++;
     }
 
     if (surface->target)
