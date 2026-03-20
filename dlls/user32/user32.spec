@@ -625,7 +625,7 @@
 @ stdcall GetParent(long)
 @ stdcall GetPhysicalCursorPos(ptr)
 # @ stub GetPointerCursorId
-# @ stub GetPointerDevice
+@ stdcall GetPointerDevice(ptr ptr)
 # @ stub GetPointerDeviceCursors
 # @ stub GetPointerDeviceInputSpace
 # @ stub GetPointerDeviceOrientation
