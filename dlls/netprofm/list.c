@@ -1354,6 +1354,19 @@ static HRESULT WINAPI list_manager_IsConnected(
     return S_OK;
 }
 
+static void throttle(void)
+{
+    const char *sgi;
+    static int cached = -1;
+
+    if (cached == -1)
+    {
+        cached = (sgi = getenv("SteamGameId")) && !strcmp( sgi, "3280350" );
+        if (cached) ERR( "GetConnectivity() throttle hack.\n" );
+    }
+    if (cached) Sleep(1);
+}
+
 static HRESULT WINAPI list_manager_GetConnectivity(
     INetworkListManager *iface,
     NLM_CONNECTIVITY *pConnectivity )
@@ -1372,6 +1385,8 @@ static HRESULT WINAPI list_manager_GetConnectivity(
         else if (network->connected)
             *pConnectivity |= NLM_CONNECTIVITY_IPV4_LOCALNETWORK;
     }
+
+    throttle();
 
     return S_OK;
 }
