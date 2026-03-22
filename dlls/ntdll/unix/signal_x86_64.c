@@ -459,6 +459,7 @@ struct amd64_thread_data
     DWORD                 xstate_features_size;  /* 033c */
     UINT64                xstate_features_mask;  /* 0340 */
     void                **instrumentation_callback; /* 0348 */
+    int                   sigusr1_pending;       /* 0350 */
 };
 
 C_ASSERT( sizeof(struct amd64_thread_data) <= sizeof(((struct ntdll_thread_data *)0)->cpu_data) );
@@ -2585,6 +2586,59 @@ static void quit_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     abort_thread( 0 );
 }
 
+/**********************************************************************
+ *		usr1_inside_syscall
+ *
+ * Shared code to handle SIGUSR1 within a syscall.
+ */
+static void usr1_inside_syscall(struct xcontext *context)
+{
+    struct syscall_frame *frame = amd64_thread_data()->syscall_frame;
+    ULONG64 saved_compaction = 0;
+    I386_CONTEXT *wow_context;
+
+    context->c.ContextFlags = CONTEXT_FULL | CONTEXT_SEGMENTS | CONTEXT_EXCEPTION_REQUEST;
+
+    NtGetContextThread( GetCurrentThread(), &context->c );
+    if (xstate_extended_features())
+    {
+        if (xstate_compaction_enabled) frame->xstate.CompactionMask |= xstate_extended_features();
+        context_init_xstate( &context->c, &frame->xstate );
+        saved_compaction = frame->xstate.CompactionMask;
+    }
+    wait_suspend( &context->c );
+    if (xstate_extended_features()) frame->xstate.CompactionMask = saved_compaction;
+    if (context->c.ContextFlags & 0x40)
+    {
+        /* xstate is updated directly in frame's xstate */
+        context->c.ContextFlags &= ~0x40;
+        frame->restore_flags |= 0x40;
+    }
+    if ((wow_context = get_cpu_area( IMAGE_FILE_MACHINE_I386 ))
+            && (wow_context->ContextFlags & CONTEXT_I386_CONTROL) == CONTEXT_I386_CONTROL)
+    {
+        WOW64_CPURESERVED *cpu = NtCurrentTeb()->TlsSlots[WOW64_TLS_CPURESERVED];
+
+        cpu->Flags |= WOW64_CPURESERVED_FLAG_RESET_STATE;
+    }
+    NtSetContextThread( GetCurrentThread(), &context->c );
+}
+
+/**********************************************************************
+ *		deferred_sigusr1
+ *
+ * Deferred handler for SIGUSR1
+ *
+ * Called after syscall entry, on the kernel stack.
+ */
+void deferred_sigusr1(void)
+{
+    struct xcontext context;
+
+    TRACE( "handling deferred SIGUSR1, context=%p\n", &context);
+    amd64_thread_data()->sigusr1_pending = 0;
+    usr1_inside_syscall(&context);
+}
 
 /**********************************************************************
  *		usr1_handler
@@ -2594,53 +2648,35 @@ static void quit_handler( int signal, siginfo_t *siginfo, void *sigcontext )
 static void usr1_handler( int signal, siginfo_t *siginfo, void *sigcontext )
 {
     ucontext_t *ucontext = init_handler( sigcontext );
+    struct syscall_frame *frame = amd64_thread_data()->syscall_frame;
+    struct xcontext *context;
 
-    if (is_inside_syscall( ucontext ))
+    extern const void *__wine_syscall_dispatcher_save_end_ptr;
+    extern const void *__wine_syscall_dispatcher_return_ptr;
+    extern const void *__wine_syscall_dispatcher_return_end_ptr;
+    if (RIP_sig(ucontext) >= (ULONG_PTR)__wine_syscall_dispatcher_instrumentation &&
+        RIP_sig(ucontext) < (ULONG_PTR)__wine_syscall_dispatcher_save_end_ptr)
     {
-        struct syscall_frame *frame = amd64_thread_data()->syscall_frame;
-        ULONG64 saved_compaction = 0;
-        I386_CONTEXT *wow_context;
-        struct xcontext *context;
-
-        context = (struct xcontext *)(((ULONG_PTR)RSP_sig(ucontext) - 128 /* red zone */ - sizeof(*context)) & ~15);
-        if ((char *)context < (char *)ntdll_get_thread_data()->kernel_stack)
-        {
-            ERR_(seh)( "kernel stack overflow.\n" );
-            return;
-        }
-        context->c.ContextFlags = CONTEXT_FULL | CONTEXT_SEGMENTS | CONTEXT_EXCEPTION_REQUEST;
-        if (frame->restore_flags & RESTORE_FLAGS_INCOMPLETE_FRAME_CONTEXT)
-        {
-            frame->restore_flags &= ~RESTORE_FLAGS_INCOMPLETE_FRAME_CONTEXT;
-            frame->eflags = 0x200;
-            fixup_frame_fpu_state( frame, ucontext );
-        }
-        NtGetContextThread( GetCurrentThread(), &context->c );
-        if (xstate_extended_features())
-        {
-            if (xstate_compaction_enabled) frame->xstate.CompactionMask |= xstate_extended_features();
-            context_init_xstate( &context->c, &frame->xstate );
-            saved_compaction = frame->xstate.CompactionMask;
-        }
-        wait_suspend( &context->c );
-        if (xstate_extended_features()) frame->xstate.CompactionMask = saved_compaction;
-        if (context->c.ContextFlags & 0x40)
-        {
-            /* xstate is updated directly in frame's xstate */
-            context->c.ContextFlags &= ~0x40;
-            frame->restore_flags |= 0x40;
-        }
-        if ((wow_context = get_cpu_area( IMAGE_FILE_MACHINE_I386 ))
-             && (wow_context->ContextFlags & CONTEXT_I386_CONTROL) == CONTEXT_I386_CONTROL)
-        {
-            WOW64_CPURESERVED *cpu = NtCurrentTeb()->TlsSlots[WOW64_TLS_CPURESERVED];
-
-            cpu->Flags |= WOW64_CPURESERVED_FLAG_RESET_STATE;
-        }
-        NtSetContextThread( GetCurrentThread(), &context->c );
+        /* Interrupted during syscall entry. Defer the USR1. */
+        TRACE( "deferring SIGUSR1 during syscall entry (rip=0x%lx)\n", (long)RIP_sig(ucontext));
+        amd64_thread_data()->sigusr1_pending = 1;
+        return;
     }
-    else
+    else if (RIP_sig(ucontext) >= (ULONG_PTR)__wine_syscall_dispatcher_return_ptr &&
+             RIP_sig(ucontext) < (ULONG_PTR)__wine_syscall_dispatcher_return_end_ptr)
     {
+        /* Interrupted during syscall exit. Rewind the exit and handle as inside syscall. */
+        TRACE( "rewinding syscall exit due to SIGUSR1 (rip=0x%lx)\n", (long)RIP_sig(ucontext));
+        R13_sig(ucontext) = (ULONG_PTR)NtCurrentTeb();
+        RBP_sig(ucontext) = (ULONG_PTR)&frame->rbp;
+        RIP_sig(ucontext) = (ULONG_PTR)__wine_syscall_dispatcher_return_ptr;
+        RCX_sig(ucontext) = (ULONG_PTR)frame;
+        RSP_sig(ucontext) = (ULONG_PTR)frame;
+        /* Fallthrough */
+    }
+    else if (!is_inside_syscall( ucontext ))
+    {
+        /* Interrupted outside a syscall. */
         struct xcontext context;
 
         save_context( &context, ucontext );
@@ -2648,9 +2684,25 @@ static void usr1_handler( int signal, siginfo_t *siginfo, void *sigcontext )
         if (is_wow64() && context.c.SegCs == cs64_sel) context.c.ContextFlags |= CONTEXT_EXCEPTION_ACTIVE;
         wait_suspend( &context.c );
         restore_context( &context, ucontext );
+        return;
     }
-}
+    /* Otherwise, interrupted within a syscall with a consistent user context. */
 
+    context = (struct xcontext *)(((ULONG_PTR)RSP_sig(ucontext) - 128 /* red zone */ - sizeof(*context)) & ~15);
+
+    if ((char *)context < (char *)ntdll_get_thread_data()->kernel_stack)
+    {
+        ERR_(seh)( "kernel stack overflow.\n" );
+        return;
+    }
+    if (frame->restore_flags & RESTORE_FLAGS_INCOMPLETE_FRAME_CONTEXT)
+    {
+        frame->restore_flags &= ~RESTORE_FLAGS_INCOMPLETE_FRAME_CONTEXT;
+        frame->eflags = 0x200;
+        fixup_frame_fpu_state( frame, ucontext );
+    }
+    usr1_inside_syscall(context);
+}
 
 #ifdef __APPLE__
 /**********************************************************************
@@ -3142,6 +3194,33 @@ __ASM_GLOBAL_FUNC( signal_start_thread,
 /***********************************************************************
  *           __wine_syscall_dispatcher
  */
+
+/* The instrumentation entry point comes first. This allows the range between
+ * __wine_syscall_dispatcher_instrumentation and __wine_syscall_dispatcher_save_end
+ * to be considered "entering a syscall" in the SIGUSR1 handler.
+ */
+__ASM_GLOBAL_FUNC( __wine_syscall_dispatcher_instrumentation,
+#ifdef __APPLE__
+                   "movq %gs:0x30,%rcx\n\t"
+                   "movq 0x328(%rcx),%rcx\n\t"
+#else
+                   "movq %gs:0x328,%rcx\n\t"       /* amd64_thread_data()->syscall_frame */
+#endif
+                   "popq 0x70(%rcx)\n\t"           /* frame->rip */
+                   __ASM_CFI(".cfi_adjust_cfa_offset -8\n\t")
+                   __ASM_CFI_REG_IS_AT2(rip, rcx, 0xf0,0x00)
+                   "pushfq\n\t"
+                   __ASM_CFI(".cfi_adjust_cfa_offset 8\n\t")
+                   "popq 0x80(%rcx)\n\t"
+                   __ASM_CFI(".cfi_adjust_cfa_offset -8\n\t")
+                   /* Save %rip into the r10 save slot, which will be
+                    * used in the instrumentation return path.
+                    */
+                   "pushq 0x70(%rcx)\n\t"          /* frame->rip */
+                   "popq 0x40(%rcx)\n\t"           /* frame->r10 */
+                   "movl $0x10000,0xb4(%rcx)\n\t"    /* frame->restore_flags <- RESTORE_FLAGS_INSTRUMENTATION */
+                   "jmp " __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_prolog_end") )
+
 __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
 #ifdef __APPLE__
                    "movq %gs:0x30,%rcx\n\t"
@@ -3253,7 +3332,16 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "leaq -0x98(%rbp),%rcx\n"
                    "2:\n\t"
 #endif
-                   "movq 0x00(%rcx),%rax\n\t"
+                   /* If the handler was interrupted while saving context, the
+                    * SIGUSR1 is deferred. Handle it now.
+                    */
+                   "\n" __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_save_end") ":\n\t"
+                   "testl $1,%gs:0x350\n\t"        /* amd64_thread_data()->sigusr1_pending */
+                   "jz 1f\n\t"
+                   "call " __ASM_NAME("deferred_sigusr1") "\n\t"
+                   "leaq -0x98(%rbp),%rcx\n"
+
+                   "1:\tmovq 0x00(%rcx),%rax\n\t"
                    "movq 0x18(%rcx),%r11\n\t"      /* 2nd argument */
                    "movl %eax,%ebx\n\t"
                    "shrl $8,%ebx\n\t"
@@ -3288,6 +3376,12 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "movq (%rbx),%r10\n\t"          /* table->ServiceTable */
                    "callq *(%r10,%rax,8)\n\t"
                    "leaq -0x98(%rbp),%rcx\n\t"
+
+                   /* If the handler is interrupted between this point and
+                    * __wine_syscall_dispatcher_return_end below,
+                    * the syscall return will be restarted. Therefore, this
+                    * code should be idempotent.
+                    */
                    __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_return") ":\n\t"
                    "movl 0xb4(%rcx),%edx\n\t"      /* frame->restore_flags */
                    "testl $0x48,%edx\n\t"          /* CONTEXT_FLOATING_POINT | CONTEXT_XSTATE */
@@ -3405,7 +3499,8 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    /* make sure that if trap flag is set the trap happens on the first instruction after iret */
                    "andq $~0x4000,(%rsp)\n\t" /* make sure NT flag is not set, or iretq will fault */
                    "popfq\n\t"
-                   "iretq\n\t"
+                   "iretq\n"
+                   __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_return_end") ":\n"
 
                    /* pop rbp-based kernel stack cfi */
                    __ASM_CFI("\t.cfi_restore_state\n")
@@ -3418,30 +3513,6 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher_return,
                    "movl 0xb0(%rcx),%r14d\n\t"     /* frame->syscall_flags */
                    "movq %rsi,%rax\n\t"
                    "jmp " __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_return") )
-
-
-__ASM_GLOBAL_FUNC( __wine_syscall_dispatcher_instrumentation,
-#ifdef __APPLE__
-                   "movq %gs:0x30,%rcx\n\t"
-                   "movq 0x328(%rcx),%rcx\n\t"
-#else
-                   "movq %gs:0x328,%rcx\n\t"       /* amd64_thread_data()->syscall_frame */
-#endif
-                   "popq 0x70(%rcx)\n\t"           /* frame->rip */
-                   __ASM_CFI(".cfi_adjust_cfa_offset -8\n\t")
-                   __ASM_CFI_REG_IS_AT2(rip, rcx, 0xf0,0x00)
-                   "pushfq\n\t"
-                   __ASM_CFI(".cfi_adjust_cfa_offset 8\n\t")
-                   "popq 0x80(%rcx)\n\t"
-                   __ASM_CFI(".cfi_adjust_cfa_offset -8\n\t")
-                   /* Save %rip into the r10 save slot, which will be
-                    * used in the instrumentation return path.
-                    */
-                   "pushq 0x70(%rcx)\n\t"          /* frame->rip */
-                   "popq 0x40(%rcx)\n\t"           /* frame->r10 */
-                   "movl $0x10000,0xb4(%rcx)\n\t"    /* frame->restore_flags <- RESTORE_FLAGS_INSTRUMENTATION */
-                   "jmp " __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_prolog_end") )
-
 
 /***********************************************************************
  *           __wine_unix_call_dispatcher
@@ -3552,6 +3623,15 @@ asm( ".data\n\t"
      ".globl " __ASM_NAME("__wine_unix_call_dispatcher_prolog_end_ptr") "\n"
      __ASM_NAME("__wine_unix_call_dispatcher_prolog_end_ptr") ":\n\t"
      ".quad " __ASM_LOCAL_LABEL("__wine_unix_call_dispatcher_prolog_end") "\n\t"
+     ".globl " __ASM_NAME("__wine_syscall_dispatcher_save_end_ptr") "\n"
+     __ASM_NAME("__wine_syscall_dispatcher_save_end_ptr") ":\n\t"
+     ".quad " __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_save_end") "\n\t"
+     ".globl " __ASM_NAME("__wine_syscall_dispatcher_return_ptr") "\n"
+     __ASM_NAME("__wine_syscall_dispatcher_return_ptr") ":\n\t"
+     ".quad " __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_return") "\n\t"
+     ".globl " __ASM_NAME("__wine_syscall_dispatcher_return_end_ptr") "\n"
+     __ASM_NAME("__wine_syscall_dispatcher_return_end_ptr") ":\n\t"
+     ".quad " __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_return_end") "\n\t"
      ".text\n\t" );
 
 #endif  /* __x86_64__ */
