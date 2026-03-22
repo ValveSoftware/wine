@@ -1095,6 +1095,9 @@ NTSTATUS WINAPI NtSetContextThread( HANDLE handle, const CONTEXT *context )
         frame->rsp    = context->Rsp;
         frame->rip    = context->Rip;
         frame->eflags = context->EFlags;
+        if ((frame->restore_flags & RESTORE_FLAGS_INSTRUMENTATION) &&
+            !(frame->restore_flags & CONTEXT_INTEGER))
+            frame->r10 = context->Rip;
     }
     if (flags & CONTEXT_FLOATING_POINT)
     {
@@ -1594,6 +1597,8 @@ NTSTATUS call_user_apc_dispatcher( CONTEXT *context, ULONG_PTR arg1, ULONG_PTR a
     frame->rsp = (ULONG64)stack;
     frame->rip = (ULONG64)pKiUserApcDispatcher;
     frame->restore_flags |= CONTEXT_CONTROL;
+    if (frame->restore_flags & RESTORE_FLAGS_INSTRUMENTATION)
+        frame->r10 = frame->rip;
     return status;
 }
 
@@ -1640,6 +1645,8 @@ NTSTATUS call_user_exception_dispatcher( EXCEPTION_RECORD *rec, CONTEXT *context
     frame->rsp = (ULONG64)stack;
     frame->rip = (ULONG64)pKiUserExceptionDispatcher;
     frame->restore_flags |= CONTEXT_CONTROL;
+    if (frame->restore_flags & RESTORE_FLAGS_INSTRUMENTATION)
+        frame->r10 = frame->rip;
     return status;
 }
 
@@ -2340,7 +2347,10 @@ static BOOL handle_syscall_trap( ucontext_t *sigcontext, siginfo_t *siginfo )
     frame->rip = *(ULONG64 *)RSP_sig( sigcontext );
     frame->eflags = EFL_sig(sigcontext);
     frame->restore_flags = CONTEXT_CONTROL;
-    if (instrumentation_callback) frame->restore_flags |= RESTORE_FLAGS_INSTRUMENTATION;
+    if (instrumentation_callback) {
+        frame->r10 = frame->rip;
+        frame->restore_flags |= RESTORE_FLAGS_INSTRUMENTATION;
+    }
 
     RCX_sig( sigcontext ) = (ULONG64)frame;
     RSP_sig( sigcontext ) += sizeof(ULONG64);
@@ -2661,7 +2671,10 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     frame->rcx = RIP_sig(ucontext);
     frame->eflags = EFL_sig(ucontext);
     frame->restore_flags = 0;
-    if (instrumentation_callback) frame->restore_flags |= RESTORE_FLAGS_INSTRUMENTATION;
+    if (instrumentation_callback) {
+        frame->r10 = frame->rip;
+        frame->restore_flags |= RESTORE_FLAGS_INSTRUMENTATION;
+    }
     RCX_sig(ucontext) = (ULONG_PTR)frame;
     R11_sig(ucontext) = frame->eflags;
     EFL_sig(ucontext) &= ~0x100;  /* clear single-step flag */
@@ -3386,7 +3399,8 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "jz 3b\n\t"
                    "testl $0x2,%edx\n\t"          /* CONTEXT_INTEGER */
                    "jnz 1b\n\t"
-                   "xchgq %r10,(%rsp)\n\t"
+                   "movq %r10,(%rsp)\n\t"         /* frame->rip */
+                   "movq 0x40(%rcx),%r10\n\t"     /* frame->r10 (original rip) */
                    "pushq %r11\n\t"
                    /* make sure that if trap flag is set the trap happens on the first instruction after iret */
                    "andq $~0x4000,(%rsp)\n\t" /* make sure NT flag is not set, or iretq will fault */
@@ -3420,6 +3434,11 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher_instrumentation,
                    __ASM_CFI(".cfi_adjust_cfa_offset 8\n\t")
                    "popq 0x80(%rcx)\n\t"
                    __ASM_CFI(".cfi_adjust_cfa_offset -8\n\t")
+                   /* Save %rip into the r10 save slot, which will be
+                    * used in the instrumentation return path.
+                    */
+                   "pushq 0x70(%rcx)\n\t"          /* frame->rip */
+                   "popq 0x40(%rcx)\n\t"           /* frame->r10 */
                    "movl $0x10000,0xb4(%rcx)\n\t"    /* frame->restore_flags <- RESTORE_FLAGS_INSTRUMENTATION */
                    "jmp " __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_prolog_end") )
 
