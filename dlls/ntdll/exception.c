@@ -165,7 +165,6 @@ static LONG call_vectored_handlers( EXCEPTION_RECORD *rec, CONTEXT *context )
     while (entry != mark)
     {
         handler = CONTAINING_RECORD( entry, VECTORED_HANDLER, entry );
-        entry = entry->Flink;
         ++*handler->count;
         func = RtlDecodePointer( handler->func );
         RtlLeaveCriticalSection( &vectored_handlers_section );
@@ -178,6 +177,7 @@ static LONG call_vectored_handlers( EXCEPTION_RECORD *rec, CONTEXT *context )
         TRACE( "handler at %p returned %lx\n", func, ret );
 
         RtlEnterCriticalSection( &vectored_handlers_section );
+        entry = entry->Flink;
         if (!--*handler->count)  /* removed during execution */
         {
             RemoveEntryList( &handler->entry );
