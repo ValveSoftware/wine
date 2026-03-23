@@ -421,6 +421,7 @@ int wmain(int argc, WCHAR *argv[])
     DWORD scheme;
     IUri *uri;
     HRESULT hres;
+    int i;
 
     /* DDE used only if -nohome is specified; avoids delay in printing usage info
      * when no parameters are passed */
@@ -430,6 +431,37 @@ int wmain(int argc, WCHAR *argv[])
     if (!url) {
         WINE_ERR( "Usage: winebrowser URL\n" );
         return -1;
+    }
+
+    /* Skip arguments that look like command-line flags (e.g. --new-window,
+     * --incognito). Windows apps may pass browser-specific flags via
+     * ShellExecute that winebrowser does not understand. Search the remaining
+     * arguments for an actual URL instead of treating the flag as one.
+     * Handle --app=URL style arguments
+     * by extracting the URL value from the flag.
+     * If no URL is found, exit successfully so the caller thinks it worked;
+     * returning an error may prevent the app from making a follow-up call
+     * with the real URL. */
+    if (url[0] == '-' && wcsicmp( url, L"-nohome" ))
+    {
+        url = NULL;
+        for (i = 1; i < argc; i++)
+        {
+            if (argv[i][0] != '-') { url = argv[i]; break; }
+            /* Extract URL from --app=URL or --app="URL" style arguments */
+            if (!wcsnicmp( argv[i], L"--app=", 6 ) && argv[i][6])
+            {
+                WINE_TRACE("Extracting URL from %s\n", wine_dbgstr_w(argv[i]));
+                url = argv[i] + 6;
+                break;
+            }
+            WINE_TRACE("Skipping unknown flag %s\n", wine_dbgstr_w(argv[i]));
+        }
+        if (!url)
+        {
+            WINE_TRACE("No URL found after flags, exiting successfully\n");
+            return 0;
+        }
     }
 
     hres = CreateUri(url, Uri_CREATE_ALLOW_IMPLICIT_FILE_SCHEME|Uri_CREATE_FILE_USE_DOS_PATH, 0, &uri);
