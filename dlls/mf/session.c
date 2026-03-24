@@ -568,7 +568,6 @@ static void session_set_topo_status(struct media_session *session, HRESULT statu
 
 static HRESULT session_bind_output_nodes(IMFTopology *topology)
 {
-    MF_TOPOLOGY_TYPE node_type;
     IMFStreamSink *stream_sink;
     IMFMediaSink *media_sink;
     WORD node_count = 0, i;
@@ -585,7 +584,7 @@ static HRESULT session_bind_output_nodes(IMFTopology *topology)
         if (FAILED(hr = IMFTopology_GetNode(topology, i, &node)))
             break;
 
-        if (FAILED(hr = IMFTopologyNode_GetNodeType(node, &node_type)) || node_type != MF_TOPOLOGY_OUTPUT_NODE)
+        if (topology_node_get_type(node) != MF_TOPOLOGY_OUTPUT_NODE)
         {
             IMFTopologyNode_Release(node);
             continue;
@@ -633,7 +632,6 @@ static HRESULT session_bind_output_nodes(IMFTopology *topology)
 
 static HRESULT session_init_media_types(IMFTopology *topology)
 {
-    MF_TOPOLOGY_TYPE node_type;
     WORD node_count, i, j;
     IMFTopologyNode *node;
     IMFMediaType *type;
@@ -649,8 +647,7 @@ static HRESULT session_init_media_types(IMFTopology *topology)
             break;
 
         if (FAILED(hr = IMFTopologyNode_GetInputCount(node, &input_count))
-                || FAILED(hr = IMFTopologyNode_GetNodeType(node, &node_type))
-                || node_type != MF_TOPOLOGY_OUTPUT_NODE)
+                || topology_node_get_type(node) != MF_TOPOLOGY_OUTPUT_NODE)
         {
             IMFTopologyNode_Release(node);
             continue;
@@ -833,7 +830,6 @@ static void release_topo_node(struct topo_node *node)
 
 static void topology_shutdown(IMFTopology *topology)
 {
-    MF_TOPOLOGY_TYPE node_type;
     IMFStreamSink *stream_sink;
     IMFTopologyNode *node;
     IMFActivate *activate;
@@ -845,8 +841,7 @@ static void topology_shutdown(IMFTopology *topology)
 
     while (SUCCEEDED(IMFTopology_GetNode(topology, idx++, &node)))
     {
-        if (SUCCEEDED(IMFTopologyNode_GetNodeType(node, &node_type)) &&
-                node_type == MF_TOPOLOGY_OUTPUT_NODE)
+        if (topology_node_get_type(node) == MF_TOPOLOGY_OUTPUT_NODE)
         {
             /* MF_TOPONODE_NOSHUTDOWN_ON_REMOVE is ignored, at least for sinks. */
 
@@ -1897,7 +1892,6 @@ static HRESULT session_append_node(struct media_session *session, IMFTopologyNod
     if (!(topo_node = calloc(1, sizeof(*topo_node))))
         return E_OUTOFMEMORY;
 
-    IMFTopologyNode_GetNodeType(node, &topo_node->type);
     IMFTopologyNode_GetTopoNodeID(node, &topo_node->node_id);
     topo_node->node = node;
     IMFTopologyNode_AddRef(topo_node->node);
@@ -1905,7 +1899,7 @@ static HRESULT session_append_node(struct media_session *session, IMFTopologyNod
     if (SUCCEEDED(IMFTopologyNode_GetUINT32(node, &MF_TOPONODE_MARKIN_HERE, &value)) && value)
         topo_node->flags |= TOPO_NODE_MARKIN_HERE;
 
-    switch (topo_node->type)
+    switch ((topo_node->type = topology_node_get_type(node)))
     {
         case MF_TOPOLOGY_OUTPUT_NODE:
             topo_node->u.sink.notify_cb.lpVtbl = &node_sample_allocator_cb_vtbl;
@@ -2350,7 +2344,6 @@ static HRESULT session_check_stream_descriptor(IMFPresentationDescriptor *pd, IM
 
 static HRESULT session_check_topology(IMFTopology *topology)
 {
-    MF_TOPOLOGY_TYPE node_type;
     IMFTopologyNode *node;
     WORD node_count, i;
     HRESULT hr;
@@ -2367,13 +2360,7 @@ static HRESULT session_check_topology(IMFTopology *topology)
         if (FAILED(hr = IMFTopology_GetNode(topology, i, &node)))
             break;
 
-        if (FAILED(hr = IMFTopologyNode_GetNodeType(node, &node_type)))
-        {
-            IMFTopologyNode_Release(node);
-            break;
-        }
-
-        switch (node_type)
+        switch (topology_node_get_type(node))
         {
             case MF_TOPOLOGY_SOURCESTREAM_NODE:
             {
