@@ -1139,6 +1139,25 @@ int get_unix_debugger_pid(void)
 
 #endif
 
+static NTSTATUS get_unix_pid( HANDLE process, int *pid )
+{
+    NTSTATUS status;
+    HANDLE thread;
+
+    if ((status = NtGetNextThread( process, NULL, THREAD_QUERY_LIMITED_INFORMATION, 0, 0, &thread ))) return status;
+
+    SERVER_START_REQ( get_thread_times )
+    {
+        req->handle = wine_server_obj_handle( thread );
+        status = wine_server_call( req );
+        if (!status) *pid = reply->unix_pid;
+    }
+    SERVER_END_REQ;
+
+    NtClose( thread );
+    return status;
+}
+
 static BOOL set_hardware_tso( BOOL enable ) {
 #ifdef HAVE_PRCTL
 #ifndef PR_GET_MEM_MODEL
@@ -1663,6 +1682,11 @@ NTSTATUS WINAPI NtQueryInformationProcess( HANDLE handle, PROCESSINFOCLASS class
         if (handle != NtCurrentProcess()) ret = STATUS_INVALID_PARAMETER;
         else if (size != sizeof(int)) ret = STATUS_INFO_LENGTH_MISMATCH;
         else *(int *)info = get_unix_debugger_pid();
+        break;
+
+    case ProcessWineUnixPid:
+        if (size != sizeof(int)) ret = STATUS_INFO_LENGTH_MISMATCH;
+        else ret = get_unix_pid( handle, (int *)info );
         break;
 
     case ProcessQuotaLimits:

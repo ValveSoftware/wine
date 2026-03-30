@@ -1957,6 +1957,7 @@ typedef enum _PROCESSINFOCLASS {
     ProcessWineLdtCopy,
     ProcessWineGrantAdminToken,
     ProcessWineUnixDebuggerPid = 1100,
+    ProcessWineUnixPid = 1101,
 #endif
     ProcessFexHardwareTso = 2000,
     ProcessFexUnalignAtomic,
