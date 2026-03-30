@@ -2034,6 +2034,7 @@ typedef enum _PROCESSINFOCLASS {
     ProcessWineMakeProcessSystem = 1000,
     ProcessWineGrantAdminToken = 1002,
     ProcessWineUnixDebuggerPid = 1100,
+    ProcessWineUnixPid = 1101,
 #endif
     ProcessFexHardwareTso = 2000,
     ProcessFexUnalignAtomic,
