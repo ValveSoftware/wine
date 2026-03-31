@@ -945,7 +945,7 @@ static VkResult win32u_vkCreateDevice( VkPhysicalDevice client_physical_device, 
         const char *vr_exts;
         char name[64];
         instance->p_vkGetPhysicalDeviceProperties( physical_device->host.physical_device, &properties );
-        sprintf( name, "VK_WINE_OPENVR_DEVICE_EXTS_PCIID_%04x_%04x", properties.vendorID, properties.deviceID );
+        sprintf( name, "VK_WINE_OPENVR_DEVICE_EXTS_PCIID_%04x_%04x", properties.vendorID, (uint16_t)properties.deviceID );
         if (!(vr_exts = getenv( name ))) vr_exts = getenv( "VK_WINE_OPENVR_DEVICE_EXTS" );
         if (vr_exts) parse_device_extensions( &device->extensions, vr_exts );
         device->extensions.has_VK_WINE_openvr_device_extensions = 0;

@@ -1375,7 +1375,7 @@ static NTSTATUS steamclient_setup_trampolines( void *args )
     return STATUS_SUCCESS;
 }
 
-static BOOL debugstr_pc_impl( void *pc, char *buffer, unsigned int size )
+BOOL debugstr_pc_impl( void *pc, char *buffer, unsigned int size )
 {
     unsigned int len;
     char *s = buffer;
