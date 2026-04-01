@@ -2344,6 +2344,7 @@ static void hacks_init(void)
                                        || !strcmp(sgi, "2329630") /* Lovey-Dovey Lockdown */
                                        || !strcmp(sgi, "2209020") /* Gemstones */
                                        || !strcmp(sgi, "223750") /* DCS World */
+                                       || !strcmp(sgi, "2495160") /* Puppeteer : Control */
                                        || !strcmp(sgi, "2361360"); /* Hentai Maid Memories */
 
     if (sgi) wine_allocs_2g_limit = !strcmp(sgi, "359870");
