@@ -1715,9 +1715,8 @@ static void test_hid_mouse(void)
 
     desc.report_descriptor_len = sizeof(report_desc);
     memcpy( desc.report_descriptor_buf, report_desc, sizeof(report_desc) );
-    fill_context( desc.context, ARRAY_SIZE(desc.context) );
 
-    if (!hid_device_start_( &desc, 1, 5000 /* needs a long timeout on Win7 */ )) goto done;
+    if (!hid_device_start( &desc, 1 )) goto done;
 
     swprintf( device_path, MAX_PATH, L"\\\\?\\hid#vid_%04x&pid_%04x", desc.attributes.VendorID,
               desc.attributes.ProductID );
@@ -2267,7 +2266,6 @@ static void test_hid_touch_screen(void)
     memcpy( desc.report_descriptor_buf, report_desc, sizeof(report_desc) );
     desc.expect_size = sizeof(expect_max_count);
     memcpy( desc.expect, &expect_max_count, sizeof(expect_max_count) );
-    fill_context( desc.context, ARRAY_SIZE(desc.context) );
 
     if (!hid_device_start( &desc, 1 )) goto done;
 
@@ -2439,7 +2437,6 @@ static void test_hid_touch_screen(void)
     desc.is_polled = TRUE;
     desc.input_size = sizeof(touch_release);
     memcpy( desc.input, &touch_release, sizeof(touch_release) );
-    fill_context( desc.context, ARRAY_SIZE(desc.context) );
 
     if (!hid_device_start( &desc, 1 )) goto done;
 
@@ -3567,9 +3564,8 @@ static void test_hid_keyboard(void)
 
     desc.report_descriptor_len = sizeof(report_desc);
     memcpy( desc.report_descriptor_buf, report_desc, sizeof(report_desc) );
-    fill_context( desc.context, ARRAY_SIZE(desc.context) );
 
-    if (!hid_device_start_( &desc, 1, 5000 /* needs a long timeout on Win7 */ )) goto done;
+    if (!hid_device_start( &desc, 1 )) goto done;
 
     swprintf( device_path, MAX_PATH, L"\\\\?\\hid#vid_%04x&pid_%04x", desc.attributes.VendorID,
               desc.attributes.ProductID );
