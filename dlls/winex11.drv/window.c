@@ -1981,6 +1981,15 @@ BOOL X11DRV_GetWindowStateUpdates( HWND hwnd, UINT *state_cmd, UINT *swp_flags, 
     {
         *foreground = hwnd_from_window( thread_data->display, thread_data->current_state.net_active_window );
         if (*foreground == old_foreground) *foreground = 0;
+
+        /* Don't change foreground if the host active window is still minimized on the Win32 side, either it's a
+         * fluke and it will be deactivated, or it should receive some WM_STATE change events that will trigger
+         * a WM_SYSCOMMAND SC_RESTORE message sequence that should then change foreground accordingly.
+         *
+         * Changing focus before it does might cause Win32 state changes to be requested to the host window
+         * manager, before we have a chance to sync the Win32 state properly.
+         */
+        if (*foreground && (NtUserGetWindowLongW( *foreground, GWL_STYLE ) & WS_MINIMIZE)) *foreground = 0;
     }
 
     if ((data = get_win_data( hwnd )))
