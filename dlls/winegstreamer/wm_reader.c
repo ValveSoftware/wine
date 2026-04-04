@@ -1853,6 +1853,12 @@ static HRESULT wm_reader_read_stream_sample(struct wm_reader *reader, struct wg_
 
     if (!(stream = wm_reader_get_stream_by_stream_number(reader, buffer->stream + 1)))
         return E_INVALIDARG;
+    if (stream->read_compressed)
+    {
+        buffer->stream = reader->stream_count - buffer->stream - 1;
+        if (!(stream = wm_reader_get_stream_by_stream_number(reader, buffer->stream + 1)))
+            return E_INVALIDARG;
+    }
 
     TRACE("Got buffer for '%s' stream %p.\n", get_major_type_string(stream->format.major_type), stream);
 
