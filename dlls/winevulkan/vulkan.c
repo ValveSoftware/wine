@@ -738,11 +738,13 @@ static void parse_openvr_extensions(struct conversion_context *ctx, const char *
         struct wine_phys_dev *phys_dev)
 {
     VkPhysicalDeviceProperties prop;
+    const char *vr_exts;
     char name[64];
 
     phys_dev->obj.instance->p_vkGetPhysicalDeviceProperties(phys_dev->obj.host.physical_device, &prop);
     sprintf( name, "VK_WINE_OPENVR_DEVICE_EXTS_PCIID_%04x_%04x", prop.vendorID, (uint16_t)prop.deviceID );
-    parse_vr_extensions(ctx, extra_extensions, extra_count, getenv(name));
+    if (!(vr_exts = getenv( name ))) vr_exts = getenv( "VK_WINE_OPENVR_DEVICE_EXTS" );
+    parse_vr_extensions(ctx, extra_extensions, extra_count, vr_exts);
 }
 
 static VkResult wine_vk_device_convert_create_info(VkPhysicalDevice client_physical_device,
