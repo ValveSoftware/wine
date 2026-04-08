@@ -1361,6 +1361,12 @@ static void window_set_monitors( struct x11drv_win_data *data, const struct moni
     {
         XEvent xev;
 
+        if (is_fullscreen && (data->configure_serial || window_needs_config_change_delay( data )))
+        {
+            TRACE( "window %p/%lx is updating or delaying config requests, delaying monitors update\n", data->hwnd, data->whole_window );
+            return; /* another window config change is pending or delayed, wait for it to complete */
+        }
+
         xev.xclient.type = ClientMessage;
         xev.xclient.window = data->whole_window;
         xev.xclient.message_type = x11drv_atom(_NET_WM_FULLSCREEN_MONITORS);
@@ -1377,6 +1383,14 @@ static void window_set_monitors( struct x11drv_win_data *data, const struct moni
                debugstr_monitor_indices( new_monitors ), data->monitors_serial );
         XSendEvent( data->display, DefaultRootWindow( data->display ), False,
                     SubstructureRedirectMask | SubstructureNotifyMask, &xev );
+
+        if (is_fullscreen)
+        {
+            data->configure_serial = data->monitors_serial;
+            data->pending_state.rect = data->rects.visible;
+            TRACE( "window %p/%lx changes fullscreen monitors, expecting config %s, serial %lu\n", data->hwnd,
+                   data->whole_window, wine_dbgstr_rect( &data->pending_state.rect ), data->configure_serial );
+        }
     }
 }
 
