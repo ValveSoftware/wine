@@ -525,6 +525,7 @@ BOOL WINAPI DllMain( HINSTANCE inst, DWORD reason, void *reserved )
         break;
       case DLL_PROCESS_DETACH:
         if (reserved) break;
+        hid_joystick_cleanup_devices();
         unregister_di_em_win_class();
         CloseHandle(steam_overlay_event);
         break;
