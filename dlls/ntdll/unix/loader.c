@@ -2271,6 +2271,7 @@ static ULONG_PTR get_image_address(void)
     return 0;
 }
 
+BOOL process_termination_delay;
 BOOL ac_odyssey;
 BOOL fsync_help_simulated_pulse;
 BOOL localsystem_sid;
@@ -2425,6 +2426,9 @@ static void hacks_init(void)
                     ))
         release_reserved_memory_low_bound = (void *)0x00200000;
 #endif
+
+    if (main_argc > 1 && strstr(main_argv[1], "edCefRenderProcess.exe"))
+        process_termination_delay = TRUE;
 }
 
 /***********************************************************************

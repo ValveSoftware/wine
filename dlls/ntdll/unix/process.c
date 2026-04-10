@@ -977,6 +977,11 @@ NTSTATUS WINAPI NtTerminateProcess( HANDLE handle, LONG exit_code )
 
     if (handle == GetCurrentProcess())
     {
+        if (process_termination_delay)
+        {
+            ERR( "HACK: delaying termination.\n" );
+            usleep( 50 * 1000 );
+        }
         terminate_process_running = TRUE;
         terminate_process_exit_code = exit_code;
     }
