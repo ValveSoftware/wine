@@ -255,7 +255,7 @@ static void *get_shm( unsigned int idx )
 #define FSYNC_LIST_BLOCK_SIZE  (65536 / sizeof(struct fsync))
 #define FSYNC_LIST_ENTRIES     256
 
-struct fsync_cache
+struct DECLSPEC_ALIGN(8) fsync_cache
 {
     enum fsync_type type;
     unsigned int shm_idx;
