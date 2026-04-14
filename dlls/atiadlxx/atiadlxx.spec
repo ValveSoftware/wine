@@ -20,7 +20,7 @@
 @ cdecl ADL2_Adapter_AdapterInfoX2_Get(ptr ptr)
 @ stub ADL2_Adapter_AdapterInfoX3_Get
 @ stub ADL2_Adapter_AdapterInfoX4_Get
-@ stub ADL2_Adapter_AdapterInfo_Get
+@ cdecl ADL2_Adapter_AdapterInfo_Get(ptr ptr long)
 @ stub ADL2_Adapter_AdapterList_Disable
 @ stub ADL2_Adapter_AdapterLocationPath_Get
 @ stub ADL2_Adapter_Aspects_Get
