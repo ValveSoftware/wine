@@ -2455,14 +2455,15 @@ static void SETUPDI_EnumerateInterfaces(HDEVINFO DeviceInfoSet,
 static BOOL is_device_instance_linked(HKEY subKey, HKEY interfacesKey, const WCHAR *deviceInstance)
 {
     LONG l;
-    DWORD class_idx = 0, device_idx, len, type;
-    HKEY class_key, device_key, link_key;
-    WCHAR class_keyname[40], device_keyname[MAX_DEVICE_ID_LEN];
+    DWORD class_idx = 0, device_idx, refstr_idx, len, type;
+    HKEY class_key, device_key, refstr_key;
+    WCHAR class_keyname[40], device_keyname[MAX_DEVICE_ID_LEN], refstr_keyname[MAX_DEVICE_ID_LEN];
     WCHAR interface_devinstance[MAX_DEVICE_ID_LEN];
     WCHAR alt_devinstance[MAX_DEVICE_ID_LEN];
     WCHAR service[40];
 
-    l = RegQueryValueExW(subKey, L"Service", NULL, &type, (BYTE *)service, &len);
+    len = sizeof(service);
+    l = RegGetValueW(subKey, NULL, L"Service", RRF_RT_REG_SZ, &type, (BYTE *)service, &len);
     if (!l && type == REG_SZ && !wcsicmp(service, L"winehid") && !wcsstr(deviceInstance, L"HID\\"))
     {
         const WCHAR *tmp = wcschr(deviceInstance, L'\\');
@@ -2497,8 +2498,8 @@ static BOOL is_device_instance_linked(HKEY subKey, HKEY interfacesKey, const WCH
             if (l)
                 continue;
 
-            len = ARRAY_SIZE(interface_devinstance);
-            l = RegQueryValueExW(device_key, L"DeviceInstance", NULL, &type, (BYTE *)interface_devinstance, &len);
+            len = sizeof(interface_devinstance);
+            l = RegGetValueW(device_key, NULL, L"DeviceInstance", RRF_RT_REG_SZ, &type, (BYTE *)interface_devinstance, &len);
             if (l || type != REG_SZ)
             {
                 RegCloseKey(device_key);
@@ -2512,22 +2513,30 @@ static BOOL is_device_instance_linked(HKEY subKey, HKEY interfacesKey, const WCH
                 continue;
             }
 
-            l = RegOpenKeyExW(device_key, L"#", 0, KEY_READ, &link_key);
-            if (l)
+            /* return TRUE if any interface of the instance is linked */
+            refstr_idx = 0;
+            while (1)
             {
-                RegCloseKey(device_key);
-                continue;
+                len = ARRAY_SIZE(refstr_keyname);
+                l = RegEnumKeyExW(device_key, refstr_idx++, refstr_keyname, &len, NULL, NULL, NULL, NULL);
+                if (l)
+                    break;
+
+                l = RegOpenKeyExW(device_key, refstr_keyname, 0, KEY_READ, &refstr_key);
+                if (l)
+                    continue;
+
+                if (is_linked(refstr_key))
+                {
+                    RegCloseKey(refstr_key);
+                    RegCloseKey(device_key);
+                    RegCloseKey(class_key);
+                    return TRUE;
+                }
+
+                RegCloseKey(refstr_key);
             }
 
-            if (is_linked(link_key))
-            {
-                RegCloseKey(link_key);
-                RegCloseKey(device_key);
-                RegCloseKey(class_key);
-                return TRUE;
-            }
-
-            RegCloseKey(link_key);
             RegCloseKey(device_key);
         }
 
