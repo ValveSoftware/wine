@@ -776,7 +776,12 @@ static const WCHAR *get_cpu_dll_name(void)
     if (!NtQueryValueKey( key, &nameW, KeyValuePartialInformation, buffer, size, &size ) && info->Type == REG_SZ)
     {
         ((WCHAR *)info->Data)[info->DataLength / sizeof(WCHAR)] = 0;
-        ret = (WCHAR *)info->Data;
+        if ((native_machine == IMAGE_FILE_MACHINE_AMD64 && (!wcscmp( (WCHAR *)info->Data, L"libwow64fex.dll")
+                                                            || !wcscmp( (WCHAR *)info->Data, L"xtajit64.dll")))
+            || (native_machine == IMAGE_FILE_MACHINE_ARM64 && !wcscmp( (WCHAR *)info->Data, L"wow64cpu.dll")))
+            ERR( "cpu dll is wrong for native_machine %#x, using default.\n", native_machine );
+        else
+            ret = (WCHAR *)info->Data;
     }
     NtClose( key );
     return ret;
