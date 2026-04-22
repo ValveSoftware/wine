@@ -6312,8 +6312,8 @@ static void test_joystick_instance_guid( DWORD version )
 
         winetest_push_context( "device %d", i );
 
-        todo_wine ok( IsEqualGUID( &expect_instances[expected_joystick - 1], &instances[i] ),
-                      "Unexpected instance %s.\n", debugstr_guid( &instances[i] ) );
+        ok( IsEqualGUID( &expect_instances[expected_joystick - 1], &instances[i] ),
+           "Unexpected instance %s.\n", debugstr_guid( &instances[i] ) );
         hr = dinput_create_device( &di, &instances[i], &device );
         ok( hr == DI_OK, "Unexpected hr %#lx.\n", hr );
 
@@ -6336,8 +6336,8 @@ static void test_joystick_instance_guid( DWORD version )
 
         winetest_push_context( "device %d", i );
 
-        todo_wine ok( IsEqualGUID( &expect_instances[expected_joystick - 1], &instances[i] ),
-                      "Unexpected instance %s.\n", debugstr_guid( &instances[i] ) );
+        ok( IsEqualGUID( &expect_instances[expected_joystick - 1], &instances[i] ),
+           "Unexpected instance %s.\n", debugstr_guid( &instances[i] ) );
         hr = dinput_create_device( &di, &instances[i], &device );
         ok( hr == DI_OK, "Unexpected hr %#lx.\n", hr );
 
@@ -6357,7 +6357,6 @@ static void test_joystick_instance_guid( DWORD version )
     {
         winetest_push_context( "device %d", i );
 
-        todo_wine_if( !(i & 0x1) )
         ok( IsEqualGUID( &expect_instances[i], &instances[i] ),
             "Unexpected guidInstance %s.\n", debugstr_guid( &instances[i] ) );
 
@@ -6398,17 +6397,13 @@ static void test_joystick_instance_guid( DWORD version )
         hid_device_start( &descs[i], 1 );
 
         hr = dinput_create_device( &di, &expect_instances[i], &device );
-        todo_wine ok( hr == DI_OK, "Unexpected hr %#lx.\n", hr );
-        if (SUCCEEDED(hr))
-        {
-            check_device_hid_serial( device, descs[i].serial_str );
-            IDirectInputDevice8_Release( device );
-        }
+        ok( hr == DI_OK, "Unexpected hr %#lx.\n", hr );
+        check_device_hid_serial( device, descs[i].serial_str );
+        IDirectInputDevice8_Release( device );
         hid_device_stop( &descs[i], 1 );
 
         hr = dinput_create_device( &di, &expect_instances[i], &device );
-        todo_wine ok( hr == E_FAIL, "Unexpected hr %#lx.\n", hr );
-        if (SUCCEEDED(hr)) IDirectInputDevice8_Release( device );
+        ok( hr == E_FAIL, "Unexpected hr %#lx.\n", hr );
 
         hid_device_start( &descs[i], 1 );
         winetest_pop_context();
@@ -6435,17 +6430,13 @@ static void test_joystick_instance_guid( DWORD version )
     hid_device_start( &descs[0], 1 );
 
     hr = dinput_create_device( &di, &expect_instances[0], &device );
-    todo_wine ok( hr == DI_OK, "Unexpected hr %#lx.\n", hr );
-    if (SUCCEEDED(hr))
-    {
-        check_device_hid_serial( device, descs[0].serial_str );
-        IDirectInputDevice8_Release( device );
-    }
+    ok( hr == DI_OK, "Unexpected hr %#lx.\n", hr );
+    check_device_hid_serial( device, descs[0].serial_str );
+    IDirectInputDevice8_Release( device );
     hid_device_stop( &descs[0], 1 );
 
     hr = dinput_create_device( &di, &expect_instances[0], &device );
-    todo_wine ok( hr == E_FAIL, "Unexpected hr %#lx.\n", hr );
-    if (SUCCEEDED(hr)) IDirectInputDevice8_Release( device );
+    ok( hr == E_FAIL, "Unexpected hr %#lx.\n", hr );
 
 
     /* Start device 1. */
@@ -6456,8 +6447,7 @@ static void test_joystick_instance_guid( DWORD version )
      * with device 0.
      */
     hr = dinput_create_device( &di, &expect_instances[0], &device );
-    todo_wine ok( hr == E_FAIL, "Unexpected hr %#lx.\n", hr );
-    if (SUCCEEDED(hr)) IDirectInputDevice8_Release( device );
+    ok( hr == E_FAIL, "Unexpected hr %#lx.\n", hr );
 
     /*
      * expect_instances[1] is not currently associated with a device, which
@@ -6469,12 +6459,9 @@ static void test_joystick_instance_guid( DWORD version )
     ok( hr == DIERR_DEVICENOTREG, "Unexpected hr %#lx.\n", hr );
 
     hr = dinput_create_device( &di, &expect_instances[0], &device );
-    todo_wine ok( hr == DI_OK, "Unexpected hr %#lx.\n", hr );
-    if (SUCCEEDED(hr))
-    {
-        check_device_hid_serial( device, descs[1].serial_str );
-        IDirectInputDevice8_Release( device );
-    }
+    ok( hr == DI_OK, "Unexpected hr %#lx.\n", hr );
+    check_device_hid_serial( device, descs[1].serial_str );
+    IDirectInputDevice8_Release( device );
     hid_device_stop( &descs[1], 1 );
 
 
