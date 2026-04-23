@@ -1650,7 +1650,14 @@ static HRESULT ddraw_surface_blt_clipped(struct ddraw_surface *dst_surface, cons
         SetRectEmpty(&src_rect);
     }
 
-    if (!dst_surface->clipper)
+    if (dst_surface->clipper && !ddraw_clipper_is_valid(dst_surface->clipper))
+    {
+        FIXME("Attempting to blit with an invalid clipper.\n");
+        return DDERR_INVALIDPARAMS;
+    }
+
+    if (!dst_surface->clipper || (dst_surface->ddraw->cooperative_level & DDSCL_EXCLUSIVE
+            && dst_surface->clipper->window))
     {
         if (src_surface && src_surface->surface_desc.ddsCaps.dwCaps & DDSCAPS_PRIMARYSURFACE)
             hr = ddraw_surface_update_frontbuffer(src_surface, &src_rect, TRUE, 0);
@@ -1660,12 +1667,6 @@ static HRESULT ddraw_surface_blt_clipped(struct ddraw_surface *dst_surface, cons
             hr = ddraw_surface_update_frontbuffer(dst_surface, &dst_rect, FALSE, 0);
 
         return hr;
-    }
-
-    if (!ddraw_clipper_is_valid(dst_surface->clipper))
-    {
-        FIXME("Attempting to blit with an invalid clipper.\n");
-        return DDERR_INVALIDPARAMS;
     }
 
     scale_x = (float)(src_rect.right - src_rect.left) / (float)(dst_rect.right - dst_rect.left);
@@ -4647,9 +4648,8 @@ static HRESULT WINAPI ddraw_surface7_SetClipper(IDirectDrawSurface7 *iface,
     if ((This->surface_desc.ddsCaps.dwCaps & DDSCAPS_PRIMARYSURFACE) && This->ddraw->wined3d_swapchain)
     {
         clipWindow = NULL;
-        if(clipper) {
+        if (clipper && !(This->ddraw->cooperative_level & DDSCL_EXCLUSIVE))
             IDirectDrawClipper_GetHWnd(iclipper, &clipWindow);
-        }
 
         if (clipWindow)
         {

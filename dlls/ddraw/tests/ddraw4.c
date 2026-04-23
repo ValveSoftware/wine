@@ -20562,9 +20562,9 @@ static void check_surface_clipper(IDirectDrawSurface4 *surface, IDirectDrawClipp
     ok(hr == DD_OK, "got %#lx.\n", hr);
 
     c = get_surface_color(surface, window_rect->left + 1, window_rect->top + 1);
-    todo_wine_if(!(style & WS_VISIBLE)) ok(c == 0x0000ff00, "got %#x.\n", c);
+    ok(c == 0x0000ff00, "got %#x.\n", c);
     c = get_surface_color(surface, 0, 0);
-    todo_wine_if((style & (WS_CHILD | WS_VISIBLE)) != (WS_CHILD | WS_VISIBLE)) ok(c == 0x0000ff00, "got %#x.\n", c);
+    ok(c == 0x0000ff00, "got %#x.\n", c);
 
     hr = IDirectDrawSurface4_SetClipper(surface, NULL);
     ok(hr == DD_OK, "got %#lx.\n", hr);
