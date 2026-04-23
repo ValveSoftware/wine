@@ -1729,6 +1729,9 @@ static HRESULT media_engine_set_source(struct media_engine *engine, IMFByteStrea
 
     if (url || bytestream)
     {
+        if (SUCCEEDED(hr))
+            media_engine_set_flag(engine, FLAGS_ENGINE_SOURCE_PENDING, TRUE);
+
         if (engine->extension)
             FIXME("Use extension to load from.\n");
 
@@ -1744,8 +1747,6 @@ static HRESULT media_engine_set_source(struct media_engine *engine, IMFByteStrea
         else
             hr = IMFSourceResolver_BeginCreateObjectFromURL(engine->resolver, url, flags, props, NULL,
                     &engine->load_handler, NULL);
-        if (SUCCEEDED(hr))
-            media_engine_set_flag(engine, FLAGS_ENGINE_SOURCE_PENDING, TRUE);
 
         if (props)
             IPropertyStore_Release(props);
