@@ -279,9 +279,21 @@ static ID3D11Device *create_d3d11_device(void)
     return NULL;
 }
 
-static HRESULT create_media_engine(IMFMediaEngineNotify *callback, IMFDXGIDeviceManager *manager, UINT32 output_format,
-        REFIID riid, void **obj)
+struct test_extension
 {
+    IMFMediaEngineExtension IMFMediaEngineExtension_iface;
+    LONG refcount;
+    IMFMediaEngine *media_engine;
+    IMFSourceResolver *resolver;
+    BOOL have_bytestream;
+};
+
+static struct test_extension *create_extension(void);
+
+static HRESULT create_media_engine(IMFMediaEngineNotify *callback, IMFDXGIDeviceManager *manager, BOOL add_extension,
+        UINT32 output_format, REFIID riid, void **obj)
+{
+    struct test_extension *extension = NULL;
     IMFMediaEngine *media_engine;
     IMFAttributes *attributes;
     HRESULT hr;
@@ -300,8 +312,22 @@ static HRESULT create_media_engine(IMFMediaEngineNotify *callback, IMFDXGIDevice
     hr = IMFAttributes_SetUINT32(attributes, &MF_MEDIA_ENGINE_VIDEO_OUTPUT_FORMAT, output_format);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
+    if (add_extension)
+    {
+        extension = create_extension();
+        ok(!!extension, "Failed to create an extension.\n");
+        hr = IMFAttributes_SetUnknown(attributes, &MF_MEDIA_ENGINE_EXTENSION, (IUnknown *)&extension->IMFMediaEngineExtension_iface);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    }
+
     hr = IMFMediaEngineClassFactory_CreateInstance(factory, 0, attributes, &media_engine);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    if (extension)
+    {
+        extension->media_engine = media_engine;
+        IMFMediaEngineExtension_Release(&extension->IMFMediaEngineExtension_iface);
+    }
 
     IMFAttributes_Release(attributes);
 
@@ -455,7 +481,7 @@ static void test_CreateInstance(void)
     IMFMediaEngineNotify_Release(&notify->IMFMediaEngineNotify_iface);
 }
 
-static void test_Shutdown(void)
+static void test_Shutdown(BOOL add_extension)
 {
     MF_MEDIA_ENGINE_CANPLAY can_play_state;
     struct media_engine_notify *notify;
@@ -473,7 +499,7 @@ static void test_Shutdown(void)
 
     notify = create_callback();
 
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_UNKNOWN,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, add_extension, DXGI_FORMAT_UNKNOWN,
             &IID_IMFMediaEngine, (void **)&media_engine);
     ok(hr == S_OK, "Failed to shut down, hr %#lx.\n", hr);
 
@@ -650,7 +676,7 @@ static void test_Shutdown(void)
     IMFMediaEngineNotify_Release(&notify->IMFMediaEngineNotify_iface);
 }
 
-static void test_Play(void)
+static void test_Play(BOOL add_extension)
 {
     struct media_engine_notify *notify;
     IMFMediaTimeRange *range, *range1;
@@ -662,7 +688,7 @@ static void test_Play(void)
 
     notify = create_callback();
 
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_UNKNOWN,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, add_extension, DXGI_FORMAT_UNKNOWN,
             &IID_IMFMediaEngine, (void **)&media_engine);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
@@ -713,7 +739,7 @@ static void test_Play(void)
     IMFMediaEngine_Release(media_engine);
 
     /* Play -> Pause */
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_UNKNOWN,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, add_extension, DXGI_FORMAT_UNKNOWN,
             &IID_IMFMediaEngine, (void **)&media_engine);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
@@ -733,7 +759,7 @@ static void test_Play(void)
     IMFMediaEngineNotify_Release(&notify->IMFMediaEngineNotify_iface);
 }
 
-static void test_playback_rate(void)
+static void test_playback_rate(BOOL add_extension)
 {
     struct media_engine_notify *notify;
     IMFMediaEngine *media_engine;
@@ -742,7 +768,7 @@ static void test_playback_rate(void)
 
     notify = create_callback();
 
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_UNKNOWN,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, add_extension, DXGI_FORMAT_UNKNOWN,
             &IID_IMFMediaEngine, (void **)&media_engine);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
@@ -864,7 +890,7 @@ cleanup:
     IMMDeviceEnumerator_Release(mme);
 }
 
-static void test_mute(void)
+static void test_mute(BOOL add_extension)
 {
     struct media_engine_notify *notify;
     IMFMediaEngine *media_engine;
@@ -874,7 +900,7 @@ static void test_mute(void)
 
     notify = create_callback();
 
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_UNKNOWN,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, add_extension, DXGI_FORMAT_UNKNOWN,
             &IID_IMFMediaEngine, (void **)&media_engine);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
@@ -917,7 +943,7 @@ static void test_mute(void)
     IMFMediaEngineNotify_Release(&notify->IMFMediaEngineNotify_iface);
 }
 
-static void test_error(void)
+static void test_error(BOOL add_extension)
 {
     struct media_engine_notify *notify;
     IMFMediaEngine *media_engine;
@@ -927,7 +953,7 @@ static void test_error(void)
 
     notify = create_callback();
 
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_UNKNOWN,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, add_extension, DXGI_FORMAT_UNKNOWN,
             &IID_IMFMediaEngine, (void **)&media_engine);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
@@ -1191,7 +1217,7 @@ static void test_SetSourceFromByteStream(void)
 
     notify = create_callback();
 
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_UNKNOWN,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, FALSE, DXGI_FORMAT_UNKNOWN,
             &IID_IMFMediaEngineEx, (void **)&media_engine);
     if (FAILED(hr))
     {
@@ -1227,7 +1253,7 @@ static void test_SetSourceFromByteStream(void)
     IMFMediaEngineNotify_Release(&notify->IMFMediaEngineNotify_iface);
 }
 
-static void test_audio_configuration(void)
+static void test_audio_configuration(BOOL add_extension)
 {
     struct media_engine_notify *notify;
     IMFMediaEngineEx *media_engine;
@@ -1236,7 +1262,7 @@ static void test_audio_configuration(void)
 
     notify = create_callback();
 
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_UNKNOWN,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, add_extension, DXGI_FORMAT_UNKNOWN,
             &IID_IMFMediaEngineEx, (void **)&media_engine);
     if (FAILED(hr))
     {
@@ -1399,7 +1425,7 @@ static struct test_transfer_notify *create_transfer_notify(void)
     return object;
 }
 
-static void test_TransferVideoFrame(void)
+static void test_TransferVideoFrame(BOOL add_extension)
 {
     struct test_transfer_notify *notify;
     ID3D11Texture2D *texture = NULL, *rb_texture;
@@ -1434,7 +1460,7 @@ static void test_TransferVideoFrame(void)
     hr = IMFDXGIDeviceManager_ResetDevice(manager, (IUnknown *)device, token);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
-    create_media_engine(&notify->IMFMediaEngineNotify_iface, manager, DXGI_FORMAT_B8G8R8X8_UNORM,
+    create_media_engine(&notify->IMFMediaEngineNotify_iface, manager, add_extension, DXGI_FORMAT_B8G8R8X8_UNORM,
             &IID_IMFMediaEngineEx, (void **)&media_engine);
 
     IMFDXGIDeviceManager_Release(manager);
@@ -1518,7 +1544,7 @@ static void test_TransferVideoFrame(void)
     hr = IMFMediaEngineEx_SetVolume(media_engine, 0.5);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
-    test_audio_session(FALSE);
+    test_audio_session(add_extension);
 
     ID3D11DeviceContext_Release(context);
     ID3D11Texture2D_Release(rb_texture);
@@ -1546,7 +1572,7 @@ done:
     IMFMediaEngineNotify_Release(&notify->IMFMediaEngineNotify_iface);
 }
 
-static void test_TransferVideoFrame_wic(void)
+static void test_TransferVideoFrame_wic(BOOL add_extension)
 {
     struct test_transfer_notify *notify;
     UINT lock_buffer_size, lock_buffer_stride;
@@ -1567,7 +1593,7 @@ static void test_TransferVideoFrame_wic(void)
 
     notify = create_transfer_notify();
 
-    create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_B8G8R8X8_UNORM,
+    create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, add_extension, DXGI_FORMAT_B8G8R8X8_UNORM,
             &IID_IMFMediaEngineEx, (void **)&media_engine);
 
     if (!(notify->media_engine = media_engine))
@@ -1981,7 +2007,7 @@ static HRESULT WINAPI test_transform_create(UINT input_count, IMFMediaType **inp
     return S_OK;
 }
 
-static void test_effect(void)
+static void test_effect(BOOL add_extension)
 {
     IMFTransform *video_effect = NULL, *video_effect2 = NULL, *audio_effect = NULL, *audio_effect2 = NULL;
     IMFMediaType *video_i420, *video_rgb32, *audio_pcm;
@@ -2050,7 +2076,7 @@ static void test_effect(void)
     hr = IMFDXGIDeviceManager_ResetDevice(manager, (IUnknown *)device, token);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
-    create_media_engine(&notify->IMFMediaEngineNotify_iface, manager, DXGI_FORMAT_B8G8R8X8_UNORM,
+    create_media_engine(&notify->IMFMediaEngineNotify_iface, manager, add_extension, DXGI_FORMAT_B8G8R8X8_UNORM,
             &IID_IMFMediaEngineEx, (void **)&media_engine);
     IMFDXGIDeviceManager_Release(manager);
     notify->media_engine = media_engine;
@@ -2166,7 +2192,7 @@ done:
     IMFMediaEngineNotify_Release(&notify->IMFMediaEngineNotify_iface);
 }
 
-static void test_GetDuration(void)
+static void test_GetDuration(BOOL add_extension)
 {
     static const double allowed_error = 0.000001;
     struct test_transfer_notify *notify;
@@ -2178,7 +2204,7 @@ static void test_GetDuration(void)
     BSTR url;
 
     notify = create_transfer_notify();
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_B8G8R8X8_UNORM,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, add_extension, DXGI_FORMAT_B8G8R8X8_UNORM,
             &IID_IMFMediaEngineEx, (void **)&media_engine);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     notify->media_engine = media_engine;
@@ -2516,7 +2542,7 @@ static struct test_seek_notify *create_seek_notify(void)
     return object;
 }
 
-static void test_GetSeekable(void)
+static void test_GetSeekable(BOOL add_extension)
 {
     IMFByteStream *stream, *unseekable_stream = NULL;
     struct test_seek_notify *notify;
@@ -2530,7 +2556,7 @@ static void test_GetSeekable(void)
     BSTR url;
 
     notify = create_seek_notify();
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_B8G8R8X8_UNORM,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, add_extension, DXGI_FORMAT_B8G8R8X8_UNORM,
             &IID_IMFMediaEngineEx, (void **)&media_engine);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     IMFMediaEngineNotify_Release(&notify->IMFMediaEngineNotify_iface);
@@ -2593,7 +2619,7 @@ static void test_GetSeekable(void)
 
     /* Unseekable bytestreams */
     notify = create_seek_notify();
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_B8G8R8X8_UNORM,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, add_extension, DXGI_FORMAT_B8G8R8X8_UNORM,
             &IID_IMFMediaEngineEx, (void **)&media_engine);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     IMFMediaEngineNotify_Release(&notify->IMFMediaEngineNotify_iface);
@@ -2626,12 +2652,6 @@ done:
     IMFByteStream_Release(stream);
 }
 
-struct test_extension
-{
-    IMFMediaEngineExtension IMFMediaEngineExtension_iface;
-    LONG refcount;
-};
-
 static struct test_extension *impl_from_IMFMediaEngineExtension(IMFMediaEngineExtension *iface)
 {
     return CONTAINING_RECORD(iface, struct test_extension, IMFMediaEngineExtension_iface);
@@ -2663,7 +2683,10 @@ static ULONG WINAPI test_extension_Release(IMFMediaEngineExtension *iface)
     ULONG refcount = InterlockedDecrement(&extension->refcount);
 
     if (!refcount)
+    {
+        IMFSourceResolver_Release(extension->resolver);
         free(extension);
+    }
 
     return refcount;
 }
@@ -2671,14 +2694,28 @@ static ULONG WINAPI test_extension_Release(IMFMediaEngineExtension *iface)
 static HRESULT WINAPI test_extension_CanPlayType(IMFMediaEngineExtension *iface,
         BOOL audio_only, BSTR mime_type, MF_MEDIA_ENGINE_CANPLAY *answer)
 {
-    return 0x80001234;
+    struct test_extension *extension = impl_from_IMFMediaEngineExtension(iface);
+    return extension->media_engine ? IMFMediaEngine_CanPlayType(extension->media_engine, mime_type, answer) : 0x80001234;
 }
 
 static HRESULT WINAPI test_extension_BeginCreateObject(IMFMediaEngineExtension *iface,
         BSTR url, IMFByteStream *bytestream, MF_OBJECT_TYPE type, IUnknown **cancel_cookie,
         IMFAsyncCallback *callback, IUnknown *state)
 {
-    return E_NOTIMPL;
+    struct test_extension *extension = impl_from_IMFMediaEngineExtension(iface);
+    DWORD flags;
+
+    flags = type == MF_OBJECT_BYTESTREAM ? MF_RESOLUTION_BYTESTREAM : MF_RESOLUTION_MEDIASOURCE;
+    flags |= MF_RESOLUTION_CONTENT_DOES_NOT_HAVE_TO_MATCH_EXTENSION_OR_MIME_TYPE;
+
+    if (bytestream)
+    {
+        extension->have_bytestream = TRUE;
+        return IMFSourceResolver_BeginCreateObjectFromByteStream(extension->resolver, bytestream, url, flags,
+                NULL, NULL, callback, state);
+    }
+    else
+        return IMFSourceResolver_BeginCreateObjectFromURL(extension->resolver, url, flags, NULL, NULL, callback, NULL);
 }
 
 static HRESULT WINAPI test_extension_CancelObjectCreation(IMFMediaEngineExtension *iface,
@@ -2690,7 +2727,13 @@ static HRESULT WINAPI test_extension_CancelObjectCreation(IMFMediaEngineExtensio
 static HRESULT WINAPI test_extension_EndCreateObject(IMFMediaEngineExtension *iface, IMFAsyncResult *result,
         IUnknown **object)
 {
-    return E_NOTIMPL;
+    struct test_extension *extension = impl_from_IMFMediaEngineExtension(iface);
+    MF_OBJECT_TYPE obj_type;
+
+    if (extension->have_bytestream)
+        return IMFSourceResolver_EndCreateObjectFromByteStream(extension->resolver, result, &obj_type, object);
+    else
+        return IMFSourceResolver_EndCreateObjectFromURL(extension->resolver, result, &obj_type, object);
 }
 
 static const IMFMediaEngineExtensionVtbl test_extension_vtbl =
@@ -2707,11 +2750,15 @@ static const IMFMediaEngineExtensionVtbl test_extension_vtbl =
 static struct test_extension *create_extension(void)
 {
     struct test_extension *object;
+    HRESULT hr;
 
     object = calloc(1, sizeof(*object));
 
     object->IMFMediaEngineExtension_iface.lpVtbl = &test_extension_vtbl;
     object->refcount = 1;
+
+    hr = MFCreateSourceResolver(&object->resolver);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
     return object;
 }
@@ -2793,7 +2840,7 @@ static void test_SetCurrentTime(void)
     BSTR url;
 
     notify = create_seek_notify();
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_B8G8R8X8_UNORM,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, FALSE, DXGI_FORMAT_B8G8R8X8_UNORM,
             &IID_IMFMediaEngineEx, (void **)&media_engine);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     IMFMediaEngineNotify_Release(&notify->IMFMediaEngineNotify_iface);
@@ -2892,7 +2939,7 @@ static void test_SetCurrentTime(void)
 
     /* Unseekable bytestreams */
     notify = create_seek_notify();
-    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, DXGI_FORMAT_B8G8R8X8_UNORM,
+    hr = create_media_engine(&notify->IMFMediaEngineNotify_iface, NULL, FALSE, DXGI_FORMAT_B8G8R8X8_UNORM,
             &IID_IMFMediaEngineEx, (void **)&media_engine);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     IMFMediaEngineNotify_Release(&notify->IMFMediaEngineNotify_iface);
@@ -2954,19 +3001,30 @@ START_TEST(mfmediaengine)
 
     test_factory();
     test_CreateInstance();
-    test_Shutdown();
-    test_Play();
-    test_playback_rate();
-    test_mute();
-    test_error();
+    test_Shutdown(FALSE);
+    test_Shutdown(TRUE);
+    test_Play(FALSE);
+    test_Play(TRUE);
+    test_playback_rate(FALSE);
+    test_playback_rate(TRUE);
+    test_mute(FALSE);
+    test_mute(TRUE);
+    test_error(FALSE);
+    test_error(TRUE);
     test_time_range();
     test_SetSourceFromByteStream();
-    test_audio_configuration();
-    test_TransferVideoFrame();
-    test_TransferVideoFrame_wic();
-    test_effect();
-    test_GetDuration();
-    test_GetSeekable();
+    test_audio_configuration(FALSE);
+    test_audio_configuration(TRUE);
+    test_TransferVideoFrame(FALSE);
+    test_TransferVideoFrame(TRUE);
+    test_TransferVideoFrame_wic(FALSE);
+    test_TransferVideoFrame_wic(TRUE);
+    test_effect(FALSE);
+    test_effect(TRUE);
+    test_GetDuration(FALSE);
+    test_GetDuration(TRUE);
+    test_GetSeekable(FALSE);
+    test_GetSeekable(TRUE);
     test_media_extension();
     test_SetCurrentTime();
 
