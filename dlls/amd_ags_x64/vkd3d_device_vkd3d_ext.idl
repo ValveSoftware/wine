@@ -1,0 +1,193 @@
+/*
+ * * Copyright 2021 NVIDIA Corporation
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+import "d3d12.idl";
+import "vkd3d_vk_includes.h";
+
+[
+    uuid(11ea7a1a-0f6a-49bf-b612-3e30f8e201dd),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12DeviceExt : IUnknown
+{
+    HRESULT GetVulkanHandles(VkInstance *vk_instance, VkPhysicalDevice *vk_physical_device, VkDevice *vk_device);
+    BOOL GetExtensionSupport(D3D12_VK_EXTENSION extension);
+    HRESULT CreateCubinComputeShaderWithName(const void *cubin_data, UINT32 cubin_size, UINT32 block_x, UINT32 block_y, UINT32 block_z, const char *shader_name, D3D12_CUBIN_DATA_HANDLE **handle);
+    HRESULT DestroyCubinComputeShader(D3D12_CUBIN_DATA_HANDLE *handle);
+    HRESULT GetCudaTextureObject(D3D12_CPU_DESCRIPTOR_HANDLE srv_handle, D3D12_CPU_DESCRIPTOR_HANDLE sampler_handle, UINT32 *cuda_texture_handle);
+    HRESULT GetCudaSurfaceObject(D3D12_CPU_DESCRIPTOR_HANDLE uav_handle, UINT32 *cuda_surface_handle);
+    HRESULT CaptureUAVInfo(D3D12_UAV_INFO *uav_info);
+}
+
+[
+    uuid(39da4e09-bd1c-4198-9fae-86bbe3be41fd),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12DXVKInteropDevice : IUnknown
+{
+    HRESULT GetDXGIAdapter(REFIID iid, void **object);
+    HRESULT GetInstanceExtensions(UINT *extension_count, const char **extensions);
+    HRESULT GetDeviceExtensions(UINT *extension_count, const char **extensions);
+    HRESULT GetDeviceFeatures(const VkPhysicalDeviceFeatures2 **features);
+    HRESULT GetVulkanHandles(VkInstance *vk_instance, VkPhysicalDevice *vk_physical_device, VkDevice *vk_device);
+    HRESULT GetVulkanQueueInfo(ID3D12CommandQueue *queue, VkQueue *vk_queue, UINT32 *vk_queue_family);
+    void GetVulkanImageLayout(ID3D12Resource *resource, D3D12_RESOURCE_STATES state, VkImageLayout *vk_layout);
+    HRESULT GetVulkanResourceInfo(ID3D12Resource *resource, UINT64 *vk_handle, UINT64 *buffer_offset);
+    HRESULT LockCommandQueue(ID3D12CommandQueue *queue);
+    HRESULT UnlockCommandQueue(ID3D12CommandQueue *queue);
+}
+
+[
+    uuid(902d8115-59eb-4406-9518-fe00f991ee65),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12DXVKInteropDevice1 : ID3D12DXVKInteropDevice
+{
+    HRESULT GetVulkanResourceInfo1(ID3D12Resource *resource, UINT64 *vk_handle, UINT64 *buffer_offset, VkFormat *format);
+    HRESULT CreateInteropCommandQueue(const D3D12_COMMAND_QUEUE_DESC *pDesc, UINT32 vk_queue_family_index, ID3D12CommandQueue **ppQueue);
+    HRESULT CreateInteropCommandAllocator(D3D12_COMMAND_LIST_TYPE type, UINT32 vk_queue_family_index, ID3D12CommandAllocator **ppAllocator);
+    HRESULT BeginVkCommandBufferInterop(ID3D12CommandList *pCmdList, VkCommandBuffer *pCommandBuffer);
+    HRESULT EndVkCommandBufferInterop(ID3D12CommandList *pCmdList);
+}
+
+[
+    uuid(90ecf26e-b212-43f5-b62a-825ad7b1385e),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12DXVKInteropDevice2 : ID3D12DXVKInteropDevice1
+{
+    /* Unlike LockCommandQueue this doesn't drain or lock d3d12 queue but only locks the access to the underlying
+     * Vulkan queue so it can be used outside of d3d12. */
+    HRESULT LockVulkanQueue(ID3D12CommandQueue *queue);
+    HRESULT UnlockVulkanQueue(ID3D12CommandQueue *queue);
+}
+
+[
+    uuid(22a70184-a6a4-4c24-bf97-7d6df9f12d8a),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12DXVKInteropDevice3 : ID3D12DXVKInteropDevice2
+{
+    /* Returns VkDeviceMemory and memory offset corresponding to the D3D12 heap allocation.
+     * If the heap has no Vulkan backing allocation yet, this method fails. */
+    HRESULT GetVulkanHeapInfo(ID3D12Heap *heap, UINT64 *vk_memory, UINT64 *heap_offset,
+            UINT32 *vk_memory_type);
+}
+
+[
+    uuid(f3112584-41f9-348d-a59b-00b7e1d285d6),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3DLowLatencyDevice : IUnknown
+{
+    BOOL SupportsLowLatency();
+    HRESULT LatencySleep();
+    HRESULT SetLatencySleepMode(BOOL low_latency_mode, BOOL low_latency_boost, UINT32 minimum_interval_us);
+    HRESULT SetLatencyMarker(UINT64 frameID, UINT32 markerType);
+    HRESULT GetLatencyInfo(D3D12_LATENCY_RESULTS *latency_results);
+}
+
+[
+    uuid(099a73fd-2199-4f45-bf48-0eb86f6fdb65),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12DeviceExt1 : ID3D12DeviceExt
+{
+    HRESULT CreateResourceFromBorrowedHandle(const D3D12_RESOURCE_DESC1 *desc, UINT64 vk_handle, ID3D12Resource **resource);
+    HRESULT GetVulkanQueueInfoEx(ID3D12CommandQueue *queue, VkQueue *vk_queue, UINT32 *vk_queue_index, UINT32 *vk_queue_flags, UINT32 *vk_queue_family);
+}
+
+[
+    uuid(e859c4ac-ba8f-41c4-8eac-1137fde6158d),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12DeviceExt2 : ID3D12DeviceExt1
+{
+    BOOL SupportsCubin64bit();
+    HRESULT CreateCubinComputeShaderExV2(D3D12_CREATE_CUBIN_SHADER_PARAMS *params);
+    HRESULT GetCudaMergedTextureSamplerObject(D3D12_GET_CUDA_MERGED_TEXTURE_SAMPLER_OBJECT_PARAMS *params);
+    HRESULT GetCudaIndependentDescriptorObject(D3D12_GET_CUDA_INDEPENDENT_DESCRIPTOR_OBJECT_PARAMS *params);
+}
+
+[
+    uuid(3aefa75c-c9f3-4b7f-a180-5df695d083bf),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12DeviceExt3 : ID3D12DeviceExt2
+{
+    BOOL SupportsAGSExtension(D3D12_AGS_EXTENSION agsExtension);
+    HRESULT SetAGSUAVSlot(UINT uavSlot);
+}
+
+/* 1:1 implementation of ffx_antilag2_dx12.h */
+struct AmdAntiLagAPIData_v1
+{
+    UINT uiSize;
+    UINT uiVersion;
+    UINT eMode;
+    const char *sControlStr;
+    UINT uiControlStrLength;
+    UINT maxFPS;
+};
+
+
+struct AmdAntiLagAPIData_v2
+{
+    UINT uiSize;
+    UINT uiVersion;
+    struct
+    {
+        UINT unused0               : 1;
+        UINT unused1               : 1;
+        UINT signalFgFrameType     : 1;
+        UINT isInterpolatedFrame   : 1;
+        UINT signalGetUserInputIdx : 1;
+        UINT signalEndOfFrameIdx   : 1;
+        UINT reserved              :26;
+    } flags;
+    UINT64 iiFrameIdx;
+    UINT64 uiiReserved[19];
+};
+
+[
+    uuid(44085fbe-e839-40c5-bf38-0ebc5ab4d0a6),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface IAmdExtAntiLagApi : IUnknown
+{
+    HRESULT UpdateAntiLagState(void *pData);
+}

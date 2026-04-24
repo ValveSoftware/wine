@@ -10,4 +10,5 @@ EXTRADLLFLAGS = -mno-cygwin
 SOURCES = \
 	amd_ags_x64_main.c \
 	unixlib.c \
-	dxvk_interfaces.idl
+	dxvk_interfaces.idl \
+	vkd3d_device_vkd3d_ext.idl
