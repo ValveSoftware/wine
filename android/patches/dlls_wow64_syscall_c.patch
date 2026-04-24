@@ -1,8 +1,16 @@
 diff --git a/dlls/wow64/syscall.c b/dlls/wow64/syscall.c
-index d2a977e..fddd3c6 100644
+index d2a977e..dde24d8 100644
 --- a/dlls/wow64/syscall.c
 +++ b/dlls/wow64/syscall.c
-@@ -726,6 +726,29 @@ static HMODULE load_64bit_module( const WCHAR *name )
+@@ -102,6 +102,7 @@ static void     (WINAPI *pBTCpuProcessInit)(void);
+ static NTSTATUS (WINAPI *pBTCpuSetContext)(HANDLE,HANDLE,void *,void *);
+ static void     (WINAPI *pBTCpuThreadInit)(void);
+ static void     (WINAPI *pBTCpuSimulate)(void) __attribute__((used));
++static NTSTATUS (WINAPI *pBTCpuSuspendLocalThread)(HANDLE,ULONG *);
+ static void *   (WINAPI *p__wine_get_unix_opcode)(void);
+ static void *   (WINAPI *pKiRaiseUserExceptionDispatcher)(void);
+ void     (WINAPI *pBTCpuFlushInstructionCache2)( const void *, SIZE_T ) = NULL;
+@@ -726,6 +727,29 @@ static HMODULE load_64bit_module( const WCHAR *name )
      return module;
  }
  
@@ -32,7 +40,7 @@ index d2a977e..fddd3c6 100644
  
  /**********************************************************************
   *           get_cpu_dll_name
-@@ -740,11 +763,17 @@ static const WCHAR *get_cpu_dll_name(void)
+@@ -740,11 +764,17 @@ static const WCHAR *get_cpu_dll_name(void)
      HANDLE key;
      ULONG size;
  
@@ -51,3 +59,23 @@ index d2a977e..fddd3c6 100644
          break;
      case IMAGE_FILE_MACHINE_ARMNT:
          RtlInitUnicodeString( &nameW, L"\\Registry\\Machine\\Software\\Microsoft\\Wow64\\arm" );
+@@ -839,6 +869,7 @@ static DWORD WINAPI process_init( RTL_RUN_ONCE *once, void *param, void **contex
+     GET_PTR( BTCpuProcessInit );
+     GET_PTR( BTCpuThreadInit );
+     GET_PTR( BTCpuResetToConsistentState );
++    GET_PTR( BTCpuSuspendLocalThread );
+     GET_PTR( BTCpuSetContext );
+     GET_PTR( BTCpuSimulate );
+     GET_PTR( BTCpuFlushInstructionCache2 );
+@@ -1525,3 +1556,11 @@ NTSTATUS WINAPI Wow64RaiseException( int code, EXCEPTION_RECORD *rec )
+ 
+     return STATUS_SUCCESS;
+ }
++
++/**********************************************************************
++ *            Wow64SuspendLocalThread (wow64.@)
++ */
++NTSTATUS WINAPI Wow64SuspendLocalThread( HANDLE thread, ULONG *count )
++{
++    return pBTCpuSuspendLocalThread( thread, count );
++}

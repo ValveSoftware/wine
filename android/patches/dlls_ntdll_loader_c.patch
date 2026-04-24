@@ -1,8 +1,20 @@
 diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
-index bc71fe0..ef39f34 100644
+index bc71fe0..b5d0539 100644
 --- a/dlls/ntdll/loader.c
 +++ b/dlls/ntdll/loader.c
-@@ -4429,7 +4429,7 @@ static void load_arm64ec_module(void)
+@@ -4089,6 +4089,11 @@ void WINAPI LdrShutdownThread(void)
+     /* don't do any detach calls if process is exiting */
+     if (process_detaching) return;
+ 
++    if (NtCurrentTeb()->SkipThreadAttach) {
++        heap_thread_detach();
++        return;
++    }
++
+     RtlProcessFlsData( NtCurrentTeb()->FlsSlots, 1 );
+ 
+     RtlEnterCriticalSection( &loader_section );
+@@ -4429,7 +4434,7 @@ static void load_arm64ec_module(void)
      ULONG buffer[16];
      KEY_VALUE_PARTIAL_INFORMATION *info = (KEY_VALUE_PARTIAL_INFORMATION *)buffer;
      UNICODE_STRING nameW = RTL_CONSTANT_STRING( L"\\Registry\\Machine\\Software\\Microsoft\\Wow64\\amd64" );
@@ -11,7 +23,7 @@ index bc71fe0..ef39f34 100644
      OBJECT_ATTRIBUTES attr;
      WINE_MODREF *wm;
      NTSTATUS status;
-@@ -4479,6 +4479,7 @@ static void build_wow64_main_module(void)
+@@ -4479,6 +4484,7 @@ static void build_wow64_main_module(void)
  static void (WINAPI *pWow64LdrpInitialize)( CONTEXT *ctx );
  
  void (WINAPI *pWow64PrepareForException)( EXCEPTION_RECORD *rec, CONTEXT *context ) = NULL;
@@ -19,7 +31,7 @@ index bc71fe0..ef39f34 100644
  
  static void init_wow64( CONTEXT *context )
  {
-@@ -4503,6 +4504,7 @@ static void init_wow64( CONTEXT *context )
+@@ -4503,6 +4509,7 @@ static void init_wow64( CONTEXT *context )
  
          GET_PTR( Wow64LdrpInitialize );
          GET_PTR( Wow64PrepareForException );
@@ -27,3 +39,26 @@ index bc71fe0..ef39f34 100644
  #undef GET_PTR
          imports_fixup_done = TRUE;
      }
+@@ -4598,6 +4605,8 @@ void loader_init( CONTEXT *context, void **entry )
+ 
+     if (process_detaching) NtTerminateThread( GetCurrentThread(), 0 );
+ 
++    if (NtCurrentTeb()->SkipLoaderInit) return;
++
+     RtlEnterCriticalSection( &loader_section );
+ 
+     if (!imports_fixup_done)
+@@ -4701,6 +4710,13 @@ void loader_init( CONTEXT *context, void **entry )
+ #ifdef __arm64ec__
+         arm64ec_thread_init();
+ #endif
++
++        if (NtCurrentTeb()->SkipThreadAttach)
++        {
++            RtlLeaveCriticalSection( &loader_section );
++            return;
++        }
++
+         wm = get_modref( NtCurrentTeb()->Peb->ImageBaseAddress );
+     }
+ 
