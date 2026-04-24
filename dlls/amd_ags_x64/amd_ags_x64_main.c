@@ -1402,10 +1402,17 @@ AGSReturnCode WINAPI agsDriverExtensionsDX12_CreateDevice(AGSContext *context,
         const AGSDX12DeviceCreationParams *creation_params, const AGSDX12ExtensionParams *extension_params,
         AGSDX12ReturnedParams *returned_params)
 {
+    const char *sgi;
     HRESULT hr;
 
     TRACE("feature level %#x, app %s, engine %s %#x %#x.\n", creation_params->FeatureLevel, debugstr_w(extension_params->pAppName),
             debugstr_w(extension_params->pEngineName), extension_params->appVersion, extension_params->engineVersion);
+
+    if ((sgi = getenv("SteamGameId")) && !strcmp(sgi, "3321460"))
+    {
+        FIXME("HACK: failing agsDriverExtensionsDX12_CreateDevice.\n");
+        return AGS_DX_FAILURE;
+    }
 
     if (!load_d3d12_functions())
     {
