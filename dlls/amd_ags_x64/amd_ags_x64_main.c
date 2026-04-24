@@ -24,6 +24,7 @@
 #include "dxgi1_6.h"
 
 #include "dxvk_interfaces.h"
+#include "vkd3d_device_vkd3d_ext.h"
 
 #include "amd_ags.h"
 
@@ -1402,17 +1403,15 @@ AGSReturnCode WINAPI agsDriverExtensionsDX12_CreateDevice(AGSContext *context,
         const AGSDX12DeviceCreationParams *creation_params, const AGSDX12ExtensionParams *extension_params,
         AGSDX12ReturnedParams *returned_params)
 {
+    ID3D12DeviceExt3 *ext;
     const char *sgi;
+    unsigned int i;
     HRESULT hr;
 
-    TRACE("feature level %#x, app %s, engine %s %#x %#x.\n", creation_params->FeatureLevel, debugstr_w(extension_params->pAppName),
-            debugstr_w(extension_params->pEngineName), extension_params->appVersion, extension_params->engineVersion);
-
-    if ((sgi = getenv("SteamGameId")) && !strcmp(sgi, "3321460"))
-    {
-        FIXME("HACK: failing agsDriverExtensionsDX12_CreateDevice.\n");
-        return AGS_DX_FAILURE;
-    }
+    TRACE("feature level %#x, app %s, engine %s %#x %#x, uavSlot %d.\n", creation_params->FeatureLevel,
+            debugstr_w(extension_params->pAppName), debugstr_w(extension_params->pEngineName),
+            extension_params->appVersion, extension_params->engineVersion,
+            extension_params->uavSlot);
 
     if (!load_d3d12_functions())
     {
@@ -1425,6 +1424,28 @@ AGSReturnCode WINAPI agsDriverExtensionsDX12_CreateDevice(AGSContext *context,
             &creation_params->iid, (void **)&returned_params->pDevice)))
     {
         ERR("D3D12CreateDevice failed, hr %#lx.\n", hr);
+        return AGS_DX_FAILURE;
+    }
+
+    if (SUCCEEDED(IUnknown_QueryInterface(returned_params->pDevice, &IID_ID3D12DeviceExt3, (void **)&ext)))
+    {
+        for (i = 0; i < 32; ++i)
+        {
+            if (ID3D12DeviceExt3_SupportsAGSExtension(ext, i))
+                returned_params->extensionsSupported |= 1u << i;
+        }
+        if (returned_params->extensionsSupported & (1 << D3D12_AGS_EXTENSION_UAV_BIND_SLOT)
+                && FAILED(ID3D12DeviceExt3_SetAGSUAVSlot(ext, extension_params->uavSlot)))
+            ERR("Setting UAV slot failed.\n");
+        ID3D12DeviceExt3_Release(ext);
+    }
+    TRACE("Supported extensions: %#x.\n", returned_params->extensionsSupported);
+
+    if (!(returned_params->extensionsSupported & (1 << D3D12_AGS_EXTENSION_INTRINSICS_19))
+            && (sgi = getenv("SteamGameId")) && !strcmp(sgi, "3321460"))
+    {
+        FIXME("HACK: failing agsDriverExtensionsDX12_CreateDevice.\n");
+        IUnknown_Release(returned_params->pDevice);
         return AGS_DX_FAILURE;
     }
 
