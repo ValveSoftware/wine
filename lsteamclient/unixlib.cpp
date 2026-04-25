@@ -9,6 +9,13 @@
 #include <unordered_map>
 #include <vector>
 
+#if defined(__ANDROID__)
+#include <android/log.h>
+#define LSTEAM_LOGCAT(...) __android_log_print(ANDROID_LOG_INFO, "lsteamclient.unix", __VA_ARGS__)
+#else
+#define LSTEAM_LOGCAT(...) ((void)0)
+#endif
+
 #if 0
 #pragma makedep unix
 #endif
@@ -683,6 +690,9 @@ static NTSTATUS steamclient_init_registry( Params *params, bool wow64 )
     int pipe, user, error;
 
     client = (u_ISteamClient_SteamClient017 *)p_CreateInterface( "SteamClient017", &error );
+    pipe = 0;
+    user = 0;
+
     if (!(pipe = client->CreateSteamPipe()) || !(user = client->ConnectToGlobalUser( pipe )))
     {
         ERR( "Failed to connect to Steam\n" );
@@ -749,11 +759,18 @@ static NTSTATUS steamclient_init( Params *params, bool wow64 )
     }
 #endif /* __APPLE__ */
 
+    LSTEAM_LOGCAT( "steamclient_init: about to dlopen path=\"%s\" pid=%d tid=%d",
+                   path, (int)getpid(), (int)gettid() );
+
     if (!(steamclient = dlopen( path, RTLD_NOW )))
     {
+        LSTEAM_LOGCAT( "steamclient_init: dlopen FAILED for \"%s\" (dlerror=%s)",
+                       path, dlerror() );
         ERR( "unable to load native steamclient library\n" );
         return -1;
     }
+
+    LSTEAM_LOGCAT( "steamclient_init: dlopen ok handle=%p path=\"%s\"", steamclient, path );
 
 #define LOAD_FUNC( x )                                         \
     if (!(p_##x = (decltype(p_##x))dlsym( steamclient, #x )))  \
@@ -769,6 +786,9 @@ static NTSTATUS steamclient_init( Params *params, bool wow64 )
     LOAD_FUNC( Steam_ReleaseThreadLocalMemory );
     LOAD_FUNC( Steam_IsKnownInterface );
     LOAD_FUNC( Steam_NotifyMissingInterface );
+
+    LSTEAM_LOGCAT( "steamclient_init: symbols resolved CreateInterface=%p Steam_BGetCallback=%p",
+                   (void *)p_CreateInterface, (void *)p_Steam_BGetCallback );
 
     TRACE( "Loaded host steamclient from %s\n", debugstr_a(path) );
     return 0;
@@ -810,6 +830,11 @@ template< typename Params >
 static NTSTATUS steamclient_CreateInterface( Params *params, bool wow64 )
 {
     params->_ret = p_CreateInterface( params->name, params->return_code );
+    LSTEAM_LOGCAT( "CreateInterface(\"%s\") -> %p (rc=%d) wow64=%d",
+                   params->name ? params->name : "(null)",
+                   (void *)params->_ret,
+                   params->return_code ? *params->return_code : -1,
+                   (int)wow64 );
     return 0;
 }
 
