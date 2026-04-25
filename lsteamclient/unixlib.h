@@ -6,6 +6,12 @@
 #include <stdint.h>
 #include <assert.h>
 
+/* Pull in libc/libc++ declarations of wcsncpy/strncpy/etc before
+ * <winbase.h> turns them into poison macros. */
+#ifdef __cplusplus
+#include <array>
+#endif /* __cplusplus */
+
 #include <windef.h>
 #include <winbase.h>
 #include <winternl.h>

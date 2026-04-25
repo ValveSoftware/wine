@@ -6,12 +6,15 @@
 #include <stdint.h>
 #include <assert.h>
 
-#include <windef.h>
-#include <winbase.h>
-
+/* Include C++ stdlib before windows headers: <winbase.h> defines poison
+ * macros like #define wcsncpy(d,s,n) error ... which corrupt later
+ * declarations of those names pulled in by libc++ headers. */
 #ifdef __cplusplus
 #include <array>
 #endif /* __cplusplus */
+
+#include <windef.h>
+#include <winbase.h>
 
 #ifdef __cplusplus
 #define U64_ARRAY( type, count, name ) std::array<type, count> name
