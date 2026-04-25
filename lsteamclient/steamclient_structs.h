@@ -6,12 +6,14 @@
 #include <stdint.h>
 #include <assert.h>
 
-#include <windef.h>
-#include <winbase.h>
-
+/* Pull in libc/libc++ declarations of wcsncpy/strncpy/etc before
+ * <winbase.h> turns them into poison macros. */
 #ifdef __cplusplus
 #include <array>
 #endif /* __cplusplus */
+
+#include <windef.h>
+#include <winbase.h>
 
 #ifdef __cplusplus
 #define U64_ARRAY( type, count, name ) std::array<type, count> name
