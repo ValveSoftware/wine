@@ -87,7 +87,7 @@ NTSTATUS steamclient_call( unsigned int code, void *args, const char *name )
     if (status == STATUS_ACCESS_VIOLATION)
     {
         ERR( "Access violation in %s.\n", name );
-        *(volatile int *)0xbeef |= 0;
+        RaiseException( status, 0, 0, NULL );
     }
     if (status) WARN( "%s failed, status %#x\n", name, (UINT)status );
     return status;

@@ -121,9 +121,7 @@ template< typename Umsg, typename Wmsg >
 static void receive_messages_utow( uint32_t count, Umsg **u_msgs, ptr32< Wmsg** > w_msgs )
 {
     Wmsg **msgs = new Wmsg *[count];
-    uint32_t i;
-
-    for (i = 0; i < count; ++i) msgs[i] = w_msgs[i];
+    while (count--) msgs[count] = w_msgs[count];
     receive_messages_utow( count, u_msgs, msgs );
     delete[] msgs;
 }
@@ -155,9 +153,7 @@ template< typename Wmsg, typename Umsg >
 static void send_messages_wtou( uint32_t count, ptr32< Wmsg *const* > w_msgs, Umsg **u_msgs )
 {
     Wmsg **msgs = new Wmsg *[count];
-    uint32_t i;
-
-    for (i = 0; i < count; ++i) msgs[i] = w_msgs[i];
+    while (count--) msgs[count] = w_msgs[count];
     send_messages_wtou( count, msgs, u_msgs );
     delete[] msgs;
 }
@@ -166,9 +162,7 @@ template< typename Wmsg, typename Umsg >
 static void send_messages_wtou( uint32_t count, ptr32< Wmsg** > w_msgs, Umsg **u_msgs )
 {
     Wmsg **msgs = new Wmsg *[count];
-    uint32_t i;
-
-    for (i = 0; i < count; ++i) msgs[i] = w_msgs[i];
+    while (count--) msgs[count] = w_msgs[count];
     send_messages_wtou( count, msgs, u_msgs );
     delete[] msgs;
 }
