@@ -735,7 +735,11 @@ static NTSTATUS steamclient_init( Params *params, bool wow64 )
 #error Unknown target architecture
 #endif
 
+#if defined(__ANDROID__)
+    snprintf( path, PATH_MAX, "/data/data/app.gamenative/files/imagefs/usr/lib/libsteamclient.so" );
+#else
     snprintf( path, PATH_MAX, "%s/.steam/sdk" STEAM_ARCH "/steamclient.so", getenv( "HOME" ) );
+#endif
 #undef STEAM_ARCH
 
     if (realpath( path, resolved_path ))
