@@ -1,9 +1,9 @@
 name: Build Steam Components
 
 on:
-  push:
-    branches: [ main, master, proton_10.0 ]
   pull_request:
+    branches: [ main, master, proton_10.0 ]
+  merge_group:
     branches: [ main, master, proton_10.0 ]
   workflow_dispatch:
     inputs:
