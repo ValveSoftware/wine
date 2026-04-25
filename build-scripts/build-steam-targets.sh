@@ -130,17 +130,44 @@ echo "Configuring build..."
 bash "$STEP_SCRIPT" "${EXTRA_STEP_ARGS[@]}" --configure
 
 echo "Building lsteamclient and steam_helper only..."
-make -j"$JOBS" \
-  lsteamclient/lsteamclient.dll \
-  lsteamclient/lsteamclient.so \
-  steam_helper/steam.exe
+if ! make -j"$JOBS" lsteamclient steam_helper; then
+  echo "Top-level targets failed, retrying subdirectory builds..."
+  make -j"$JOBS" -C lsteamclient
+  make -j"$JOBS" -C steam_helper
+fi
 
 ARTIFACT_DIR="$OUTPUT_ROOT/$ARTIFACT_ARCH"
 mkdir -p "$ARTIFACT_DIR"
 
-cp lsteamclient/lsteamclient.dll "$ARTIFACT_DIR/"
-cp lsteamclient/lsteamclient.so "$ARTIFACT_DIR/"
-cp steam_helper/steam.exe "$ARTIFACT_DIR/"
+copy_if_exists() {
+  local path="$1"
+  if [ -f "$path" ]; then
+    cp "$path" "$ARTIFACT_DIR/"
+    echo "Collected artifact: $path"
+    return 0
+  fi
+  return 1
+}
+
+LSTEAMCLIENT_OK=0
+STEAM_HELPER_OK=0
+
+copy_if_exists "lsteamclient/lsteamclient.dll" && LSTEAMCLIENT_OK=1 || true
+copy_if_exists "lsteamclient/lsteamclient.so" && LSTEAMCLIENT_OK=1 || true
+copy_if_exists "lsteamclient/lsteamclient.dll.so" && LSTEAMCLIENT_OK=1 || true
+
+copy_if_exists "steam_helper/steam.exe" && STEAM_HELPER_OK=1 || true
+copy_if_exists "steam_helper/steam.exe.so" && STEAM_HELPER_OK=1 || true
+
+if [ "$LSTEAMCLIENT_OK" -ne 1 ]; then
+  echo "Error: no lsteamclient artifact was produced." >&2
+  exit 1
+fi
+
+if [ "$STEAM_HELPER_OK" -ne 1 ]; then
+  echo "Error: no steam_helper artifact was produced." >&2
+  exit 1
+fi
 
 echo "Artifacts saved in: $ARTIFACT_DIR"
 ls -lah "$ARTIFACT_DIR"
