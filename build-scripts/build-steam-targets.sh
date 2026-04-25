@@ -95,6 +95,19 @@ case "$ARCH" in
     ;;
 esac
 
+# Re-export PATH/DLLTOOL in this shell so `make` (run after the step script
+# returns) sees the llvm-mingw toolchain. Without this, winebuild falls back
+# to the system clang's llvm-dlltool, which on Ubuntu is LLVM 18 and lacks
+# the -N flag needed for ARM64EC import libraries.
+LLVM_MINGW_TOOLCHAIN="${LLVM_MINGW_TOOLCHAIN:-$HOME/toolchains/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64/bin}"
+if [ -d "$LLVM_MINGW_TOOLCHAIN" ]; then
+  export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
+  export DLLTOOL="$LLVM_MINGW_TOOLCHAIN/llvm-dlltool"
+  echo "Using llvm-mingw at: $LLVM_MINGW_TOOLCHAIN"
+else
+  echo "Warning: llvm-mingw toolchain not found at $LLVM_MINGW_TOOLCHAIN" >&2
+fi
+
 EXTRA_STEP_ARGS=()
 if [ "$ENABLE_16KB_PAGES" -eq 1 ]; then
   EXTRA_STEP_ARGS+=("--enable-16kb-pages")
