@@ -130,44 +130,54 @@ echo "Configuring build..."
 bash "$STEP_SCRIPT" "${EXTRA_STEP_ARGS[@]}" --configure
 
 echo "Building lsteamclient and steam_helper only..."
-if ! make -j"$JOBS" lsteamclient steam_helper; then
-  echo "Top-level targets failed, retrying subdirectory builds..."
-  make -j"$JOBS" -C lsteamclient
-  make -j"$JOBS" -C steam_helper
-fi
+make -j"$JOBS" lsteamclient/all steam_helper/all
 
 ARTIFACT_DIR="$OUTPUT_ROOT/$ARTIFACT_ARCH"
 mkdir -p "$ARTIFACT_DIR"
 
-copy_if_exists() {
-  local path="$1"
-  if [ -f "$path" ]; then
-    cp "$path" "$ARTIFACT_DIR/"
-    echo "Collected artifact: $path"
-    return 0
+collect_dir() {
+  local src_dir="$1"
+  local dest_subdir="$2"
+  local found=0
+
+  if [ ! -d "$src_dir" ]; then
+    return 1
   fi
-  return 1
+
+  mkdir -p "$ARTIFACT_DIR/$dest_subdir"
+  while IFS= read -r -d '' f; do
+    cp "$f" "$ARTIFACT_DIR/$dest_subdir/"
+    echo "Collected artifact: $f"
+    found=1
+  done < <(find "$src_dir" \
+    \( -name "*.dll" -o -name "*.so" -o -name "*.exe" -o -name "*.dll.so" -o -name "*.exe.so" \) \
+    -type f -print0)
+
+  if [ "$found" -ne 1 ]; then
+    return 1
+  fi
+  return 0
 }
 
 LSTEAMCLIENT_OK=0
 STEAM_HELPER_OK=0
 
-copy_if_exists "lsteamclient/lsteamclient.dll" && LSTEAMCLIENT_OK=1 || true
-copy_if_exists "lsteamclient/lsteamclient.so" && LSTEAMCLIENT_OK=1 || true
-copy_if_exists "lsteamclient/lsteamclient.dll.so" && LSTEAMCLIENT_OK=1 || true
-
-copy_if_exists "steam_helper/steam.exe" && STEAM_HELPER_OK=1 || true
-copy_if_exists "steam_helper/steam.exe.so" && STEAM_HELPER_OK=1 || true
+collect_dir "lsteamclient" "lsteamclient" && LSTEAMCLIENT_OK=1 || true
+collect_dir "steam_helper" "steam_helper" && STEAM_HELPER_OK=1 || true
 
 if [ "$LSTEAMCLIENT_OK" -ne 1 ]; then
   echo "Error: no lsteamclient artifact was produced." >&2
+  echo "Tree under lsteamclient/:" >&2
+  find lsteamclient -maxdepth 3 -type f >&2 || true
   exit 1
 fi
 
 if [ "$STEAM_HELPER_OK" -ne 1 ]; then
   echo "Error: no steam_helper artifact was produced." >&2
+  echo "Tree under steam_helper/:" >&2
+  find steam_helper -maxdepth 3 -type f >&2 || true
   exit 1
 fi
 
 echo "Artifacts saved in: $ARTIFACT_DIR"
-ls -lah "$ARTIFACT_DIR"
+find "$ARTIFACT_DIR" -type f
