@@ -2,7 +2,7 @@ name: Build Proton Wine (SDK 28)
 
 on:
   push:
-    branches: [ main, master, proton_10.0 ]
+    branches: [ main, master, proton_10.0, "proton_10.0*" ]
   pull_request:
     branches: [ main, master, proton_10.0 ]
   workflow_dispatch:
