@@ -511,6 +511,8 @@ next_event:
         return FALSE;
     }
     receive_params.cookie = params.cookie;
+    ERR("Steam_BGetCallback got callback id=0x%x cubParam=%u user=%u\n",
+        win_msg->m_iCallback, win_msg->m_cubParam, (unsigned)win_msg->m_hSteamUser);
 
     if (!(win_msg->m_pubParam = HeapAlloc( GetProcessHeap(), 0, win_msg->m_cubParam ))) return FALSE;
     last_callback_data = win_msg->m_pubParam;

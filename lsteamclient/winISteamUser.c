@@ -3928,6 +3928,7 @@ int8_t __thiscall winISteamUser_SteamUser018_BLoggedOn(struct w_iface *_this)
     };
     TRACE("%p\n", _this);
     STEAMCLIENT_CALL( ISteamUser_SteamUser018_BLoggedOn, &params );
+    ERR("BLoggedOn -> %d\n", (int)params._ret);
     return params._ret;
 }
 
