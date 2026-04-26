@@ -11,6 +11,7 @@
 
 #if defined(__ANDROID__)
 #include <android/log.h>
+#include <unistd.h>
 #define LSTEAM_LOGCAT(...) __android_log_print(ANDROID_LOG_INFO, "lsteamclient.unix", __VA_ARGS__)
 #else
 #define LSTEAM_LOGCAT(...) ((void)0)
@@ -759,8 +760,8 @@ static NTSTATUS steamclient_init( Params *params, bool wow64 )
     }
 #endif /* __APPLE__ */
 
-    LSTEAM_LOGCAT( "steamclient_init: about to dlopen path=\"%s\" pid=%d tid=%d",
-                   path, (int)getpid(), (int)gettid() );
+    LSTEAM_LOGCAT( "steamclient_init: about to dlopen path=\"%s\" pid=%d",
+                   path, (int)getpid() );
 
     if (!(steamclient = dlopen( path, RTLD_NOW )))
     {
