@@ -721,10 +721,20 @@ static NTSTATUS steamclient_init_registry( Params *params, bool wow64 )
     pipe = 0;
     user = 0;
 
-    if (!(pipe = client->CreateSteamPipe()) || !(user = client->ConnectToGlobalUser( pipe )))
+    pipe = client->CreateSteamPipe();
+    if (!pipe)
     {
-        ERR( "Failed to connect to Steam\n" );
-        if (pipe) client->BReleaseSteamPipe( pipe );
+        ERR( "Failed to connect to Steam: CreateSteamPipe returned 0 (libsteamclient.so daemon not reachable). HOME=%s TMPDIR=%s\n",
+             debugstr_a(getenv("HOME")), debugstr_a(getenv("TMPDIR")) );
+        return 0;
+    }
+
+    user = client->ConnectToGlobalUser( pipe );
+    if (!user)
+    {
+        ERR( "Failed to connect to Steam: ConnectToGlobalUser(pipe=%d) returned 0 (daemon reachable but no logged-in global user). HOME=%s TMPDIR=%s\n",
+             pipe, debugstr_a(getenv("HOME")), debugstr_a(getenv("TMPDIR")) );
+        client->BReleaseSteamPipe( pipe );
         return 0;
     }
 

@@ -55,6 +55,7 @@ static BOOL wsa_initialized;
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
     TRACE("(%p, %lu, %p)\n", instance, reason, reserved);
+    ERR("LSTEAMCLIENT_PATCH_BUILD_MARKER_v1 reason=%lu instance=%p\n", reason, instance);
 
     switch (reason)
     {
