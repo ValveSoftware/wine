@@ -12,7 +12,34 @@
 #if defined(__ANDROID__)
 #include <android/log.h>
 #include <unistd.h>
-#define LSTEAM_LOGCAT(...) __android_log_print(ANDROID_LOG_INFO, "lsteamclient.unix", __VA_ARGS__)
+
+/* Resolve __android_log_print lazily via dlsym so we don't need to link liblog.so. */
+static int lsteam_android_log( int prio, const char *tag, const char *fmt, ... )
+{
+    typedef int (*alp_t)( int, const char *, const char *, ... );
+    static alp_t alp = NULL;
+    static int tried = 0;
+    va_list ap;
+    int r = 0;
+
+    if (!tried)
+    {
+        void *h = dlopen( "liblog.so", RTLD_NOW );
+        if (h) alp = (alp_t)dlsym( h, "__android_log_print" );
+        tried = 1;
+    }
+    if (!alp) return 0;
+
+    va_start( ap, fmt );
+    {
+        char buf[1024];
+        vsnprintf( buf, sizeof(buf), fmt, ap );
+        r = alp( prio, tag, "%s", buf );
+    }
+    va_end( ap );
+    return r;
+}
+#define LSTEAM_LOGCAT(...) lsteam_android_log( ANDROID_LOG_INFO, "lsteamclient.unix", __VA_ARGS__ )
 #else
 #define LSTEAM_LOGCAT(...) ((void)0)
 #endif
