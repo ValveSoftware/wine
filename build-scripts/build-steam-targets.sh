@@ -159,8 +159,14 @@ collect_dir() {
 
   mkdir -p "$ARTIFACT_DIR/$dest_subdir"
   while IFS= read -r -d '' f; do
-    cp "$f" "$ARTIFACT_DIR/$dest_subdir/"
-    echo "Collected artifact: $f"
+    # Preserve the per-arch subdirectory layout (e.g. arm64ec-windows/, i386-windows/)
+    # so multiple-arch builds don't overwrite each other at the artifact destination.
+    local rel
+    rel="${f#$src_dir/}"
+    local dest_path="$ARTIFACT_DIR/$dest_subdir/$rel"
+    mkdir -p "$(dirname "$dest_path")"
+    cp "$f" "$dest_path"
+    echo "Collected artifact: $f -> $dest_path"
     found=1
   done < <(find "$src_dir" \
     \( -name "*.dll" -o -name "*.so" -o -name "*.exe" -o -name "*.dll.so" -o -name "*.exe.so" \) \
