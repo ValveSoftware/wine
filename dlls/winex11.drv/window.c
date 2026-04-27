@@ -985,7 +985,11 @@ static void set_size_hints( struct x11drv_win_data *data, DWORD style )
         }
         else size_hints->win_gravity = NorthWestGravity;
 
-        if (!is_window_resizable( data, style ))
+        /* HACK: gamescope heavily relies on normal size hints to decide which size to configure
+         * the window after it is being mapped. Request normal size hints on every window that
+         * isn't minimized or maximized, so that it more likely uses the correct size.
+         */
+        if (!is_window_resizable( data, style ) || X11DRV_HasWindowManager( "steamcompmgr" ))
         {
             size_hints->max_width = data->rects.visible.right - data->rects.visible.left;
             size_hints->max_height = data->rects.visible.bottom - data->rects.visible.top;
