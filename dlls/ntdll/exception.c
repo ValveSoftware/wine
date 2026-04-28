@@ -265,6 +265,10 @@ NTSTATUS WINAPI dispatch_exception( EXCEPTION_RECORD *rec, CONTEXT *context )
         TRACE( " info[%ld]=%p\n", i, (void *)rec->ExceptionInformation[i] );
     TRACE_CONTEXT( context );
 
+#ifdef __x86_64__
+if (
+#endif
+
     if (call_vectored_handlers( rec, context ) == EXCEPTION_CONTINUE_EXECUTION)
         NtContinue( context, FALSE );
 
