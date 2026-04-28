@@ -81,6 +81,7 @@ typedef struct tagACLMulti {
     /* const ITfLangBarItemMgrVtbl *LangBarItemMgrVtbl; */
     ITfUIElementMgr ITfUIElementMgr_iface;
     ITfSourceSingle ITfSourceSingle_iface;
+    ITfFunctionProvider ITfFunctionProvider_iface;
     LONG refCount;
 
     /* Aggregation */
@@ -169,10 +170,62 @@ static inline ThreadMgr *impl_from_ITfSourceSingle(ITfSourceSingle *iface)
     return CONTAINING_RECORD(iface, ThreadMgr, ITfSourceSingle_iface);
 }
 
+static ThreadMgr *impl_from_ITfFunctionProvider(ITfFunctionProvider *iface)
+{
+    return CONTAINING_RECORD(iface, ThreadMgr, ITfFunctionProvider_iface);
+}
+
 static inline EnumTfDocumentMgr *impl_from_IEnumTfDocumentMgrs(IEnumTfDocumentMgrs *iface)
 {
     return CONTAINING_RECORD(iface, EnumTfDocumentMgr, IEnumTfDocumentMgrs_iface);
 }
+
+static HRESULT WINAPI func_provider_QueryInterface(ITfFunctionProvider *iface, REFIID iid, LPVOID *ppvOut)
+{
+    ThreadMgr *This = impl_from_ITfFunctionProvider(iface);
+    return ITfThreadMgrEx_QueryInterface(&This->ITfThreadMgrEx_iface, iid, ppvOut);
+}
+
+static ULONG WINAPI func_provider_AddRef(ITfFunctionProvider *iface)
+{
+    ThreadMgr *This = impl_from_ITfFunctionProvider(iface);
+    return ITfThreadMgrEx_AddRef(&This->ITfThreadMgrEx_iface);
+}
+
+static ULONG WINAPI func_provider_Release(ITfFunctionProvider *iface)
+{
+    ThreadMgr *This = impl_from_ITfFunctionProvider(iface);
+    return ITfThreadMgrEx_Release(&This->ITfThreadMgrEx_iface);
+}
+
+static HRESULT WINAPI func_provider_GetType(ITfFunctionProvider *iface, GUID *guid)
+{
+    FIXME("(%p) %p stub.\n", iface, guid);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI func_provider_GetDescription(ITfFunctionProvider *iface, BSTR *desc)
+{
+    FIXME("(%p) %p stub.\n", iface, desc);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI func_provider_GetFunction(ITfFunctionProvider *iface, REFGUID guid, REFIID riid, IUnknown **func)
+{
+    FIXME("(%p) %s %s %p stub.\n", iface, debugstr_guid(guid), debugstr_guid(riid), func);
+    return E_NOTIMPL;
+}
+
+static const ITfFunctionProviderVtbl TfFunctionProviderVtbl =
+{
+    func_provider_QueryInterface,
+    func_provider_AddRef,
+    func_provider_Release,
+    func_provider_GetType,
+    func_provider_GetDescription,
+    func_provider_GetFunction,
+};
+
 
 /***********************************************************************
  *              TF_GetThreadMgr (MSCTF.@)
@@ -547,8 +600,11 @@ static HRESULT WINAPI ThreadMgr_GetFunctionProvider(ITfThreadMgrEx *iface, REFCL
 ITfFunctionProvider **ppFuncProv)
 {
     ThreadMgr *This = impl_from_ITfThreadMgrEx(iface);
-    FIXME("STUB:(%p)\n",This);
-    return E_NOTIMPL;
+
+    TRACE("(%p)\n",This);
+    *ppFuncProv = &This->ITfFunctionProvider_iface;
+    ITfFunctionProvider_AddRef(*ppFuncProv);
+    return S_OK;
 }
 
 static HRESULT WINAPI ThreadMgr_EnumFunctionProviders(ITfThreadMgrEx *iface,
@@ -1415,6 +1471,7 @@ HRESULT ThreadMgr_Constructor(IUnknown *pUnkOuter, IUnknown **ppOut)
     This->ITfThreadMgrEventSink_iface.lpVtbl = &ThreadMgrEventSinkVtbl;
     This->ITfUIElementMgr_iface.lpVtbl = &ThreadMgrUIElementMgrVtbl;
     This->ITfSourceSingle_iface.lpVtbl = &SourceSingleVtbl;
+    This->ITfFunctionProvider_iface.lpVtbl = &TfFunctionProviderVtbl;
     This->refCount = 1;
 
     CompartmentMgr_Constructor((IUnknown*)&This->ITfThreadMgrEx_iface, &IID_IUnknown, (IUnknown**)&This->CompartmentMgr);
