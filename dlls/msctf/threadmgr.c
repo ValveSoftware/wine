@@ -35,6 +35,9 @@
 #include "msctf.h"
 #include "msctf_internal.h"
 
+#include "initguid.h"
+#include "ctffunc.h"
+
 WINE_DEFAULT_DEBUG_CHANNEL(msctf);
 
 static CRITICAL_SECTION ThreadMgrCs;
@@ -180,6 +183,78 @@ static inline EnumTfDocumentMgr *impl_from_IEnumTfDocumentMgrs(IEnumTfDocumentMg
     return CONTAINING_RECORD(iface, EnumTfDocumentMgr, IEnumTfDocumentMgrs_iface);
 }
 
+static HRESULT WINAPI reconversion_QueryInterface(ITfFnReconversion *iface, REFIID iid, LPVOID *ppvOut)
+{
+    TRACE("(%p) %s, %p.\n", iface, debugstr_guid(iid), ppvOut);
+
+    *ppvOut = NULL;
+    if (IsEqualIID(iid, &IID_IUnknown) || IsEqualIID(iid, &IID_ITfFnReconversion)
+            || IsEqualIID(iid, &IID_ITfFunction))
+    {
+        *ppvOut = iface;
+        return S_OK;
+    }
+
+    WARN("unsupported interface: %s\n", debugstr_guid(iid));
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI reconversion_AddRef(ITfFnReconversion *iface)
+{
+    TRACE("(%p).\n", iface);
+    return 2;
+}
+
+static ULONG WINAPI reconversion_Release(ITfFnReconversion *iface)
+{
+    TRACE("(%p).\n", iface);
+    return 1;
+}
+
+static HRESULT WINAPI reconversion_GetDisplayName(ITfFnReconversion *iface, BSTR *name)
+{
+    FIXME("(%p) %p stub.\n", iface, name);
+
+    *name = SysAllocString(L"Stub");
+    return S_OK;
+}
+
+static HRESULT WINAPI reconversion_QueryRange(ITfFnReconversion *iface, ITfRange *range, ITfRange **new_range, BOOL *convertable)
+{
+    FIXME("(%p) %p %p %p stub.\n", iface, range, new_range, convertable);
+
+    *convertable = FALSE;
+    *new_range = NULL;
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI reconversion_GetReconversion(ITfFnReconversion *iface, ITfRange *range, ITfCandidateList **cand_list)
+{
+    FIXME("(%p) %p %p stub.\n", iface, range, cand_list);
+
+    *cand_list = NULL;
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI reconversion_Reconvert(ITfFnReconversion *iface, ITfRange *range)
+{
+    FIXME("(%p) %p stub.\n", iface, range);
+    return E_NOTIMPL;
+}
+
+static ITfFnReconversionVtbl reconversion_vtbl =
+{
+    reconversion_QueryInterface,
+    reconversion_AddRef,
+    reconversion_Release,
+    reconversion_GetDisplayName,
+    reconversion_QueryRange,
+    reconversion_GetReconversion,
+    reconversion_Reconvert,
+};
+
+static ITfFnReconversion reconversion_stub = { &reconversion_vtbl };
+
 static HRESULT WINAPI func_provider_QueryInterface(ITfFunctionProvider *iface, REFIID iid, LPVOID *ppvOut)
 {
     ThreadMgr *This = impl_from_ITfFunctionProvider(iface);
@@ -213,6 +288,13 @@ static HRESULT WINAPI func_provider_GetDescription(ITfFunctionProvider *iface, B
 static HRESULT WINAPI func_provider_GetFunction(ITfFunctionProvider *iface, REFGUID guid, REFIID riid, IUnknown **func)
 {
     FIXME("(%p) %s %s %p stub.\n", iface, debugstr_guid(guid), debugstr_guid(riid), func);
+
+    if (IsEqualIID(riid, &IID_ITfFnReconversion))
+    {
+        TRACE("returning ITfFnReconversio stub.\n");
+        *func = (IUnknown *)&reconversion_stub;
+        return S_OK;
+    }
     return E_NOTIMPL;
 }
 
