@@ -744,7 +744,10 @@ static void init_locale(void)
     if (!unix_to_win_locale( ctype, system_locale )) system_locale[0] = 0;
     TRACE_(nls)( "Unix LC_CTYPE is %s, setting system locale to %s\n", debugstr_a(ctype), debugstr_a(user_locale) );
 
-    if (main_argc > 1 && strstr(main_argv[1], "start_protected_game.exe"))
+    if (main_argc > 1 && (
+            strstr(main_argv[1], "start_protected_game.exe")
+            || strstr(main_argv[1], "RocketLeague_EAC.exe")
+       ))
     {
         FIXME( "HACK setting EN locale.\n" );
         messages = "en-US";
