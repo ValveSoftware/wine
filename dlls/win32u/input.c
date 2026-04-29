@@ -2948,3 +2948,12 @@ BOOL WINAPI NtUserGetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT 
     memcpy( ptr, thread_data->history + index, min( count, ARRAY_SIZE(thread_data->current) ) * size );
     return TRUE;
 }
+
+/**********************************************************************
+ *       NtUserInitializeTouchInjection    (win32u.@)
+ */
+BOOL WINAPI NtUserInitializeTouchInjection( UINT max_count, UINT mode )
+{
+    FIXME( "max_count %u, mode %#x stub!\n", max_count, mode );
+    return TRUE;
+}
