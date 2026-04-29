@@ -756,6 +756,15 @@ BOOL WINAPI UnregisterTouchWindow( HWND hwnd )
 }
 
 /*****************************************************************************
+ * InitializeTouchInjection (USER32.@)
+ */
+BOOL WINAPI InitializeTouchInjection( UINT32 max_count, DWORD dw_mode )
+{
+    FIXME( "max_count %u, dw_mode %#lx stub!\n", max_count, dw_mode );
+    return TRUE;
+}
+
+/*****************************************************************************
  * GetGestureInfo (USER32.@)
  */
 BOOL WINAPI CloseGestureInfoHandle( HGESTUREINFO handle )
