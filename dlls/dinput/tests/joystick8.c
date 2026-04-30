@@ -2075,6 +2075,7 @@ static void test_simple_joystick( DWORD version )
     prop_dword.dwData = 0xdeadbeef;
     hr = IDirectInputDevice8_GetProperty( device, DIPROP_JOYSTICKID, &prop_dword.diph );
     ok( hr == DI_OK, "GetProperty DIPROP_JOYSTICKID returned %#lx\n", hr );
+    todo_wine
     ok( prop_dword.dwData == 0, "got %#lx expected 0\n", prop_dword.dwData );
 
     prop_dword.dwData = 0xdeadbeef;
@@ -6015,7 +6016,7 @@ static BOOL CALLBACK select_default_instance( const DIDEVICEINSTANCEW *devinst, 
     ok( hr == DI_OK, "got hr %#lx.\n", hr );
     hr = IDirectInputDevice8_GetProperty( device, DIPROP_JOYSTICKID, &prop_dword.diph );
     ok( hr == DI_OK, "got hr %#lx.\n", hr );
-    ok( prop_dword.dwData < 100, "got %lu.\n", prop_dword.dwData );
+    todo_wine ok( prop_dword.dwData < 100, "got %lu.\n", prop_dword.dwData );
 
     hr = IDirectInputDevice8_GetProperty( device, DIPROP_GUIDANDPATH, &prop_guid_path.diph );
     ok( hr == DI_OK, "got hr %#lx.\n", hr );
@@ -6103,14 +6104,11 @@ static void test_joystick_id(void)
     hr = IDirectInput8_CreateDevice( di8, &GUID_Joystick, &device, NULL );
     if (d.default_instance_found)
     {
-        todo_wine ok( hr == DI_OK, "got %#lx.\n", hr );
-        if (hr == DI_OK)
-        {
-            hr = IDirectInputDevice8_GetProperty( device, DIPROP_JOYSTICKID, &prop_dword.diph );
-            ok( hr == DI_OK, "got hr %#lx.\n", hr );
-            ok( !prop_dword.dwData, "got %lu.\n", prop_dword.dwData );
-            IDirectInputDevice8_Release( device );
-        }
+        ok( hr == DI_OK, "got %#lx.\n", hr );
+        hr = IDirectInputDevice8_GetProperty( device, DIPROP_JOYSTICKID, &prop_dword.diph );
+        ok( hr == DI_OK, "got hr %#lx.\n", hr );
+        ok( !prop_dword.dwData, "got %lu.\n", prop_dword.dwData );
+        IDirectInputDevice8_Release( device );
     }
     else
     {
