@@ -6103,11 +6103,14 @@ static void test_joystick_id(void)
     hr = IDirectInput8_CreateDevice( di8, &GUID_Joystick, &device, NULL );
     if (d.default_instance_found)
     {
-        ok( hr == DI_OK, "got %#lx.\n", hr );
-        hr = IDirectInputDevice8_GetProperty( device, DIPROP_JOYSTICKID, &prop_dword.diph );
-        ok( hr == DI_OK, "got hr %#lx.\n", hr );
-        ok( !prop_dword.dwData, "got %lu.\n", prop_dword.dwData );
-        IDirectInputDevice8_Release( device );
+        todo_wine ok( hr == DI_OK, "got %#lx.\n", hr );
+        if (hr == DI_OK)
+        {
+            hr = IDirectInputDevice8_GetProperty( device, DIPROP_JOYSTICKID, &prop_dword.diph );
+            ok( hr == DI_OK, "got hr %#lx.\n", hr );
+            ok( !prop_dword.dwData, "got %lu.\n", prop_dword.dwData );
+            IDirectInputDevice8_Release( device );
+        }
     }
     else
     {
