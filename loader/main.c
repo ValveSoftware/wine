@@ -154,6 +154,16 @@ static void *try_dlopen( const char *argv0 )
     void *handle;
 
     if (!argv0) return NULL;
+
+    if ((p = remove_tail( argv0, "i386-unix/wine64")))
+    {
+        path = build_path( p, "x86_64-unix/ntdll.so" );
+        free( p );
+        handle = dlopen( path, RTLD_NOW );
+        free( path );
+        return handle;
+    }
+
     if (!(dir = realpath_dirname( argv0 ))) return NULL;
 
     if ((p = remove_tail( dir, "/loader" )))
