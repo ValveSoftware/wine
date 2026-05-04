@@ -3682,6 +3682,32 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, HWND owner_hint, UIN
         return;
     }
 
+    /* Hack for bug 26914 Resident Evil 2 (883710) window invisible on the screen with Mutter Wayland
+     *
+     * The root cause is a Mutter Wayland bug. However, until the fix for Mutter is widely deployed,
+     * We need a hack to get games working.
+     *
+     * The bug happens because Mutter Wayland can enter a state where _XWAYLAND_ALLOW_COMMITS stays
+     * at 0, the meaning of which is to block any new content from being displayed on the screen.
+     * The changes WM_STATE before XReconfigureWMWindow() so the bug doesn't get triggered.
+     *
+     * The deadlock can happen according to the following events:
+     * <1> Application -> Disable decorations, so a window has only one actor.
+     * <2> Application -> Call XReconfigureWMWindow() to resize the window.
+     * <3> Mutter -> meta_window_x11_move_resize_internal() calls meta_window_x11_freeze_commits()
+     *     because of the size change.
+     * <4> Application -> Call XWithdrawWindow() to hide the window.
+     * <5> Mutter -> Destroy the actor of the window.
+     * <6> Mutter -> meta_window_actor_x11_after_paint() returns early because meta_window_actor_is_destroyed()
+     *     returns TRUE. _XWAYLAND_ALLOW_COMMITS stays at 0, which blocks new actor for XWayland.
+     * <7> Application -> Calls XMapWindow() and starts painting.
+     * <8> Mutter -> _XWAYLAND_ALLOW_COMMITS is 0, so no new actor is created for the paint. No new
+     *     actor for the window, so _XWAYLAND_ALLOW_COMMITS stays at 0. Thus, a deadlock and the
+     *     window stays invisible.
+     */
+    if (X11DRV_HasWindowManager( "Mutter" ) && get_desired_wm_state( new_style, new_rects ) == WithdrawnState)
+        window_set_wm_state( data, WithdrawnState, 0 );
+
     /* don't change position if we are about to minimize or maximize a managed window */
     if (!(data->managed && (swp_flags & SWP_STATECHANGED) && (new_style & (WS_MINIMIZE|WS_MAXIMIZE)))
          || (!(new_style & WS_MINIMIZE) && X11DRV_HasWindowManager( "steamcompmgr" )))
