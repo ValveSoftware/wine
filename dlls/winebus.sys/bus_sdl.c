@@ -1179,6 +1179,7 @@ NTSTATUS sdl_bus_init(void *args)
     /* CW-Bug-Id: #23185: Disable SDL 2.30 new behavior, we need the steam virtual
      * controller name to figure which slot number it represents. */
     pSDL_SetHintWithPriority("SteamVirtualGamepadInfo", "", SDL_HINT_OVERRIDE);
+    unsetenv("SteamVirtualGamepadInfo");
 
     if (pSDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) < 0)
     {
