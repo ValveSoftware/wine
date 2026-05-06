@@ -711,7 +711,7 @@ NTSTATUS WINAPI NtGdiDdDDIQueryAdapterInfo( D3DKMT_QUERYADAPTERINFO *desc )
         if (desc->PrivateDriverDataSize < sizeof(*value))
             return STATUS_INVALID_PARAMETER;
 
-        *value = KMT_DRIVERVERSION_WDDM_1_3;
+        *value = KMT_DRIVERVERSION_WDDM_3_1;
         return STATUS_SUCCESS;
     }
     case KMTQAITYPE_WDDM_2_7_CAPS:
