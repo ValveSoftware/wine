@@ -364,19 +364,11 @@ static enum loadorder get_load_order_value( HANDLE std_key, HANDLE app_key, WCHA
 void set_load_order_app_name( const WCHAR *app_name )
 {
     static const WCHAR eac_launcherW[] = {'P','R','O','T','O','N','_','E','A','C','_','L','A','U','N','C','H','E','R','_','P','R','O','C','E','S','S',0};
-    static const WCHAR crossoutW[] = {'C','r','o','s','s','o','u','t','.','e','x','e',0};
     const WCHAR *p;
 
     if ((p = wcsrchr( app_name, '\\' ))) app_name = p + 1;
     app_key = open_app_key( app_name );
     main_exe_loaded = TRUE;
-
-    if (!wcscmp( app_name, crossoutW ))
-    {
-        ERR( "Disabling EAC bridge.\n" );
-        eac_launcher_process = TRUE;
-        return;
-    }
 
     p = NtCurrentTeb()->Peb->ProcessParameters->Environment;
     while(*p)
