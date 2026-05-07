@@ -11,6 +11,12 @@
  * Format: OWNED_DLCS=<appid>[,<appid>...]
  */
 
+#include "unix_private.h"
+
+#if 0
+#pragma makedep unix
+#endif
+
 #include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
