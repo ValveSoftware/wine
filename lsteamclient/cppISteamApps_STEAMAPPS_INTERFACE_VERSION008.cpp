@@ -1,5 +1,6 @@
 /* This file is auto-generated, do not edit. */
 #include "unix_private.h"
+#include "owned_dlcs.h"
 
 #if 0
 #pragma makedep unix
@@ -135,6 +136,11 @@ NTSTATUS ISteamApps_STEAMAPPS_INTERFACE_VERSION008_BIsDlcInstalled( void *args )
 {
     struct ISteamApps_STEAMAPPS_INTERFACE_VERSION008_BIsDlcInstalled_params *params = (struct ISteamApps_STEAMAPPS_INTERFACE_VERSION008_BIsDlcInstalled_params *)args;
     struct u_ISteamApps_STEAMAPPS_INTERFACE_VERSION008 *iface = (struct u_ISteamApps_STEAMAPPS_INTERFACE_VERSION008 *)params->u_iface;
+    if (is_owned_dlc( params->appID ))
+    {
+        params->_ret = true;
+        return 0;
+    }
     params->_ret = iface->BIsDlcInstalled( params->appID );
     return 0;
 }
@@ -144,6 +150,11 @@ NTSTATUS wow64_ISteamApps_STEAMAPPS_INTERFACE_VERSION008_BIsDlcInstalled( void *
 {
     struct wow64_ISteamApps_STEAMAPPS_INTERFACE_VERSION008_BIsDlcInstalled_params *params = (struct wow64_ISteamApps_STEAMAPPS_INTERFACE_VERSION008_BIsDlcInstalled_params *)args;
     struct u_ISteamApps_STEAMAPPS_INTERFACE_VERSION008 *iface = (struct u_ISteamApps_STEAMAPPS_INTERFACE_VERSION008 *)params->u_iface;
+    if (is_owned_dlc( params->appID ))
+    {
+        params->_ret = true;
+        return 0;
+    }
     params->_ret = iface->BIsDlcInstalled( params->appID );
     return 0;
 }

@@ -260,5 +260,6 @@ SOURCES = \
 	unix_steam_remote_storage_manual.cpp \
 	unix_steam_utils_manual.cpp \
 	unix_steam_matchmaking_manual.cpp \
+	owned_dlcs.cpp \
 	unixlib.cpp \
 	unixlib_generated.cpp \
