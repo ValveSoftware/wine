@@ -3677,6 +3677,7 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, HWND owner_hint, UIN
         {
             WARN( "%p/%#lx setting force_below_hack.\n", hwnd, data->whole_window );
             data->force_below_hack = 1;
+            if (X11DRV_HasWindowManager( "steamcompmgr" )) new_style &= ~WS_VISIBLE;
         }
     }
 
