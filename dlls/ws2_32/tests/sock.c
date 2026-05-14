@@ -4474,7 +4474,7 @@ static void test_select(void)
     SetLastError(0);
     ret = select(maxfd + 1, &readfds, &writefds, &exceptfds, &select_timeout);
     ok ( (ret == SOCKET_ERROR), "expected SOCKET_ERROR, got %i\n", ret);
-    todo_wine ok ( WSAGetLastError() == WSAENOTSOCK, "expected WSAENOTSOCK, got %i\n", WSAGetLastError());
+    ok ( WSAGetLastError() == WSAENOTSOCK, "expected WSAENOTSOCK, got %i\n", WSAGetLastError());
     ok ( !FD_ISSET(fdRead, &readfds), "FD should not be set\n");
 
     FD_ZERO(&readfds);
@@ -4491,7 +4491,7 @@ static void test_select(void)
     FD_SET((SOCKET)file, &exceptfds);
     ret = select(maxfd + 1, &readfds, &writefds, &exceptfds, &select_timeout);
     ok ( (ret == SOCKET_ERROR), "expected SOCKET_ERROR, got %i\n", ret);
-    todo_wine ok ( WSAGetLastError() == WSAENOTSOCK, "expected WSAENOTSOCK, got %i\n", WSAGetLastError());
+    ok ( WSAGetLastError() == WSAENOTSOCK, "expected WSAENOTSOCK, got %i\n", WSAGetLastError());
 
     CloseHandle(file);
 
