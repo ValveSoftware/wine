@@ -1430,7 +1430,8 @@ static void __attribute__((used)) capture_context( CONTEXT *context, UINT cpsr, 
     /* unwind one level to get register values from caller function */
     unwind_context = *context;
     unwind_one_frame( &unwind_context );
-    memcpy( &context->Rax, &unwind_context.Rax, offsetof(CONTEXT,FltSave) - offsetof(CONTEXT,Rax) );
+    if (!RtlIsEcCode( unwind_context.Rip ))
+        memcpy( &context->Rax, &unwind_context.Rax, offsetof(CONTEXT,FltSave) - offsetof(CONTEXT,Rax) );
 }
 
 /***********************************************************************
