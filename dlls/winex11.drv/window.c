@@ -3644,6 +3644,7 @@ static int use_force_below_hack(void)
         cached = sgi && (
                  !strcmp(sgi, "1293830")
                  || !strcmp(sgi, "1551360")
+		 || !strcmp(sgi, "2483190")
                  );
     }
     return cached;
