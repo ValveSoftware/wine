@@ -321,6 +321,7 @@ static HRESULT WINAPI d3d8_CheckDeviceMultiSampleType(IDirect3D8 *iface, UINT ad
     struct d3d8 *d3d8 = impl_from_IDirect3D8(iface);
     struct wined3d_adapter *wined3d_adapter;
     unsigned int output_idx;
+    const char *sgi;
     HRESULT hr;
 
     TRACE("iface %p, adapter %u, device_type %#x, format %#x, windowed %#x, multisample_type %#x.\n",
@@ -332,6 +333,16 @@ static HRESULT WINAPI d3d8_CheckDeviceMultiSampleType(IDirect3D8 *iface, UINT ad
 
     if (multisample_type > D3DMULTISAMPLE_16_SAMPLES)
         return D3DERR_INVALIDCALL;
+
+    sgi = getenv("SteamGameId");
+    if (sgi && !strcmp(sgi, "32350"))
+    {
+        /* STAR WARS Starfighter checks R8G8B8 but if available it then uses R5G5B5.
+         * Even if multisampling is available for R5G5B5, it will fail because it enables
+         * backbuffer locking, and locking a multisampled backbuffer is required to fail. */
+        WARN("HACK: returning D3DERR_NOTAVAILABLE.\n");
+        return D3DERR_NOTAVAILABLE;
+    }
 
     wined3d_mutex_lock();
     wined3d_adapter = wined3d_output_get_adapter(d3d8->wined3d_outputs[output_idx]);
