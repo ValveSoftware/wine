@@ -1339,7 +1339,8 @@ static void usr1_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     CHPE_V2_CPU_AREA_INFO *chpe;
     CONTEXT context;
 
-    if ((chpe = NtCurrentTeb()->ChpeV2CpuAreaInfo) && chpe->InSimulation && chpe->SuspendDoorbell)
+    if ((chpe = NtCurrentTeb()->ChpeV2CpuAreaInfo) && chpe->SuspendDoorbell &&
+             (chpe->InSimulation || chpe->InSyscallCallback))
     {
         NTSTATUS status = server_select( NULL, 0, SELECT_INTERRUPTIBLE | SELECT_COOPERATIVE_SUSPEND,
                                          0, NULL, NULL );
