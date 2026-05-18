@@ -147,6 +147,9 @@ static pthread_cond_t pulse_cond = PTHREAD_COND_INITIALIZER;
 
 static ULONG_PTR zero_bits = 0;
 
+static UINT32 silence_buf_size = 1048576;
+static BYTE *silence_buf;
+
 static NTSTATUS pulse_not_implemented(void *args)
 {
     return STATUS_SUCCESS;
@@ -301,6 +304,8 @@ static NTSTATUS pulse_process_detach(void *args)
     if (pulse_ml)
         pa_mainloop_quit(pulse_ml, 0);
 
+    free( silence_buf );
+    silence_buf = NULL;
     return STATUS_SUCCESS;
 }
 
@@ -1491,12 +1496,43 @@ write:
     return pa_stream_write(stream->stream, buffer, bytes, NULL, 0, PA_SEEK_RELATIVE);
 }
 
+static void pulse_write_index_catchup(struct pulse_stream *stream)
+{
+    const pa_timing_info *ti = pa_stream_get_timing_info(stream->stream);
+    UINT32 frame_size, to_write;
+    int64_t write_index;
+
+    ti = pa_stream_get_timing_info(stream->stream);
+    if (!ti || ti->read_index <= ti->write_index) return;
+
+    if (!silence_buf) silence_buf = calloc(1, silence_buf_size);
+    frame_size = pa_frame_size(&stream->ss);
+
+    while (ti && ti->read_index > ti->write_index)
+    {
+        write_index = ti->write_index;
+        TRACE("stream %p, runnind %d, read is ahead of write %lld bytes.\n", stream, stream->started,
+              (long long)(ti->read_index - write_index));
+
+        to_write = min(ti->read_index - write_index, silence_buf_size) / frame_size * frame_size;
+        pa_stream_write(stream->stream, silence_buf, to_write, NULL, 0, PA_SEEK_RELATIVE);
+        ti = pa_stream_get_timing_info(stream->stream);
+        if (ti && ti->write_index <= write_index)
+        {
+            WARN("write index did not advance.\n");
+            break;
+        }
+    }
+}
+
 static void pulse_write(struct pulse_stream *stream)
 {
     /* write as much data to PA as we can */
     UINT32 to_write;
     BYTE *buf = stream->local_buffer + stream->pa_offs_bytes;
     UINT32 bytes = pa_stream_writable_size(stream->stream);
+
+    pulse_write_index_catchup(stream);
 
     if (stream->just_underran)
     {
@@ -1505,9 +1541,17 @@ static void pulse_write(struct pulse_stream *stream)
             to_write = bytes - stream->pa_held_bytes;
             TRACE("prebuffering %u frames of silence\n",
                     (int)(to_write / pa_frame_size(&stream->ss)));
-            buf = calloc(1, to_write);
-            pa_stream_write(stream->stream, buf, to_write, NULL, 0, PA_SEEK_RELATIVE);
-            free(buf);
+            if (silence_buf && to_write > silence_buf_size)
+            {
+                free(silence_buf);
+                silence_buf = NULL;
+            }
+            if (!silence_buf)
+            {
+                silence_buf_size = max(silence_buf_size, to_write);
+                silence_buf = calloc(1, silence_buf_size);
+            }
+            pa_stream_write(stream->stream, silence_buf, to_write, NULL, 0, PA_SEEK_RELATIVE);
         }
 
         stream->just_underran = FALSE;
@@ -1709,6 +1753,10 @@ static void pa_streams_timer_cb(pa_mainloop_api *api, pa_time_event *e, const st
                 stream->lcl_offs_bytes += adv_bytes;
                 stream->lcl_offs_bytes %= stream->real_bufsize_bytes;
                 stream->held_bytes -= adv_bytes;
+            }
+            else if (stream->dataflow == eRender)
+            {
+                pulse_write_index_catchup(stream);
             }
             else if (stream->dataflow == eCapture)
             {
