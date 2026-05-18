@@ -2338,3 +2338,10 @@ HRESULT WINAPI UiaDisconnectProvider(IRawElementProviderSimple *elprov)
 
     return S_OK;
 }
+
+HRESULT WINAPI UiaDisconnectAllProviders(void)
+{
+    FIXME("stub\n");
+
+    return S_OK;
+}
