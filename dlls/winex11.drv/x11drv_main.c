@@ -88,6 +88,7 @@ int xfixes_event_base = 0;
 char *process_name = NULL;
 HANDLE steam_overlay_event;
 
+static BOOL err_locked_display;
 static x11drv_error_callback err_callback;   /* current callback for error */
 static Display *err_callback_display;        /* display callback is set for */
 static void *err_callback_arg;               /* error callback argument */
@@ -253,6 +254,18 @@ void X11DRV_expect_error( Display *display, x11drv_error_callback callback, void
 {
     pthread_mutex_lock( &error_mutex );
     XLockDisplay( display );
+    err_locked_display   = TRUE;
+    err_callback         = callback;
+    err_callback_display = display;
+    err_callback_arg     = arg;
+    err_callback_result  = 0;
+    err_serial           = NextRequest(display);
+}
+
+void X11DRV_expect_error_no_user_lock( Display *display, x11drv_error_callback callback, void *arg )
+{
+    pthread_mutex_lock( &error_mutex );
+    err_locked_display   = FALSE;
     err_callback         = callback;
     err_callback_display = display;
     err_callback_arg     = arg;
@@ -271,7 +284,11 @@ int X11DRV_check_error(void)
 {
     int res = err_callback_result;
     err_callback = NULL;
-    XUnlockDisplay( err_callback_display );
+    if (err_locked_display)
+    {
+        XUnlockDisplay( err_callback_display );
+        err_locked_display = FALSE;
+    }
     pthread_mutex_unlock( &error_mutex );
     return res;
 }
