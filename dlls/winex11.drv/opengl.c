@@ -920,7 +920,7 @@ static BOOL set_swap_interval( struct gl_drawable *gl, int interval )
     switch (swap_control_method)
     {
     case GLX_SWAP_CONTROL_EXT:
-        X11DRV_expect_error(gdi_display, GLXErrorHandler, NULL);
+        X11DRV_expect_error_no_user_lock(gdi_display, GLXErrorHandler, NULL);
         pglXSwapIntervalEXT( gdi_display, gl->drawable, interval );
         XSync(gdi_display, False);
         ret = !X11DRV_check_error();
@@ -1277,7 +1277,7 @@ static BOOL x11drv_context_create( int format, void *share, const int *attribLis
         }
     }
 
-    X11DRV_expect_error(gdi_display, GLXErrorHandler, NULL);
+    X11DRV_expect_error_no_user_lock(gdi_display, GLXErrorHandler, NULL);
     *context = create_glxcontext( format, share, attribList ? glx_attribs : NULL );
     XSync(gdi_display, False);
     if ((err = X11DRV_check_error()) || !*context)
