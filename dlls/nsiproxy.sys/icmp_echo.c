@@ -128,6 +128,7 @@ struct icmp_reply_ctx
     unsigned int data_offset;
     BYTE packet[65536];
     unsigned int packet_size;
+    uint16_t id, sequence;
 };
 
 struct family_ops;
@@ -357,7 +358,7 @@ static BOOL ipv4_linux_ping_parse_ip_hdr( struct msghdr *msg, int recvd, int *ip
 }
 #endif
 
-static int ipv4_parse_icmp_hdr( struct icmp_data *data, struct icmp_hdr *icmp, int icmp_size,
+static int ipv4_parse_icmp_hdr( struct icmp_socket *s, struct icmp_hdr *icmp, int icmp_size,
                                 struct icmp_reply_ctx *ctx )
 {
     static const IP_STATUS unreach_codes[] =
@@ -387,9 +388,8 @@ static int ipv4_parse_icmp_hdr( struct icmp_data *data, struct icmp_hdr *icmp, i
     switch (icmp->type)
     {
     case ICMP4_ECHO_REPLY:
-        if ((!data->s->ping_socket && icmp->un.echo.id != data->s->id) ||
-            icmp->un.echo.sequence != data->seq) return -1;
-
+        ctx->id = icmp->un.echo.id;
+        ctx->sequence = icmp->un.echo.sequence;
         ctx->status = IP_SUCCESS;
         return icmp_size - sizeof(*icmp);
 
@@ -419,11 +419,13 @@ static int ipv4_parse_icmp_hdr( struct icmp_data *data, struct icmp_hdr *icmp, i
         return -1;
     }
 
-    if (data->s->ping_socket) return 0;
+    if (s->ping_socket)
+    {
+        /* Ping sockets only return echo reply through normal recvmsg() received data, should not get here. */
+        return -1;
+    }
 
-    /* Check that the appended packet is really ours -
-     * all handled icmp replies have an 8-byte header
-     * followed by the original ip hdr. */
+    /* All handled icmp replies have an 8-byte header followed by the original ip hdr. */
     if (icmp_size < sizeof(*icmp) + sizeof(*orig_ip_hdr)) return -1;
     orig_ip_hdr = (struct ip_hdr *)(icmp + 1);
     if (orig_ip_hdr->v_hl >> 4 != 4 || orig_ip_hdr->protocol != IPPROTO_ICMP) return -1;
@@ -431,10 +433,10 @@ static int ipv4_parse_icmp_hdr( struct icmp_data *data, struct icmp_hdr *icmp, i
     if (icmp_size < sizeof(*icmp) + orig_ip_hdr_len + sizeof(*orig_icmp_hdr)) return -1;
     orig_icmp_hdr = (const struct icmp_hdr *)((const BYTE *)orig_ip_hdr + orig_ip_hdr_len);
     if (orig_icmp_hdr->type != ICMP4_ECHO_REQUEST ||
-        orig_icmp_hdr->code != 0 ||
-        (!data->s->ping_socket && orig_icmp_hdr->un.echo.id != data->s->id) ||
-        orig_icmp_hdr->un.echo.sequence != data->seq) return -1;
+        orig_icmp_hdr->code != 0) return -1;
 
+    ctx->id = orig_icmp_hdr->un.echo.id;
+    ctx->sequence = orig_icmp_hdr->un.echo.sequence;
     ctx->status = status;
     return 0;
 }
@@ -500,7 +502,7 @@ struct family_ops
     int (*set_reply_ip_status)( IP_STATUS ip_status, unsigned int bits, void *out );
     void (*set_socket_opts)( struct icmp_socket *s );
     BOOL (*parse_ip_hdr)( struct msghdr *msg, int recvd, int *ip_hdr_len, struct icmp_reply_ctx *ctx );
-    int (*parse_icmp_hdr)( struct icmp_data *data, struct icmp_hdr *icmp, int icmp_len, struct icmp_reply_ctx *ctx );
+    int (*parse_icmp_hdr)( struct icmp_socket *s, struct icmp_hdr *icmp, int icmp_len, struct icmp_reply_ctx *ctx );
     BOOL (*fill_reply)( struct icmp_get_reply_params *params, struct icmp_reply_ctx *ctx );
 };
 
@@ -625,7 +627,7 @@ static BOOL ipv6_parse_ip_hdr( struct msghdr *msg, int recvd, int *ip_hdr_len,
     return TRUE;
 }
 
-static int ipv6_parse_icmp_hdr( struct icmp_data *data, struct icmp_hdr *icmp,
+static int ipv6_parse_icmp_hdr( struct icmp_socket *s, struct icmp_hdr *icmp,
                                 int icmp_size, struct icmp_reply_ctx *ctx )
 {
     static const IP_STATUS unreach_codes[] =
@@ -646,9 +648,8 @@ static int ipv6_parse_icmp_hdr( struct icmp_data *data, struct icmp_hdr *icmp,
     switch (icmp->type)
     {
     case ICMP6_ECHO_REPLY:
-        if ((!data->s->ping_socket && icmp->un.echo.id != data->s->id) ||
-            icmp->un.echo.sequence != data->seq) return -1;
-
+        ctx->id = icmp->un.echo.id;
+        ctx->sequence = icmp->un.echo.sequence;
         ctx->status = IP_SUCCESS;
         return icmp_size - sizeof(*icmp);
 
@@ -680,20 +681,24 @@ static int ipv6_parse_icmp_hdr( struct icmp_data *data, struct icmp_hdr *icmp,
         return -1;
     }
 
-    if (data->s->ping_socket) return 0;
-    /* Check that the appended packet is really ours. */
+    if (s->ping_socket)
+    {
+        /* Ping sockets only return echo reply through normal recvmsg() received data, should not get here. */
+        return -1;
+    }
+
+    /* All handled icmp replies have an 8-byte header followed by the original ip hdr. */
     if (icmp_size < sizeof(*icmp) + sizeof(*orig_ip_hdr)) return -1;
     orig_ip_hdr = (struct ipv6_hdr *)(icmp + 1);
     if ((orig_ip_hdr->v_prio >> 4) != 6 || orig_ip_hdr->next_hdr != IPPROTO_ICMPV6) return -1;
     if (icmp_size < sizeof(*icmp) + sizeof(*orig_ip_hdr) + sizeof(*orig_icmp_hdr)) return -1;
     orig_icmp_hdr = (const struct icmp_hdr *)((const BYTE *)orig_ip_hdr + sizeof(*orig_ip_hdr));
     if (orig_icmp_hdr->type != ICMP6_ECHO_REQUEST ||
-        orig_icmp_hdr->code != 0 ||
-        (!data->s->ping_socket && orig_icmp_hdr->un.echo.id != data->s->id) ||
-        orig_icmp_hdr->un.echo.sequence != data->seq) return -1;
+        orig_icmp_hdr->code != 0) return -1;
 
+    ctx->id = orig_icmp_hdr->un.echo.id;
+    ctx->sequence = orig_icmp_hdr->un.echo.sequence;
     ctx->status = status;
-
     return 0;
 }
 
@@ -983,6 +988,7 @@ NTSTATUS icmp_listen( void *args )
     int ip_hdr_len, recvd;
     struct icmp_data *data;
     unsigned int i, count;
+    BOOL matched;
     int ret;
     BYTE b;
 
@@ -1035,11 +1041,18 @@ NTSTATUS icmp_listen( void *args )
             if (recvd < ip_hdr_len + sizeof(*icmp_hdr)) goto skip;
             ctx.packet_size = recvd;
             icmp_hdr = (struct icmp_hdr *)(ctx.packet + ip_hdr_len);
+            if ((ctx.data_size = s->ops->parse_icmp_hdr( s, icmp_hdr, recvd - ip_hdr_len, &ctx )) < 0)
+            {
+                WARN( "parse_icmp_hdr failed.\n" );
+                goto skip;
+            }
             pthread_mutex_lock( &listen_lock );
+            matched = FALSE;
             LIST_FOR_EACH_ENTRY( data, &s->request_list, struct icmp_data, entry )
             {
-                if ((ctx.data_size = s->ops->parse_icmp_hdr( data, icmp_hdr, recvd - ip_hdr_len, &ctx )) < 0)
-                    continue;
+                if ((!s->ping_socket && ctx.id != s->id) || ctx.sequence != data->seq) continue;
+                TRACE( "id %d, seq %d matched to %p.\n", ctx.id, ctx.sequence, data );
+                matched = TRUE;
                 data->polling = FALSE;
                 list_remove( &data->entry );
                 sockaddr_to_SOCKADDR_INET( (struct sockaddr *)&addr, &ctx.addr );
@@ -1050,6 +1063,7 @@ NTSTATUS icmp_listen( void *args )
                 break;
             }
             pthread_mutex_unlock( &listen_lock );
+            if (!matched) TRACE( "id %d, seq %d not matched.\n", ctx.id, ctx.sequence );
 skip:
             ++i;
         }
