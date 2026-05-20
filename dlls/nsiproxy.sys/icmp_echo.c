@@ -1198,7 +1198,7 @@ NTSTATUS icmp_get_reply( void *args )
 {
     struct icmp_get_reply_params *params = args;
     struct icmp_data *data;
-    NTSTATUS ret;
+    NTSTATUS ret = STATUS_SUCCESS;
 
     data = handle_data( params->handle );
     if (!data) return STATUS_INVALID_PARAMETER;
@@ -1208,7 +1208,7 @@ NTSTATUS icmp_get_reply( void *args )
         TRACE( "data %p, seq %u, invalid hop_limit.\n", data, data->seq );
         icmp_data_stop_polling( data, STATUS_SUCCESS );
         params->reply_len = data->s->ops->set_reply_ip_status( IP_GENERAL_FAILURE, params->bits, params->reply );
-        return STATUS_SUCCESS;
+        goto done;
     }
 
     if (icmp_data_stop_polling( data, STATUS_TIMEOUT ))
@@ -1216,7 +1216,6 @@ NTSTATUS icmp_get_reply( void *args )
         /* Was still polling, timeout. */
         TRACE( "data %p, seq %u, timeout.\n", data, data->seq );
         params->reply_len = data->s->ops->set_reply_ip_status( IP_REQ_TIMED_OUT, params->bits, params->reply );
-        ret = STATUS_SUCCESS;
     }
     else if (!(ret = data->status))
     {
@@ -1227,6 +1226,7 @@ NTSTATUS icmp_get_reply( void *args )
         }
         else TRACE( "data %p, seq %u, got reply %u.\n", data, data->seq, data->reply_ctx.status );
     }
+done:
     icmp_data_free( data );
     handle_free( params->handle );
     return ret;
