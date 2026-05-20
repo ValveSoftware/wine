@@ -290,6 +290,20 @@ static BOOL capture_buffer_service(capture_state_t* state)
     if (rc!=DS_OK)
         return FALSE;
 
+    ptr1 = ptr2 = (void *)0xdeadbeef;
+    len1 = len2 = 0xdeadbeef;
+    rc=IDirectSoundCaptureBuffer_Lock(state->dscbo,(DWORD)-1,0,
+                                      &ptr1,&len1,&ptr2,&len2,0);
+    ok(rc==DSERR_INVALIDPARAM,"IDirectSoundCaptureBuffer_Lock() failed: %08lx\n", rc);
+    ok(!ptr1 && !ptr2 && !len1 && !len2, "got %p, %lu, %p, %lu.\n", ptr1, len1, ptr2, len2);
+
+    ptr1 = ptr2 = (void *)0xdeadbeef;
+    len1 = len2 = 0xdeadbeef;
+    rc=IDirectSoundCaptureBuffer_Lock(state->dscbo,state->offset,10 * 1048576,
+                                      &ptr1,&len1,&ptr2,&len2,0);
+    ok(rc==DSERR_INVALIDPARAM,"IDirectSoundCaptureBuffer_Lock() failed: %08lx\n", rc);
+    ok(!ptr1 && !ptr2 && !len1 && !len2, "got %p, %lu, %p, %lu.\n", ptr1, len1, ptr2, len2);
+
     rc=IDirectSoundCaptureBuffer_Lock(state->dscbo,state->offset,state->size,
                                       &ptr1,&len1,&ptr2,&len2,0);
     ok(rc==DS_OK,"IDirectSoundCaptureBuffer_Lock() failed: %08lx\n", rc);

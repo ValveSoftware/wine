@@ -452,12 +452,14 @@ static HRESULT WINAPI IDirectSoundCaptureBufferImpl_Lock(IDirectSoundCaptureBuff
 
     if (This->device->client) {
         *lplpvAudioPtr1 = This->device->buffer + dwReadCusor;
-        if ( (dwReadCusor + dwReadBytes) > This->device->buflen) {
-            *lpdwAudioBytes1 = This->device->buflen - dwReadCusor;
+        if ( dwReadCusor > This->device->buflen || This->device->buflen - dwReadCusor < dwReadBytes) {
+            *lpdwAudioBytes1 = 0;
+            *lplpvAudioPtr1 = NULL;
 	    if (lplpvAudioPtr2)
-            	*lplpvAudioPtr2 = This->device->buffer;
+            *lplpvAudioPtr2 = NULL;
 	    if (lpdwAudioBytes2)
-		*lpdwAudioBytes2 = dwReadBytes - *lpdwAudioBytes1;
+		*lpdwAudioBytes2 = 0;
+	    hres = DSERR_INVALIDPARAM;
         } else {
             *lpdwAudioBytes1 = dwReadBytes;
 	    if (lplpvAudioPtr2)
