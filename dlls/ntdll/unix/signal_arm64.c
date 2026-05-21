@@ -345,13 +345,14 @@ NTSTATUS signal_set_full_context( CONTEXT *context )
 {
     struct syscall_frame *frame = get_syscall_frame();
     struct arm64_thread_data *arm64_data = arm64_thread_data();
+    CHPE_V2_CPU_AREA_INFO *cpu_area = NtCurrentTeb()->ChpeV2CpuAreaInfo;
     NTSTATUS status;
 
-    if (arm64_data->suspend_pending)
+    if (arm64_data->suspend_pending && !cpu_area->InSyscallCallback && !cpu_area->InSimulation)
     {
         sigset_t old_set;
         pthread_sigmask( SIG_BLOCK, &server_block_set, &old_set );
-        *NtCurrentTeb()->ChpeV2CpuAreaInfo->SuspendDoorbell = 0;
+        *cpu_area->SuspendDoorbell = 0;
         arm64_data->suspend_pending = FALSE;
         wait_suspend( context );
         status = NtSetContextThread( GetCurrentThread(), context );
