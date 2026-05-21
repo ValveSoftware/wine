@@ -207,6 +207,7 @@ struct ddraw_surface
      * but no pointer to prevent temptations to traverse it in the wrong direction.
      */
     unsigned int is_root : 1;
+    unsigned int is_chain_start : 1;
     unsigned int is_lost : 1;
     unsigned int sysmem_fallback : 1;
 
