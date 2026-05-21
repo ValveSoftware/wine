@@ -451,8 +451,7 @@ static HRESULT WINAPI IDirectSoundCaptureBufferImpl_Lock(IDirectSoundCaptureBuff
     EnterCriticalSection(&(This->device->lock));
 
     if (This->device->client) {
-        *lplpvAudioPtr1 = This->device->buffer + dwReadCusor;
-        if ( dwReadCusor > This->device->buflen || This->device->buflen - dwReadCusor < dwReadBytes) {
+        if ( dwReadCusor >= This->device->buflen || !dwReadBytes || dwReadBytes > This->device->buflen) {
             *lpdwAudioBytes1 = 0;
             *lplpvAudioPtr1 = NULL;
 	    if (lplpvAudioPtr2)
@@ -461,11 +460,12 @@ static HRESULT WINAPI IDirectSoundCaptureBufferImpl_Lock(IDirectSoundCaptureBuff
 		*lpdwAudioBytes2 = 0;
 	    hres = DSERR_INVALIDPARAM;
         } else {
-            *lpdwAudioBytes1 = dwReadBytes;
-	    if (lplpvAudioPtr2)
-            	*lplpvAudioPtr2 = 0;
-	    if (lpdwAudioBytes2)
-            	*lpdwAudioBytes2 = 0;
+            *lplpvAudioPtr1 = This->device->buffer + dwReadCusor;
+            *lpdwAudioBytes1 = min(dwReadBytes, This->device->buflen - dwReadCusor);
+            if (lpdwAudioBytes2)
+                *lpdwAudioBytes2 = dwReadBytes - *lpdwAudioBytes1;
+            if (lplpvAudioPtr2)
+                *lplpvAudioPtr2 = dwReadBytes - *lpdwAudioBytes1 ? This->device->buffer : NULL;
         }
     } else {
         TRACE("invalid call\n");
