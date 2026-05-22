@@ -6327,11 +6327,19 @@ static HRESULT ddraw_surface_reserve_memory(struct wined3d_texture *wined3d_text
     return hr;
 }
 
-static void wined3d_resource_desc_from_ddraw(struct ddraw *ddraw,
-        struct wined3d_resource_desc *wined3d_desc, const DDSURFACEDESC2 *desc)
+static BOOL force_3ddevice(struct ddraw *ddraw, const DDSURFACEDESC2 *desc, unsigned int surface_version)
 {
-    const DWORD caps = desc->ddsCaps.dwCaps;
+    return surface_version == 1 && desc->ddsCaps.dwCaps & DDSCAPS_PRIMARYSURFACE && !(ddraw->flags & DDRAW_NO3D);
+}
+
+static void wined3d_resource_desc_from_ddraw(struct ddraw *ddraw,
+        struct wined3d_resource_desc *wined3d_desc, const DDSURFACEDESC2 *desc, unsigned int version)
+{
+    DWORD caps = desc->ddsCaps.dwCaps;
     const DWORD caps2 = desc->ddsCaps.dwCaps2;
+
+    if (force_3ddevice(ddraw, desc, version))
+        caps |= DDSCAPS_3DDEVICE;
 
     wined3d_desc->resource_type = WINED3D_RTYPE_TEXTURE_2D;
     wined3d_desc->format = wined3dformat_from_ddrawformat(&desc->ddpfPixelFormat);
@@ -6397,7 +6405,7 @@ static HRESULT ddraw_texture_init(struct ddraw_texture *texture, struct ddraw *d
     unsigned int i, j;
     HRESULT hr;
 
-    wined3d_resource_desc_from_ddraw(ddraw, &wined3d_desc, desc);
+    wined3d_resource_desc_from_ddraw(ddraw, &wined3d_desc, desc, texture->version);
 
     if (wined3d_desc.format == WINED3DFMT_UNKNOWN)
     {
@@ -6976,7 +6984,7 @@ HRESULT ddraw_surface_create(struct ddraw *ddraw, const DDSURFACEDESC2 *surface_
 
             if (desc->ddsCaps.dwCaps & DDSCAPS_ZBUFFER)
                 bind_flags |= WINED3D_BIND_DEPTH_STENCIL;
-            else if (desc->ddsCaps.dwCaps & DDSCAPS_3DDEVICE)
+            else if ((desc->ddsCaps.dwCaps & DDSCAPS_3DDEVICE) || force_3ddevice(ddraw, desc, version))
                 bind_flags |= WINED3D_BIND_RENDER_TARGET;
 
             if (!(ddraw->flags & DDRAW_NO3D) && SUCCEEDED(hr = wined3d_check_device_format(ddraw->wined3d,
