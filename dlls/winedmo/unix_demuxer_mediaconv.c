@@ -215,9 +215,15 @@ int mediaconv_demuxer_open( AVFormatContext **ctx, struct stream_context *contex
     pthread_mutex_lock( &fozdb_lock );
 
     if (read_db && (transcoded = fozdb_entry_get( &read_db->entries, VIDEO_CONV_FOZ_TAG_MKVDATA, &stream_hash )))
+    {
         TRACE( "Found mkv stream for %s\n", debugstr_fozdb_hash( &stream_hash ) );
+        mark_transcoded_stream(read_db, &stream_hash);
+    }
     else if (read_db && (transcoded = fozdb_entry_get( &read_db->entries, VIDEO_CONV_FOZ_TAG_OGVDATA, &stream_hash )))
+    {
         TRACE( "Found ogv stream for %s\n", debugstr_fozdb_hash( &stream_hash ) );
+        mark_transcoded_stream(read_db, &stream_hash);
+    }
     else if (!dump_db)
         TRACE( "No dump fozdb for stream %s\n", debugstr_fozdb_hash( &stream_hash ) );
     else
