@@ -317,6 +317,7 @@ extern void virtual_map_user_shared_data(void);
 extern void virtual_init_user_shared_data(void);
 extern NTSTATUS virtual_handle_fault( EXCEPTION_RECORD *rec, void *stack );
 extern unsigned int virtual_locked_server_call( void *req_ptr );
+extern void virtual_apply_arm64x_read_fixups( int fd, void *buffer, size_t size, off_t offset );
 extern ssize_t virtual_locked_read( int fd, void *addr, size_t size );
 extern ssize_t virtual_locked_pread( int fd, void *addr, size_t size, off_t offset );
 extern ssize_t virtual_locked_recvmsg( int fd, struct msghdr *hdr, int flags );
@@ -402,6 +403,7 @@ extern NTSTATUS unixcall_wine_dbg_write( void *args );
 extern NTSTATUS unixcall_wine_server_call( void *args );
 extern NTSTATUS unixcall_wine_server_fd_to_handle( void *args );
 extern NTSTATUS unixcall_wine_server_handle_to_fd( void *args );
+extern NTSTATUS unixcall_apply_arm64x_read_fixups( void *args );
 extern NTSTATUS unixcall_wine_spawnvp( void *args );
 #ifdef _WIN64
 extern NTSTATUS wow64_wine_dbg_write( void *args );

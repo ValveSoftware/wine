@@ -6728,6 +6728,25 @@ err:
 
 
 /******************************************************************************
+ *              unixcall_apply_arm64x_read_fixups
+ */
+NTSTATUS unixcall_apply_arm64x_read_fixups( void *args )
+{
+    struct apply_arm64x_read_fixups_params *params = args;
+    enum server_fd_type type;
+    int fd, needs_close;
+
+    if (!server_get_unix_fd( params->handle, FILE_READ_DATA, &fd, &needs_close, &type, NULL ))
+    {
+        if (type == FD_TYPE_FILE)
+            virtual_apply_arm64x_read_fixups( fd, params->buffer, params->size, params->offset );
+        if (needs_close) close( fd );
+    }
+    return STATUS_SUCCESS;
+}
+
+
+/******************************************************************************
  *              NtReadFileScatter   (NTDLL.@)
  */
 NTSTATUS WINAPI NtReadFileScatter( HANDLE file, HANDLE event, PIO_APC_ROUTINE apc, void *apc_user,

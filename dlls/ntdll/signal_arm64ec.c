@@ -33,6 +33,7 @@
 #include "wine/list.h"
 #include "ntdll_misc.h"
 #include "unwind.h"
+#include "unixlib.h"
 #include "wine/debug.h"
 #include "ntsyscalls.h"
 
@@ -723,9 +724,17 @@ static void notify_map_view_of_section( HANDLE handle, void *addr, SIZE_T size, 
     SECTION_IMAGE_INFORMATION info;
     NTSTATUS status;
 
+    if (NtQuerySection( handle, SectionImageInformation, &info, sizeof(info), NULL ))
+    {
+        if (pNotifyMemoryProtect)
+        {
+            pNotifyMemoryProtect( addr, size, protect, FALSE, 0 );
+            pNotifyMemoryProtect( addr, size, protect, TRUE, STATUS_SUCCESS );
+        }
+        return;
+    }
     if (!pNotifyMapViewOfSection) return;
     if (!NtCurrentTeb()->Tib.ArbitraryUserPointer) return;
-    if (NtQuerySection( handle, SectionImageInformation, &info, sizeof(info), NULL )) return;
     status = pNotifyMapViewOfSection( NULL, addr, NULL, size, alloc, protect );
     if (NT_SUCCESS(status)) return;
     NtUnmapViewOfSection( GetCurrentProcess(), addr );
@@ -806,17 +815,34 @@ NTSTATUS SYSCALL_API NtReadFile( HANDLE handle, HANDLE event, PIO_APC_ROUTINE ap
                                  IO_STATUS_BLOCK *io, void *buffer, ULONG length,
                                  LARGE_INTEGER *offset, ULONG *key )
 {
+    struct apply_arm64x_read_fixups_params params =
+    {
+        .handle = handle,
+        .buffer = buffer,
+        .offset = offset && offset->QuadPart >= 0 ? offset->QuadPart : -1,
+    };
     NTSTATUS status;
 
     if (pBTCpu64NotifyReadFile && enter_syscall_callback())
     {
         pBTCpu64NotifyReadFile( handle, buffer, length, FALSE, 0 );
         status = syscall_NtReadFile( handle, event, apc, apc_user, io, buffer, length, offset, key );
+        if (!status && io->Information)
+        {
+            params.size = io->Information;
+            WINE_UNIX_CALL( unix_apply_arm64x_read_fixups, &params );
+        }
         if (pBTCpu64NotifyReadFile) pBTCpu64NotifyReadFile( handle, buffer, length, TRUE, status );
         leave_syscall_callback();
         return status;
     }
-    return syscall_NtReadFile( handle, event, apc, apc_user, io, buffer, length, offset, key );
+    status = syscall_NtReadFile( handle, event, apc, apc_user, io, buffer, length, offset, key );
+    if (!status && io->Information)
+    {
+        params.size = io->Information;
+        WINE_UNIX_CALL( unix_apply_arm64x_read_fixups, &params );
+    }
+    return status;
 }
 
 NTSTATUS SYSCALL_API NtSetContextThread( HANDLE handle, const CONTEXT *context )
