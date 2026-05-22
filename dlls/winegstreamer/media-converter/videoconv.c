@@ -66,14 +66,6 @@
 #define HASH_CHUNK_SIZE (8 * 1024 * 1024) /* 8 MB. */
 #define HASH_STRIDE     (HASH_CHUNK_SIZE * 6)
 
-#define VIDEO_CONV_FOZ_TAG_VIDEODATA        0
-#define VIDEO_CONV_FOZ_TAG_OGVDATA          1
-#define VIDEO_CONV_FOZ_TAG_STREAM           2
-#define VIDEO_CONV_FOZ_TAG_MKVDATA          3
-#define VIDEO_CONV_FOZ_TAG_CODEC            4
-#define VIDEO_CONV_FOZ_TAG_ORIGINAL_ENTRIES 5
-#define VIDEO_CONV_FOZ_NUM_TAGS             6
-
 #define DURATION_NONE (UINT64_MAX)
 
 struct pad_reader

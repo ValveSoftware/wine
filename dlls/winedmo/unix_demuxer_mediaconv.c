@@ -36,13 +36,6 @@ WINE_DEFAULT_DEBUG_CHANNEL(dmo);
 #define HASH_CHUNK_SIZE (8 * 1024 * 1024) /* 8 MB. */
 #define HASH_STRIDE     (HASH_CHUNK_SIZE * 6)
 
-#define VIDEO_CONV_FOZ_TAG_VIDEODATA 0
-#define VIDEO_CONV_FOZ_TAG_OGVDATA   1
-#define VIDEO_CONV_FOZ_TAG_STREAM    2
-#define VIDEO_CONV_FOZ_TAG_MKVDATA   3
-#define VIDEO_CONV_FOZ_TAG_CODEC     4
-#define VIDEO_CONV_FOZ_NUM_TAGS      5
-
 static pthread_mutex_t fozdb_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct fozdb *dump_db, *read_db;
 static int fozdb_users;
