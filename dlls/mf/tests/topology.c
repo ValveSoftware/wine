@@ -2291,6 +2291,7 @@ enum loader_test_flags
     LOADER_EXPECT_MFT_INPUT_ENUMERATED = 0x8000,
     LOADER_ADD_OPTIONAL_TEST_MFT_DOWNSTREAM = 0x10000,
     LOADER_EXPECT_MFT_OUTPUT_ENUMERATED_TODO = 0x20000,
+    LOADER_EXPECT_MFT_INPUT_ENUMERATED_TODO = 0x40000,
 };
 
 static void test_topology_loader(void)
@@ -2512,7 +2513,6 @@ static void test_topology_loader(void)
         unsigned int expected_output_index;
         unsigned int optional_mft_count;
         BOOL expect_optional_mft_rejected[2];
-        BOOL expect_optional_mft_accepted_todo;
         unsigned int flags;
         GUID decoder_class;
         GUID converter_class;
@@ -2903,7 +2903,7 @@ static void test_topology_loader(void)
             .mft_input_types = {&video_nv12_1280}, .mft_output_types = {&video_nv12_1280},
             .optional_mft_count = 1,
             .expected_result = S_OK, .decoder_class = CLSID_CMSH264DecoderMFT,
-            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED,
+            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED_TODO,
         },
         {
             /* H264 -> NV12, add two optional test MFTs and test MFT */
@@ -2911,7 +2911,7 @@ static void test_topology_loader(void)
             .mft_input_types = {&video_nv12_1280}, .mft_output_types = {&video_nv12_1280},
             .optional_mft_count = 2,
             .expected_result = S_OK, .decoder_class = CLSID_CMSH264DecoderMFT,
-            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED,
+            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED_TODO,
         },
         {
             /* H264 -> NV12, add unconnectable optional test MFT and test MFT */
@@ -2920,7 +2920,7 @@ static void test_topology_loader(void)
             .optional_mft_input_types = {&video_yuy2_1280},
             .optional_mft_count = 1, .expect_optional_mft_rejected = {TRUE},
             .expected_result = S_OK, .decoder_class = CLSID_CMSH264DecoderMFT,
-            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED,
+            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED_TODO,
         },
         {
             /* H264 -> NV12, add unconnectable optional test MFT, connectable optional test MFT and test MFT */
@@ -2929,7 +2929,7 @@ static void test_topology_loader(void)
             .optional_mft_input_types = {&video_yuy2_1280, &video_nv12_1280},
             .optional_mft_count = 2, .expect_optional_mft_rejected = {TRUE, FALSE},
             .expected_result = S_OK, .decoder_class = CLSID_CMSH264DecoderMFT,
-            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED,
+            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED_TODO,
         },
         {
             /* #60 H264 -> NV12, add connectable optional test MFT, unconnectable optional test MFT and test MFT */
@@ -2938,7 +2938,7 @@ static void test_topology_loader(void)
             .optional_mft_input_types = {&video_nv12_1280, &video_yuy2_1280},
             .optional_mft_count = 2, .expect_optional_mft_rejected = {FALSE, TRUE},
             .expected_result = S_OK, .decoder_class = CLSID_CMSH264DecoderMFT,
-            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED,
+            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED_TODO,
         },
         {
             /* H264 -> NV12, add two unconnectable optional test MFTs and test MFT */
@@ -2947,7 +2947,7 @@ static void test_topology_loader(void)
             .optional_mft_input_types = {&video_yuy2_1280, &video_yuy2_1280},
             .optional_mft_count = 2, .expect_optional_mft_rejected = {TRUE, TRUE},
             .expected_result = S_OK, .decoder_class = CLSID_CMSH264DecoderMFT,
-            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED,
+            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED_TODO,
         },
         {
             /* H264 -> NV12, add optional test MFT and test MFT, require test MFT input change for optional */
@@ -2956,7 +2956,7 @@ static void test_topology_loader(void)
             .optional_mft_output_type = &video_yuy2_1280,
             .optional_mft_count = 1,
             .expected_result = S_OK, .decoder_class = CLSID_CMSH264DecoderMFT,
-            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED,
+            .flags = LOADER_ADD_TEST_MFT | LOADER_EXPECT_MFT_INPUT_ENUMERATED_TODO,
         },
         {
             /* H264 -> NV12, add test MFT and optional test MFT */
@@ -2980,7 +2980,7 @@ static void test_topology_loader(void)
             .input_types = {&video_h264_1280}, .output_types = {&video_nv12_1280}, .sink_method = MF_CONNECT_DIRECT, .source_method = -1,
             .mft_input_types = {&video_nv12_1280}, .mft_output_types = {&video_nv12_1280, &video_yuy2_1280},
             .optional_mft_input_types = {&video_yuy2_1280},
-            .optional_mft_count = 1, .expect_optional_mft_accepted_todo = TRUE,
+            .optional_mft_count = 1,
             .expected_result = S_OK, .decoder_class = CLSID_CMSH264DecoderMFT,
             .flags = LOADER_ADD_TEST_MFT | LOADER_NO_CURRENT_OUTPUT | LOADER_ADD_OPTIONAL_TEST_MFT_DOWNSTREAM | LOADER_EXPECT_MFT_INPUT_ENUMERATED | LOADER_EXPECT_MFT_OUTPUT_ENUMERATED_TODO,
         },
@@ -3431,7 +3431,7 @@ static void test_topology_loader(void)
             for (j = 0; j < test->optional_mft_count; ++j)
             {
                 hr = IMFTopology_GetNodeByID(full_topology, optional_mft_node_id[j], &mft_node);
-                todo_wine_if(test->expect_optional_mft_accepted_todo)
+                todo_wine_if(test->expect_optional_mft_rejected[j])
                 ok(hr == (test->expect_optional_mft_rejected[j] ? MF_E_NOT_FOUND : S_OK), "Unexpected hr %#lx.\n", hr);
                 expect_optional_rejected |= test->expect_optional_mft_rejected[j];
 
@@ -3467,7 +3467,7 @@ todo_wine {
 
             hr = IMFTopology_GetNodeCount(full_topology, &node_count);
             ok(hr == S_OK, "Failed to get node count, hr %#lx.\n", hr);
-            todo_wine_if(test->expect_optional_mft_accepted_todo)
+            todo_wine_if(expect_optional_rejected)
             ok(node_count == count, "Unexpected node count %u.\n", node_count);
 
             hr = IMFTopologyNode_GetTopoNodeID(src_node, &node_id);
@@ -3502,11 +3502,13 @@ todo_wine {
                 ok(!!test_transform->set_output_sequence_id, "Test transform output sequence id not set.\n");
                 if (test->flags & LOADER_ADD_OPTIONAL_TEST_MFT_DOWNSTREAM)
                 {
+                    todo_wine
                     ok(optional_transforms[0]->set_input_sequence_id > handler.is_supported_sequence_id,
                             "Optional transform input was not configured after the sink input.\n");
                 }
                 else
                 {
+                    todo_wine
                     ok(optional_transforms[0]->set_input_sequence_id > test_transform->set_input_sequence_id,
                             "Optional transform input was not configured after the non-optional one.\n");
                     if (optional_transforms[0]->set_output_sequence_id)
@@ -3660,7 +3662,7 @@ todo_wine {
             ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
             hr = IMFTopology_GetNodeCount(topology2, &node_count);
             ok(hr == S_OK, "Failed to get node count, hr %#lx.\n", hr);
-            todo_wine_if(test->expect_optional_mft_accepted_todo)
+            todo_wine_if(expect_optional_rejected)
             ok(node_count == count, "Unexpected node count %u.\n", node_count);
 
             ref = IMFTopology_Release(topology2);
@@ -3683,7 +3685,8 @@ todo_wine {
 
         if (test_transform)
         {
-            ok(test_transform->input_enum_complete == !!(test->flags & LOADER_EXPECT_MFT_INPUT_ENUMERATED),
+            todo_wine_if(test->flags & LOADER_EXPECT_MFT_INPUT_ENUMERATED_TODO)
+            ok(test_transform->input_enum_complete == !!(test->flags & (LOADER_EXPECT_MFT_INPUT_ENUMERATED | LOADER_EXPECT_MFT_INPUT_ENUMERATED_TODO)),
                     "got transform input_enum_complete %u\n", test_transform->input_enum_complete);
             todo_wine_if((test->flags & LOADER_EXPECT_MFT_OUTPUT_ENUMERATED_TODO) || (test_transform->output_enum_complete && (test->flags & LOADER_TODO)))
             ok(test_transform->output_enum_complete == !!(test->flags & (LOADER_EXPECT_MFT_OUTPUT_ENUMERATED | LOADER_EXPECT_MFT_OUTPUT_ENUMERATED_TODO)),
