@@ -52,6 +52,14 @@ GST_DEBUG_CATEGORY_EXTERN(media_converter_debug);
 
 typedef int (*data_read_callback)(void *data_reader, uint8_t *buffer, size_t size, size_t *read_size);
 
+#define VIDEO_CONV_FOZ_TAG_VIDEODATA        0
+#define VIDEO_CONV_FOZ_TAG_OGVDATA          1
+#define VIDEO_CONV_FOZ_TAG_STREAM           2
+#define VIDEO_CONV_FOZ_TAG_MKVDATA          3
+#define VIDEO_CONV_FOZ_TAG_CODEC            4
+#define VIDEO_CONV_FOZ_TAG_ORIGINAL_ENTRIES 5
+#define VIDEO_CONV_FOZ_NUM_TAGS             6
+
 /* Changing this will invalidate the cache. You MUST clear it. */
 #define HASH_SEED 0x4AA61F63
 
