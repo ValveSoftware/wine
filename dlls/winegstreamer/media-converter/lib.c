@@ -316,6 +316,87 @@ void dump_fozdb_close(struct dump_fozdb *db)
     }
 }
 
+#define SHA1_DIGEST_LENGTH 20
+
+typedef struct
+{
+    uint32_t tag;
+    struct fozdb_hash hash;
+    uint8_t sha1[SHA1_DIGEST_LENGTH];
+} original_entries_slot;
+C_ASSERT(sizeof(original_entries_slot) == 40);
+
+void mark_transcoded_stream(struct fozdb *fozdb, struct fozdb_hash *hash)
+{
+    struct fozdb *played_fozdb;
+    uint32_t original_size;
+    size_t read_size;
+    char *played_filename;
+    char *transcoded_file;
+    char *ptr;
+    size_t len;
+    uint8_t *slots;
+
+    if (fozdb_entry_size(fozdb, VIDEO_CONV_FOZ_TAG_ORIGINAL_ENTRIES, hash, &original_size) != CONV_OK)
+    {
+        GST_TRACE("No original entries stream found. Not dumping played chunks.\n");
+        return;
+    }
+    if (!original_size || (original_size % sizeof(original_entries_slot)))
+    {
+        GST_TRACE("Unexpected orginal entries stream size %d.\n", original_size);
+        return;
+    }
+    /* FIXME until we get a proper output file name,
+     * store played_chunks.foz in same directory as MEDIACONV_VIDEO_TRANSCODED_FILE
+     */
+    if (!(transcoded_file = getenv("MEDIACONV_VIDEO_TRANSCODED_FILE")))
+    {
+        GST_DEBUG("No transcoded filename, aborting\n");
+        return;
+    }
+    ptr = strrchr(transcoded_file, '/');
+    len = ptr ? ptr + 1 - transcoded_file : 0;
+    if (!(played_filename = malloc(len + strlen("played_chunks.foz") + 1)))
+    {
+        GST_DEBUG("OOM\n");
+        return;
+    }
+    if (len) memcpy(played_filename, transcoded_file, len);
+    strcpy(played_filename + len, "played_chunks.foz");
+
+    GST_TRACE("Writing played chunks into %s\n", played_filename);
+    /* ensure file exists */
+    if (create_file(played_filename) != CONV_OK ||
+        fozdb_create(played_filename, O_RDWR, false, VIDEO_CONV_FOZ_NUM_TAGS, &played_fozdb) != CONV_OK)
+    {
+        GST_ERROR("Couldn't create or open %s fozdb\n", played_filename);
+        return;
+    }
+
+    slots = malloc(original_size);
+    if (slots &&
+        fozdb_read_entry_data(fozdb, VIDEO_CONV_FOZ_TAG_ORIGINAL_ENTRIES, hash, 0,
+                              slots, original_size, &read_size, false) == CONV_OK &&
+        original_size == read_size)
+    {
+        original_entries_slot *slot;
+        original_entries_slot *last_slot = (void *)(slots + original_size);
+
+        for (slot = (void *)slots; slot < last_slot; slot++)
+        {
+            if (!fozdb_has_entry(played_fozdb, slot->tag, &slot->hash))
+            {
+                struct bytes_reader bytes_reader;
+                bytes_reader_init(&bytes_reader, slot->sha1, SHA1_DIGEST_LENGTH);
+                fozdb_write_entry(played_fozdb, slot->tag, &slot->hash, &bytes_reader, bytes_reader_read, true);
+            }
+        }
+    }
+    free(slots);
+    fozdb_release(played_fozdb);
+}
+
 #ifndef _WINEDMO
 
 bool media_converter_init(void)
