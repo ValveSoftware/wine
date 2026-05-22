@@ -38,6 +38,7 @@
 #define GST_ERROR(fmt, ...) ERR(fmt "\n", ## __VA_ARGS__)
 #define GST_WARNING(fmt, ...) WARN(fmt "\n", ## __VA_ARGS__)
 #define GST_INFO(fmt, ...) TRACE(fmt "\n", ## __VA_ARGS__)
+#define GST_TRACE(fmt, ...) TRACE(fmt "\n", ## __VA_ARGS__)
 #define GST_DEBUG(fmt, ...) TRACE(fmt "\n", ## __VA_ARGS__)
 typedef struct gst_buffer GstBuffer; /* not used */
 extern size_t gst_buffer_extract(GstBuffer*,size_t,void*,size_t); /* not used */
@@ -182,6 +183,7 @@ extern uint32_t crc32(uint32_t crc, const uint8_t *ptr, size_t buf_len);
 extern int create_placeholder_file(const char *file_name);
 extern int dump_fozdb_open(struct dump_fozdb *db, bool create, const char *file_path_env, int num_tags);
 extern void dump_fozdb_close(struct dump_fozdb *db);
+extern void mark_transcoded_stream(struct fozdb *fozdb, struct fozdb_hash *hash);
 
 /* murmur3.c. */
 extern void murmur3_x64_128_state_init(struct murmur3_x64_128_state *state, uint32_t seed);
