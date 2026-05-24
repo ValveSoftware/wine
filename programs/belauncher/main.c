@@ -169,7 +169,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
     battleye_status = 0x9; /* Launching Game */
     _write(1, &battleye_status, 1);
 
-    if (PathIsRelativeW(game_exeW))
+    if (PathIsRelativeW(game_exeW) || game_exeW[0] == L'\\')
         path_len = wcslen(path);
     else
         path_len = 0;
