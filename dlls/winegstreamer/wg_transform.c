@@ -91,6 +91,7 @@ struct wg_transform
     GstAtomicQueue *output_queue;
     GstSample *output_sample;
     bool output_caps_changed;
+    bool reblock_output_audio;
     GstCaps *desired_caps;
     GstCaps *output_caps;
     GstCaps *input_caps;
@@ -722,6 +723,25 @@ static bool transform_create_converter_elements(struct wg_transform *transform,
         if (!(element = create_element("audioresample", "base"))
                 || !append_element(transform->container, element, first, last))
             return false;
+
+        /* Reblock Proton transcoded audio into larger chunks if necessary. */
+        if (transform->reblock_output_audio)
+        {
+            gint num_samples = 1024, sample_rate;
+            GValue duration = G_VALUE_INIT;
+
+            if (!gst_structure_get_int(gst_caps_get_structure(transform->output_caps, 0),
+                    "rate", &sample_rate))
+                return false;
+
+            if (!(element = create_element("audiobuffersplit", "bad"))
+                    || !append_element(transform->container, element, first, last))
+                return false;
+
+            g_value_init(&duration, GST_TYPE_FRACTION);
+            gst_value_set_fraction(&duration, num_samples, sample_rate);
+            g_object_set_property(G_OBJECT(element), "output-buffer-duration", &duration);
+        }
     }
 
     if (g_str_has_prefix(output_mime, "video/"))
@@ -794,6 +814,8 @@ NTSTATUS wg_transform_create(void *args)
                 memmove((WAVEFORMATEXTENSIBLE *)input_type.u.audio + 1, hwf->pbAudioSpecificConfig,
                         data_size - sizeof(audio));
                 memcpy(input_type.u.audio, &audio, sizeof(audio));
+
+                transform->reblock_output_audio = true;
             }
         }
     }
