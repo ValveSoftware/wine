@@ -1873,6 +1873,12 @@ BOOL wrap_wglSwapBuffers( TEB *teb, HDC hdc )
         /* default implementation: implicitly flush the context */
         flush_context( teb, funcs->p_glFlush );
     }
+    else
+    {
+        /* Drawable could've changed in p_wglSwapBuffers(). */
+        pop_default_fbo( teb );
+        pop_default_fbo_buffers( teb );
+    }
 
     return ret;
 }
