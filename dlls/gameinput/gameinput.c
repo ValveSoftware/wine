@@ -28,7 +28,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(ginput);
 
-HRESULT WINAPI GameInputCreate( v0_IGameInput **out )
+HRESULT WINAPI GameInputCreate( IGameInput_v0 **out )
 {
     FIXME( "out %p, stub!\n", out );
     return E_NOTIMPL;
