@@ -22,6 +22,10 @@
 #define COBJMACROS
 #include "windef.h"
 #include "winbase.h"
+#include "winreg.h"
+#include "devpropdef.h"
+#include "devfiltertypes.h"
+#include "devquery.h"
 
 #include "initguid.h"
 #include "gameinput.h"
@@ -43,6 +47,8 @@ struct game_input
 {
     IGameInput_v0 IGameInput_v0_iface;
     LONG refcount;
+    HDEVQUERY query;
+    HANDLE initialized;
 };
 
 static struct game_input *impl_from_v0_IGameInput( IGameInput_v0 *iface )
@@ -94,7 +100,13 @@ static ULONG WINAPI game_input_v0_Release( IGameInput_v0 *iface )
 
     TRACE( "impl %p decreasing refcount to %lu.\n", impl, ref );
 
-    if (!ref) free( impl );
+    if (!ref)
+    {
+        DevCloseObjectQuery( impl->query );
+        CloseHandle( impl->initialized );
+        free( impl );
+    }
+
     return ref;
 }
 
@@ -253,6 +265,26 @@ static const IGameInput_v0Vtbl game_input_v0_vtbl =
     game_input_v0_SetFocusPolicy,
 };
 
+static void WINAPI device_query_cb( HDEVQUERY devquery, void *context, const DEV_QUERY_RESULT_ACTION_DATA *action )
+{
+    struct game_input *impl = context;
+
+    switch (action->Action)
+    {
+    case DevQueryResultStateChange:
+        TRACE( "impl %p, DevQueryResultStateChange %u\n", impl, action->Data.State );
+        SetEvent( impl->initialized );
+        break;
+
+    case DevQueryResultAdd:
+    case DevQueryResultUpdate:
+    case DevQueryResultRemove:
+        TRACE( "impl %p, action %u type %u id %s props %lu\n", impl, action->Action, action->Data.DeviceObject.ObjectType,
+               debugstr_w(action->Data.DeviceObject.pszObjectId), action->Data.DeviceObject.cPropertyCount );
+        break;
+    }
+}
+
 static struct game_input *game_input_create(void)
 {
     struct game_input *impl;
@@ -260,6 +292,16 @@ static struct game_input *game_input_create(void)
     if (!(impl = calloc( 1, sizeof(*impl) ))) return NULL;
     impl->IGameInput_v0_iface.lpVtbl = &game_input_v0_vtbl;
     impl->refcount = 1;
+
+    if (!(impl->initialized = CreateEventW( NULL, TRUE, FALSE, NULL )) ||
+        FAILED(DevCreateObjectQuery( DevObjectTypeDeviceInterface, DevQueryFlagUpdateResults | DevQueryFlagAllProperties,
+                                     0, NULL, 0, NULL, device_query_cb, impl, &impl->query )))
+    {
+        if (impl->initialized) CloseHandle( impl->initialized );
+        ERR( "Failed to enumerate devices\n" );
+        free( impl );
+        return NULL;
+    }
 
     TRACE( "created GameInput %p\n", impl );
     return impl;
@@ -281,6 +323,7 @@ HRESULT WINAPI GameInputCreate( IGameInput_v0 **out )
     LeaveCriticalSection( &game_input_cs );
     if (!impl) return E_OUTOFMEMORY;
 
+    WaitForSingleObject( impl->initialized, INFINITE );
     *out = &impl->IGameInput_v0_iface;
     return S_OK;
 
