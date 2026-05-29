@@ -459,7 +459,7 @@ static int init_info(ADL_CONTEXT_HANDLE ctx)
         if (CM_Locate_DevNodeW(&devinst, instance_id, 0))
             continue;
         size = sizeof(ctx->gpus[i].luid);
-        if (CM_Get_DevNode_PropertyW(devinst, &DEVPROPKEY_GPU_LUID, &type, &ctx->gpus[ctx->gpu_count].luid, &size, 0))
+        if (CM_Get_DevNode_PropertyW(devinst, &DEVPROPKEY_GPU_LUID, &type, (BYTE *)&ctx->gpus[ctx->gpu_count].luid, &size, 0))
             continue;
 
         ++ctx->gpu_count;
