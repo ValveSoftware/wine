@@ -58,6 +58,7 @@ struct device
     WCHAR path[MAX_PATH];
     struct list entry;
 
+    GameInputDeviceStatus status;
     GameInputDeviceInfo_v0 info_v0;
 };
 
@@ -323,6 +324,15 @@ struct device_callback
     GameInputDeviceCallback_v0 callback;
 };
 
+static void device_callback_notify( struct device_callback *entry, IGameInputDevice_v0 *device, GameInputKind input_kind,
+                                    GameInputDeviceStatus new_status, GameInputDeviceStatus old_status )
+{
+    if (entry->device && entry->device != device) return;
+    if (!(entry->input_kind & input_kind)) return;
+    if (!(entry->status_filter & (new_status | old_status))) return;
+    entry->callback( (UINT_PTR)entry, entry->context, device, 0, new_status, old_status );
+}
+
 static HRESULT device_callback_create( IGameInputDevice_v0 *device, GameInputKind input_kind, GameInputDeviceStatus status_filter,
                                        void *context, GameInputDeviceCallback_v0 callback, struct device_callback **out )
 {
@@ -468,21 +478,27 @@ static HRESULT WINAPI game_input_v0_RegisterReadingCallback( IGameInput_v0 *ifac
     return E_NOTIMPL;
 }
 
-static HRESULT WINAPI game_input_v0_RegisterDeviceCallback( IGameInput_v0 *iface, IGameInputDevice_v0 *device, GameInputKind input_kind, GameInputDeviceStatus status_filter,
+static HRESULT WINAPI game_input_v0_RegisterDeviceCallback( IGameInput_v0 *iface, IGameInputDevice_v0 *device_iface, GameInputKind input_kind, GameInputDeviceStatus status_filter,
                                                             GameInputEnumerationKind enumeration_kind, void *context, GameInputDeviceCallback_v0 callback,
                                                             GameInputCallbackToken *token )
 {
     struct game_input *impl = CONTAINING_RECORD( iface, struct game_input, IGameInput_v0_iface );
     struct device_callback *entry;
+    struct device *device;
     HRESULT hr;
 
-    FIXME( "impl %p device %p input_kind %#x status_filter %#x enumeration_kind %#x, context %p callback %p token %p stub!\n",
-           impl, device, input_kind, status_filter, enumeration_kind, context, callback, token );
+    FIXME( "impl %p device_iface %p input_kind %#x status_filter %#x enumeration_kind %#x, context %p callback %p token %p stub!\n",
+           impl, device_iface, input_kind, status_filter, enumeration_kind, context, callback, token );
 
-    if (FAILED(hr = device_callback_create( device, input_kind, status_filter, context, callback, &entry ))) return hr;
+    if (FAILED(hr = device_callback_create( device_iface, input_kind, status_filter, context, callback, &entry ))) return hr;
 
     EnterCriticalSection( &game_input_cs );
     list_add_tail( &impl->callbacks, &entry->entry );
+
+    LIST_FOR_EACH_ENTRY( device, &impl->devices, struct device, entry )
+        device_callback_notify( entry, &device->IGameInputDevice_v0_iface, GameInputKindGamepad,
+                                device->status, GameInputDeviceNoStatus );
+
     LeaveCriticalSection( &game_input_cs );
 
     *token = (UINT_PTR)entry;
@@ -621,7 +637,15 @@ static void WINAPI device_query_cb( HDEVQUERY devquery, void *context, const DEV
         EnterCriticalSection( &game_input_cs );
         if ((device = find_device( &impl->devices, &action->Data.DeviceObject )) ||
             (device = device_create( &impl->devices, &action->Data.DeviceObject )))
-            FIXME( "Added device %p\n", device );
+        {
+            GameInputDeviceStatus old_status = device->status;
+            struct device_callback *entry;
+            device->status = GameInputDeviceConnected;
+
+            LIST_FOR_EACH_ENTRY( entry, &impl->callbacks, struct device_callback, entry )
+                device_callback_notify( entry, &device->IGameInputDevice_v0_iface, GameInputKindGamepad,
+                                        device->status, old_status );
+        }
         LeaveCriticalSection( &game_input_cs );
 
         break;
@@ -632,7 +656,15 @@ static void WINAPI device_query_cb( HDEVQUERY devquery, void *context, const DEV
 
         EnterCriticalSection( &game_input_cs );
         if ((device = find_device( &impl->devices, &action->Data.DeviceObject )))
-            FIXME( "Removed device %p\n", device );
+        {
+            GameInputDeviceStatus old_status = device->status;
+            struct device_callback *entry;
+            device->status = GameInputDeviceNoStatus;
+
+            LIST_FOR_EACH_ENTRY( entry, &impl->callbacks, struct device_callback, entry )
+                device_callback_notify( entry, &device->IGameInputDevice_v0_iface, GameInputKindGamepad,
+                                        device->status, old_status );
+        }
         LeaveCriticalSection( &game_input_cs );
 
         break;
