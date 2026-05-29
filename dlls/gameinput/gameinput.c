@@ -29,6 +29,8 @@
 
 #include "initguid.h"
 #include "gameinput.h"
+
+#include "wine/list.h"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(ginput);
@@ -43,12 +45,42 @@ static CRITICAL_SECTION_DEBUG game_input_cs_debug =
 static CRITICAL_SECTION game_input_cs = { &game_input_cs_debug, -1, 0, 0, 0, 0 };
 static struct game_input *game_input;
 
+struct device_callback
+{
+    struct list entry;
+
+    IGameInputDevice_v0 *device;
+    GameInputKind input_kind;
+    GameInputDeviceStatus status_filter;
+
+    void *context;
+    GameInputDeviceCallback_v0 callback;
+};
+
+static HRESULT device_callback_create( IGameInputDevice_v0 *device, GameInputKind input_kind, GameInputDeviceStatus status_filter,
+                                       void *context, GameInputDeviceCallback_v0 callback, struct device_callback **out )
+{
+    struct device_callback *entry;
+
+    if (!(entry = calloc( 1, sizeof(*entry) ))) return E_OUTOFMEMORY;
+    if ((entry->device = device)) IGameInputDevice_v0_AddRef( entry->device );
+    entry->input_kind = input_kind;
+    entry->status_filter = status_filter;
+    entry->context = context;
+    entry->callback = callback;
+
+    *out = entry;
+    return S_OK;
+}
+
 struct game_input
 {
     IGameInput_v0 IGameInput_v0_iface;
     LONG refcount;
+
     HDEVQUERY query;
     HANDLE initialized;
+    struct list callbacks;
 };
 
 static struct game_input *impl_from_v0_IGameInput( IGameInput_v0 *iface )
@@ -102,6 +134,15 @@ static ULONG WINAPI game_input_v0_Release( IGameInput_v0 *iface )
 
     if (!ref)
     {
+        struct list *ptr;
+
+        while ((ptr = list_head( &impl->callbacks )))
+        {
+            struct device_callback *callback = LIST_ENTRY(ptr, struct device_callback, entry);
+            list_remove( &callback->entry );
+            free( callback );
+        }
+
         DevCloseObjectQuery( impl->query );
         CloseHandle( impl->initialized );
         free( impl );
@@ -157,9 +198,22 @@ static HRESULT WINAPI game_input_v0_RegisterDeviceCallback( IGameInput_v0 *iface
                                                             GameInputEnumerationKind enumeration_kind, void *context, GameInputDeviceCallback_v0 callback,
                                                             GameInputCallbackToken *token )
 {
+    struct game_input *impl = CONTAINING_RECORD( iface, struct game_input, IGameInput_v0_iface );
+    struct device_callback *entry;
+    HRESULT hr;
+
     FIXME( "impl %p device %p input_kind %#x status_filter %#x enumeration_kind %#x, context %p callback %p token %p stub!\n",
-           impl_from_v0_IGameInput( iface ), device, input_kind, status_filter, enumeration_kind, context, callback, token );
-    return E_NOTIMPL;
+           impl, device, input_kind, status_filter, enumeration_kind, context, callback, token );
+
+    if (FAILED(hr = device_callback_create( device, input_kind, status_filter, context, callback, &entry ))) return hr;
+
+    EnterCriticalSection( &game_input_cs );
+    list_add_tail( &impl->callbacks, &entry->entry );
+    LeaveCriticalSection( &game_input_cs );
+
+    *token = (UINT_PTR)entry;
+
+    return hr;
 }
 
 static HRESULT WINAPI game_input_v0_RegisterSystemButtonCallback( IGameInput_v0 *iface, IGameInputDevice_v0 *device,
@@ -292,6 +346,7 @@ static struct game_input *game_input_create(void)
     if (!(impl = calloc( 1, sizeof(*impl) ))) return NULL;
     impl->IGameInput_v0_iface.lpVtbl = &game_input_v0_vtbl;
     impl->refcount = 1;
+    list_init( &impl->callbacks );
 
     if (!(impl->initialized = CreateEventW( NULL, TRUE, FALSE, NULL )) ||
         FAILED(DevCreateObjectQuery( DevObjectTypeDeviceInterface, DevQueryFlagUpdateResults | DevQueryFlagAllProperties,
