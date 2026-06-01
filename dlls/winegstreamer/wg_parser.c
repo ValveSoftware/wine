@@ -126,7 +126,7 @@ struct wg_parser_stream
     GstBuffer *buffer;
     GstMapInfo map_info;
 
-    bool flushing, eos, enabled, has_tags, has_buffer, no_more_pads, fix_nv12;
+    bool flushing, eos, enabled, has_tags, has_buffer, no_more_pads, fix_align;
 
     uint64_t duration;
     gchar *tags[WG_PARSER_TAG_COUNT];
@@ -739,7 +739,7 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
         {
             GstStructure *structure;
             GstVideoInfo video_info;
-            bool fix_nv12 = false;
+            bool fix_nv12 = false, fix_yv12 = false;
             GstCaps *caps;
 
             gst_event_parse_caps(event, &caps);
@@ -755,11 +755,23 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
                 }
                 if (fix_nv12)
                     GST_INFO("Enabling the NV12 alignment fix.");
+
+                fix_yv12 = (GST_VIDEO_INFO_FORMAT(&video_info) == GST_VIDEO_FORMAT_YV12
+                            || GST_VIDEO_INFO_FORMAT(&video_info) == GST_VIDEO_FORMAT_I420)
+                        && (video_info.stride[1] > GST_ROUND_UP_2(video_info.width/2));
+                if (fix_yv12 && GST_VIDEO_INFO_IS_INTERLACED(&video_info))
+                {
+                    GST_WARNING("YV12 alignment fix is not implemented for interlaced YV12.\n");
+                    fix_yv12 = false;
+                }
+                if (fix_yv12)
+                    GST_INFO("Enabling the YV12 alignment fix.");
+
             }
 
             pthread_mutex_lock(&parser->mutex);
             stream->current_caps = gst_caps_ref(caps);
-            stream->fix_nv12 = fix_nv12;
+            stream->fix_align = fix_nv12 || fix_yv12;
             pthread_mutex_unlock(&parser->mutex);
             pthread_cond_signal(&parser->init_cond);
             break;
@@ -779,7 +791,7 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
     return TRUE;
 }
 
-static void buffer_fix_nv12(GstBuffer *buffer, GstCaps *caps)
+static void buffer_fix_align(GstBuffer *buffer, GstCaps *caps)
 {
     GstVideoInfo src_info, dst_info;
     gint i, aligned_height;
@@ -799,28 +811,62 @@ static void buffer_fix_nv12(GstBuffer *buffer, GstCaps *caps)
 
     dst_info = src_info;
 
-    aligned_height = GST_ROUND_UP_2(dst_info.height);
-    dst_info.stride[0] = GST_ROUND_UP_2(dst_info.width);
-    dst_info.stride[1] = dst_info.stride[0];
-    dst_info.offset[0] = 0;
-    dst_info.offset[1] = dst_info.stride[0] * aligned_height;
-    dst_info.size = dst_info.offset[1] + dst_info.stride[0] * aligned_height / 2;
-
-    dst = src = map_info.data;
-    for (i = 0; i < aligned_height; ++i)
+    if (GST_VIDEO_INFO_FORMAT(&src_info) == GST_VIDEO_FORMAT_NV12)
     {
-        memmove(dst, src, dst_info.stride[0]);
-        dst += dst_info.stride[0];
-        src += src_info.stride[0];
-    }
+        aligned_height = GST_ROUND_UP_2(dst_info.height);
+        dst_info.stride[0] = GST_ROUND_UP_2(dst_info.width);
+        dst_info.stride[1] = dst_info.stride[0];
+        dst_info.offset[0] = 0;
+        dst_info.offset[1] = dst_info.stride[0] * aligned_height;
+        dst_info.size = dst_info.offset[1] + dst_info.stride[0] * aligned_height / 2;
 
-    dst = map_info.data + dst_info.offset[1];
-    src = map_info.data + src_info.offset[1];
-    for (i = 0; i < aligned_height / 2; ++i)
+        dst = src = map_info.data;
+        for (i = 0; i < aligned_height; ++i)
+        {
+            memmove(dst, src, dst_info.stride[0]);
+            dst += dst_info.stride[0];
+            src += src_info.stride[0];
+        }
+
+        dst = map_info.data + dst_info.offset[1];
+        src = map_info.data + src_info.offset[1];
+        for (i = 0; i < aligned_height / 2; ++i)
+        {
+            memmove(dst, src, dst_info.stride[1]);
+            dst += dst_info.stride[1];
+            src += src_info.stride[1];
+        }
+    } else if (GST_VIDEO_INFO_FORMAT(&src_info) == GST_VIDEO_FORMAT_I420
+                || GST_VIDEO_INFO_FORMAT(&src_info) == GST_VIDEO_FORMAT_YV12)
     {
-        memmove(dst, src, dst_info.stride[1]);
-        dst += dst_info.stride[1];
-        src += src_info.stride[1];
+        gint plane1, plane2;
+        plane1 = (src_info.offset[2] > src_info.offset[1]) ? 1 : 2;
+        plane2 = 3 - plane1;
+        aligned_height = (src_info.offset[plane2] - src_info.offset[plane1]) / src_info.stride[plane1];
+
+        dst_info.stride[2] = dst_info.stride[1] = GST_ROUND_UP_2(dst_info.width / 2);
+        dst_info.offset[plane2] = dst_info.offset[plane1] + dst_info.stride[plane1] * aligned_height;
+        dst_info.size = dst_info.offset[plane2] + dst_info.stride[plane2] * aligned_height;
+
+        dst = map_info.data + dst_info.offset[plane1];
+        src = map_info.data + src_info.offset[plane1];
+        for (i = 0; i < aligned_height; ++i)
+        {
+            memmove(dst, src, dst_info.stride[plane1]);
+            dst += dst_info.stride[plane1];
+            src += src_info.stride[plane1];
+        }
+        dst = map_info.data + dst_info.offset[plane2];
+        src = map_info.data + src_info.offset[plane2];
+        for (i = 0; i < aligned_height; ++i)
+        {
+            memmove(dst, src, dst_info.stride[plane2]);
+            dst += dst_info.stride[plane2];
+            src += src_info.stride[plane2];
+        }
+    } else
+    {
+        GST_ERROR("fix_align called for unsupported format.");
     }
 
     gst_buffer_unmap(buffer, &map_info);
@@ -864,8 +910,8 @@ static GstFlowReturn sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *bu
         return GST_FLOW_FLUSHING;
     }
 
-    if (stream->fix_nv12)
-        buffer_fix_nv12(buffer, stream->current_caps);
+    if (stream->fix_align)
+        buffer_fix_align(buffer, stream->current_caps);
 
     if (!gst_buffer_map(buffer, &stream->map_info, GST_MAP_READ))
     {
