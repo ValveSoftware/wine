@@ -468,25 +468,29 @@ static BOOL open_device_at_index(const WCHAR *device_path, int index)
     return TRUE;
 }
 
-static BOOL find_opened_device(const WCHAR *device_path, int *free_slot)
+static BOOL find_opened_device(const WCHAR *device_path, int *slot)
 {
     int i;
 
-    *free_slot = XUSER_MAX_COUNT;
+    *slot = XUSER_MAX_COUNT;
     for (i = XUSER_MAX_COUNT; i > 0; i--)
     {
-        if (!controllers[i - 1].device) *free_slot = i - 1;
-        else if (!wcsicmp(device_path, controllers[i - 1].device_path)) return TRUE;
+        if (!controllers[i - 1].device) *slot = i - 1;
+        else if (!wcsicmp(device_path, controllers[i - 1].device_path))
+        {
+            *slot = i - 1;
+            return TRUE;
+        }
     }
 
     /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
     if ((swscanf(device_path, L"\\\\?\\hid#vid_28de&pid_11ff&xi_%02u#", &i) == 1 ||
          swscanf(device_path, L"\\\\?\\HID#VID_28DE&PID_11FF&XI_%02u#", &i) == 1) &&
-        i < XUSER_MAX_COUNT && *free_slot != i)
+        i < XUSER_MAX_COUNT && *slot != i)
     {
         controller_destroy(&controllers[i], TRUE);
-        if (*free_slot != XUSER_MAX_COUNT) open_device_at_index(controllers[i].device_path, *free_slot);
-        *free_slot = i;
+        if (*slot != XUSER_MAX_COUNT) open_device_at_index(controllers[i].device_path, *slot);
+        *slot = i;
     }
 
     return FALSE;
