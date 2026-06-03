@@ -337,22 +337,24 @@ static void controller_destroy(struct xinput_controller *controller, BOOL alread
 }
 
 /* enable an opened controller, xinput_cs must be held */
-static void controller_enable(struct xinput_controller *controller)
+static BOOL controller_enable(struct xinput_controller *controller)
 {
     ULONG report_len = controller->hid.caps.InputReportByteLength;
     char *report_buf = controller->hid.input_report_buf;
     XINPUT_VIBRATION state = controller->vibration;
     BOOL ret;
 
-    if (controller->enabled) return;
+    if (controller->enabled) return TRUE;
     HID_set_state(controller, &state);
-    controller->enabled = TRUE;
 
     memset(&controller->hid.read_ovl, 0, sizeof(controller->hid.read_ovl));
     controller->hid.read_ovl.hEvent = controller->read_event;
     ret = ReadFile(controller->device, report_buf, report_len, NULL, &controller->hid.read_ovl);
-    if (!ret && GetLastError() != ERROR_IO_PENDING) controller_destroy(controller, TRUE);
-    else SetEvent(update_event);
+    if (!ret && GetLastError() != ERROR_IO_PENDING) return FALSE;
+
+    controller->enabled = TRUE;
+    SetEvent(update_event);
+    return TRUE;
 }
 
 /* opened a new controller device, xinput_cs must be held */
@@ -377,14 +379,14 @@ static BOOL controller_init(struct xinput_controller *controller, PHIDP_PREPARSE
     controller->enabled = FALSE;
 
     controller->device = device;
-    controller_enable(controller);
-    return TRUE;
+    if (controller_enable(controller)) return TRUE;
 
 failed:
     free(controller->hid.input_report_buf);
     free(controller->hid.output_report_buf);
     free(controller->hid.feature_report_buf);
     memset(&controller->hid, 0, sizeof(controller->hid));
+    controller->device = NULL;
     return FALSE;
 }
 
@@ -811,7 +813,7 @@ void WINAPI DECLSPEC_HOTPATCH XInputEnable(BOOL enable)
     {
         if (!controllers[index].device) continue;
         if (!enable) controller_disable(&controllers[index]);
-        else controller_enable(&controllers[index]);
+        else if (!controller_enable(&controllers[index])) controller_destroy(&controllers[index], TRUE);
     }
     LeaveCriticalSection(&xinput_cs);
 }
