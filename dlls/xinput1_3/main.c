@@ -308,8 +308,8 @@ static void controller_disable(struct xinput_controller *controller)
     HID_set_state(controller, &state);
     controller->enabled = FALSE;
 
-    CancelIoEx(controller->device, &controller->hid.read_ovl);
-    WaitForSingleObject(controller->hid.read_ovl.hEvent, INFINITE);
+    if (CancelIoEx(controller->device, &controller->hid.read_ovl))
+        WaitForSingleObject(controller->hid.read_ovl.hEvent, INFINITE);
     SetEvent(update_event);
 }
 
