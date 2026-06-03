@@ -928,12 +928,14 @@ static struct opengl_drawable *framebuffer_surface_create( int format, struct cl
 
 static BOOL needs_framebuffer_surface( HWND hwnd )
 {
+    static int xwayland_nv_cached = -1;
     float gamma_ramp[GAMMA_RAMP_SIZE * 4];
     LONG gamma_serial;
 
     if (!fshack_enabled) return FALSE;
 
-    if (user_driver->pHasWindowManager( "xwayland_glx_nvidia" ))
+    if (xwayland_nv_cached == -1) xwayland_nv_cached = !!user_driver->pHasWindowManager( "xwayland_glx_nvidia" );
+    if (xwayland_nv_cached)
     {
         static int skip_cached = -1;
         if (skip_cached == -1)
