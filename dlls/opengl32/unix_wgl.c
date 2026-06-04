@@ -1541,7 +1541,10 @@ static void fs_hack_setup_gamma_shader( struct wgl_context *ctx, const struct op
     funcs->p_glDeleteShader( fshader );
     funcs->p_glDeleteShader( vshader );
 
-    funcs->p_glGenBuffers( 1, &ctx->gamma_ramp );
+    if (ctx->is_core)
+        funcs->p_glGenBuffers( 1, &ctx->gamma_ramp );
+    else
+        ctx->gamma_ramp = 0x10001;
     funcs->p_glBindBuffer( GL_UNIFORM_BUFFER, ctx->gamma_ramp );
     funcs->p_glBufferData( GL_UNIFORM_BUFFER, sizeof(float) * 4 * GAMMA_RAMP_SIZE, default_gamma_ramp, GL_DYNAMIC_DRAW );
 
