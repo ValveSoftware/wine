@@ -604,7 +604,7 @@ static void fs_hack_handle_fbo_state( int mode, struct wgl_context *ctx, struct 
         funcs->p_glDrawBuffer( state->draw_buffer );
         funcs->p_glReadBuffer( state->read_buffer );
     }
-    fs_hack_handle_enable_switch( mode, GL_FRAMEBUFFER_SRGB, &state->fb_srgb, TRUE );
+    fs_hack_handle_enable_switch( mode, GL_FRAMEBUFFER_SRGB, &state->fb_srgb, FALSE );
 }
 
 static void fs_hack_handle_clip_control( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
@@ -803,20 +803,21 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
         funcs->p_glReadBuffer( GL_COLOR_ATTACHMENT0 );
         funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, surface->base.read_fbo );
         funcs->p_glDrawBuffer( GL_COLOR_ATTACHMENT0 );
+        if (is_srgb_format( surface->internalformat ))
+            funcs->p_glEnable( GL_FRAMEBUFFER_SRGB );
         funcs->p_glBlitFramebuffer( 0, 0, src.right, src.bottom, 0, 0, src.right, src.bottom, GL_COLOR_BUFFER_BIT,
                                     GL_NEAREST );
     }
 
     funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
 
-    if (!is_srgb_format( surface->internalformat ))
-        funcs->p_glDisable( GL_FRAMEBUFFER_SRGB );
-
     /* the target default framebuffer should be swapped after. We are always presenting framebuffer's surface
      * front while the color attachment textures are swapped on framebuffer surface swap before blit. */
     funcs->p_glDrawBuffer( GL_BACK );
     if (surface->base.read_fbo == surface->base.draw_fbo && !needs_gamma)
     {
+        if (is_srgb_format( surface->internalformat ))
+            funcs->p_glEnable( GL_FRAMEBUFFER_SRGB );
         funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, surface->base.read_fbo );
         funcs->p_glReadBuffer( GL_COLOR_ATTACHMENT0 );
         funcs->p_glBlitFramebuffer( 0, 0, src.right, src.bottom, 0, 0, dst.right, dst.bottom, GL_COLOR_BUFFER_BIT,
@@ -832,6 +833,8 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
         funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.read_fbo, GL_COLOR_ATTACHMENT0,
                                                              GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &front_texture );
         funcs->p_glBindTexture( GL_TEXTURE_2D, front_texture );
+        if (is_srgb_format( surface->internalformat ))
+            funcs->p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT );
 
         if (ctx->has_GL_ARB_viewport_array) funcs->p_glViewportIndexedf( 0, 0, 0, dst.right, dst.bottom );
         else funcs->p_glViewport( 0, 0, dst.right, dst.bottom );
