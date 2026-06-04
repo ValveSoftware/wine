@@ -30,6 +30,11 @@ WINE_DEFAULT_DEBUG_CHANNEL(ginput);
 
 HRESULT WINAPI GameInputCreate( IGameInput_v0 **out )
 {
+    const char *sgi, *sd;
+    if ((!(sgi = getenv( "SteamGameId" )) || strcmp(sgi, "1771300") /* Kingdom Come Deliverance II */)) goto failed;
+    if ((sd = getenv( "SteamDeck" )) && atoi( sd )) goto failed; /* not on Steam Deck */
+
+failed:
     FIXME( "out %p, stub!\n", out );
     return E_NOTIMPL;
 }
