@@ -193,6 +193,7 @@ struct framebuffer_surface
     struct opengl_drawable base;
     struct opengl_drawable *target;
     LONG last_gamma_serial;
+    GLenum internalformat;
     int width, height;
     LONG64 serial;
 };
@@ -200,6 +201,27 @@ struct framebuffer_surface
 static struct framebuffer_surface *framebuffer_from_opengl_drawable( struct opengl_drawable *base )
 {
     return CONTAINING_RECORD( base, struct framebuffer_surface, base );
+}
+
+static BOOL is_default_fbo_srgb_capable( void )
+{
+    const struct opengl_funcs *funcs = &display_funcs;
+    GLboolean srgb_capable = 0;
+    GLint draw_fbo, read_fbo;
+
+    funcs->p_glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, &draw_fbo );
+    funcs->p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &read_fbo );
+    funcs->p_glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+    funcs->p_glGetBooleanv( GL_FRAMEBUFFER_SRGB_CAPABLE_EXT, &srgb_capable );
+    funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, draw_fbo );
+    funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, read_fbo );
+    TRACE( "capable %d.\n", srgb_capable );
+    return srgb_capable;
+}
+
+static BOOL is_srgb_format( GLenum internalformat )
+{
+    return internalformat == GL_SRGB8_ALPHA8 || internalformat == GL_SRGB8;
 }
 
 static GLenum color_format_from_pfd( const struct wgl_pixel_format *desc )
@@ -225,11 +247,11 @@ static GLenum color_format_from_pfd( const struct wgl_pixel_format *desc )
             return GL_RGB10_A2;
         if (desc->pfd.cAlphaBits == 32) return GL_RGBA32UI;
         if (desc->pfd.cAlphaBits == 16) return GL_RGBA16;
-        if (desc->pfd.cAlphaBits == 8) return GL_RGBA8;
+        if (desc->pfd.cAlphaBits == 8) return is_default_fbo_srgb_capable() ? GL_SRGB8_ALPHA8 : GL_RGBA8;
         if (desc->pfd.cAlphaBits == 4) return GL_RGBA4;
         if (desc->pfd.cBlueBits == 32) return GL_RGB32UI;
         if (desc->pfd.cBlueBits == 16) return GL_RGB16;
-        if (desc->pfd.cBlueBits == 8) return GL_RGB8;
+        if (desc->pfd.cBlueBits == 8) return is_default_fbo_srgb_capable() ? GL_SRGB8 : GL_RGB8;
         if (desc->pfd.cBlueBits == 4) return GL_RGB4;
         if (desc->pfd.cGreenBits == 32) return GL_RG32UI;
         if (desc->pfd.cGreenBits == 16) return GL_RG16;
@@ -301,6 +323,7 @@ static void get_drawable_size( struct opengl_drawable *drawable, int *width, int
 static GLuint create_framebuffer( struct opengl_drawable *drawable, const struct wgl_pixel_format *desc,
                                   int width, int height, GLuint *framebuffer_textures )
 {
+    struct framebuffer_surface *surface = framebuffer_from_opengl_drawable( drawable );
     const struct opengl_funcs *funcs = &display_funcs;
     GLuint count = 1, fbo, name;
 
@@ -308,13 +331,13 @@ static GLuint create_framebuffer( struct opengl_drawable *drawable, const struct
     if (drawable->stereo) count *= 2;
 
     funcs->p_glCreateFramebuffers( 1, &fbo );
-
+    surface->internalformat = color_format_from_pfd( desc );
     for (GLuint i = 0; i < count; i++)
     {
         if (desc->samples)
         {
             funcs->p_glCreateRenderbuffers( 1, &name );
-            funcs->p_glNamedRenderbufferStorageMultisample( name, desc->samples, color_format_from_pfd( desc ), width, height );
+            funcs->p_glNamedRenderbufferStorageMultisample( name, desc->samples, surface->internalformat, width, height );
             funcs->p_glNamedFramebufferRenderbuffer( fbo, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, name );
         }
         else
@@ -345,17 +368,19 @@ static GLuint create_framebuffer( struct opengl_drawable *drawable, const struct
 static void resize_framebuffer( struct opengl_drawable *drawable, const struct wgl_pixel_format *desc, GLuint fbo,
                                 int width, int height )
 {
+    struct framebuffer_surface *surface = framebuffer_from_opengl_drawable( drawable );
     const struct opengl_funcs *funcs = &display_funcs;
     GLuint count = 1, name;
     GLenum ret;
 
     if (drawable->doublebuffer) count *= 2;
     if (drawable->stereo) count *= 2;
+    surface->internalformat = color_format_from_pfd( desc );
 
     for (GLuint i = 0; i < count; i++)
     {
         funcs->p_glGetNamedFramebufferAttachmentParameteriv( fbo, GL_COLOR_ATTACHMENT0 + i, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, (GLint *)&name );
-        if (desc->samples) funcs->p_glNamedRenderbufferStorageMultisample( name, desc->samples, color_format_from_pfd( desc ), width, height );
+        if (desc->samples) funcs->p_glNamedRenderbufferStorageMultisample( name, desc->samples, surface->internalformat, width, height );
         else resize_texture( name, desc, width, height );
         TRACE( "drawable %p/%u resized color buffer %#x/%u to %d,%d\n", drawable, fbo, GL_COLOR_ATTACHMENT0 + i, name, width, height );
     }
@@ -579,6 +604,7 @@ static void fs_hack_handle_fbo_state( int mode, struct wgl_context *ctx, struct 
         funcs->p_glDrawBuffer( state->draw_buffer );
         funcs->p_glReadBuffer( state->read_buffer );
     }
+    fs_hack_handle_enable_switch( mode, GL_FRAMEBUFFER_SRGB, &state->fb_srgb, FALSE );
 }
 
 static void fs_hack_handle_clip_control( int mode, struct wgl_context *ctx, struct fs_hack_gl_state *state )
@@ -604,7 +630,6 @@ static void fs_hack_handle_shaders( int mode, struct wgl_context *ctx, struct fs
 
     if (ctx->has_GL_ARB_fragment_program) fs_hack_handle_enable_switch( mode, GL_FRAGMENT_PROGRAM_ARB, &state->arb_frag, FALSE );
     if (ctx->has_GL_ARB_vertex_program) fs_hack_handle_enable_switch( mode, GL_VERTEX_PROGRAM_ARB, &state->arb_vert, FALSE );
-    fs_hack_handle_enable_switch( mode, GL_FRAMEBUFFER_SRGB, &state->fb_srgb, FALSE );
     if (ctx->has_GL_ATI_fragment_shader) fs_hack_handle_enable_switch( mode, GL_FRAGMENT_SHADER_ATI, &state->ati_frag, FALSE );
 
     if (mode == SET)
@@ -778,8 +803,12 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
         funcs->p_glReadBuffer( GL_COLOR_ATTACHMENT0 );
         funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, surface->base.read_fbo );
         funcs->p_glDrawBuffer( GL_COLOR_ATTACHMENT0 );
+        if (is_srgb_format( surface->internalformat ))
+            funcs->p_glEnable( GL_FRAMEBUFFER_SRGB );
         funcs->p_glBlitFramebuffer( 0, 0, src.right, src.bottom, 0, 0, src.right, src.bottom, GL_COLOR_BUFFER_BIT,
                                     GL_NEAREST );
+        if (is_srgb_format( surface->internalformat ))
+            funcs->p_glDisable( GL_FRAMEBUFFER_SRGB );
     }
 
     funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
@@ -789,6 +818,8 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
     funcs->p_glDrawBuffer( GL_BACK );
     if (surface->base.read_fbo == surface->base.draw_fbo && !needs_gamma)
     {
+        if (is_srgb_format( surface->internalformat ))
+            funcs->p_glEnable( GL_FRAMEBUFFER_SRGB );
         funcs->p_glBindFramebuffer( GL_READ_FRAMEBUFFER, surface->base.read_fbo );
         funcs->p_glReadBuffer( GL_COLOR_ATTACHMENT0 );
         funcs->p_glBlitFramebuffer( 0, 0, src.right, src.bottom, 0, 0, dst.right, dst.bottom, GL_COLOR_BUFFER_BIT,
@@ -804,6 +835,8 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
         funcs->p_glGetNamedFramebufferAttachmentParameteriv( surface->base.read_fbo, GL_COLOR_ATTACHMENT0,
                                                              GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &front_texture );
         funcs->p_glBindTexture( GL_TEXTURE_2D, front_texture );
+        if (is_srgb_format( surface->internalformat ))
+            funcs->p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT );
 
         if (ctx->has_GL_ARB_viewport_array) funcs->p_glViewportIndexedf( 0, 0, 0, dst.right, dst.bottom );
         else funcs->p_glViewport( 0, 0, dst.right, dst.bottom );
