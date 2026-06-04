@@ -26,14 +26,20 @@
 #include "devpropdef.h"
 #include "devfiltertypes.h"
 #include "devquery.h"
+#include "hidusage.h"
+#include "ddk/hidsdi.h"
 
 #include "initguid.h"
 #include "gameinput.h"
+#include "devpkey.h"
+#include "ddk/hidclass.h"
 
 #include "wine/list.h"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(ginput);
+
+DEFINE_GUID( GUID_DEVINTERFACE_WINEXINPUT,0x6c53d5fd,0x6480,0x440f,0xb6,0x18,0x47,0x67,0x50,0xc5,0xe1,0xa6 );
 
 static CRITICAL_SECTION game_input_cs;
 static CRITICAL_SECTION_DEBUG game_input_cs_debug =
@@ -44,6 +50,266 @@ static CRITICAL_SECTION_DEBUG game_input_cs_debug =
 };
 static CRITICAL_SECTION game_input_cs = { &game_input_cs_debug, -1, 0, 0, 0, 0 };
 static struct game_input *game_input;
+
+struct device
+{
+    IGameInputDevice_v0 IGameInputDevice_v0_iface;
+    LONG refcount;
+    WCHAR path[MAX_PATH];
+    struct list entry;
+
+    GameInputDeviceInfo_v0 info_v0;
+};
+
+static struct device *device_from_IGameInputDevice_v0( IGameInputDevice_v0 *iface )
+{
+    return CONTAINING_RECORD( iface, struct device, IGameInputDevice_v0_iface );
+}
+
+static HRESULT WINAPI game_input_device_v0_QueryInterface( IGameInputDevice_v0 *iface, REFIID iid, void **out )
+{
+    struct device *device = device_from_IGameInputDevice_v0( iface );
+
+    TRACE( "device %p, iid %s, out %p.\n", device, debugstr_guid( iid ), out );
+
+    if (IsEqualGUID( iid, &IID_IGameInputDevice_v0 ) ||
+        IsEqualGUID( iid, &IID_IUnknown ))
+    {
+        IGameInputDevice_v0_AddRef( &device->IGameInputDevice_v0_iface );
+        *out = &device->IGameInputDevice_v0_iface;
+        return S_OK;
+    }
+
+    *out = NULL;
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI game_input_device_v0_AddRef( IGameInputDevice_v0 *iface )
+{
+    struct device *device = device_from_IGameInputDevice_v0( iface );
+    ULONG ref = InterlockedIncrement( &device->refcount );
+    TRACE( "device %p increasing refcount to %lu.\n", device, ref );
+    return ref;
+}
+
+static ULONG WINAPI game_input_device_v0_Release( IGameInputDevice_v0 *iface )
+{
+    struct device *device = device_from_IGameInputDevice_v0( iface );
+    ULONG ref = InterlockedDecrement( &device->refcount );
+    TRACE( "device %p decreasing refcount to %lu.\n", device, ref );
+    if (!ref) free( device );
+    return ref;
+};
+
+static const GameInputDeviceInfo_v0 *WINAPI game_input_device_v0_GetDeviceInfo( IGameInputDevice_v0 *iface )
+{
+    struct device *device = device_from_IGameInputDevice_v0( iface );
+    FIXME( "device %p stub!\n", device );
+    return &device->info_v0;
+}
+
+static GameInputDeviceStatus WINAPI game_input_device_v0_GetDeviceStatus( IGameInputDevice_v0 *iface )
+{
+    FIXME( "device %p stub!\n", device_from_IGameInputDevice_v0( iface ) );
+    return 0;
+}
+
+static void WINAPI game_input_device_v0_GetBatteryState( IGameInputDevice_v0 *iface, GameInputBatteryState *state )
+{
+    FIXME( "device %p, state %p stub!\n", device_from_IGameInputDevice_v0( iface ), state );
+}
+
+static HRESULT WINAPI game_input_device_v0_CreateForceFeedbackEffect( IGameInputDevice_v0 *iface, uint32_t index, const GameInputForceFeedbackParams *params,
+                                                                  IGameInputForceFeedbackEffect_v0 **effect )
+{
+    FIXME( "device %p, index %u, params %p, effect %p stub!\n", device_from_IGameInputDevice_v0( iface ), index, params, effect );
+    return E_NOTIMPL;
+}
+
+static bool WINAPI game_input_device_v0_IsForceFeedbackMotorPoweredOn( IGameInputDevice_v0 *iface, uint32_t index )
+{
+    FIXME( "device %p, index %u stub!\n", device_from_IGameInputDevice_v0( iface ), index );
+    return FALSE;
+}
+
+static void WINAPI game_input_device_v0_SetForceFeedbackMotorGain( IGameInputDevice_v0 *iface, uint32_t index, float gain )
+{
+    FIXME( "device %p, index %u, gain %f stub!\n", device_from_IGameInputDevice_v0( iface ), index, gain );
+}
+
+static HRESULT WINAPI game_input_device_v0_SetHapticMotorState( IGameInputDevice_v0 *iface, uint32_t index, const GameInputHapticFeedbackParams *params )
+{
+    FIXME( "device %p, index %u, params %p stub!\n", device_from_IGameInputDevice_v0( iface ), index, params );
+    return E_NOTIMPL;
+}
+
+static void WINAPI game_input_device_v0_SetRumbleState( IGameInputDevice_v0 *iface, const GameInputRumbleParams *params )
+{
+    FIXME( "device %p, params %p stub!\n", device_from_IGameInputDevice_v0( iface ), params );
+}
+
+static void WINAPI game_input_device_v0_SetInputSynchronizationState( IGameInputDevice_v0 *iface, bool enabled )
+{
+    FIXME( "device %p, enabled %d stub!\n", device_from_IGameInputDevice_v0( iface ), enabled );
+}
+
+static void WINAPI game_input_device_v0_SendInputSynchronizationHint( IGameInputDevice_v0 *iface )
+{
+    FIXME( "device %p stub!\n", device_from_IGameInputDevice_v0( iface ) );
+}
+
+static void WINAPI game_input_device_v0_PowerOff( IGameInputDevice_v0 *iface )
+{
+    FIXME( "device %p stub!\n", device_from_IGameInputDevice_v0( iface ) );
+}
+
+static HRESULT WINAPI game_input_device_v0_CreateRawDeviceReport( IGameInputDevice_v0 *iface, uint32_t report_id, GameInputRawDeviceReportKind report_kind,
+                                                              IGameInputRawDeviceReport_v0 **report )
+{
+    FIXME( "device %p, report_id %u, report_kind %#x, report %p stub!\n", device_from_IGameInputDevice_v0( iface ), report_id, report_kind, report );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI game_input_device_v0_GetRawDeviceFeature( IGameInputDevice_v0 *iface, uint32_t report_id, IGameInputRawDeviceReport_v0 **report )
+{
+    FIXME( "device %p, report_id %u, report %p stub!\n", device_from_IGameInputDevice_v0( iface ), report_id, report );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI game_input_device_v0_SetRawDeviceFeature( IGameInputDevice_v0 *iface, IGameInputRawDeviceReport_v0 *report )
+{
+    FIXME( "device %p, report %p stub!\n", device_from_IGameInputDevice_v0( iface ), report );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI game_input_device_v0_SendRawDeviceOutput( IGameInputDevice_v0 *iface, IGameInputRawDeviceReport_v0 *report )
+{
+    FIXME( "device %p, report %p stub!\n", device_from_IGameInputDevice_v0( iface ), report );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI game_input_device_v0_SendRawDeviceOutputWithResponse( IGameInputDevice_v0 *iface, IGameInputRawDeviceReport_v0 *request_report,
+                                                                        IGameInputRawDeviceReport_v0 **response_report )
+{
+    FIXME( "device %p, request_report %p, response_report %p stub!\n", device_from_IGameInputDevice_v0( iface ), request_report, response_report );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI game_input_device_v0_ExecuteRawDeviceIoControl( IGameInputDevice_v0 *iface, uint32_t control_code, size_t input_buffer_size, const void *input_buffer,
+                                                                  size_t output_buffer_size, void *output_buffer, size_t *output_size )
+{
+    FIXME( "device %p, control_code %u, input_buffer_size %Iu, input_buffer %p, output_buffer_size %Iu, output_buffer %p, output_size %p stub!\n",
+           device_from_IGameInputDevice_v0( iface ), control_code, input_buffer_size, input_buffer, output_buffer_size, output_buffer, output_size );
+    return E_NOTIMPL;
+}
+
+static bool WINAPI game_input_device_v0_AcquireExclusiveRawDeviceAccess( IGameInputDevice_v0 *iface, uint64_t timeout_us )
+{
+    FIXME( "device %p, timeout_us %I64u stub!\n", device_from_IGameInputDevice_v0( iface ), timeout_us );
+    return FALSE;
+}
+
+static void WINAPI game_input_device_v0_ReleaseExclusiveRawDeviceAccess( IGameInputDevice_v0 *iface )
+{
+    FIXME( "device %p stub!\n", device_from_IGameInputDevice_v0( iface ) );
+}
+
+static const IGameInputDevice_v0Vtbl game_input_device_v0_vtbl =
+{
+    game_input_device_v0_QueryInterface,
+    game_input_device_v0_AddRef,
+    game_input_device_v0_Release,
+    game_input_device_v0_GetDeviceInfo,
+    game_input_device_v0_GetDeviceStatus,
+    game_input_device_v0_GetBatteryState,
+    game_input_device_v0_CreateForceFeedbackEffect,
+    game_input_device_v0_IsForceFeedbackMotorPoweredOn,
+    game_input_device_v0_SetForceFeedbackMotorGain,
+    game_input_device_v0_SetHapticMotorState,
+    game_input_device_v0_SetRumbleState,
+    game_input_device_v0_SetInputSynchronizationState,
+    game_input_device_v0_SendInputSynchronizationHint,
+    game_input_device_v0_PowerOff,
+    game_input_device_v0_CreateRawDeviceReport,
+    game_input_device_v0_GetRawDeviceFeature,
+    game_input_device_v0_SetRawDeviceFeature,
+    game_input_device_v0_SendRawDeviceOutput,
+    game_input_device_v0_SendRawDeviceOutputWithResponse,
+    game_input_device_v0_ExecuteRawDeviceIoControl,
+    game_input_device_v0_AcquireExclusiveRawDeviceAccess,
+    game_input_device_v0_ReleaseExclusiveRawDeviceAccess,
+};
+
+static BOOL matches_device_interface( const DEV_OBJECT *object, const GUID *iid )
+{
+    for (UINT i = 0; i < object->cPropertyCount; i++)
+    {
+        const DEVPROPERTY *prop = object->pProperties + i;
+        if (memcmp( &DEVPKEY_DeviceInterface_ClassGuid, &prop->CompKey.Key, sizeof(prop->CompKey.Key) )) continue;
+        return IsEqualGUID( prop->Buffer, iid );
+    }
+
+    return FALSE;
+}
+
+static struct device *device_create( struct list *devices, const DEV_OBJECT *object )
+{
+    GameInputDeviceFamily family = GameInputFamilyHid;
+    const WCHAR *device_path = object->pszObjectId;
+    PHIDP_PREPARSED_DATA preparsed;
+    struct device *device = NULL;
+    HIDD_ATTRIBUTES attr;
+    HIDP_CAPS caps;
+    HANDLE file;
+    WCHAR *tmp;
+
+    if (!matches_device_interface( object, &GUID_DEVINTERFACE_HID ) &&
+        !matches_device_interface( object, &GUID_DEVINTERFACE_WINEXINPUT ))
+        return NULL;
+
+    if ((tmp = wcschr( device_path + 8, '#' )) && !wcsnicmp( tmp - 6, L"&IG_", 4 )) return NULL;
+    if (tmp && !wcsnicmp( tmp - 6, L"&XI_", 4 )) family = GameInputFamilyXbox360;
+
+    TRACE( "device_path %s\n", debugstr_w( device_path ) );
+
+    file = CreateFileW(device_path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                         NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING, NULL);
+    if (file == INVALID_HANDLE_VALUE) return NULL;
+
+    HidD_GetAttributes( file, &attr );
+    HidD_GetPreparsedData( file, &preparsed );
+    HidP_GetCaps( preparsed, &caps );
+    HidD_FreePreparsedData( preparsed );
+
+    if (caps.UsagePage != HID_USAGE_PAGE_GENERIC || caps.Usage != HID_USAGE_GENERIC_GAMEPAD) goto done;
+
+    if (!(device = calloc( 1, sizeof(*device) ))) goto done;
+    device->IGameInputDevice_v0_iface.lpVtbl = &game_input_device_v0_vtbl;
+    device->refcount = 1;
+    wcscpy( device->path, device_path );
+
+    device->info_v0.infoSize = sizeof(device->info_v0.infoSize);
+    device->info_v0.vendorId = attr.VendorID;
+    device->info_v0.productId = attr.ProductID;
+    device->info_v0.usage.page = caps.UsagePage;
+    device->info_v0.usage.id = caps.Usage;
+    device->info_v0.deviceFamily = family;
+    device->info_v0.capabilities = GameInputDeviceCapabilityNone;
+    device->info_v0.supportedInput = GameInputKindUiNavigation_v0 | GameInputKindGamepad | GameInputKindController;
+    device->info_v0.supportedRumbleMotors = GameInputRumbleNone;
+    device->info_v0.controllerAxisCount = 6;
+    device->info_v0.controllerButtonCount = caps.NumberInputButtonCaps;
+    device->info_v0.controllerSwitchCount = 1;
+    device->info_v0.supportedSystemButtons = GameInputSystemButtonGuide;
+
+    list_add_tail( devices, &device->entry );
+
+    TRACE( "created device %p\n", device );
+done:
+    CloseHandle( file );
+    return device;
+}
 
 struct device_callback
 {
@@ -80,6 +346,7 @@ struct game_input
 
     HDEVQUERY query;
     HANDLE initialized;
+    struct list devices;
     struct list callbacks;
 };
 
@@ -141,6 +408,13 @@ static ULONG WINAPI game_input_v0_Release( IGameInput_v0 *iface )
             struct device_callback *callback = LIST_ENTRY(ptr, struct device_callback, entry);
             list_remove( &callback->entry );
             free( callback );
+        }
+
+        while ((ptr = list_head( &impl->devices )))
+        {
+            struct device *device = LIST_ENTRY(ptr, struct device, entry);
+            list_remove( &device->entry );
+            IGameInputDevice_v0_Release( &device->IGameInputDevice_v0_iface );
         }
 
         DevCloseObjectQuery( impl->query );
@@ -319,9 +593,19 @@ static const IGameInput_v0Vtbl game_input_v0_vtbl =
     game_input_v0_SetFocusPolicy,
 };
 
+static struct device *find_device( struct list *devices, const DEV_OBJECT *object )
+{
+    struct device *device;
+
+    LIST_FOR_EACH_ENTRY( device, devices, struct device, entry )
+        if (!wcscmp( device->path, object->pszObjectId )) return device;
+    return NULL;
+}
+
 static void WINAPI device_query_cb( HDEVQUERY devquery, void *context, const DEV_QUERY_RESULT_ACTION_DATA *action )
 {
     struct game_input *impl = context;
+    struct device *device;
 
     switch (action->Action)
     {
@@ -331,8 +615,29 @@ static void WINAPI device_query_cb( HDEVQUERY devquery, void *context, const DEV
         break;
 
     case DevQueryResultAdd:
-    case DevQueryResultUpdate:
+        TRACE( "impl %p, action %u type %u id %s props %lu\n", impl, action->Action, action->Data.DeviceObject.ObjectType,
+               debugstr_w(action->Data.DeviceObject.pszObjectId), action->Data.DeviceObject.cPropertyCount );
+
+        EnterCriticalSection( &game_input_cs );
+        if ((device = find_device( &impl->devices, &action->Data.DeviceObject )) ||
+            (device = device_create( &impl->devices, &action->Data.DeviceObject )))
+            FIXME( "Added device %p\n", device );
+        LeaveCriticalSection( &game_input_cs );
+
+        break;
+
     case DevQueryResultRemove:
+        TRACE( "impl %p, action %u type %u id %s props %lu\n", impl, action->Action, action->Data.DeviceObject.ObjectType,
+               debugstr_w(action->Data.DeviceObject.pszObjectId), action->Data.DeviceObject.cPropertyCount );
+
+        EnterCriticalSection( &game_input_cs );
+        if ((device = find_device( &impl->devices, &action->Data.DeviceObject )))
+            FIXME( "Removed device %p\n", device );
+        LeaveCriticalSection( &game_input_cs );
+
+        break;
+
+    case DevQueryResultUpdate:
         TRACE( "impl %p, action %u type %u id %s props %lu\n", impl, action->Action, action->Data.DeviceObject.ObjectType,
                debugstr_w(action->Data.DeviceObject.pszObjectId), action->Data.DeviceObject.cPropertyCount );
         break;
@@ -346,6 +651,7 @@ static struct game_input *game_input_create(void)
     if (!(impl = calloc( 1, sizeof(*impl) ))) return NULL;
     impl->IGameInput_v0_iface.lpVtbl = &game_input_v0_vtbl;
     impl->refcount = 1;
+    list_init( &impl->devices );
     list_init( &impl->callbacks );
 
     if (!(impl->initialized = CreateEventW( NULL, TRUE, FALSE, NULL )) ||

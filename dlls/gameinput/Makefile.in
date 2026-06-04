@@ -1,5 +1,5 @@
 MODULE     = gameinput.dll
-IMPORTS    = cfgmgr32
+IMPORTS    = cfgmgr32 hid
 EXTRADEFS  = -D_GAMEINPUT_
 
 EXTRADLLFLAGS = -Wb,--prefer-native
