@@ -810,6 +810,8 @@ static void blit_framebuffer_surface( struct framebuffer_surface *surface )
             funcs->p_glEnable( GL_FRAMEBUFFER_SRGB );
         funcs->p_glBlitFramebuffer( 0, 0, src.right, src.bottom, 0, 0, src.right, src.bottom, GL_COLOR_BUFFER_BIT,
                                     GL_NEAREST );
+        if (is_srgb_format( surface->internalformat ))
+            funcs->p_glDisable( GL_FRAMEBUFFER_SRGB );
     }
 
     funcs->p_glBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
