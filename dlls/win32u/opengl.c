@@ -975,7 +975,10 @@ static BOOL needs_framebuffer_surface( HWND hwnd )
         if (skip_cached == -1)
         {
             const char *sgi = getenv( "SteamGameId" );
-            skip_cached = sgi && !strcmp( sgi, "582660" );
+            skip_cached = sgi && (
+                          !strcmp( sgi, "582660" )
+                          || !strcmp( sgi, "323220" )
+                          );
         }
         if (!skip_cached)
         {
