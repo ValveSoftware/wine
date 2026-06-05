@@ -659,7 +659,10 @@ static void fs_hack_handle_shaders( int mode, struct wgl_context *ctx, struct fs
         funcs->p_glBindTexture( GL_TEXTURE_2D, state->bound_texture );
         funcs->p_glActiveTexture( state->active_texture );
 
-        funcs->p_glBindBufferRange( GL_UNIFORM_BUFFER, 0, state->ubo, state->ubo_start, state->ubo_size );
+        if (state->ubo_size)
+            funcs->p_glBindBufferRange( GL_UNIFORM_BUFFER, 0, state->ubo, state->ubo_start, state->ubo_size );
+        else
+            funcs->p_glBindBufferBase( GL_UNIFORM_BUFFER, 0, state->ubo );
     }
 }
 
