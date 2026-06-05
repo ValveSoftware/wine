@@ -1506,6 +1506,24 @@ static void window_set_net_wm_state( struct x11drv_win_data *data, UINT new_stat
             {
                 WARN( "window %p/%lx becomes fullscreen, updating _NET_WM_STATE_FULLSCREEN_MONITORS\n", data->hwnd, data->whole_window );
                 update_fullscreen_monitors( data, TRUE );
+
+                /* Bug 26859 - Guild Wars 2 (1284210) Alt+Enters into Fullscreen with Taskbar Showing [KDE Only]
+                 *
+                 * When entering fullscreen, expect a ConfigureNotify. This helps make ConfigureNotify
+                 * events from older requests like changing MWM hints obsolete. Those extra older
+                 * ConfigureNotify events could cause unexpected config changes for applications
+                 * because they can happen, for example, after MWM hints property change events. So
+                 * could be considered as legitimate ConfigureNotify events even when we don't want
+                 * them. A ideal fix would be to set configure_serial for every request that can
+                 * trigger ConfigureNotify events. However, it's difficult to tell whether ConfigureNotify
+                 * event will arrive in some cases, especially with different WMs. */
+                if (X11DRV_HasWindowManager( "KWin" ))
+                {
+                    data->configure_serial = NextRequest( data->display );
+                    data->pending_state.rect = data->rects.visible;
+                    TRACE( "window %p/%lx entering fullscreen, expecting config %s, serial %lu\n", data->hwnd,
+                           data->whole_window, wine_dbgstr_rect( &data->pending_state.rect ), data->configure_serial );
+                }
             }
 
             data->pending_state.net_wm_state ^= (1 << i);
