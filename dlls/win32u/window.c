@@ -1580,6 +1580,24 @@ LONG_PTR set_window_long( HWND hwnd, INT offset, UINT size, LONG_PTR newval, BOO
         user_driver->pSetWindowStyle( hwnd, offset, &style );
         if (made_visible || layered) update_window_state( hwnd );
         send_message( hwnd, WM_STYLECHANGED, offset, (LPARAM)&style );
+
+        /* A Plague Tale: Requiem creates the window with borders, then removes them
+         * without calling SetWindowPos with SWP_FRAMECHANGED, causing a black bar
+         * at the top. Force frame recalculation for this game. */
+        if (sgi && !strcmp( sgi, "1182900" ) && offset == GWL_STYLE)
+        {
+            DWORD old_border = retval & (WS_BORDER | WS_DLGFRAME | WS_CAPTION | WS_SYSMENU |
+                                          WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+            DWORD new_border = newval & (WS_BORDER | WS_DLGFRAME | WS_CAPTION | WS_SYSMENU |
+                                          WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+            if ((old_border & ~new_border) && !(newval & (WS_CHILD | WS_POPUP)))
+            {
+                TRACE( "forcing frame recalc for APTRequiem\n" );
+                NtUserSetWindowPos( hwnd, 0, 0, 0, 0, 0,
+                                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE |
+                                    SWP_FRAMECHANGED );
+            }
+        }
     }
 
     return retval;
