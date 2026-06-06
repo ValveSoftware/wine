@@ -1898,6 +1898,7 @@ static MonoAssembly* CDECL wine_mono_assembly_preload_hook_v2_fn(MonoAssemblyNam
             const char *module_name;
             const char *appid;
             const char *source;
+            const WCHAR *library;
         } assembly_hacks[] = {
             {
                 "CameraQuakeViewer",
@@ -1923,12 +1924,20 @@ static MonoAssembly* CDECL wine_mono_assembly_preload_hook_v2_fn(MonoAssemblyNam
                 "46450", /* Grotesque Tactics: Evil Heroes  */
                 "namespace WeifenLuo.WinFormsUI { class DockPanel {} }"
             },
+            {
+                "EdgeBrowserControl",
+                "EdgeBrowserControl.dll",
+                NULL,
+                "namespace EdgeBrowserControl { class MyWebBrowser {} }",
+                L"SharpKmyCore"
+            },
         };
 
         for (i = 0; i < ARRAY_SIZE(assembly_hacks); ++i)
         {
             if (!strcmp(assemblyname, assembly_hacks[i].assembly_name) &&
-                    !strcmp(sgi, assembly_hacks[i].appid))
+                    (!assembly_hacks[i].appid || !strcmp(sgi, assembly_hacks[i].appid)) &&
+                    (!assembly_hacks[i].library || GetModuleHandleW(assembly_hacks[i].library)))
             {
                 char assembly_path[MAX_PATH];
 
