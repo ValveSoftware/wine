@@ -2890,7 +2890,9 @@ static NTSTATUS open_known_dll( const WCHAR *libname, UNICODE_STRING *nt_name, W
     OBJECT_ATTRIBUTES attr;
 
     if (!known_dlls_ntdir) return STATUS_DLL_NOT_FOUND;
+#if !defined(__arm64ec__) && !defined(__aarch64__)
     if (libname && !_wcsicmp( libname, L"ucrtbase.dll" )) return STATUS_DLL_NOT_FOUND;
+#endif
     RtlInitUnicodeString( &str, libname );
     InitializeObjectAttributes( &attr, &str, OBJ_CASE_INSENSITIVE, known_dlls_ntdir, NULL );
     if ((status = NtOpenSection( mapping, MAXIMUM_ALLOWED, &attr ))) return status;
@@ -3430,14 +3432,16 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, UNI
 
         if (status == STATUS_SUCCESS)
         {
-            static const WCHAR ucrtbase[] = L"ucrtbase.dll";
-            unsigned int len;
-
             TRACE ("found %s for %s\n", debugstr_w(fullname), debugstr_w(libname) );
-            len = wcslen( fullname );
-            if (len > ARRAY_SIZE(ucrtbase) - 1 && !_wcsicmp( fullname + len - (ARRAY_SIZE(ucrtbase) - 1), ucrtbase )
-                && (*pwm = find_basename_module( ucrtbase )))
-                return STATUS_SUCCESS;
+#if !defined(__arm64ec__) && !defined(__aarch64__)
+            {
+                static const WCHAR ucrtbase[] = L"ucrtbase.dll";
+                unsigned int len = wcslen( fullname );
+                if (len > ARRAY_SIZE(ucrtbase) - 1 && !_wcsicmp( fullname + len - (ARRAY_SIZE(ucrtbase) - 1), ucrtbase )
+                    && (*pwm = find_basename_module( ucrtbase )))
+                    return STATUS_SUCCESS;
+            }
+#endif
             libname = fullname;
         }
         else
