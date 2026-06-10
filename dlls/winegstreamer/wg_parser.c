@@ -757,15 +757,15 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
                     GST_INFO("Enabling the NV12 alignment fix.");
 
                 fix_yv12 = (GST_VIDEO_INFO_FORMAT(&video_info) == GST_VIDEO_FORMAT_YV12
-                            || GST_VIDEO_INFO_FORMAT(&video_info) == GST_VIDEO_FORMAT_I420)
+                        || GST_VIDEO_INFO_FORMAT(&video_info) == GST_VIDEO_FORMAT_I420)
                         && (video_info.stride[1] > GST_ROUND_UP_2(video_info.width/2));
                 if (fix_yv12 && GST_VIDEO_INFO_IS_INTERLACED(&video_info))
                 {
-                    GST_WARNING("YV12 alignment fix is not implemented for interlaced YV12.\n");
+                    GST_WARNING("YV12/I420 alignment fix is not implemented for interlaced YV12/I420.\n");
                     fix_yv12 = false;
                 }
                 if (fix_yv12)
-                    GST_INFO("Enabling the YV12 alignment fix.");
+                    GST_INFO("Enabling the YV12/I420 alignment fix.");
 
             }
 
@@ -836,10 +836,11 @@ static void buffer_fix_align(GstBuffer *buffer, GstCaps *caps)
             dst += dst_info.stride[1];
             src += src_info.stride[1];
         }
-    } else if (GST_VIDEO_INFO_FORMAT(&src_info) == GST_VIDEO_FORMAT_I420
+    }
+    else if (GST_VIDEO_INFO_FORMAT(&src_info) == GST_VIDEO_FORMAT_I420
                 || GST_VIDEO_INFO_FORMAT(&src_info) == GST_VIDEO_FORMAT_YV12)
     {
-        gint plane1, plane2;
+        gint p, plane1, plane2;
         plane1 = (src_info.offset[2] > src_info.offset[1]) ? 1 : 2;
         plane2 = 3 - plane1;
         aligned_height = (src_info.offset[plane2] - src_info.offset[plane1]) / src_info.stride[plane1];
@@ -848,25 +849,24 @@ static void buffer_fix_align(GstBuffer *buffer, GstCaps *caps)
         dst_info.offset[plane2] = dst_info.offset[plane1] + dst_info.stride[plane1] * aligned_height;
         dst_info.size = dst_info.offset[plane2] + dst_info.stride[plane2] * aligned_height;
 
-        dst = map_info.data + dst_info.offset[plane1];
-        src = map_info.data + src_info.offset[plane1];
-        for (i = 0; i < aligned_height; ++i)
+        assert(dst_info.size <= src_info.size);
+
+        for (p = 1; p <= 2; ++p)
         {
-            memmove(dst, src, dst_info.stride[plane1]);
-            dst += dst_info.stride[plane1];
-            src += src_info.stride[plane1];
+            dst = map_info.data + dst_info.offset[p];
+            src = map_info.data + src_info.offset[p];
+            for (i = 0; i < aligned_height; ++i)
+            {
+                memmove(dst, src, dst_info.stride[p]);
+                dst += dst_info.stride[p];
+                src += src_info.stride[p];
+            }
         }
-        dst = map_info.data + dst_info.offset[plane2];
-        src = map_info.data + src_info.offset[plane2];
-        for (i = 0; i < aligned_height; ++i)
-        {
-            memmove(dst, src, dst_info.stride[plane2]);
-            dst += dst_info.stride[plane2];
-            src += src_info.stride[plane2];
-        }
-    } else
+    }
+    else
     {
-        GST_ERROR("fix_align called for unsupported format.");
+        /* should never happen */
+        assert(0);
     }
 
     gst_buffer_unmap(buffer, &map_info);
