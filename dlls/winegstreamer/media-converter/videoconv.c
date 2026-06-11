@@ -169,8 +169,6 @@ static int dump_fozdb_open_video(bool create)
 
 static void dump_fozdb_discard_transcoded(void)
 {
-    struct rb_tree to_discard_chunks = {fozdb_entry_compare};
-    struct fozdb_entry *entry;
     struct fozdb *read_fozdb;
     char *read_fozdb_path;
     int ret;
@@ -199,40 +197,11 @@ static void dump_fozdb_discard_transcoded(void)
         return;
     }
 
-    FOZDB_FOR_EACH_TAG_ENTRY(entry, VIDEO_CONV_FOZ_TAG_STREAM, dump_fozdb.fozdb)
+    if ((ret = discard_transcoded_streams(dump_fozdb.fozdb, read_fozdb)) < 0)
     {
-        struct fozdb_hash chunk_id;
-        uint32_t i;
-        size_t read_size;
-
-        if (fozdb_has_entry(read_fozdb, VIDEO_CONV_FOZ_TAG_OGVDATA, &entry->key.hash))
-        {
-            if (entry->full_size)
-            {
-                uint8_t *buffer = calloc(1, entry->full_size);
-                if (fozdb_read_entry_data(dump_fozdb.fozdb, VIDEO_CONV_FOZ_TAG_STREAM, &entry->key.hash,
-                        0, buffer, entry->full_size, &read_size, true) == CONV_OK)
-                {
-                    for (i = 0; i < read_size / sizeof(chunk_id); ++i)
-                    {
-                        fozdb_hash_from_bytes(&chunk_id, buffer + i * sizeof(chunk_id));
-                        fozdb_entry_put(&to_discard_chunks, VIDEO_CONV_FOZ_TAG_VIDEODATA, &chunk_id);
-                    }
-                }
-                free(buffer);
-            }
-
-            fozdb_entry_put(&to_discard_chunks, VIDEO_CONV_FOZ_TAG_STREAM, &entry->key.hash);
-        }
-    }
-
-    if ((ret = fozdb_discard_entries(dump_fozdb.fozdb, &to_discard_chunks)) < 0)
-    {
-        GST_ERROR("Failed to discard entries, ret %d.", ret);
+        GST_ERROR("failed to discard transcoded streams from the dump db, ret %i.", ret);
         dump_fozdb_close(&dump_fozdb);
     }
-
-    rb_destroy(&to_discard_chunks, fozdb_entry_destroy, NULL);
 }
 
 struct pad_reader *pad_reader_create_with_stride(GstPad *pad, size_t stride)

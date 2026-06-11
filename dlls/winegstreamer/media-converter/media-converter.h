@@ -184,6 +184,7 @@ extern int create_placeholder_file(const char *file_name);
 extern int dump_fozdb_open(struct dump_fozdb *db, bool create, const char *file_path_env, int num_tags);
 extern void dump_fozdb_close(struct dump_fozdb *db);
 extern void mark_transcoded_stream(struct fozdb *fozdb, struct fozdb_hash *hash);
+extern int discard_transcoded_streams(struct fozdb *dump_db, struct fozdb *read_fozdb);
 
 /* murmur3.c. */
 extern void murmur3_x64_128_state_init(struct murmur3_x64_128_state *state, uint32_t seed);
