@@ -397,6 +397,59 @@ void mark_transcoded_stream(struct fozdb *fozdb, struct fozdb_hash *hash)
     fozdb_release(played_fozdb);
 }
 
+int discard_transcoded_streams(struct fozdb *dump_db, struct fozdb *read_db)
+{
+    struct rb_tree to_discard_chunks = {fozdb_entry_compare};
+    struct fozdb_entry *entry;
+    int ret;
+
+    if (!dump_db || !read_db)
+        return CONV_ERROR_INVALID_ARGUMENT;
+
+    if (discarding_disabled())
+        return CONV_OK;
+
+    FOZDB_FOR_EACH_TAG_ENTRY(entry, VIDEO_CONV_FOZ_TAG_STREAM, dump_db)
+    {
+        struct fozdb_hash chunk_id;
+        uint32_t i;
+        size_t read_size;
+
+        if (fozdb_has_entry(read_db, VIDEO_CONV_FOZ_TAG_OGVDATA, &entry->key.hash) ||
+                fozdb_has_entry(read_db, VIDEO_CONV_FOZ_TAG_MKVDATA, &entry->key.hash))
+        {
+            uint8_t *buffer;
+
+            fozdb_entry_put(&to_discard_chunks, VIDEO_CONV_FOZ_TAG_STREAM, &entry->key.hash);
+
+            if (!entry->full_size) continue;
+
+            if (!(buffer = calloc(1, entry->full_size)))
+            {
+                GST_WARNING("out of memory.");
+                break;
+            }
+
+            if (fozdb_read_entry_data(dump_db, VIDEO_CONV_FOZ_TAG_STREAM, &entry->key.hash,
+                    0, buffer, entry->full_size, &read_size, true) == CONV_OK)
+            {
+                for (i = 0; i < read_size / sizeof(chunk_id); ++i)
+                {
+                    fozdb_hash_from_bytes(&chunk_id, buffer + i * sizeof(chunk_id));
+                    fozdb_entry_put(&to_discard_chunks, VIDEO_CONV_FOZ_TAG_VIDEODATA, &chunk_id);
+                }
+            }
+            free(buffer);
+        }
+    }
+
+    ret = fozdb_discard_entries(dump_db, &to_discard_chunks);
+
+    rb_destroy(&to_discard_chunks, fozdb_entry_destroy, NULL);
+
+    return ret;
+}
+
 #ifndef _WINEDMO
 
 bool media_converter_init(void)
