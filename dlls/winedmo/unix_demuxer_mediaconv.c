@@ -214,6 +214,9 @@ int mediaconv_demuxer_open( AVFormatContext **ctx, struct stream_context *contex
 
     pthread_mutex_lock( &fozdb_lock );
 
+    if ((ret = discard_transcoded_streams(dump_db, read_db)) < 0)
+        TRACE("failed to discard transcoded streams from the dump db, ret %i\n", ret);
+
     if (read_db && (transcoded = fozdb_entry_get( &read_db->entries, VIDEO_CONV_FOZ_TAG_MKVDATA, &stream_hash )))
     {
         TRACE( "Found mkv stream for %s\n", debugstr_fozdb_hash( &stream_hash ) );
