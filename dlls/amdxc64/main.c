@@ -167,7 +167,6 @@ const static struct IAmdExtStub2Vtbl AMDSTUB2_vtable = {
 struct AMDExtStub1
 {
     IAmdExtStub1 IAmdExtStub1_iface;
-    LONG ref;
 };
 
 struct AMDExtStub1* impl_from_IAMDExtStub1(IAmdExtStub1 *iface)
@@ -177,22 +176,19 @@ struct AMDExtStub1* impl_from_IAMDExtStub1(IAmdExtStub1 *iface)
 
 ULONG STDMETHODCALLTYPE AMDExtStub1_AddRef(IAmdExtStub1 *iface)
 {
-    struct AMDExtStub1 *this = impl_from_IAMDExtStub1(iface);
-    return InterlockedIncrement(&this->ref);
+    return 2;
 }
 
 ULONG STDMETHODCALLTYPE AMDExtStub1_Release(IAmdExtStub1 *iface)
 {
-    struct AMDExtStub1 *this = impl_from_IAMDExtStub1(iface);
-    ULONG ret = InterlockedDecrement(&this->ref);
-    if (!ret) free(this);
-    return ret;
+    return 1;
 }
 
 HRESULT STDMETHODCALLTYPE AmdExtStub1_QueryInterface2(IAmdExtStub1 *iface, void* unk, REFIID iid, void **out)
 {
     TRACE("%p %p %s %p\n", iface, unk, debugstr_guid(iid), out);
 
+    *out = NULL;
     if(IsEqualGUID(iid, &IID_IAmdExtStub2))
     {
         struct AMDExtStub2 *this = calloc(1, sizeof(struct AMDExtStub2));
@@ -220,6 +216,11 @@ static const struct IAmdExtStub1Vtbl AMDSTUB1_vtable = {
     AmdExtStub1_QueryInterface2
 };
 
+static struct AMDExtStub1 amd_ext_stub1 =
+{
+    .IAmdExtStub1_iface = { &AMDSTUB1_vtable },
+};
+
 HRESULT CDECL AmdExtD3DCreateInterface(IUnknown *outer, REFIID iid, void **obj)
 {
     TRACE("outer %p, iid %s, obj %p\n", outer, debugstr_guid(iid), obj);
@@ -234,10 +235,7 @@ HRESULT CDECL AmdExtD3DCreateInterface(IUnknown *outer, REFIID iid, void **obj)
     } else if (IsEqualGUID(iid, &IID_IAmdExtAntiLagApi)) {
         return ID3D12Device_QueryInterface((ID3D12Device *)outer, &IID_IAmdExtAntiLagApi, obj);
     } else if(IsEqualGUID(iid, &IID_IAmdExtStub1)) {
-        struct AMDExtStub1 *this = calloc(1, sizeof(struct AMDExtStub1));
-        this->IAmdExtStub1_iface.lpVtbl = &AMDSTUB1_vtable;
-        this->ref = 1;
-        *obj = &this->IAmdExtStub1_iface;
+        *obj = &amd_ext_stub1;
         return S_OK;
     } else {
         FIXME("unknown guid: %s\n", debugstr_guid(iid));
