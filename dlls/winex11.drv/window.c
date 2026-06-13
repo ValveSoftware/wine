@@ -1824,6 +1824,25 @@ static void window_set_wm_state( struct x11drv_win_data *data, UINT new_state, B
         window_set_wm_state( data, NormalState, activate );
         return;
     }
+    /* Bug 27190 - XCOM® 2 (268500) Keyboard Controls Not Working
+     *
+     * On older Mutter and forks before Mutter commit 3218626d, handling the first MapRequest will
+     * unminimize the window even though XWMHints.initial_state is set to IconicState. WM_STATE will
+     * then be set to NormalState instead of IconicState as a result. Thus, we could be waiting for
+     * a IconicState that never comes. On Mutter, the bug has been fixed for more than three years.
+     * So enable this hack for Muffin on Cinnamon desktop only. Other Mutter forks don't seem to
+     * have a meaningful user base. The PR for Muffin is at https://github.com/linuxmint/muffin/pull/826.
+     * Remove this hack when the fix has been widely deployed.
+     */
+    else if (X11DRV_HasWindowManager( "Mutter (Muffin)" ) && data->managed
+             && MAKELONG(old_state, new_state) == MAKELONG(WithdrawnState, IconicState))
+    {
+        WARN( "window %p/%lx is in WithdrawnState requesting IconicState, change to NormalState "
+              "first to workaround a bug on older Muffin on Cinnamon desktop.\n", data->hwnd, data->whole_window );
+        window_set_wm_state( data, NormalState, FALSE );
+        window_set_wm_state( data, IconicState, FALSE );
+        return;
+    }
 
     switch (MAKELONG(old_state, new_state))
     {
