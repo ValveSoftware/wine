@@ -596,8 +596,21 @@ static void sync_window_input_shape( struct x11drv_win_data *data )
 {
 #ifdef HAVE_LIBXSHAPE
     DWORD ex_style = NtUserGetWindowLongW( data->hwnd, GWL_EXSTYLE );
+    char const *sgi;
 
     if (!data->whole_window) return;
+
+    /* HACK for bug 27151 - TBH: Task Bar Hero (3678970) does not take input
+     *
+     * The game constantly calls GetCursorPos() to check if the cursor position is inside its window.
+     * If so, it removes WS_EX_TRANSPARENT and thus input gets allowed. However, GetCursorPos()
+     * doesn't work reliably, especially on Wayland. On Wayland, the cursor needs to be on an X11
+     * window that takes input for the cursor position to be updated. When the cursor is on a Wayland
+     * window, XQueryPointer() doesn't work and no XI_RawMotion event for the root window is sent so
+     * the cursor position becomes stale. This hack rejects setting an empty input shape for the
+     * window so that it can get input.
+     */
+    if ((sgi = getenv( "SteamGameId" )) && !strcmp( sgi, "3678970" )) return;
 
     if (ex_style & WS_EX_TRANSPARENT)
     {
