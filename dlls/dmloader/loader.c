@@ -902,6 +902,7 @@ static const IDirectMusicLoader8Vtbl loader_vtbl =
 static inline void touch_soundfont_used_tag(void)
 {
     WCHAR env[MAX_PATH];
+    ERR("Creating the soundfont-used file.\n");
 
     if (GetEnvironmentVariableW(L"STEAM_COMPAT_TRANSCODED_MEDIA_PATH", env, ARRAY_SIZE(env)))
     {
