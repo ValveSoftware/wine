@@ -1800,6 +1800,7 @@ static void load_global_options( const UNICODE_STRING *image )
             peb->NtGlobalFlag = get_dword_option( key, globalflagW, peb->NtGlobalFlag );
             NtClose( key );
         }
+        else peb->ProcessParameters->Flags |= PROCESS_PARAMS_IMAGE_KEY_MISSING;
         NtClose( attr.RootDirectory );
     }
 }

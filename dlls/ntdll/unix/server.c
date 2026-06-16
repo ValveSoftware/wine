@@ -1787,6 +1787,19 @@ void server_init_process_done(void)
     SERVER_END_REQ;
 
     assert( !status );
+    if (peb->BeingDebugged)
+    {
+        peb->ProcessParameters->Flags &= ~PROCESS_PARAMS_IMAGE_KEY_MISSING;
+        if (wow_peb)
+        {
+#ifdef _WIN64
+            RTL_USER_PROCESS_PARAMETERS32 *wow64_params = ULongToPtr(wow_peb->ProcessParameters);
+#else
+            RTL_USER_PROCESS_PARAMETERS64 *wow64_params = ULongToPtr(wow_peb->ProcessParameters);
+#endif
+            wow64_params->Flags &= ~PROCESS_PARAMS_IMAGE_KEY_MISSING;
+        }
+    }
     signal_start_thread( main_image_info.TransferAddress, peb, suspend, NtCurrentTeb() );
 }
 
