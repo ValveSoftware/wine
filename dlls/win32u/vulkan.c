@@ -3213,9 +3213,21 @@ static VkResult win32u_vkQueueSubmit( VkQueue client_queue, uint32_t count, cons
             switch ((*next)->sType)
             {
             case VK_STRUCTURE_TYPE_D3D12_FENCE_SUBMIT_INFO_KHR:
-                FIXME( "VK_STRUCTURE_TYPE_D3D12_FENCE_SUBMIT_INFO_KHR not implemented!\n" );
+            {
+                VkD3D12FenceSubmitInfoKHR *info = (VkD3D12FenceSubmitInfoKHR *)*next;
+
+                if (timeline->sType == VK_STRUCTURE_TYPE_D3D12_FENCE_SUBMIT_INFO_KHR)
+                    ERR( "Duplicated d3d12 fence submit info.\n" );
+                else if (timeline->sType)
+                    FIXME( "Both d3d12 fence and timeline submit info.\n" );
+                timeline->sType = info->sType;
+                timeline->waitSemaphoreValueCount = info->waitSemaphoreValuesCount;
+                timeline->pWaitSemaphoreValues = info->pWaitSemaphoreValues;
+                timeline->signalSemaphoreValueCount = info->signalSemaphoreValuesCount;
+                timeline->pSignalSemaphoreValues = info->pSignalSemaphoreValues;
                 *next = (*next)->pNext; next = &prev;
                 break;
+            }
             case VK_STRUCTURE_TYPE_DEVICE_GROUP_SUBMIT_INFO:
                 device_group = (VkDeviceGroupSubmitInfo *)*next;
                 break;
@@ -3225,7 +3237,11 @@ static VkResult win32u_vkQueueSubmit( VkQueue client_queue, uint32_t count, cons
             case VK_STRUCTURE_TYPE_PERFORMANCE_QUERY_SUBMIT_INFO_KHR: break;
             case VK_STRUCTURE_TYPE_PROTECTED_SUBMIT_INFO: break;
             case VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO:
-                if (timeline->sType) ERR( "Duplicated timeline semaphore submit info!\n" );
+                if (timeline->sType == VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO)
+                    ERR( "Duplicated timeline semaphore submit info.\n" );
+                else if (timeline->sType)
+                    FIXME( "Both d3d12 fence and timeline submit info.\n" );
+
                 *timeline = *(VkTimelineSemaphoreSubmitInfo *)*next;
                 *next = (*next)->pNext; next = &prev; /* remove it from the chain, we'll add it back below */
                 break;
