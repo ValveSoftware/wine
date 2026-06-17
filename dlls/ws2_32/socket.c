@@ -4294,7 +4294,7 @@ int WINAPI WSARecvDisconnect( SOCKET s, WSABUF *data )
 
 static BOOL protocol_matches_filter( const int *filter, unsigned int index )
 {
-    if (supported_protocols[index].dwProviderFlags & PFL_HIDDEN) return FALSE;
+    //if (supported_protocols[index].dwProviderFlags & PFL_HIDDEN) return FALSE;
     if (!filter) return TRUE;
     while (*filter)
     {
