@@ -829,6 +829,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputSetState(DWORD index, XINPUT_VIBRATION *vib
     if (index >= XUSER_MAX_COUNT) return ERROR_BAD_ARGUMENTS;
 
     EnterCriticalSection(&xinput_cs);
+    if (!controllers[index].device) update_controller_list();
     if (!controllers[index].device)
         ret = ERROR_DEVICE_NOT_CONNECTED;
     else if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0)
@@ -844,16 +845,26 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputSetState(DWORD index, XINPUT_VIBRATION *vib
  * XInputGetState() in the hook, so we need a wrapper. */
 static DWORD xinput_get_state(DWORD index, XINPUT_STATE *state)
 {
+    DWORD ret;
+
     if (!state) return ERROR_BAD_ARGUMENTS;
 
     start_update_thread();
 
     if (index >= XUSER_MAX_COUNT) return ERROR_BAD_ARGUMENTS;
-    if (!get_current_state(index, state)) return ERROR_DEVICE_NOT_CONNECTED;
 
-    if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0) memset(state, 0, sizeof(*state));
+    ret = get_current_state(index, state) ? ERROR_SUCCESS : ERROR_DEVICE_NOT_CONNECTED;
+    if (ret == ERROR_SUCCESS) goto done;
 
-    return ERROR_SUCCESS;
+    EnterCriticalSection(&xinput_cs);
+    update_controller_list();
+    ret = get_current_state(index, state) ? ERROR_SUCCESS : ERROR_DEVICE_NOT_CONNECTED;
+    LeaveCriticalSection(&xinput_cs);
+
+done:
+    if (ret == ERROR_SUCCESS && WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0)
+        memset(state, 0, sizeof(*state));
+    return ret;
 }
 
 DWORD WINAPI DECLSPEC_HOTPATCH XInputGetState(DWORD index, XINPUT_STATE *state)
@@ -1003,7 +1014,7 @@ static DWORD check_for_keystroke(const DWORD index, XINPUT_KEYSTROKE *keystroke)
         /* note: guide button does not send an event */
     };
 
-    if (!get_current_state(index, &state)) return ERROR_DEVICE_NOT_CONNECTED;
+    if ((ret = xinput_get_state(index, &state))) return ret;
     AcquireSRWLockExclusive(&keystroke_lock);
 
     cur = &state.Gamepad;
@@ -1153,7 +1164,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputGetCapabilitiesEx(DWORD unk, DWORD index, D
     if (index >= XUSER_MAX_COUNT) return ERROR_BAD_ARGUMENTS;
 
     EnterCriticalSection(&xinput_cs);
-
+    if (!controllers[index].device) update_controller_list();
     if (!controllers[index].device)
         ret = ERROR_DEVICE_NOT_CONNECTED;
     else if (!HidD_GetAttributes(controllers[index].device, &attr))
