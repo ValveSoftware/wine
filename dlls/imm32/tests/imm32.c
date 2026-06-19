@@ -1132,9 +1132,9 @@ static void test_SCS_SETSTR(void)
     ok(!msg || broken(ends_comp_in_set && msg), "found WM_IME_ENDCOMPOSITION.\n");
 
     alen = ImmGetCompositionStringA(imc, GCS_COMPSTR, cstring, 20);
-    todo_wine ok(alen == 2 || broken(ends_comp_in_set && !alen), "got %ld.\n", alen);
+    ok(alen == 2 || broken(ends_comp_in_set && !alen), "got %ld.\n", alen);
     wlen = ImmGetCompositionStringW(imc, GCS_COMPSTR, wstring, 20);
-    todo_wine ok(wlen == 4 || broken(ends_comp_in_set && !wlen), "got %ld.\n", wlen);
+    ok(wlen == 4 || broken(ends_comp_in_set && !wlen), "got %ld.\n", wlen);
 
     msg_spy_flush_msgs();
     ret = ImmSetCompositionStringW(imc, SCS_SETSTR, L"", 2, NULL, 0);
@@ -1143,9 +1143,9 @@ static void test_SCS_SETSTR(void)
     todo_wine ok(!!msg || broken(ends_comp_in_set && !msg), "did not find WM_IME_ENDCOMPOSITION.\n");
 
     alen = ImmGetCompositionStringA(imc, GCS_COMPSTR, cstring, 20);
-    todo_wine ok(!alen, "got %ld.\n", alen);
+    ok(!alen, "got %ld.\n", alen);
     wlen = ImmGetCompositionStringW(imc, GCS_COMPSTR, wstring, 20);
-    todo_wine ok(!wlen, "got %ld.\n", alen);
+    ok(!wlen, "got %ld.\n", alen);
 
     msg_spy_flush_msgs();
     ret = ImmSetCompositionStringW(imc, SCS_SETSTR, string, sizeof(string), NULL, 2);
