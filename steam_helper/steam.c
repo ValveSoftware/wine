@@ -812,6 +812,8 @@ int main(int argc, char *argv[])
     HANDLE wait_handle = INVALID_HANDLE_VALUE;
     HANDLE event2 = INVALID_HANDLE_VALUE;
     HANDLE event = INVALID_HANDLE_VALUE;
+    HANDLE start_lock = INVALID_HANDLE_VALUE;
+    HANDLE start_file = INVALID_HANDLE_VALUE;
     HANDLE child = INVALID_HANDLE_VALUE;
     BOOL game_process = FALSE;
     const char *sgi;
@@ -831,6 +833,19 @@ int main(int argc, char *argv[])
 
         /* For 2K Launcher. */
         event2 = CreateEventW( NULL, FALSE, FALSE, L"Global\\Valve_SteamIPC_Class" );
+
+        start_lock = CreateEventA( NULL, FALSE, FALSE, "Local\\SteamStart_SharedMemLock" );
+        start_file = CreateFileMappingA( INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE,
+                                         0, 0x1000, "Local\\SteamStart_SharedMemFile" );
+        if (start_file)
+        {
+            void *view = MapViewOfFile( start_file, FILE_MAP_WRITE, 0, 0, 0 );
+            if (view)
+            {
+                memset( view, 0, 0x1000 );
+                *(DWORD *)view = GetCurrentProcessId();
+            }
+        }
 
         CreateThread(NULL, 0, create_steam_windows, NULL, 0, NULL);
 
