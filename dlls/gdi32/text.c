@@ -337,6 +337,35 @@ static void BidiLines(int baselevel, LPWSTR pszOutLine, LPCWSTR pszLine, const W
     HeapFree(GetProcessHeap(), 0, run);
 }
 
+static BOOL run_needs_font_linking(HDC hdc, const WCHAR *str, int count)
+{
+    BOOL ret = FALSE;
+    WORD *glyphs;
+    int i;
+
+    if (!hdc)
+        return FALSE;
+
+    if (!(glyphs = HeapAlloc(GetProcessHeap(), 0, count * sizeof(*glyphs))))
+        return FALSE;
+
+    if (NtGdiGetGlyphIndicesW(hdc, str, count, glyphs, GGI_MARK_NONEXISTING_GLYPHS) != GDI_ERROR)
+    {
+        for (i = 0; i < count; ++i)
+        {
+            /* Ignore control characters when checking for missing glyphs. */
+            if (glyphs[i] == 0xffff && str[i] >= 32)
+            {
+                ret = TRUE;
+                break;
+            }
+        }
+    }
+
+    HeapFree(GetProcessHeap(), 0, glyphs);
+    return ret;
+}
+
 /*************************************************************
  *    BIDI_Reorder
  *
@@ -642,6 +671,14 @@ static BOOL BIDI_Reorder( HDC hDC,               /* [in] Display DC */
                         TRACE("Unable to shape with currently selected font\n");
                     else
                         FIXME("Unable to shape string (%lx)\n",res);
+                    j = nItems;
+                    doGlyphs = FALSE;
+                    HeapFree(GetProcessHeap(), 0, *lpGlyphs);
+                    *lpGlyphs = NULL;
+                }
+                else if (run_needs_font_linking(hDC, text, cChars))
+                {
+                    TRACE("Shaped run needs font linking\n");
                     j = nItems;
                     doGlyphs = FALSE;
                     HeapFree(GetProcessHeap(), 0, *lpGlyphs);
