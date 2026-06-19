@@ -1110,7 +1110,7 @@ static void test_SCS_SETSTR(void)
     ret = ImmSetCompositionStringW(imc, SCS_SETSTR, NULL, 128, NULL, 128);
     ok(ret, "got error %lu.\n", GetLastError());
     msg = msg_spy_find_msg(WM_IME_ENDCOMPOSITION);
-    todo_wine ok(!!msg || broken(ends_comp_in_set && !msg), "did not find WM_IME_ENDCOMPOSITION.\n");
+    ok(!!msg || broken(ends_comp_in_set && !msg), "did not find WM_IME_ENDCOMPOSITION.\n");
 
     alen = ImmGetCompositionStringA(imc, GCS_COMPSTR, cstring, 20);
     ok(!alen, "got %ld.\n", alen);
@@ -1121,7 +1121,7 @@ static void test_SCS_SETSTR(void)
     ret = ImmSetCompositionStringW(imc, SCS_SETSTR, string, sizeof(string), NULL, 0);
     ok(ret, "got error %lu.\n", GetLastError());
     msg = msg_spy_find_msg(WM_IME_STARTCOMPOSITION);
-    todo_wine ok(!!msg, "did not find  WM_IME_STARTCOMPOSITION.\n");
+    ok(!!msg, "did not find  WM_IME_STARTCOMPOSITION.\n");
     msg = msg_spy_find_msg(WM_IME_COMPOSITION);
     ok(!!msg, "did not find WM_IME_COMPOSITION.\n");
 
@@ -1140,7 +1140,7 @@ static void test_SCS_SETSTR(void)
     ret = ImmSetCompositionStringW(imc, SCS_SETSTR, L"", 2, NULL, 0);
     ok(ret, "got error %lu.\n", GetLastError());
     msg = msg_spy_find_msg(WM_IME_ENDCOMPOSITION);
-    todo_wine ok(!!msg || broken(ends_comp_in_set && !msg), "did not find WM_IME_ENDCOMPOSITION.\n");
+    ok(!!msg || broken(ends_comp_in_set && !msg), "did not find WM_IME_ENDCOMPOSITION.\n");
 
     alen = ImmGetCompositionStringA(imc, GCS_COMPSTR, cstring, 20);
     ok(!alen, "got %ld.\n", alen);
@@ -1151,7 +1151,7 @@ static void test_SCS_SETSTR(void)
     ret = ImmSetCompositionStringW(imc, SCS_SETSTR, string, sizeof(string), NULL, 2);
     ok(ret, "got error %lu.\n", GetLastError());
     msg = msg_spy_find_msg(WM_IME_STARTCOMPOSITION);
-    todo_wine ok(!!msg, "did not find WM_IME_STARTCOMPOSITION.\n");
+    ok(!!msg, "did not find WM_IME_STARTCOMPOSITION.\n");
     msg = msg_spy_find_msg(WM_IME_COMPOSITION);
     ok(!!msg, "did not find WM_IME_COMPOSITION.\n");
     msg = msg_spy_find_msg(WM_IME_ENDCOMPOSITION);
