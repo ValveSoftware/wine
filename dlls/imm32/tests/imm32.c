@@ -6500,7 +6500,7 @@ static void test_ImmSetCompositionWindow(void)
     ok_ne( NULL, himc, HIMC, "%p" );
     ctx = ImmLockIMC( himc );
     ok_ne( NULL, ctx, INPUTCONTEXT *, "%p" );
-    process_messages();
+    flush_events();
     memset( ime_calls, 0, sizeof(ime_calls) );
     ime_call_count = 0;
 
