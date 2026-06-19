@@ -768,6 +768,17 @@ void init_shared_data_cpuinfo( KUSER_SHARED_DATA *data )
 static void fill_performance_core_info(void);
 static BOOL sysfs_parse_bitmap(const char *filename, ULONG_PTR *mask);
 
+static ULONG popcount( ULONG val )
+{
+#if defined(__MINGW32__)
+    return __builtin_popcount( val );
+#else
+    val -= val >> 1 & 0x55555555;
+    val = (val & 0x33333333) + (val >> 2 & 0x33333333);
+    return ((val + (val >> 4)) & 0x0f0f0f0f) * 0x01010101 >> 24;
+#endif
+}
+
 void fill_cpu_override(void)
 {
     const char *env_override = getenv("WINE_CPU_TOPOLOGY");
@@ -807,9 +818,40 @@ void fill_cpu_override(void)
         host_cpu_count = MAXIMUM_PROCESSORS;
     }
 
-    cpu_override.mapping.cpu_count = strtol(env_override, &s, 10);
-    if (s == env_override)
-        goto error;
+    if (env_override[0] == 'p' || env_override[0] == 'P')
+    {
+        unsigned int count = host_cpu_count;
+
+        if (env_override[1])
+        {
+            count = strtol( env_override + 1, &s, 10 );
+            if (!count || s == env_override + 1) goto error;
+        }
+        else s = env_override + 1;
+        if (*s) goto error;
+        fill_performance_core_info();
+        if (!performance_cores_capacity)
+        {
+            TRACE( "No performance cores.\n" );
+            return;
+        }
+        for (i = 0; i < performance_cores_capacity; ++i)
+        {
+            if (!performance_cores[i]) continue;
+            cpu_override.mapping.cpu_count += popcount( performance_cores[i] );
+        }
+        if (!cpu_override.mapping.cpu_count)
+        {
+            TRACE( "No performance cores.\n" );
+            return;
+        }
+        cpu_override.mapping.cpu_count = min( cpu_override.mapping.cpu_count, count );
+    }
+    else
+    {
+        cpu_override.mapping.cpu_count = strtol( env_override, &s, 10 );
+        if (s == env_override) goto error;
+    }
 
     if (!cpu_override.mapping.cpu_count || cpu_override.mapping.cpu_count > MAXIMUM_PROCESSORS)
     {
