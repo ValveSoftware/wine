@@ -6999,6 +6999,103 @@ static void test_bitmap_font_glyph_index(void)
     DeleteDC(hdc);
 }
 
+#define create_textout_bitmap(hdc, bmi, rect, text, count, options, bits) \
+        create_textout_bitmap_(__LINE__, hdc, bmi, rect, text, count, options, bits)
+static HBITMAP create_textout_bitmap_(unsigned int line, HDC hdc, const BITMAPINFO *bmi,
+        const RECT *rect, const WCHAR *text, UINT count, UINT options, void **bits)
+{
+    HBITMAP bitmap, old_bitmap;
+
+    bitmap = CreateDIBSection(hdc, bmi, DIB_RGB_COLORS, bits, NULL, 0);
+    ok_(__FILE__, line)(!!bitmap, "CreateDIBSection failed.\n");
+    old_bitmap = SelectObject(hdc, bitmap);
+    FillRect(hdc, rect, GetStockObject(WHITE_BRUSH));
+    ok_(__FILE__, line)(ExtTextOutW(hdc, 8, 8, options, NULL, text, count, NULL), "ExtTextOutW failed.\n");
+    SelectObject(hdc, old_bitmap);
+
+    return bitmap;
+}
+
+static void test_textout_missing_glyph(void)
+{
+    static const WCHAR text[] = {0x221e, 0x2260};
+    static const RECT rect = {0, 0, 96, 48};
+    WCHAR face[LF_FACESIZE], glyphs[ARRAY_SIZE(text)];
+    HBITMAP text_bitmap, glyph_bitmap;
+    void *text_bits, *glyph_bits;
+    HFONT font, old_font;
+    BITMAPINFO bmi;
+    LOGFONTW lf;
+    HDC hdc;
+    DWORD ret;
+
+    if (!is_font_installed("System"))
+    {
+        skip("System is not installed.\n");
+        return;
+    }
+
+    hdc = CreateCompatibleDC(NULL);
+    ok(!!hdc, "CreateCompatibleDC failed.\n");
+
+    memset(&lf, 0, sizeof(lf));
+    lf.lfHeight = -24;
+    lf.lfCharSet = DEFAULT_CHARSET;
+    wcscpy(lf.lfFaceName, L"System");
+    font = CreateFontIndirectW(&lf);
+    old_font = SelectObject(hdc, font);
+    GetTextFaceW(hdc, ARRAY_SIZE(face), face);
+    if (wcsicmp(face, lf.lfFaceName))
+    {
+        skip("System is not selected, got %s.\n", wine_dbgstr_w(face));
+        SelectObject(hdc, old_font);
+        DeleteObject(font);
+        DeleteDC(hdc);
+        return;
+    }
+
+    ret = GetGlyphIndicesW(hdc, text, ARRAY_SIZE(text), glyphs, GGI_MARK_NONEXISTING_GLYPHS);
+    ok(ret != GDI_ERROR, "GetGlyphIndicesW failed.\n");
+    if (ret == GDI_ERROR || glyphs[0] != 0xffff)
+    {
+        skip("System has glyphs for the test string.\n");
+        SelectObject(hdc, old_font);
+        DeleteObject(font);
+        DeleteDC(hdc);
+        return;
+    }
+
+    ret = GetGlyphIndicesW(hdc, text, ARRAY_SIZE(text), glyphs, 0);
+    ok(ret != GDI_ERROR, "GetGlyphIndicesW failed.\n");
+
+    memset(&bmi, 0, sizeof(bmi));
+    bmi.bmiHeader.biSize = sizeof(bmi.bmiHeader);
+    bmi.bmiHeader.biWidth = rect.right;
+    bmi.bmiHeader.biHeight = -rect.bottom;
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+
+    SetBkColor(hdc, RGB(255, 255, 255));
+    SetTextColor(hdc, RGB(0, 0, 0));
+    SetTextAlign(hdc, TA_LEFT | TA_RTLREADING);
+
+    text_bitmap = create_textout_bitmap(hdc, &bmi, &rect,
+            text, ARRAY_SIZE(text), 0, &text_bits);
+    glyph_bitmap = create_textout_bitmap(hdc, &bmi, &rect,
+            (const WCHAR *)glyphs, ARRAY_SIZE(glyphs), ETO_GLYPH_INDEX, &glyph_bits);
+
+    todo_wine
+    ok(memcmp(text_bits, glyph_bits, rect.right * rect.bottom * 4),
+            "Missing glyph text unexpectedly matched default glyph output.\n");
+
+    DeleteObject(text_bitmap);
+    DeleteObject(glyph_bitmap);
+    SelectObject(hdc, old_font);
+    DeleteObject(font);
+    DeleteDC(hdc);
+}
+
 static void test_GetCharWidthI(void)
 {
     static const char *teststr = "wine ";
@@ -8105,6 +8202,7 @@ START_TEST(font)
     test_GetCharWidth32();
     test_fake_bold_font();
     test_bitmap_font_glyph_index();
+    test_textout_missing_glyph();
     test_GetCharWidthI();
     test_long_names();
     test_ttf_names();
