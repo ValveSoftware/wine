@@ -7085,7 +7085,6 @@ static void test_textout_missing_glyph(void)
     glyph_bitmap = create_textout_bitmap(hdc, &bmi, &rect,
             (const WCHAR *)glyphs, ARRAY_SIZE(glyphs), ETO_GLYPH_INDEX, &glyph_bits);
 
-    todo_wine
     ok(memcmp(text_bits, glyph_bits, rect.right * rect.bottom * 4),
             "Missing glyph text unexpectedly matched default glyph output.\n");
 
