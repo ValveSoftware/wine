@@ -31,6 +31,7 @@
 #define COBJMACROS
 #include "initguid.h"
 #include "d3d12.h"
+#include "dxgi1_4.h"
 
 #include "amdxc_interfaces.h"
 
@@ -40,6 +41,7 @@ struct AMDFSR4FFX
 {
     IAmdExtFfxApi IAmdExtFfxApi_iface;
     LONG ref;
+    LUID luid;
 };
 
 static struct AMDFSR4FFX* impl_from_IAmdExtFfxApi(IAmdExtFfxApi* iface)
@@ -68,12 +70,56 @@ HRESULT STDMETHODCALLTYPE AMDFSR4FFX_QueryInterface(IAmdExtFfxApi *iface, REFIID
     return E_NOINTERFACE;
 }
 
+static BOOL is_device_supported(LUID luid)
+{
+    IDXGIFactory4 *factory;
+    IDXGIAdapter *adapter;
+    DXGI_ADAPTER_DESC desc;
+    BOOL ret = FALSE;
+    HRESULT hr;
+
+    hr = CreateDXGIFactory2(0, &IID_IDXGIFactory4, (void **)&factory);
+    if (hr != S_OK)
+    {
+        ERR("Failed to create DXGI Factory: %#lx!\n", hr);
+        return FALSE;
+    }
+
+    hr = IDXGIFactory4_EnumAdapterByLuid(factory, luid, &IID_IDXGIAdapter, (void**) &adapter);
+    if (hr != S_OK)
+    {
+        ERR("Failed to create find adapter by LUID %08lx:%08lx: %#lx!\n", luid.HighPart, luid.LowPart, hr);
+        IDXGIFactory4_Release(factory);
+        return FALSE;
+    }
+
+    IDXGIAdapter_GetDesc(adapter, &desc);
+
+    IDXGIAdapter_Release(adapter);
+    IDXGIFactory4_Release(factory);
+
+    TRACE("The device vid:pid is %#x:%#x.\n", desc.VendorId, desc.DeviceId);
+
+    /* supported discrete NAVI3s */
+    if (desc.VendorId == 0x1002 &&
+            (desc.DeviceId == 0x73f0 || (desc.DeviceId >= 0x7440 && desc.DeviceId <= 0x749f))
+        ) {
+        TRACE("Device supported.\n");
+        return TRUE;
+    }
+
+    TRACE("Device may be unsupported.\n");
+
+    return ret;
+}
+
 typedef HRESULT (__stdcall *updateffxapi_pfn)(void*, unsigned int);
 
 HRESULT STDMETHODCALLTYPE AMDFSR4FFX_UpdateFfxApiProvider(IAmdExtFfxApi *iface, void* data, unsigned int size)
 {
     static int once;
     const char *env;
+    struct AMDFSR4FFX* amdfs4ffx_data = impl_from_IAmdExtFfxApi(iface);
     updateffxapi_pfn pfn;
     HMODULE amdffx;
 
@@ -81,7 +127,9 @@ HRESULT STDMETHODCALLTYPE AMDFSR4FFX_UpdateFfxApiProvider(IAmdExtFfxApi *iface, 
 
     env = getenv("FSR4_UPGRADE");
 
-    if (env && !strcmp(env, "1"))
+    /* either FSR4_UPGRADE=1 or unset but on a supported device */
+    if ((!env && is_device_supported(amdfs4ffx_data->luid)) ||
+        (env && !strcmp(env, "1")))
     {
         amdffx = LoadLibraryA("amdxcffx64");
         if (!amdffx)
@@ -221,6 +269,26 @@ static struct AMDExtStub1 amd_ext_stub1 =
     .IAmdExtStub1_iface = { &AMDSTUB1_vtable },
 };
 
+LUID get_luid(IUnknown *outer)
+{
+    LUID luid = {};
+    ID3D12Device *device;
+    HRESULT hr;
+
+    /* XXX: can it be something else like d3d11? */
+    hr = IUnknown_QueryInterface(outer, &IID_ID3D12Device, (void**)&device);
+    if (hr != S_OK)
+    {
+        ERR("Failed to get ID3D12Device from outer: %#lx!\n", hr);
+        return luid;
+    }
+    luid = ID3D12Device_GetAdapterLuid(device);
+    TRACE("LUID = %08lx:%08lx\n", luid.HighPart, luid.LowPart);
+    ID3D12Device_Release(device);
+
+    return luid;
+}
+
 HRESULT CDECL AmdExtD3DCreateInterface(IUnknown *outer, REFIID iid, void **obj)
 {
     TRACE("outer %p, iid %s, obj %p\n", outer, debugstr_guid(iid), obj);
@@ -230,6 +298,7 @@ HRESULT CDECL AmdExtD3DCreateInterface(IUnknown *outer, REFIID iid, void **obj)
         struct AMDFSR4FFX* ffx = calloc(1, sizeof(struct AMDFSR4FFX));
         ffx->IAmdExtFfxApi_iface.lpVtbl = &AMDFSR4FFX_vtable;
         ffx->ref = 1;
+        ffx->luid = get_luid(outer);
         *obj = &ffx->IAmdExtFfxApi_iface;
         return S_OK;
     } else if (IsEqualGUID(iid, &IID_IAmdExtAntiLagApi)) {
