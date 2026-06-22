@@ -802,6 +802,7 @@ HKLM,SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x86,"Version",2,"14.42.344
 11,gecko\plugin,npmshtml.dll
 11,Speech\Common,sapi.dll
 11,Speech\Engines\TTS,msttsengine.dll
+11,DriverStore\FileRepository\igd_faux.inf_1,igd10iumd64.dll
 11,wbem,mofcomp.exe
 11,wbem,wbemdisp.dll
 11,wbem,wbemprox.dll
@@ -895,6 +896,7 @@ HKLM,SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x86,"Version",2,"14.42.344
 11,gecko\plugin,npmshtml.dll
 11,Speech\Common,sapi.dll
 11,Speech\Engines\TTS,msttsengine.dll
+11,DriverStore\FileRepository\igd_faux.inf_1,igd10iumd64.dll
 11,wbem,mofcomp.exe
 11,wbem,wbemdisp.dll
 11,wbem,wbemprox.dll
