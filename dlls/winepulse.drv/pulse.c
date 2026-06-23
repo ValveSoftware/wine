@@ -70,6 +70,8 @@ struct pulse_period
     struct list entry;
     char *device;
     pa_usec_t period;
+    pa_usec_t timer_last_time, stream_time;
+    pa_usec_t adjust;
     struct list streams;
     pa_time_event *time_event;
     struct pulse_stream *timer_stream;
@@ -102,9 +104,9 @@ struct pulse_stream
     SIZE_T tmp_buffer_bytes, held_bytes, peek_len, peek_buffer_len, pa_held_bytes, max_pa_held_bytes;
     BYTE *local_buffer, *tmp_buffer, *peek_buffer;
     void *locked_ptr;
-    BOOL just_underran;
+    BOOL just_underran, pa_started, update_timing_info_pending;
     pa_usec_t mmdev_period_usec;
-    pa_usec_t stream_time, last_time;
+    pa_usec_t timeline_start_stream_time, timeline_start_period_time;
 
     INT64 clock_lastpos, clock_written;
 
@@ -418,7 +420,10 @@ static void pulse_underflow_callback(pa_stream *s, void *userdata)
 
 static void pulse_started_callback(pa_stream *s, void *userdata)
 {
+    struct pulse_stream *stream = userdata;
+
     TRACE("%p: (Re)started playing\n", userdata);
+    stream->pa_started = TRUE;
 }
 
 static void pulse_op_cb(pa_stream *s, int success, void *user)
@@ -1163,8 +1168,7 @@ static HRESULT pulse_spec_from_waveformat(struct pulse_stream *stream, const WAV
 
 static HRESULT pulse_stream_connect(struct pulse_stream *stream, const char *pulse_name, UINT32 period_bytes)
 {
-    pa_stream_flags_t flags = PA_STREAM_START_CORKED | PA_STREAM_START_UNMUTED | PA_STREAM_ADJUST_LATENCY
-                              | PA_STREAM_AUTO_TIMING_UPDATE | PA_STREAM_INTERPOLATE_TIMING;
+    pa_stream_flags_t flags = PA_STREAM_START_CORKED | PA_STREAM_START_UNMUTED | PA_STREAM_ADJUST_LATENCY;
     int ret;
     char buffer[64];
     static LONG number;
@@ -1502,8 +1506,12 @@ static void pulse_write_index_catchup(struct pulse_stream *stream)
     UINT32 frame_size, to_write;
     int64_t write_index;
 
-    ti = pa_stream_get_timing_info(stream->stream);
     if (!ti || ti->read_index <= ti->write_index) return;
+    if (ti->read_index_corrupt || ti->write_index_corrupt)
+    {
+        WARN("index corrupt %d / %d.\n", ti->read_index_corrupt, ti->write_index_corrupt);
+        return;
+    }
 
     if (!silence_buf) silence_buf = calloc(1, silence_buf_size);
     frame_size = pa_frame_size(&stream->ss);
@@ -1531,8 +1539,6 @@ static void pulse_write(struct pulse_stream *stream)
     UINT32 to_write;
     BYTE *buf = stream->local_buffer + stream->pa_offs_bytes;
     UINT32 bytes = pa_stream_writable_size(stream->stream);
-
-    pulse_write_index_catchup(stream);
 
     if (stream->just_underran)
     {
@@ -1687,63 +1693,114 @@ static NTSTATUS pulse_timer_loop(void *args)
     return STATUS_SUCCESS;
 }
 
-static void pa_streams_timer_cb(pa_mainloop_api *api, pa_time_event *e, const struct timeval *tv, void *userdata)
+#define TIMER_ADJUST_DELAY (5 * PA_USEC_PER_SEC)
+
+static void pulse_update_timing_cb(pa_stream *s, int success, void *user)
 {
-    pa_usec_t now = pa_rtclock_now(), next_timer, stream_time = 0;
-    struct pulse_period *period = userdata;
-    struct pulse_stream *stream;
-    int64_t adjust = 0;
-    UINT32 adv_bytes;
+    struct pulse_stream *stream = user;
+    struct pulse_period *period = stream->period;
+    pa_usec_t period_stream_time, stream_time;
     int err;
 
-    if (period->timer_stream && !period->timer_stream->started)
-        period->timer_stream = NULL;
-
-    if (!period->timer_stream)
+    stream->update_timing_info_pending = FALSE;
+    if (!success)
     {
-        LIST_FOR_EACH_ENTRY(stream, &period->streams, struct pulse_stream, period_entry)
-        {
-            if (stream->started)
-            {
-                if ((err = pa_stream_get_time(stream->stream, &stream->stream_time)))
-                    ERR("pa_stream_get_time error %d.\n", err);
-                stream->last_time = stream->stream_time;
-                TRACE("period %p, stream %p is now timer stream, stream_time %llu.\n", period, stream, (long long)stream->stream_time);
-                stream->stream_time -= period->period;
-                period->timer_stream = stream;
-                break;
-            }
-        }
+        WARN("failed.\n");
+        return;
     }
 
-    next_timer = now + period->period;
-    if (period->timer_stream)
+    period_stream_time = period->stream_time;
+    if (!stream->pa_started)
+        return;
+
+    if (period->timer_stream && (!period->timer_stream->pa_started || !period->timer_stream->timeline_start_period_time
+                                 || period_stream_time - period->timer_stream->timeline_start_period_time < TIMER_ADJUST_DELAY))
     {
-        if ((err = pa_stream_get_time(period->timer_stream->stream, &stream_time)))
-            ERR("pa_stream_get_time error %d.\n", err);
-        if (stream_time > period->timer_stream->last_time)
+        TRACE("stream %p is no longer timer stream, started %d, period_stream_time %lld, last_time %lld.\n",
+            period->timer_stream, period->timer_stream->pa_started, (long long)period_stream_time, (long long)period->timer_stream->timeline_start_period_time);
+        period->timer_stream->timeline_start_period_time = 0;
+        period->timer_stream = NULL;
+    }
+
+    if ((err = pa_stream_get_time(stream->stream, &stream_time)))
+    {
+        WARN("pa_stream_get_time failed with %d.\n", err);
+        return;
+    }
+
+    if (!stream->timeline_start_period_time)
+    {
+        stream->timeline_start_period_time = period_stream_time;
+        stream->timeline_start_stream_time = stream_time;
+        TRACE("started stream %p timing at rt %lld, stream %lld.\n", stream, (long long)period_stream_time, (long long)stream_time);
+    }
+    else if (!period->timer_stream && period_stream_time - stream->timeline_start_period_time > TIMER_ADJUST_DELAY)
+    {
+        period->timer_stream = stream;
+        TRACE("stream %p is now timer stream.\n", stream);
+    }
+    if (period->timer_stream == stream)
+    {
+        period->adjust = (int64_t)((period_stream_time - stream->timeline_start_period_time) - (stream_time - stream->timeline_start_stream_time)) / 10;
+        TRACE("stream %p, peropd diff %lld, stream diff %lld.\n", stream,
+              (long long)(period_stream_time - stream->timeline_start_period_time),
+              (long long)(stream_time - stream->timeline_start_stream_time));
+        if (period->adjust < -5 * period->period && period->adjust > 5 * period->period)
         {
-            period->timer_stream->stream_time += period->period;
-            adjust = period->timer_stream->stream_time - stream_time;
-            TRACE("period %p, stream_time %lld, adjust %lld.\n", period, (long long)stream_time, (long long)adjust);
-            if (adjust > (int64_t)(period->period / 3))
-                adjust = period->period / 3;
-            else if (adjust < -(int64_t)(period->period / 3))
-                adjust = -(int64_t)period->period / 3;
-            next_timer += adjust;
+            WARN("stream %p, resetting period timing (adjust %lld).\n", stream, (long long)period->adjust);
+            period->adjust = 0;
+            period->timer_stream = NULL;
+            stream->timeline_start_period_time = 0;
+            stream->timeline_start_stream_time = 0;
         }
-        else
-        {
-            WARN("stream time did not advance, last_time %lld, stream_time %lld.\n",
-                    (long long)period->timer_stream->last_time, (long long)stream_time);
-        }
-        period->timer_stream->last_time = stream_time;
+    }
+    pulse_write_index_catchup(stream);
+}
+
+
+static void pa_streams_timer_cb(pa_mainloop_api *api, pa_time_event *e, const struct timeval *tv, void *userdata)
+{
+    struct pulse_period *period = userdata;
+    struct pulse_stream *stream;
+    BOOL reset_timeline = FALSE;
+    pa_usec_t next_timer;
+    int64_t adjust = 0;
+    UINT32 adv_bytes;
+    pa_operation *o;
+    pa_usec_t now;
+
+    period->stream_time += period->period;
+    now = pa_rtclock_now();
+    if (period->timer_last_time + period->period < now)
+    {
+        WARN("Next period is in the past, resetting timeline.\n");
+        period->timer_last_time = now;
+        period->adjust = 0;
+        reset_timeline = TRUE;
     }
 
     LIST_FOR_EACH_ENTRY(stream, &period->streams, struct pulse_stream, period_entry)
     {
         if (stream->started)
         {
+            if (reset_timeline)
+            {
+                stream->timeline_start_period_time = 0;
+                stream->timeline_start_stream_time = 0;
+            }
+            if (!stream->update_timing_info_pending && (o = pa_stream_update_timing_info(stream->stream, pulse_update_timing_cb, stream)))
+            {
+                pa_operation_unref(o);
+                stream->update_timing_info_pending = TRUE;
+            }
+            else if (stream->update_timing_info_pending)
+            {
+                TRACE("pa_stream_update_timing_info is still pending.\n");
+            }
+            else
+            {
+                ERR("pa_stream_update_timing_info err %d.\n", pa_context_errno(pulse_ctx));
+            }
             if (stream->dataflow == eRender && stream->held_bytes)
             {
                 pulse_write(stream);
@@ -1754,10 +1811,6 @@ static void pa_streams_timer_cb(pa_mainloop_api *api, pa_time_event *e, const st
                 stream->lcl_offs_bytes %= stream->real_bufsize_bytes;
                 stream->held_bytes -= adv_bytes;
             }
-            else if (stream->dataflow == eRender)
-            {
-                pulse_write_index_catchup(stream);
-            }
             else if (stream->dataflow == eCapture)
             {
                 pulse_read(stream);
@@ -1767,7 +1820,16 @@ static void pa_streams_timer_cb(pa_mainloop_api *api, pa_time_event *e, const st
             NtSetEvent(stream->event, NULL);
     }
 
-    TRACE("period %p, now %llu, next_timer %llu.\n", period, (long long)now, (long long)next_timer);
+    adjust = period->adjust;
+    if (adjust > (int64_t)(period->period / 3))
+        adjust = period->period / 3;
+    else if (adjust < -(int64_t)(period->period / 3))
+        adjust = -(int64_t)period->period / 3;
+    next_timer = period->timer_last_time + period->period + adjust;
+    TRACE("period %p, timer_last_time %llu, next_timer %llu, adjust %lld.\n",
+            period, (long long)period->timer_last_time, (long long)next_timer, (long long)period->adjust);
+    period->timer_last_time = next_timer;
+    period->adjust = 0;
     pa_context_rttime_restart(pulse_ctx, e, next_timer);
 }
 
@@ -1839,7 +1901,8 @@ static void pulse_add_stream_to_period(struct pulse_stream *stream)
     stream->period = period;
     list_add_tail(&period->streams, &stream->period_entry);
     list_add_tail(&active_periods, &period->entry);
-    period->time_event = pa_context_rttime_new(pulse_ctx, pa_rtclock_now() + period->period,
+    period->timer_last_time = pa_rtclock_now() + period->period;
+    period->time_event = pa_context_rttime_new(pulse_ctx, period->timer_last_time,
             pa_streams_timer_cb, period);
     api = pa_mainloop_get_api(pulse_ml);
     api->time_set_destroy(period->time_event, pa_streams_timer_cb_destroy);
@@ -1961,7 +2024,12 @@ static NTSTATUS pulse_stop(void *args)
             params->result = E_FAIL;
     }
     if (SUCCEEDED(params->result))
+    {
         stream->started = FALSE;
+        stream->pa_started = FALSE;
+        stream->timeline_start_period_time = 0;
+        stream->timeline_start_stream_time = 0;
+    }
     pulse_unlock();
     return STATUS_SUCCESS;
 }
