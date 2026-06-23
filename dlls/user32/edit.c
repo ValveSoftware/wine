@@ -4385,6 +4385,8 @@ static LRESULT EDIT_WM_NCCreate(HWND hwnd, LPCREATESTRUCTW lpcs, BOOL unicode)
 	EDITSTATE *es;
 	UINT alloc_size;
 
+	if ((EDITSTATE*)GetWindowLongPtrW(hwnd, 0)) return TRUE;
+
 	TRACE("Creating %s edit control, style = %08lx\n",
 		unicode ? "Unicode" : "ANSI", lpcs->style);
 
