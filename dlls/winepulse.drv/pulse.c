@@ -401,13 +401,13 @@ static void pulse_contextcallback(pa_context *c, void *userdata)
 static void pulse_stream_state(pa_stream *s, void *user)
 {
     pa_stream_state_t state = pa_stream_get_state(s);
-    TRACE("Stream state changed to %i\n", state);
+    TRACE("%p: Stream state changed to %i\n", user, state);
     pulse_broadcast();
 }
 
 static void pulse_attr_update(pa_stream *s, void *user) {
     const pa_buffer_attr *attr = pa_stream_get_buffer_attr(s);
-    TRACE("New attributes or device moved:\n");
+    TRACE("%p: New attributes or device moved:\n", user);
     dump_attr(attr);
 }
 
@@ -1345,7 +1345,7 @@ static NTSTATUS pulse_create_stream(void *args)
 
     *params->channel_count = stream->ss.channels;
     *params->stream = (stream_handle)(UINT_PTR)stream;
-
+    TRACE("created stream %p.\n", stream);
 exit:
     if (FAILED(params->result = hr)) {
         free(stream->local_buffer);
@@ -1711,7 +1711,10 @@ static void pulse_update_timing_cb(pa_stream *s, int success, void *user)
 
     period_stream_time = period->stream_time;
     if (!stream->pa_started)
+    {
+        pulse_write_index_catchup(stream);
         return;
+    }
 
     if (period->timer_stream && (!period->timer_stream->pa_started || !period->timer_stream->timeline_start_period_time
                                  || period_stream_time - period->timer_stream->timeline_start_period_time < TIMER_ADJUST_DELAY))
