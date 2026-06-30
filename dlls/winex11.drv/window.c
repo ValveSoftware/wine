@@ -1857,8 +1857,8 @@ static void window_set_wm_state( struct x11drv_win_data *data, UINT new_state, B
 
     if (new_state == NormalState)
     {
-        /* try forcing activation if the window is supposed to be foreground or if it is fullscreen */
-        if (data->hwnd == foreground || data->is_fullscreen) activate = TRUE;
+        /* try forcing activation if the window is supposed to be foreground */
+        if (data->hwnd == foreground) activate = TRUE;
         /* Some older Mutter versions get confused when mapping a window while another has focus
          * and if there's another window with _NET_WM_STATE_ABOVE. It then decides that the newly
          * mapped window doesn't deserve to be raised or focused, even if the topmost window isn't
