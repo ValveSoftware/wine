@@ -2038,13 +2038,7 @@ typedef enum _PROCESSINFOCLASS {
     ProcessWineUnixPid = 1101,
 #endif
     ProcessFexHardwareTso = 2000,
-    ProcessFexUnalignAtomic,
 } PROCESSINFOCLASS;
-
-// These match the prctl flag values
-#define FEX_UNALIGN_ATOMIC_EMULATE       (1ULL << 0)
-#define FEX_UNALIGN_ATOMIC_BACKPATCH     (1ULL << 1)
-#define FEX_UNALIGN_ATOMIC_STRICT_SPLIT_LOCKS    (1ULL << 2)
 
 #define MEM_EXECUTE_OPTION_DISABLE   0x01
 #define MEM_EXECUTE_OPTION_ENABLE    0x02
