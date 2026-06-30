@@ -1867,7 +1867,8 @@ CONFIGRET WINAPI CM_Get_Device_ID_ExW( DEVINST node, WCHAR *buffer, ULONG len, U
     if (*dev.device) path_len += swprintf( path + path_len, ARRAY_SIZE(path) - path_len, L"\\%s", dev.device );
     if (*dev.instance) path_len += swprintf( path + path_len, ARRAY_SIZE(path) - path_len, L"\\%s", dev.instance );
 
-    if (path_len > len) return CR_BUFFER_SMALL;
+    /* len is in WCHARs and must include space for the trailing null. */
+    if (path_len + 1 > len) return CR_BUFFER_SMALL;
     memcpy( buffer, path, (path_len + 1) * sizeof(WCHAR) );
 
     return CR_SUCCESS;
@@ -1879,14 +1880,26 @@ CONFIGRET WINAPI CM_Get_Device_ID_ExW( DEVINST node, WCHAR *buffer, ULONG len, U
 CONFIGRET WINAPI CM_Get_Device_ID_ExA( DEVINST node, char *bufferA, ULONG len, ULONG flags, HMACHINE machine )
 {
     WCHAR *bufferW;
+    ULONG lenW;
+    int lenA;
     CONFIGRET ret;
 
-    bufferW = bufferA ? malloc( len * sizeof(WCHAR) ) : NULL;
-    ret = CM_Get_Device_ID_ExW( node, bufferA ? bufferW : NULL, len, flags, machine );
-    if (!ret && bufferA && len && !WideCharToMultiByte( CP_ACP, 0, bufferW, len, bufferA, len, 0, 0 ))
+    if (!bufferA) return CR_INVALID_POINTER;
+    if ((ret = CM_Get_Device_ID_Size_Ex( &lenW, node, flags, machine ))) return ret;
+    if (!(bufferW = malloc( (lenW + 1) * sizeof(WCHAR) ))) return CR_OUT_OF_MEMORY;
+
+    ret = CM_Get_Device_ID_ExW( node, bufferW, lenW + 1, flags, machine );
+    if (!ret)
     {
-        if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) ret = CR_BUFFER_SMALL;
-        else ret = CR_FAILURE;
+        if (!(lenA = WideCharToMultiByte( CP_ACP, 0, bufferW, -1, NULL, 0, NULL, NULL )))
+            ret = CR_FAILURE;
+        else if (lenA > len)
+            ret = CR_BUFFER_SMALL;
+        else if (!WideCharToMultiByte( CP_ACP, 0, bufferW, -1, bufferA, lenA, NULL, NULL ))
+        {
+            if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) ret = CR_BUFFER_SMALL;
+            else ret = CR_FAILURE;
+        }
     }
     free( bufferW );
 
