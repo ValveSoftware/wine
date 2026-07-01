@@ -693,7 +693,26 @@ BOOL WINAPI SetupGetInfDriverStoreLocationW(
     PCWSTR LocaleName, PWSTR ReturnBuffer, DWORD ReturnBufferSize,
     PDWORD RequiredSize)
 {
+
     FIXME("stub: %s %p %s %p %lu %p\n", debugstr_w(FileName), AlternativePlatformInfo, debugstr_w(LocaleName), ReturnBuffer, ReturnBufferSize, RequiredSize);
+
+    if (FileName && !wcscmp(L"igd_faux.inf", FileName) && ReturnBuffer) {
+        WCHAR igd_full_path[MAX_PATH];
+
+        WARN("HACK: requesting location of igd_faux.inf\n");
+
+        GetSystemDirectoryW(igd_full_path, ARRAY_SIZE(igd_full_path));
+        wcscat(igd_full_path, L"\\DriverStore\\FileRepository\\igd_faux.inf_1\\igd_faux.inf");
+
+        if (ReturnBufferSize <= wcslen(igd_full_path)) {
+            SetLastError(ERROR_INSUFFICIENT_BUFFER);
+            return FALSE;
+        }
+
+        WARN(" -> %s\n", debugstr_w(igd_full_path));
+        wcscpy(ReturnBuffer, igd_full_path);
+        return TRUE;
+    }
 
     SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
     return FALSE;
