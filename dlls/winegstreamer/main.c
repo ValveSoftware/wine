@@ -1106,7 +1106,7 @@ static const REGFILTERPINS2 reg_decodebin_parser_pins[3] =
 static const REGFILTER2 reg_decodebin_parser =
 {
     .dwVersion = 2,
-    .dwMerit = MERIT_NORMAL - 1,
+    .dwMerit = MERIT_PREFERRED,
     .cPins2 = 3,
     .rgPins2 = reg_decodebin_parser_pins,
 };
