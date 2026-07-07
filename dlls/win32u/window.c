@@ -4816,6 +4816,26 @@ static BOOL show_window( HWND hwnd, INT cmd )
         }
     }
 
+    /* HACK for Bug 26340 - RPGMaker Engine games minimize out of interactivity on gamescope.
+     *
+     * Revert this when https://github.com/ValveSoftware/gamescope/pull/2237 has been widely deployed.
+     * */
+    if (cmd == SW_MINIMIZE && user_driver->pHasWindowManager( "steamcompmgr" ))
+    {
+        const char *sgi = getenv( "SteamGameId" );
+        if (sgi && (
+            !strcmp( sgi, "2939770" )       /* Labyrinth Flowers */
+            || !strcmp( sgi, "3531980" )    /* Obscurite Magie 3: The Divine Stones */
+            || !strcmp( sgi, "2997780" )    /* Pixel Pixie */
+            || !strcmp( sgi, "3561800" )    /* Hero in an All-Forgiving Fantasy World RPG */
+            || !strcmp( sgi, "2992490" )    /* Epic Quest - Definitive Edition */
+            || !strcmp( sgi, "2138140" )    /* Didactic Jesus Game */
+            || !strcmp( sgi, "2208730" )    /* Raiders of Ruin */
+            || !strcmp( sgi, "782330" )     /* DOOM Eternal */
+            ))
+            goto done;
+    }
+
     switch(cmd)
     {
     case SW_HIDE:
