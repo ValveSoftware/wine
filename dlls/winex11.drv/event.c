@@ -882,6 +882,7 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     HWND foreground = NtUserGetForegroundWindow();
     XFocusChangeEvent *event = &xev->xfocus;
     BOOL was_grabbed;
+    char const *sgi;
 
     if (event->detail == NotifyPointer) return FALSE;
     if (!hwnd) return FALSE;
@@ -922,7 +923,19 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
 
     xim_set_focus( hwnd, TRUE );
 
-    if (use_take_focus) return TRUE;
+    /* Bug 27087: Need for Speed™ Hot Pursuit Remastered (1328660) no input in fullscreen in Gamescope
+     *
+     * The bug also happens on Windows in fullscreen mode. It needs an Alt+Tab and then an user
+     * input for the game to handle further user inputs on Windows. On Proton with other window
+     * managers, the support of WM_TAKE_FOCUS allows the game to receive focus without user inputs
+     * so the bug doesn't appear. However, Gamescope doesn't support WM_TAKE_FOCUS so here we are.
+     * We could leave this alone to adhere to the bug for bug compatibility policy. But that would
+     * break the game and create a bad user experience. So set focus in this case to work around the
+     * game bug. The hack was previously applied for all games in experimental_10.0. However, it
+     * would cause bug 24831. So limit this hack to Need for Speed only */
+    sgi = getenv( "SteamGameId" );
+    if (use_take_focus && !(X11DRV_HasWindowManager( "steamcompmgr" ) && sgi && !strcmp( sgi, "1328660" )))
+        return TRUE;
 
     if (!can_activate_window(hwnd))
     {
