@@ -260,6 +260,41 @@ LONG X11DRV_ChangeDisplaySettings( LPDEVMODEW displays, LPCWSTR primary_name, HW
     XUngrabServer( gdi_display );
     XFlush( gdi_display );
 
+    /* Bug 26880 hack for SDL3 games. Sleep 100ms to wait for the WM to handle display change events
+     *
+     * Work around for a SDL3 game bug that uses the native display mode instead of the specified
+     * display mode when restoring from focus loss. For example, an SDL3 game on a 1920x1080 monitor
+     * uses 1024x768 display mode. When the game gets minimized, say by Alt+Tab, it will set the
+     * display mode back to 1920x1080. When the game window gets restored, the window manager will
+     * resize the window to 1920x1080 because the window still has __NET_WM_STATE_FULLSCREEN set
+     * even though it's minimized. So a WM_WINDOWPOSCHANGE (1920x1080) is sent to the game window.
+     * The game processes the WM_WINDOWPOSCHANGE and changes to the previous 1024x768 display mode.
+     * So a WM_WINDOWPOSCHANGE (1024x768) will be sent later once the WM finishes processing the
+     * display change event. However, there might be a delay between the WM_WINDOWPOSCHANGE (1920x1080)
+     * and WM_WINDOWPOSCHANGE (1024x768). So if the game finishes WM_WINDOWPOSCHANGE (1920x1080) and
+     * it can't find more messages, then it will trigger a render update and use the current window
+     * size (1920x1080) to adjust the display mode, causing it to revert to the native display mode
+     * instead of the specified one. See SDL3 testwm.c main message loop for example.
+
+     * The root cause is the difference in the behavior of WM on Linux and Windows. Windows still
+     * uses the old window size when restoring a window, even though the display mode is changed.
+     * The presence of __NET_WM_STATE_FULLSCREEN on Linux makes the WM choose the current display
+     * size instead of the previous window size. I tried removing __NET_WM_STATE_FULLSCREEN for a
+     * window when it gets minimized. But it will trigger unexpected size changes because removing
+     * __NET_WM_STATE_FULLSCREEN causes WMs to restore the window to its previous size before
+     * fullscreen. Eventually, I decided to add a bit of delay here so that when this function
+     * returns, the WM has already processed the display change event and triggers a ConfigureNotify,
+     * so that the second WM_WINDOWPOSCHANGE (1024x768) is most likely in the message queue.
+     *
+     * 100ms seems enough when testing. The bug applied to other applications as well so it's not
+     * gated to SDL3.
+     */
+    {
+        LARGE_INTEGER timeout;
+        timeout.QuadPart = (ULONGLONG)100 * -10000;
+        NtDelayExecution( FALSE, &timeout );
+    }
+
 done:
     free( modes );
     free( ids );
