@@ -4774,6 +4774,12 @@ NTSTATUS WINAPI EtwUnregister(REGHANDLE handle)
     return STATUS_SUCCESS;
 }
 
+PEPROCESS WINAPI IoThreadToProcess(PETHREAD thread)
+{
+    TRACE("thread %p\n", thread);
+    return thread->kthread.process;
+}
+
 /*****************************************************
  *           DllMain
  */
