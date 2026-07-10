@@ -553,7 +553,7 @@
 @ stub ADL2_OverdriveN_ThrottleNotification_Get
 @ stub ADL2_OverdriveN_ZeroRPMFan_Get
 @ stub ADL2_OverdriveN_ZeroRPMFan_Set
-@ stub ADL2_Overdrive_Caps
+@ cdecl ADL2_Overdrive_Caps(ptr long ptr ptr ptr)
 @ stub ADL2_PPLogSettings_Get
 @ stub ADL2_PPLogSettings_Set
 @ stub ADL2_PPW_Caps
