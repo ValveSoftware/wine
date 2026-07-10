@@ -1170,3 +1170,11 @@ int CDECL ADL2_Overdrive_Caps(ADL_CONTEXT_HANDLE ctx, int adapter_index, int *su
     *version = 0;
     return ADL_ERR_NOT_SUPPORTED;
 }
+
+int CDECL ADL2_OverdriveN_Temperature_Get(ADL_CONTEXT_HANDLE ctx, int adapter_index, int type, int *temperature)
+{
+    FIXME("ctx %p, adapter_index %d, type %d, temperature %p.\n", ctx, adapter_index, type, temperature);
+
+    *temperature = 65000; /* 65C */
+    return ADL_OK;
+}
