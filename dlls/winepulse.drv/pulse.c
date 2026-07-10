@@ -24,6 +24,7 @@
 #endif
 
 #include "config.h"
+#undef _TIME_BITS /* libpulse uses default time bitness convention. */
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -58,6 +59,8 @@ DEFINE_GUID(GUID_NULL,0,0,0,0,0,0,0,0,0,0,0);
 #include "mult.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(pulse);
+
+C_ASSERT((sizeof(void *) == 8 && sizeof(struct timeval) == 16) || (sizeof(void *) == 4 && sizeof(struct timeval) == 8));
 
 enum phys_device_bus_type {
     phys_device_bus_invalid = -1,
