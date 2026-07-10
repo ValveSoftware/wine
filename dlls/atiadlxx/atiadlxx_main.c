@@ -1159,3 +1159,14 @@ int CDECL ADL2_Device_PMLog_Device_Create(ADL_CONTEXT_HANDLE ctx, int adapter_in
 
     return ADL_ERR_NOT_SUPPORTED;
 }
+
+int CDECL ADL2_Overdrive_Caps(ADL_CONTEXT_HANDLE ctx, int adapter_index, int *supported, int *enabled, int *version)
+{
+    FIXME("ctx %p, adapter_index %d, supported %p, enabled %p, version %p stub.\n",
+            ctx, adapter_index, supported, enabled, version);
+
+    *supported = 0;
+    *enabled = 0;
+    *version = 0;
+    return ADL_ERR_NOT_SUPPORTED;
+}
