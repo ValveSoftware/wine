@@ -211,7 +211,7 @@
 @ stub ADL2_Desktop_PrimaryInfo_Get
 @ stub ADL2_Desktop_TextureState_Get
 @ stub ADL2_Desktop_Texture_Enable
-@ stub ADL2_Device_PMLog_Device_Create
+@ cdecl ADL2_Device_PMLog_Device_Create(ptr long ptr)
 @ stub ADL2_Device_PMLog_Device_Destroy
 @ stub ADL2_DisplayScaling_Set
 @ stub ADL2_Display_AdapterID_Get

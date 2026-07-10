@@ -318,6 +318,8 @@ typedef struct ADLAdapterODClockInfo
     ADLODClockSetting sEngineClock;
 } ADLAdapterODClockInfo;
 
+typedef unsigned int ADL_D3DKMT_HANDLE;
+
 static const ADLVersionsInfo version = {
     "99.19.02-230831a-396538C-AMD-Software-Adrenalin-Edition",
     "",
@@ -1149,4 +1151,11 @@ int CDECL ADL_Display_ODClockInfo_Get(int adapter_index, ADLAdapterODClockInfo *
     clock_info->sMemoryClock.iRequestedClock = 210000;
     clock_info->sEngineClock = clock_info->sMemoryClock;
     return ADL_OK;
+}
+
+int CDECL ADL2_Device_PMLog_Device_Create(ADL_CONTEXT_HANDLE ctx, int adapter_index, ADL_D3DKMT_HANDLE *device)
+{
+    FIXME("ctx %p, adapter_index %d, device %p stub.\n", ctx, adapter_index, device);
+
+    return ADL_ERR_NOT_SUPPORTED;
 }
