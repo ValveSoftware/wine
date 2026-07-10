@@ -548,7 +548,7 @@
 @ stub ADL2_OverdriveN_SystemClocksX2_Set
 @ stub ADL2_OverdriveN_SystemClocks_Get
 @ stub ADL2_OverdriveN_SystemClocks_Set
-@ stub ADL2_OverdriveN_Temperature_Get
+@ cdecl ADL2_OverdriveN_Temperature_Get(ptr long long ptr)
 @ stub ADL2_OverdriveN_Test_Set
 @ stub ADL2_OverdriveN_ThrottleNotification_Get
 @ stub ADL2_OverdriveN_ZeroRPMFan_Get
