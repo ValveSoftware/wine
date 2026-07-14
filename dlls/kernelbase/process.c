@@ -501,7 +501,7 @@ done:
     return ret;
 }
 
-static char *get_product_name( const WCHAR *app_name )
+char *get_product_name( const WCHAR *app_name )
 {
     WCHAR full_path[MAX_PATH];
     char *product_name, *ret;
@@ -510,8 +510,16 @@ static char *get_product_name( const WCHAR *app_name )
     void *block;
     UINT size;
 
-    if (!GetLongPathNameW( app_name, full_path, MAX_PATH )) lstrcpynW( full_path, app_name, MAX_PATH );
-    if (!GetFullPathNameW( full_path, MAX_PATH, full_path, NULL )) lstrcpynW( full_path, app_name, MAX_PATH );
+    if (app_name)
+    {
+        if (!GetLongPathNameW( app_name, full_path, MAX_PATH )) lstrcpynW( full_path, app_name, MAX_PATH );
+        if (!GetFullPathNameW( full_path, MAX_PATH, full_path, NULL )) lstrcpynW( full_path, app_name, MAX_PATH );
+    }
+    else
+    {
+        *full_path = 0;
+        GetModuleFileNameW( NULL, full_path, MAX_PATH );
+    }
 
     size = GetFileVersionInfoSizeExW(0, full_path, NULL);
     if (!size)
