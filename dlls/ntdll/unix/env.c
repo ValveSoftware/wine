@@ -747,7 +747,7 @@ static void init_locale(void)
     if (main_argc > 1 && (
             strstr(main_argv[1], "start_protected_game.exe")
             || strstr(main_argv[1], "RocketLeague_EAC.exe")
-            || ((p = getenv( "SteamGameId" )) && !strcmp( p, "2221490" ) && !strcmp( main_argv[1], "-public_key_store_address" ))
+            || strstr(main_argv[1], "EACLaunch.exe")
        ))
     {
         FIXME( "HACK setting EN locale.\n" );
