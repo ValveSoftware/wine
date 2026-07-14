@@ -6050,6 +6050,19 @@ INT WINAPI DECLSPEC_HOTPATCH GetLocaleInfoA( LCID lcid, LCTYPE lctype, char *buf
     return ret;
 }
 
+static void hack_spoof_locale( LCID *lcid )
+{
+    char *get_product_name( const WCHAR * );
+    static int cached = -1;
+
+    if (cached == -1)
+    {
+        const char *s = get_product_name( NULL );
+        cached = s && !strcmp( s, "Easy Anti-Cheat Bootstrapper (EOS)" );
+        if (cached) FIXME( "HACK: Forcing en-US locale.\n" );
+    }
+    if (cached) *lcid = MAKELCID(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), SORT_DEFAULT);
+}
 
 /******************************************************************************
  *	GetLocaleInfoW   (kernelbase.@)
@@ -6057,6 +6070,8 @@ INT WINAPI DECLSPEC_HOTPATCH GetLocaleInfoA( LCID lcid, LCTYPE lctype, char *buf
 INT WINAPI DECLSPEC_HOTPATCH GetLocaleInfoW( LCID lcid, LCTYPE lctype, WCHAR *buffer, INT len )
 {
     const NLS_LOCALE_DATA *locale;
+
+    hack_spoof_locale( &lcid );
 
     if (len < 0 || (len && !buffer))
     {
