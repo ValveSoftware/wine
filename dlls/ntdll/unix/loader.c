@@ -2362,6 +2362,7 @@ static void hacks_init(void)
     case 212910: /* CoD Black Ops II Zombies */
     case 247910: /* Sniper Elite: Nazi Zombie Army 2 */
     case 227100: /* Sniper Elite: Nazi Zombie Army */
+    case 63380:  /* Sniper Elite: V2 */
         setenv( "WINESTEAMNOEXEC", "1", 0 );
         break;
     }
