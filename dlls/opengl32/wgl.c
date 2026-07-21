@@ -1746,6 +1746,15 @@ static char *fixup_shader( GLsizei count, const GLchar *const*string, const GLin
             "#version 120\r\n",
         },
         {
+            "2005950",
+            /* add_ext */
+            NULL,
+            /* search_str */
+            "#version 410 core", TRUE,
+            /* prepend_str */
+            "#version 420 core"
+        },
+        {
             "2578670",
             /* add_ext */
             NULL,
