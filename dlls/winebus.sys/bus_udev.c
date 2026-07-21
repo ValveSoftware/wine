@@ -1705,6 +1705,22 @@ static void get_container_id_for_usb_udev_device(struct udev_device *dev, struct
     TRACE("Created container ID %s.\n", debugstr_guid(&desc->bus_container_id));
 }
 
+static void fixup_steaminput_vidpid( struct device_desc *desc )
+{
+    static int cached = -1;
+
+    if (cached == -1)
+    {
+        const char *s = getenv( "PROTON_SPOOF_STEAMINPUT_VIDPID" );
+        cached = s && *s != '0';
+        if (cached) ERR( "HACK: spoofing Steam Input controller vid / pid.\n" );
+    }
+    if (!cached) return;
+
+    desc->vid = 0x045e;
+    desc->pid = 0x028e;
+}
+
 static void udev_add_device(struct udev_device *dev, int fd)
 {
     struct device_desc desc = { .input = -1 };
@@ -1743,6 +1759,7 @@ static void udev_add_device(struct udev_device *dev, int fd)
     if (desc.vid == 0x28de && desc.pid == 0x11ff && !strcmp(subsystem, "input"))
     {
         TRACE("evdev %s: detected steam input virtual controller\n", debugstr_a(devnode));
+        fixup_steaminput_vidpid( &desc );
         desc.is_gamepad = TRUE;
     }
     else if (is_sdl_ignored_device(desc.vid, desc.pid))
