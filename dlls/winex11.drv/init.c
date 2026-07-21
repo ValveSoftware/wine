@@ -245,6 +245,7 @@ static BOOL enable_fullscreen_hack( HWND hwnd )
 BOOL needs_offscreen_rendering( HWND hwnd )
 {
     UINT style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
+    UINT ex_style = NtUserGetWindowLongW( hwnd, GWL_EXSTYLE );
     struct window_surface *surface;
     struct x11drv_win_data *data;
     BOOL needs_offscreen;
@@ -257,7 +258,7 @@ BOOL needs_offscreen_rendering( HWND hwnd )
         release_win_data( data );
     }
 
-    if (!needs_offscreen && style & WS_EX_LAYERED && NtUserGetLayeredWindowAttributes( hwnd, NULL, NULL, &layered_flags )
+    if (!needs_offscreen && ex_style & WS_EX_LAYERED && NtUserGetLayeredWindowAttributes( hwnd, NULL, NULL, &layered_flags )
         && layered_flags & LWA_COLORKEY)
         needs_offscreen = TRUE;
 
