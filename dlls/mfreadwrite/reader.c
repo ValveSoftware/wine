@@ -1635,6 +1635,7 @@ static ULONG WINAPI src_reader_Release(IMFSourceReaderEx *iface)
             LeaveCriticalSection(&reader->cs);
         }
 
+        MFUnlockWorkQueue(reader->queue);
         source_reader_release(reader);
     }
 
