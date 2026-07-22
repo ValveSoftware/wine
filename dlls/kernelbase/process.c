@@ -599,6 +599,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     }
     options[] =
     {
+        {L"Elisa The Innkeeper - Prequel\\nw.exe", L" --disable_direct_composition=1"},
         {L"UniverseGenerator.exe", L" --disable_direct_composition=1"},
         {L"Blaite\\nw.exe", L" --disable_direct_composition=1"},
         {L"Click&Fight.exe", L" --disable_direct_composition=1"},
