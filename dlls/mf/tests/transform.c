@@ -7258,7 +7258,6 @@ static void test_wmv_decoder(BOOL use_2d_buffer)
             .output_sample_desc = &output_sample_desc_rgb,
             .result_bitmap = use_2d_buffer ? L"rgb32frame.bmp" : L"rgb32frame-flip.bmp",
             .delta = 5,
-            .todo = use_2d_buffer,
         },
 
         {
@@ -7281,7 +7280,6 @@ static void test_wmv_decoder(BOOL use_2d_buffer)
             .output_sample_desc = &output_sample_desc_rgb,
             .result_bitmap = use_2d_buffer ? L"rgb32frame.bmp" : L"rgb32frame-flip.bmp",
             .delta = 5,
-            .todo = use_2d_buffer,
         },
 
         {
@@ -7305,7 +7303,6 @@ static void test_wmv_decoder(BOOL use_2d_buffer)
             .output_sample_desc = &output_sample_desc_rgb,
             .result_bitmap = use_2d_buffer ? L"rgb32frame-flip.bmp" : L"rgb32frame.bmp",
             .delta = 5,
-            .todo = use_2d_buffer,
         },
 
         {
