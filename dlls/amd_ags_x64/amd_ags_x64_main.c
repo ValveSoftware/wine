@@ -94,7 +94,7 @@ amd_ags_info[AMD_AGS_VERSION_COUNT] =
     {AGS_MAKE_VERSION(5, 4, 2), AGS_MAKE_VERSION(5, 4, 2), sizeof(AGSDeviceInfo_542), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
     {AGS_MAKE_VERSION(6, 0, 0), AGS_MAKE_VERSION(6, 0, 1), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA2},
     {AGS_MAKE_VERSION(6, 1, 0), AGS_MAKE_VERSION(6, 2, 0), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA3},
-    {AGS_MAKE_VERSION(6, 3, 0), AGS_MAKE_VERSION(6, 3, 0), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA4},
+    {AGS_MAKE_VERSION(6, 3, 0), AGS_MAKE_VERSION(6, 3, 1), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA4},
 };
 
 #define DEF_FIELD(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), \
