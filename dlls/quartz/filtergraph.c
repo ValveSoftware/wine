@@ -4762,7 +4762,7 @@ static void enter_fullscreen_mode(struct filter_graph *graph, IVideoWindow *wind
     IVideoWindow_put_Owner(window, 0);
     if (overlay)
         IOverlay_GetWindowHandle(overlay, &hwnd);
-    IVideoWindow_SetWindowPosition(window, monitor_top, monitor_left, monitor_width, monitor_height);
+    IVideoWindow_SetWindowPosition(window, monitor_left, monitor_top, monitor_width, monitor_height);
     IVideoWindow_get_MessageDrain(window, &s->drain);
     IVideoWindow_put_MessageDrain(window, graph->hwnd_drain);
     IVideoWindow_put_Visible(window, OATRUE);
