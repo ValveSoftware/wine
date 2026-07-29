@@ -6205,7 +6205,7 @@ void sysparams_init(void)
     if (!get_config_key( hkey, appkey, "EmulateModelist", buffer, sizeof(buffer) ))
         emulate_modelist = !IS_OPTION_TRUE( buffer[0] );
     if (!get_config_key( hkey, appkey, "EmulateModeset", buffer, sizeof(buffer) ))
-        emulate_modeset = !IS_OPTION_TRUE( buffer[0] );
+        emulate_modeset = IS_OPTION_TRUE( buffer[0] );
 
     {
         const char *s;
