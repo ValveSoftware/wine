@@ -767,6 +767,13 @@ LONG WINAPI UnhandledExceptionFilter( EXCEPTION_POINTERS *epointers )
         }
     }
 
+    nested = rec->ExceptionFlags & EXCEPTION_NESTED_CALL;
+    if (top_filter && !nested)
+    {
+        LONG ret = top_filter( epointers );
+        if (ret != EXCEPTION_CONTINUE_SEARCH) return ret;
+    }
+
     if (!NtCurrentTeb()->Peb->BeingDebugged)
     {
         if (rec->ExceptionCode == CONTROL_C_EXIT)
@@ -775,18 +782,10 @@ LONG WINAPI UnhandledExceptionFilter( EXCEPTION_POINTERS *epointers )
             TerminateProcess( GetCurrentProcess(), 1 );
         }
 
-        nested = rec->ExceptionFlags & EXCEPTION_NESTED_CALL;
-        if (top_filter && !nested)
-        {
-            LONG ret = top_filter( epointers );
-            if (ret != EXCEPTION_CONTINUE_SEARCH) return ret;
-        }
-
-        if ((GetErrorMode() & SEM_NOGPFAULTERRORBOX) ||
-            !start_debugger_atomic( epointers ) || !NtCurrentTeb()->Peb->BeingDebugged)
-            return nested ? EXCEPTION_CONTINUE_SEARCH : EXCEPTION_EXECUTE_HANDLER;
+        if (!(GetErrorMode() & SEM_NOGPFAULTERRORBOX) && start_debugger_atomic( epointers ))
+            return EXCEPTION_CONTINUE_SEARCH;
     }
-    return EXCEPTION_CONTINUE_SEARCH;
+    return nested ? EXCEPTION_CONTINUE_SEARCH : EXCEPTION_EXECUTE_HANDLER;
 }
 
 

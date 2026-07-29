@@ -2478,8 +2478,8 @@ static void test_unhandled_exception_filter(BYTE being_debugged_flag)
     old = SetUnhandledExceptionFilter( test_unhandled_exception_filter_topfilter );
     test_unhandled_exception_filter_called = 0;
     ret = UnhandledExceptionFilter( &ep );
-    todo_wine_if(being_debugged_flag) ok( test_unhandled_exception_filter_called, "not called.\n" );
-    todo_wine_if(being_debugged_flag) ok( ret == EXCEPTION_EXECUTE_HANDLER, "got %ld.\n", ret );
+    ok( test_unhandled_exception_filter_called, "not called.\n" );
+    ok( ret == EXCEPTION_EXECUTE_HANDLER, "got %ld.\n", ret );
 
     SetUnhandledExceptionFilter( NULL );
 
@@ -2493,7 +2493,7 @@ static void test_unhandled_exception_filter(BYTE being_debugged_flag)
     test_unhandled_exception_filter_called = 0;
     ret = UnhandledExceptionFilter( &ep );
     ok( !test_unhandled_exception_filter_called, "called.\n" );
-    todo_wine_if(being_debugged_flag) ok( ret == EXCEPTION_EXECUTE_HANDLER, "got %#lx.\n", ret );
+    ok( ret == EXCEPTION_EXECUTE_HANDLER, "got %#lx.\n", ret );
 
     SetUnhandledExceptionFilter( old );
     NtCurrentTeb()->Peb->BeingDebugged = 0;
