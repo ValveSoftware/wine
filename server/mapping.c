@@ -1310,8 +1310,6 @@ static client_ptr_t assign_map_address( struct mapping *mapping )
     struct addr_range *range = (mapping->image.base >> 32) ? &ranges64 : &ranges32;
     mem_size_t size = round_size( mapping->size, granularity_mask );
 
-    if (!(mapping->image.image_charact & IMAGE_FILE_DLL)) return 0;
-
     if ((ret = get_fd_map_address( mapping->fd ))) return ret;
 
     size += granularity_mask + 1;  /* leave some free space between mappings */
