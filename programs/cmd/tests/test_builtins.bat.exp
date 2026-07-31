@@ -58,7 +58,7 @@ SUCCESS 0
 FAILURE 255
 FAILURE 255
 --- success/failure for START command
-@todo_wine@FAILURE 1
+FAILURE 1
 foo@space@
 SUCCESS 1024
 @todo_wine@SUCCESS 666

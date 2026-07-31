@@ -495,3 +495,4 @@ extern WCHAR version_string[];
 #define WCMD_ENDOFFILE        1049
 #define WCMD_NUMCOPIED        1050
 #define WCMD_NOCOPYTOSELF     1051
+#define WCMD_STRING_UNIXFAIL  1052

@@ -3291,129 +3291,256 @@ RETURN_CODE WCMD_shift(const WCHAR *args)
 
 /****************************************************************************
  * WCMD_start
+ *
+ * Start a program with ShellExecute.
+ *
+ * Big part of the code is just copied from programs/start/start.c
+ * This implementation doesn't contain Wine-specific extensions.
  */
 RETURN_CODE WCMD_start(WCHAR *args)
 {
     RETURN_CODE return_code = NO_ERROR;
-    int argno;
-    int have_title;
-    WCHAR file[MAX_PATH];
-    WCHAR *cmdline, *cmdline_params;
-    STARTUPINFOW st;
-    PROCESS_INFORMATION pi;
+    DWORD binary_type, creation_flags;
+    int argn = 0;
+    SHELLEXECUTEINFOW sei = { 0 };
+    USHORT machine = 0;
+    WCHAR *thisparam, *rawarg, *qual;
+    WCHAR path_argument[MAXSTRING] = L"cmd.exe"; /* the path parameter can also be a URL which can be larger than MAX_PATH. */
+    WCHAR lpDirectory[MAX_PATH] = L"";
+    WCHAR *title = NULL;
+    struct search_command sc;
 
-    GetSystemDirectoryW( file, MAX_PATH );
-    lstrcatW(file, L"\\start.exe");
-    cmdline = xalloc( (wcslen(file) + wcslen(args) + 8) * sizeof(WCHAR) );
-    lstrcpyW( cmdline, file );
-    lstrcatW(cmdline, L" ");
-    cmdline_params = cmdline + lstrlenW(cmdline);
+    sei.cbSize = sizeof(sei);
+    sei.lpVerb = L"open";
+    sei.nShow = SW_SHOWNORMAL;
+    /* Dunno what these mean, but it looks like winMe's start uses them */
+    sei.fMask = SEE_MASK_FLAG_DDEWAIT | SEE_MASK_FLAG_NO_UI;
+    creation_flags = CREATE_NEW_CONSOLE;
 
-    /* The start built-in has some special command-line parsing properties
-     * which will be outlined here.
-     *
-     * both '\t' and ' ' are argument separators
-     * '/' has a special double role as both separator and switch prefix, e.g.
-     *
-     * > start /low/i
-     * or
-     * > start "title"/i
-     *
-     * are valid ways to pass multiple options to start. In the latter case
-     * '/i' is not a part of the title but parsed as a switch.
-     *
-     * However, '=', ';' and ',' are not separators:
-     * > start "deus"=ex,machina
-     *
-     * will in fact open a console titled 'deus=ex,machina'
-     *
-     * The title argument parsing code is only interested in quotes themselves,
-     * it does not respect escaping of any kind and all quotes are dropped
-     * from the resulting title, therefore:
-     *
-     * > start "\"" hello"/low
-     *
-     * actually opens a console titled '\ hello' with low priorities.
-     *
-     * To not break compatibility with wine programs relying on
-     * wine's separate 'start.exe', this program's peculiar console
-     * title parsing is actually implemented in 'cmd.exe' which is the
-     * application native Windows programs will use to invoke 'start'.
-     *
-     * WCMD_parameter_with_delims will take care of everything for us.
-     */
-    /* FIXME: using an external start.exe has several caveats:
-     * - cannot discriminate syntax error in arguments from child's return code
-     * - need to access start.exe's child to get its running state
-     *   (not start.exe itself)
-     */
-    have_title = FALSE;
-    for (argno=0; ; argno++) {
-        WCHAR *thisArg, *argN;
-
-        argN = NULL;
-        thisArg = WCMD_parameter_with_delims(args, argno, &argN, FALSE, FALSE, L" \t/");
-
-        /* No more parameters */
-        if (!argN)
-            break;
-
-        /* Found the title */
-        if (argN[0] == '"') {
-            TRACE("detected console title: %s\n", wine_dbgstr_w(thisArg));
-            have_title = TRUE;
-
-            /* Copy all of the cmdline processed */
-            memcpy(cmdline_params, args, sizeof(WCHAR) * (argN - args));
-            cmdline_params[argN - args] = '\0';
-
-            /* Add quoted title */
-            lstrcatW(cmdline_params, L"\"\\\"");
-            lstrcatW(cmdline_params, thisArg);
-            lstrcatW(cmdline_params, L"\\\"\"");
-
-            /* Concatenate remaining command-line */
-            thisArg = WCMD_parameter_with_delims(args, argno, &argN, TRUE, FALSE, L" \t/");
-            lstrcatW(cmdline_params, argN + lstrlenW(thisArg));
-
-            break;
+    while (!!(thisparam = WCMD_parameter(args, argn, &rawarg, FALSE, FALSE)) && !!rawarg)
+    {
+        if (!title && rawarg[0] == '"')
+        {
+            title = wcsdup(thisparam);
+            argn++;
+            continue;
         }
 
-        /* Skipping a regular argument? */
-        else if (argN != args && argN[-1] == '/') {
-            continue;
+        if (*thisparam != '/') break;
 
-        /* Not an argument nor the title, start of program arguments,
-         * stop looking for title.
-         */
-        } else
-            break;
+        qual = wcstok(thisparam, L"/", NULL);
+        while (qual)
+        {
+            /* Qualifiers with values just break the loop. */
+            if (towupper(*qual) == 'D')
+            {
+                WCHAR *dir = ++qual;
+
+                if (!*dir && !*(dir = WCMD_parameter(args, ++argn, &rawarg, FALSE, FALSE)))
+                    WINE_ERR("you must specify a directory path for the /d option\n");
+
+                if (!WCMD_get_fullpath(dir, ARRAY_SIZE(lpDirectory), lpDirectory, NULL))
+                    goto error;
+
+                TRACE("%s\n", wine_dbgstr_w(lpDirectory));
+
+                sei.lpDirectory = lpDirectory;
+                break;
+            }
+            else if (towupper(*qual) == 'B')
+                creation_flags &= ~CREATE_NEW_CONSOLE;
+            else if (towupper(*qual) == 'I')
+                FIXME("/i is ignored\n"); /* FIXME */
+            else if (!_wcsicmp(qual, L"MIN"))
+                sei.nShow = SW_SHOWMINIMIZED;
+            else if (!_wcsicmp(qual, L"MAX"))
+                sei.nShow = SW_SHOWMAXIMIZED;
+            else if (!_wcsicmp(qual, L"LOW"))
+                creation_flags |= IDLE_PRIORITY_CLASS;
+            else if (!_wcsicmp(qual, L"NORMAL"))
+                creation_flags |= NORMAL_PRIORITY_CLASS;
+            else if (!_wcsicmp(qual, L"HIGH"))
+                creation_flags |= HIGH_PRIORITY_CLASS;
+            else if (!_wcsicmp(qual, L"REALTIME"))
+                creation_flags |= REALTIME_PRIORITY_CLASS;
+            else if (!_wcsicmp(qual, L"ABOVENORMAL"))
+                creation_flags |= ABOVE_NORMAL_PRIORITY_CLASS;
+            else if (!_wcsicmp(qual, L"BELOWNORMAL"))
+                creation_flags |= BELOW_NORMAL_PRIORITY_CLASS;
+            else if (!_wcsicmp(qual, L"SEPARATE"))
+                creation_flags |= CREATE_SEPARATE_WOW_VDM;
+            else if (!_wcsicmp(qual, L"SHARED"))
+                creation_flags |= CREATE_SHARED_WOW_VDM;
+            else if (towupper(*qual) == 'W' || !_wcsicmp(qual, L"WAIT"))
+                sei.fMask |= SEE_MASK_NOCLOSEPROCESS;
+            else if (!_wcsicmp(qual, L"NODE"))
+                FIXME("start /node is ignored\n"); /* FIXME */
+            else if (!_wcsicmp(qual, L"AFFINITY"))
+            {
+                if (!*(thisparam = WCMD_parameter(args, ++argn, &rawarg, FALSE, FALSE)))
+                {
+                    SetLastError(return_code = ERROR_INVALID_PARAMETER);
+                    WCMD_print_error();
+                    goto error;
+                }
+                FIXME("start /affinity is ignored\n"); /* FIXME */
+                break;
+            }
+            else if (!_wcsicmp(qual, L"MACHINE"))
+            {
+                if (!*(thisparam = WCMD_parameter(args, ++argn, &rawarg, FALSE, FALSE)))
+                {
+                    SetLastError(return_code = ERROR_INVALID_PARAMETER);
+                    WCMD_print_error();
+                    goto error;
+                }
+
+                if (!_wcsicmp( thisparam, L"x86" )) machine = IMAGE_FILE_MACHINE_I386;
+                else if (!_wcsicmp( thisparam, L"amd64" )) machine = IMAGE_FILE_MACHINE_AMD64;
+                else if (!_wcsicmp( thisparam, L"arm" )) machine = IMAGE_FILE_MACHINE_ARMNT;
+                else if (!_wcsicmp( thisparam, L"arm64" )) machine = IMAGE_FILE_MACHINE_ARM64;
+                else
+                {
+                    SetLastError(return_code = ERROR_INVALID_PARAMETER);
+                    WCMD_print_error();
+                    goto error;
+                }
+                break;
+            }
+            else
+            {
+                TRACE("Error %s\n", wine_dbgstr_w(thisparam));
+                SetLastError(return_code = ERROR_INVALID_PARAMETER);
+                WCMD_print_error();
+                goto error;
+            }
+
+            qual = wcstok(NULL, L"/", NULL);
+        }
+
+        argn++;
     }
 
-    /* build command-line if not built yet */
-    if (!have_title) {
-        lstrcatW( cmdline, args );
-    }
+    thisparam = WCMD_parameter(args, argn, &rawarg, FALSE, FALSE);
+    if (*(thisparam))
+        wcscpy(path_argument, thisparam);
 
-    memset( &st, 0, sizeof(STARTUPINFOW) );
-    st.cb = sizeof(STARTUPINFOW);
-
-    if (CreateProcessW( file, cmdline, NULL, NULL, TRUE, 0, NULL, NULL, &st, &pi ))
-    {
-        DWORD exit_code;
-        WaitForSingleObject( pi.hProcess, INFINITE );
-        GetExitCodeProcess( pi.hProcess, &exit_code );
-        errorlevel = (exit_code == STILL_ACTIVE) ? NO_ERROR : exit_code;
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-    }
+    if (*(thisparam = WCMD_parameter(args, ++argn, &rawarg, FALSE, FALSE)))
+        sei.lpParameters = rawarg;
     else
+        sei.lpParameters = L"";
+
+    if (WCMD_search_command(path_argument, &sc, FALSE) == NO_ERROR)
+        sei.lpFile = sc.path;
+    else sei.lpFile = path_argument;
+
+    if (GetBinaryTypeW(sei.lpFile, &binary_type))
     {
-        SetLastError(ERROR_FILE_NOT_FOUND);
-        WCMD_print_error ();
-        return_code = errorlevel = ERROR_INVALID_FUNCTION;
+        WCHAR *commandline;
+        PROCESS_INFORMATION process_information;
+        BOOL ret;
+        STARTUPINFOEXW si = {{ sizeof(si.StartupInfo) }};
+        struct _PROC_THREAD_ATTRIBUTE_LIST *attribute_list = NULL;
+        int len = lstrlenW(sei.lpFile) + 4 + lstrlenW(sei.lpParameters);
+
+        /* explorer on windows always quotes the filename when running a binary on windows (see bug 5224) so we have to use CreateProcessW in this case */
+
+        if (machine)
+        {
+            SIZE_T size = 1024;
+            attribute_list =  malloc( size );
+            InitializeProcThreadAttributeList( attribute_list, 1, 0, &size );
+            UpdateProcThreadAttribute( attribute_list, 0, PROC_THREAD_ATTRIBUTE_MACHINE_TYPE, &machine, sizeof(machine), NULL, NULL );
+            si.StartupInfo.cb = sizeof(si);
+            si.lpAttributeList = attribute_list;
+            creation_flags |= EXTENDED_STARTUPINFO_PRESENT;
+        }
+
+        commandline = malloc(len * sizeof(WCHAR));
+        swprintf(commandline, len, L"\"%s\" %s", path_argument, sei.lpParameters);
+
+        si.StartupInfo.wShowWindow = sei.nShow;
+        si.StartupInfo.dwFlags |= STARTF_USESHOWWINDOW;
+        si.StartupInfo.lpTitle = title;
+
+        ret = CreateProcessW( sei.lpFile, commandline, NULL, NULL, FALSE,
+                                creation_flags, NULL, sei.lpDirectory,
+                                &si.StartupInfo, &process_information );
+        free(attribute_list);
+        free(commandline);
+        if (!ret)
+        {
+            ERR("failed to create process %ld\n", GetLastError());
+            return_code = GetLastError();
+            goto error;
+        }
+        sei.hProcess = process_information.hProcess;
     }
-    free(cmdline);
+    else if (!ShellExecuteExW(&sei))
+    {
+        const WCHAR *filename = sei.lpFile;
+        DWORD size, filename_len;
+        WCHAR pathext[MAX_PATH];
+        WCHAR *name;
+
+        size = GetEnvironmentVariableW(L"PATHEXT", pathext, ARRAY_SIZE(pathext));
+        if (size)
+        {
+            WCHAR *start, *ptr;
+
+            filename_len = lstrlenW(filename);
+            name = malloc((filename_len + size) * sizeof(WCHAR));
+            if (!name)
+            {
+                return_code = ERROR_OUTOFMEMORY;
+                goto error;
+            }
+
+            sei.lpFile = name;
+            start = pathext;
+            return_code = ERROR_FILE_NOT_FOUND;
+            while ((ptr = wcschr(start, ';')))
+            {
+                if (start == ptr)
+                {
+                    start = ptr + 1;
+                    continue;
+                }
+
+                lstrcpyW(name, filename);
+                memcpy(&name[filename_len], start, (ptr - start) * sizeof(WCHAR));
+                name[filename_len + (ptr - start)] = 0;
+
+                if (ShellExecuteExW(&sei)) {
+                    return_code = NO_ERROR;
+                    break;
+                }
+                start = ptr + 1;
+            }
+
+            free(name);
+
+            if (return_code != NO_ERROR)
+                goto error;
+        }
+    }
+
+    if (sei.fMask & SEE_MASK_NOCLOSEPROCESS)
+    {
+        DWORD exitcode;
+
+        WaitForSingleObject(sei.hProcess, INFINITE);
+        GetExitCodeProcess(sei.hProcess, &exitcode);
+
+        errorlevel = exitcode;
+    }
+
+    error:
+    free(title);
+
+    if (return_code != NO_ERROR)
+        return_code = ERROR_INVALID_FUNCTION;
+
     return return_code;
 }
 
