@@ -3570,8 +3570,7 @@ static NTSTATUS map_image_view( struct file_view **view_ret, struct pe_image_inf
     void *base;
     NTSTATUS status;
     ULONG_PTR start, end;
-    BOOL top_down = (image_info->image_charact & IMAGE_FILE_DLL) &&
-                    (image_info->image_flags & IMAGE_FLAGS_ImageDynamicallyRelocated);
+    BOOL top_down = (image_info->image_flags & IMAGE_FLAGS_ImageDynamicallyRelocated);
 
     limit_low = max( limit_low, (ULONG_PTR)address_space_start );  /* make sure the DOS area remains free */
     if (!limit_high) limit_high = (ULONG_PTR)user_space_limit;
@@ -3649,7 +3648,6 @@ static NTSTATUS virtual_map_image( HANDLE mapping, void **addr_ptr, SIZE_T *size
     }
 
     if (!image_info->map_addr &&
-        (image_info->image_charact & IMAGE_FILE_DLL) &&
         (image_info->image_flags & IMAGE_FLAGS_ImageDynamicallyRelocated))
     {
         SERVER_START_REQ( get_image_map_address )
