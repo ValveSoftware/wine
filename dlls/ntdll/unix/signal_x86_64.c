@@ -2985,23 +2985,20 @@ static void *mac_thread_gsbase(void)
 #ifdef __linux__
 static uintptr_t libc_addr, libc_size;
 
-static int libc_addr_cb( struct dl_phdr_info *info, size_t size, void *arg )
+static int libc_addr_cb( struct dl_phdr_info *info, size_t info_size, void *arg )
 {
-    const char *p;
+    uintptr_t restorer_addr = (uintptr_t)arg;
+    uintptr_t size = 0;
 
-    if ((p = strrchr( info->dlpi_name, '/' )))
-        ++p;
-    else
-        p = info->dlpi_name;
+    for (unsigned int i = 0; i < info->dlpi_phnum; ++i)
+        size = max( size, info->dlpi_phdr[i].p_vaddr + info->dlpi_phdr[i].p_memsz );
 
-    if (strcmp( p, "libc.so.6" ))
+    if (restorer_addr < info->dlpi_addr || restorer_addr >= info->dlpi_addr + size)
         return 0;
 
     libc_addr = info->dlpi_addr;
-    libc_size = 0;
-    for (unsigned int i = 0; i < info->dlpi_phnum; ++i)
-        libc_size = max( libc_size, info->dlpi_phdr[i].p_vaddr + info->dlpi_phdr[i].p_memsz );
-
+    libc_size = size;
+    TRACE_(seh)( "found signal trampoline in %s\n", info->dlpi_name);
     return 1;
 }
 #endif
@@ -3038,14 +3035,6 @@ void signal_init_process(void)
 #endif
     }
 
-#ifdef __linux__
-    if (syscall_dispatch_enabled && !dl_iterate_phdr( libc_addr_cb, NULL ))
-    {
-        WARN_(seh)( "could not find libc\n" );
-        syscall_dispatch_enabled = FALSE;
-    }
-#endif
-
     signal_alloc_thread( NtCurrentTeb() );
 
     sig_act.sa_mask = server_block_set;
@@ -3070,6 +3059,24 @@ void signal_init_process(void)
 #if defined(__APPLE__) || defined(__linux__)
     sig_act.sa_sigaction = sigsys_handler;
     if (sigaction( SIGSYS, &sig_act, NULL ) == -1) goto error;
+#endif
+
+#ifdef __linux__
+    if (syscall_dispatch_enabled)
+    {
+        struct sigaction act;
+
+        if (sigaction( SIGSYS, NULL, &act ) == -1)
+        {
+            WARN_(seh)( "failed to retrieve signal restorer trampoline\n" );
+            syscall_dispatch_enabled = FALSE;
+        }
+        else if (!dl_iterate_phdr( libc_addr_cb, act.sa_restorer ))
+        {
+            WARN_(seh)( "could not find library containing signal restorer trampoline\n" );
+            syscall_dispatch_enabled = FALSE;
+        }
+    }
 #endif
 
     emulate_cpuid();
