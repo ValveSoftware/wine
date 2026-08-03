@@ -429,6 +429,8 @@ struct x11drv_thread_data
     struct display_state pending_state;       /* display state tracking the pending / requested state */
     struct display_state current_state;       /* display state tracking the current X11 state */
     unsigned long net_active_window_serial;   /* serial of last pending _NET_ACTIVE_WINDOW request */
+
+    UINT ignore_focus_hack : 1;
 };
 
 extern struct x11drv_thread_data *x11drv_init_thread_data(void);
