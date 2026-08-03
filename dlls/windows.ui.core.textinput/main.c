@@ -159,14 +159,18 @@ static HRESULT WINAPI core_input_view_GetCoreInputViewOcclusions(ICoreInputView 
 
 static HRESULT WINAPI core_input_view_TryShowPrimaryView(ICoreInputView *iface, boolean *result)
 {
-    FIXME("iface %p, boolean %p stub!\n", iface, result);
-    return E_NOTIMPL;
+    FIXME("iface %p, boolean %p semi-stub!\n", iface, result);
+
+    *result = FALSE;
+    return S_OK;
 }
 
 static HRESULT WINAPI core_input_view_TryHidePrimaryView(ICoreInputView *iface, boolean *result)
 {
-    FIXME("iface %p, boolean %p stub!\n", iface, result);
-    return E_NOTIMPL;
+    FIXME("iface %p, boolean %p semi-stub!\n", iface, result);
+
+    *result = TRUE;
+    return S_OK;
 }
 
 static const struct ICoreInputViewVtbl core_input_view_vtbl =
@@ -249,22 +253,28 @@ DEFINE_IINSPECTABLE(core_input_view3, ICoreInputView3, struct core_input_view, I
 
 static HRESULT WINAPI core_input_view3_TryShow(ICoreInputView3 *iface, boolean *result)
 {
-    FIXME("iface %p, result %p stub!\n", iface, result);
-    return E_NOTIMPL;
+    FIXME("iface %p, result %p semi-stub!\n", iface, result);
+
+    *result = FALSE;
+    return S_OK;
 }
 
 static HRESULT WINAPI core_input_view3_TryShowWithKind(ICoreInputView3 *iface,
                                                        CoreInputViewKind type,
                                                        boolean *result)
 {
-    FIXME("iface %p, type %d, result %p stub!\n", iface, type, result);
-    return E_NOTIMPL;
+    FIXME("iface %p, type %d, result %p semi-stub!\n", iface, type, result);
+
+    *result = FALSE;
+    return S_OK;
 }
 
 static HRESULT WINAPI core_input_view3_TryHide(ICoreInputView3 *iface, boolean *result)
 {
-    FIXME("iface %p, result %p stub!\n", iface, result);
-    return E_NOTIMPL;
+    FIXME("iface %p, result %p semi-stub!\n", iface, result);
+
+    *result = TRUE;
+    return S_OK;
 }
 
 static const struct ICoreInputView3Vtbl core_input_view3_vtbl =
