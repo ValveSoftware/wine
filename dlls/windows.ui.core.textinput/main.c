@@ -23,6 +23,8 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(coreinputview);
 
+#define WM_TABTIP_OSK_TOGGLE (WM_USER + 1)
+
 struct core_input_view
 {
     ICoreInputView ICoreInputView_iface;
@@ -30,6 +32,7 @@ struct core_input_view
     ICoreInputView3 ICoreInputView3_iface;
     ICoreInputView4 ICoreInputView4_iface;
     struct weak_reference_source weak_reference_source;
+    HWND tabtip_hwnd;
 };
 
 static inline struct core_input_view *impl_from_ICoreInputView(ICoreInputView *iface)
@@ -159,7 +162,12 @@ static HRESULT WINAPI core_input_view_GetCoreInputViewOcclusions(ICoreInputView 
 
 static HRESULT WINAPI core_input_view_TryShowPrimaryView(ICoreInputView *iface, boolean *result)
 {
+    struct core_input_view *impl = impl_from_ICoreInputView(iface);
+
     FIXME("iface %p, boolean %p semi-stub!\n", iface, result);
+
+    if (impl->tabtip_hwnd)
+        PostMessageW(impl->tabtip_hwnd, WM_TABTIP_OSK_TOGGLE, TRUE, 0);
 
     *result = FALSE;
     return S_OK;
@@ -167,7 +175,12 @@ static HRESULT WINAPI core_input_view_TryShowPrimaryView(ICoreInputView *iface, 
 
 static HRESULT WINAPI core_input_view_TryHidePrimaryView(ICoreInputView *iface, boolean *result)
 {
+    struct core_input_view *impl = impl_from_ICoreInputView(iface);
+
     FIXME("iface %p, boolean %p semi-stub!\n", iface, result);
+
+    if (impl->tabtip_hwnd)
+        PostMessageW(impl->tabtip_hwnd, WM_TABTIP_OSK_TOGGLE, FALSE, 0);
 
     *result = TRUE;
     return S_OK;
@@ -253,7 +266,12 @@ DEFINE_IINSPECTABLE(core_input_view3, ICoreInputView3, struct core_input_view, I
 
 static HRESULT WINAPI core_input_view3_TryShow(ICoreInputView3 *iface, boolean *result)
 {
+    struct core_input_view *impl = impl_from_ICoreInputView3(iface);
+
     FIXME("iface %p, result %p semi-stub!\n", iface, result);
+
+    if (impl->tabtip_hwnd)
+        PostMessageW(impl->tabtip_hwnd, WM_TABTIP_OSK_TOGGLE, TRUE, 0);
 
     *result = FALSE;
     return S_OK;
@@ -263,7 +281,12 @@ static HRESULT WINAPI core_input_view3_TryShowWithKind(ICoreInputView3 *iface,
                                                        CoreInputViewKind type,
                                                        boolean *result)
 {
+    struct core_input_view *impl = impl_from_ICoreInputView3(iface);
+
     FIXME("iface %p, type %d, result %p semi-stub!\n", iface, type, result);
+
+    if (impl->tabtip_hwnd && (type == CoreInputViewKind_Default || type == CoreInputViewKind_Keyboard))
+        PostMessageW(impl->tabtip_hwnd, WM_TABTIP_OSK_TOGGLE, TRUE, 0);
 
     *result = FALSE;
     return S_OK;
@@ -271,7 +294,12 @@ static HRESULT WINAPI core_input_view3_TryShowWithKind(ICoreInputView3 *iface,
 
 static HRESULT WINAPI core_input_view3_TryHide(ICoreInputView3 *iface, boolean *result)
 {
+    struct core_input_view *impl = impl_from_ICoreInputView3(iface);
+
     FIXME("iface %p, result %p semi-stub!\n", iface, result);
+
+    if (impl->tabtip_hwnd)
+        PostMessageW(impl->tabtip_hwnd, WM_TABTIP_OSK_TOGGLE, FALSE, 0);
 
     *result = TRUE;
     return S_OK;
@@ -453,6 +481,7 @@ static HRESULT WINAPI core_input_view_statics_GetForCurrentView(ICoreInputViewSt
     view->ICoreInputView2_iface.lpVtbl = &core_input_view2_vtbl;
     view->ICoreInputView3_iface.lpVtbl = &core_input_view3_vtbl;
     view->ICoreInputView4_iface.lpVtbl = &core_input_view4_vtbl;
+    view->tabtip_hwnd = FindWindowW(L"IPTip_Main_Window", L"Input");
 
     if (FAILED(hr = weak_reference_source_init(&view->weak_reference_source,
                                                (IUnknown *)&view->ICoreInputView_iface)))

@@ -1,5 +1,5 @@
 MODULE  = windows.ui.core.textinput.dll
-IMPORTS = combase
+IMPORTS = combase user32
 
 SOURCES = \
 	classes.idl \
