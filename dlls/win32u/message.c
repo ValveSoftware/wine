@@ -2254,7 +2254,7 @@ static LRESULT handle_internal_message( HWND hwnd, UINT msg, WPARAM wparam, LPAR
         switch (LOWORD(state_cmd))
         {
         case SC_RESTORE:
-            if (HIWORD(state_cmd)) NtUserSetActiveWindow( hwnd );
+            if (HIWORD(state_cmd) && !foreground) set_foreground_window( hwnd, FALSE, TRUE );
 
             /* make the win32 window restore to the current host window config */
             set_window_normal_placement( hwnd, window_rect );
