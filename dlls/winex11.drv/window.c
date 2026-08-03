@@ -1871,7 +1871,7 @@ static void window_set_wm_state( struct x11drv_win_data *data, UINT new_state, B
     TRACE( "window %p/%lx, requesting WM_STATE %#x -> %#x serial %lu, foreground %p, activate %u\n", data->hwnd, data->whole_window,
            old_state, new_state, data->wm_state_serial, NtUserGetForegroundWindow(), activate );
 
-    if (new_state == IconicState && X11DRV_HasWindowManager( "steamcompmgr" ) && skip_iconify())
+    if (new_state == IconicState && x11drv_thread_data()->ignore_focus_hack && skip_iconify())
     {
         /* Gamescope will restore window when attempting to iconify it. Do not call XIconifyWindow() and
          * pretend that window is already minimized for the games which depend on some windows to be minimized. */
@@ -1915,7 +1915,7 @@ static void window_set_wm_state( struct x11drv_win_data *data, UINT new_state, B
      * Still, it changes it to NormalState on IconifyWindow, or when giving focus to a window so we will
      * mostly only lack response for transitions to Withdrawn and shouldn't wait for it.
      */
-    if (X11DRV_HasWindowManager( "steamcompmgr" ) && new_state == WithdrawnState) data->wm_state_serial = 0;
+    if (x11drv_thread_data()->ignore_focus_hack && new_state == WithdrawnState) data->wm_state_serial = 0;
 }
 
 static void window_set_managed( struct x11drv_win_data *data, BOOL new_managed )
@@ -4195,6 +4195,7 @@ static Window get_net_supporting_wm_check( Display *display, Window window )
 void net_supporting_wm_check_init( struct x11drv_thread_data *data )
 {
     Window window = None, other;
+    const char *env;
 
     if (!(window = get_net_supporting_wm_check( data->display, DefaultRootWindow( data->display ) ))) return;
 
@@ -4219,6 +4220,9 @@ void net_supporting_wm_check_init( struct x11drv_thread_data *data )
             data->window_manager = NULL;
         }
     }
+
+    if ((env = getenv( "WINE_IGNORE_FOCUS_HACK" ))) data->ignore_focus_hack = atoi( env );
+    else data->ignore_focus_hack = X11DRV_HasWindowManager( "steamcompmgr" );
 }
 
 BOOL X11DRV_HasWindowManager( const char *name )
