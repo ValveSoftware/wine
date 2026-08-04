@@ -42,6 +42,13 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(xess);
 
+static bool xess_disable_image_view_cache_enabled(void)
+{
+    const char *value = getenv("PROTON_XESS_DISABLE_IMAGE_VIEW_CACHE");
+
+    return value && value[0] && value[0] != '0';
+}
+
 static void xess_log_vk_image_view_info(const char *texture_name,
     const xess_vk_image_view_info *info)
 {
@@ -332,6 +339,7 @@ static VkImageView xess_d3d12_get_or_create_image_view(xess_context_handle_t hCo
     VkImage vk_image, VkFormat format, const D3D12_RESOURCE_DESC *desc,
     VkImageAspectFlags aspect_mask, UINT mip_level_count)
 {
+    bool disable_cache;
     struct xess_d3d12_state_tracker *state_entry;
     struct xess_d3d12_image_view_entry *cache_entry;
     VkImageViewType view_type;
@@ -348,20 +356,25 @@ static VkImageView xess_d3d12_get_or_create_image_view(xess_context_handle_t hCo
     view_type = get_vk_image_view_type_from_desc(desc);
     layer_count = (desc->Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D) ? 1 : desc->DepthOrArraySize;
 
-    LIST_FOR_EACH_ENTRY(cache_entry, &state_entry->image_view_entries, struct xess_d3d12_image_view_entry, entry)
+    disable_cache = xess_disable_image_view_cache_enabled();
+
+    if (!disable_cache)
     {
-        if (cache_entry->image == vk_image &&
-            cache_entry->format == format &&
-            cache_entry->aspect_mask == aspect_mask &&
-            cache_entry->view_type == view_type &&
-            cache_entry->mip_level_count == mip_level_count &&
-            cache_entry->layer_count == layer_count)
+        LIST_FOR_EACH_ENTRY(cache_entry, &state_entry->image_view_entries, struct xess_d3d12_image_view_entry, entry)
         {
-            cache_entry->reuse_count++;
-            if (cache_entry->reuse_count == 1)
-                TRACE("Reusing cached VkImageView %#I64x for image %#I64x (format %u).\n",
-                    (UINT64)cache_entry->image_view, (UINT64)cache_entry->image, cache_entry->format);
-            return cache_entry->image_view;
+            if (cache_entry->image == vk_image &&
+                cache_entry->format == format &&
+                cache_entry->aspect_mask == aspect_mask &&
+                cache_entry->view_type == view_type &&
+                cache_entry->mip_level_count == mip_level_count &&
+                cache_entry->layer_count == layer_count)
+            {
+                cache_entry->reuse_count++;
+                if (cache_entry->reuse_count == 1)
+                    TRACE("Reusing cached VkImageView %#I64x for image %#I64x (format %u).\n",
+                        (UINT64)cache_entry->image_view, (UINT64)cache_entry->image, cache_entry->format);
+                return cache_entry->image_view;
+            }
         }
     }
 
@@ -384,9 +397,14 @@ static VkImageView xess_d3d12_get_or_create_image_view(xess_context_handle_t hCo
     cache_entry->image_view = image_view;
     cache_entry->reuse_count = 0;
     list_add_tail(&state_entry->image_view_entries, &cache_entry->entry);
-    TRACE("Cached new VkImageView %#I64x for image %#I64x (format %u, mips %u, layers %u).\n",
-        (UINT64)cache_entry->image_view, (UINT64)cache_entry->image, cache_entry->format,
-        cache_entry->mip_level_count, cache_entry->layer_count);
+    if (disable_cache)
+        TRACE("PROTON_XESS_DISABLE_IMAGE_VIEW_CACHE=1 created uncached VkImageView %#I64x for image %#I64x (format %u, mips %u, layers %u).\n",
+            (UINT64)cache_entry->image_view, (UINT64)cache_entry->image, cache_entry->format,
+            cache_entry->mip_level_count, cache_entry->layer_count);
+    else
+        TRACE("Cached new VkImageView %#I64x for image %#I64x (format %u, mips %u, layers %u).\n",
+            (UINT64)cache_entry->image_view, (UINT64)cache_entry->image, cache_entry->format,
+            cache_entry->mip_level_count, cache_entry->layer_count);
     return image_view;
 }
 
