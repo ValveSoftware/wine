@@ -49,6 +49,13 @@ static bool xess_disable_image_view_cache_enabled(void)
     return value && value[0] && value[0] != '0';
 }
 
+static bool xess_disable_internal_pipeline_cache_enabled(void)
+{
+    const char *value = getenv("PROTON_XESS_DISABLE_INTERNAL_PIPELINE_CACHE");
+
+    return value && value[0] && value[0] != '0';
+}
+
 static void xess_log_vk_image_view_info(const char *texture_name,
     const xess_vk_image_view_info *info)
 {
@@ -480,6 +487,7 @@ static xess_result_t translate_texture_resource(
 
 static BOOL xess_d3d12_create_state_tracker(xess_context_handle_t hContext, VkDevice vk_device)
 {
+    bool disable_pipeline_cache;
     struct xess_d3d12_state_tracker *entry;
     PFN_vkCreatePipelineCache pfn_vkCreatePipelineCache;
     VkPipelineCacheCreateInfo create_info;
@@ -500,6 +508,16 @@ static BOOL xess_d3d12_create_state_tracker(xess_context_handle_t hContext, VkDe
     }
 
     entry->vk_device = vk_device;
+    disable_pipeline_cache = xess_disable_internal_pipeline_cache_enabled();
+    if (disable_pipeline_cache)
+    {
+        entry->pipeline_cache = VK_NULL_HANDLE;
+        entry->pfn_vkDestroyPipelineCache = NULL;
+        TRACE("PROTON_XESS_DISABLE_INTERNAL_PIPELINE_CACHE=1 disabling internal VkPipelineCache for context %p\n",
+            hContext);
+        return TRUE;
+    }
+
     pfn_vkCreatePipelineCache = (PFN_vkCreatePipelineCache)vkGetDeviceProcAddr(vk_device, "vkCreatePipelineCache");
     entry->pfn_vkDestroyPipelineCache = (PFN_vkDestroyPipelineCache)vkGetDeviceProcAddr(vk_device, "vkDestroyPipelineCache");
     if (!pfn_vkCreatePipelineCache || !entry->pfn_vkDestroyPipelineCache)
@@ -528,11 +546,14 @@ static xess_result_t xess_d3d12_get_context_pipeline_cache(xess_context_handle_t
 {
     struct xess_d3d12_state_tracker *entry;
 
-    if (!(entry = xess_d3d12_find_state_tracker(hContext)) || entry->pipeline_cache == VK_NULL_HANDLE)
+    if (!(entry = xess_d3d12_find_state_tracker(hContext)))
     {
-        WARN("No pipeline cache is tracked for context %p.\n", hContext);
+        WARN("No state tracker is available for context %p when retrieving pipeline cache.\n", hContext);
         return XESS_RESULT_ERROR_INVALID_ARGUMENT;
     }
+
+    if (entry->pipeline_cache == VK_NULL_HANDLE && xess_disable_internal_pipeline_cache_enabled())
+        TRACE("Context %p is configured without an internal VkPipelineCache.\n", hContext);
 
     *pipeline_cache = entry->pipeline_cache;
     return XESS_RESULT_SUCCESS;
