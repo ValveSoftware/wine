@@ -42,6 +42,53 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(xess);
 
+static void xess_log_vk_image_view_info(const char *texture_name,
+    const xess_vk_image_view_info *info)
+{
+    TRACE("%s: image=%#I64x view=%#I64x format=%u size=%ux%u aspect=%#x baseMip=%u levels=%u baseLayer=%u layers=%u\n",
+        texture_name,
+        (UINT64)info->image,
+        (UINT64)info->imageView,
+        info->format,
+        info->width,
+        info->height,
+        info->subresourceRange.aspectMask,
+        info->subresourceRange.baseMipLevel,
+        info->subresourceRange.levelCount,
+        info->subresourceRange.baseArrayLayer,
+        info->subresourceRange.layerCount);
+}
+
+static void xess_log_execute_params(const xess_vk_execute_params_t *params)
+{
+    xess_log_vk_image_view_info("colorTexture", &params->colorTexture);
+    xess_log_vk_image_view_info("velocityTexture", &params->velocityTexture);
+    if (params->depthTexture.imageView)
+        xess_log_vk_image_view_info("depthTexture", &params->depthTexture);
+    if (params->exposureScaleTexture.imageView)
+        xess_log_vk_image_view_info("exposureScaleTexture", &params->exposureScaleTexture);
+    if (params->responsivePixelMaskTexture.imageView)
+        xess_log_vk_image_view_info("responsivePixelMaskTexture", &params->responsivePixelMaskTexture);
+    xess_log_vk_image_view_info("outputTexture", &params->outputTexture);
+    TRACE("Execute params: jitter=(%f, %f) exposureScale=%f resetHistory=%u input=%ux%u inputBase={color=(%u,%u),mv=(%u,%u),depth=(%u,%u),mask=(%u,%u)} outputBase=(%u,%u)\n",
+        params->jitterOffsetX,
+        params->jitterOffsetY,
+        params->exposureScale,
+        params->resetHistory,
+        params->inputWidth,
+        params->inputHeight,
+        params->inputColorBase.x,
+        params->inputColorBase.y,
+        params->inputMotionVectorBase.x,
+        params->inputMotionVectorBase.y,
+        params->inputDepthBase.x,
+        params->inputDepthBase.y,
+        params->inputResponsiveMaskBase.x,
+        params->inputResponsiveMaskBase.y,
+        params->outputColorBase.x,
+        params->outputColorBase.y);
+}
+
 static UINT get_mip_level_count_from_desc(const D3D12_RESOURCE_DESC *desc)
 {
     // D3D12 allows creating textures with MipLevels=0 (meaning "full mip chain")
@@ -949,11 +996,19 @@ xess_result_t CDECL xessD3D12Execute(xess_context_handle_t hContext,
     status = WINE_UNIX_CALL(unix_xessVKExecute, &unix_params);
     if (status)
     {
+        TRACE("XeSS execute failed at unix call boundary, dumping execute parameters\n");
+        xess_log_execute_params(&vk_exec_params);
         ERR("Unix call unix_xessVKExecute failed, status %#lx\n", status);
         result = XESS_RESULT_ERROR_CANT_LOAD_LIBRARY;
         goto cleanup;
     }
     result = unix_params.result;
+    if (result != XESS_RESULT_SUCCESS)
+    {
+        TRACE("XeSS execute returned failure result %s (0x%x), dumping execute parameters\n",
+            xess_result_to_string(result), result);
+        xess_log_execute_params(&vk_exec_params);
+    }
 
 cleanup:
     /* End Vulkan command buffer interop */
