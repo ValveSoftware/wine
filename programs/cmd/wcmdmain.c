@@ -4941,8 +4941,6 @@ static void WCMD_setup(void)
     /* init for loop context */
     forloopcontext = NULL;
     WCMD_save_for_loop_context(TRUE);
-    SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), ENABLE_PROCESSED_OUTPUT
-                   | ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 }
 
 /*****************************************************************************
