@@ -67,9 +67,10 @@ XESS_API xess_result_t xessDestroyContext(xess_context_handle_t hContext)
 {
     struct xess_destroy_context_params params = { hContext };
     TRACE("(%p)\n", hContext);
+    /* Destroy unix-side context first while d3d12_device ref keeps VkDevice alive. */
     XESS_WINE_UNIX_CALL(unix_xessDestroyContext, &params);
-    if (params.result == XESS_RESULT_SUCCESS)
-        xess_d3d12_destroy_state_tracker(hContext);
+    xess_d3d12_destroy_state_tracker(hContext);
+    TRACE("xessDestroyContext result: %s (0x%x)\n", xess_result_to_string(params.result), params.result);
     return params.result;
 }
 
