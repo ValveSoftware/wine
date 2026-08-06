@@ -54,8 +54,9 @@ static WINE_MMIO *MMIOList;
 /* From kernel32 */
 static HANDLE create_file_OF( LPCSTR path, INT mode )
 {
-    DWORD access, sharing, creation;
-    char full_path[MAX_PATH];
+    DWORD access, sharing, creation, len;
+    WCHAR *pathW, full_path[MAX_PATH];
+    HANDLE ret;
 
     if (mode & OF_CREATE)
     {
@@ -84,12 +85,25 @@ static HANDLE create_file_OF( LPCSTR path, INT mode )
     default:                  sharing = FILE_SHARE_READ | FILE_SHARE_WRITE; break;
     }
 
-    if (mode & OF_CREATE)
-        return CreateFileA( path, access, sharing, NULL, creation, FILE_ATTRIBUTE_NORMAL, 0 );
-
-    if (!SearchPathA( NULL, path, NULL, MAX_PATH, full_path, NULL ))
+    if (!(len = MultiByteToWideChar( CP_ACP, 0, path, -1, NULL, 0 )))
         return INVALID_HANDLE_VALUE;
-    return CreateFileA( full_path, access, sharing, NULL, creation, FILE_ATTRIBUTE_NORMAL, 0 );
+    if (!(pathW = malloc( len * sizeof(*pathW) )))
+        return INVALID_HANDLE_VALUE;
+    MultiByteToWideChar( CP_ACP, 0, path, -1, pathW, len );
+
+    /* Use the Unicode APIs: the path SearchPathA() resolves may contain
+     * characters that cannot be represented in the ANSI codepage, which it
+     * would silently replace with '?'.
+     */
+    if (mode & OF_CREATE)
+        ret = CreateFileW( pathW, access, sharing, NULL, creation, FILE_ATTRIBUTE_NORMAL, 0 );
+    else if (!SearchPathW( NULL, pathW, NULL, ARRAY_SIZE(full_path), full_path, NULL ))
+        ret = INVALID_HANDLE_VALUE;
+    else
+        ret = CreateFileW( full_path, access, sharing, NULL, creation, FILE_ATTRIBUTE_NORMAL, 0 );
+
+    free( pathW );
+    return ret;
 }
 
 /**************************************************************************
