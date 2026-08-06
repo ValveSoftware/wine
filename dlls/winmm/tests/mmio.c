@@ -23,6 +23,7 @@
 #include "windef.h"
 #include "winbase.h"
 #include "wingdi.h"
+#include "winnls.h"
 #include "mmsystem.h"
 #include "vfw.h"
 #include "wine/test.h"
@@ -585,6 +586,89 @@ static void test_mmioOpen_create(void)
     ok(ret, "got error %lu\n", GetLastError());
 }
 
+static void test_mmioOpen_unicode_path(void)
+{
+    /* Characters from a few different scripts, so that at least one of them is
+     * not representable in whichever ANSI codepage the tests are run under.
+     */
+    static const WCHAR candidates[] = {0x4e2d, 0x0416, 0x05d0, 0x0e01, 0x2603};
+    WCHAR dir_name[MAX_PATH], cwd[MAX_PATH], temp_dir[MAX_PATH], name[MAX_PATH];
+    WCHAR wc = 0;
+    MMIOINFO info = {0};
+    HANDLE file;
+    HMMIO hmmio;
+    unsigned int i;
+    BOOL used, ret;
+    char buffer[8];
+    size_t len;
+
+    if (GetACP() == CP_UTF8)
+    {
+        skip("every character is representable in codepage %u\n", GetACP());
+        return;
+    }
+
+    for (i = 0; i < ARRAY_SIZE(candidates); i++)
+    {
+        used = FALSE;
+        WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, &candidates[i], 1,
+                buffer, sizeof(buffer), NULL, &used);
+        if (used)
+        {
+            wc = candidates[i];
+            break;
+        }
+    }
+    if (!wc)
+    {
+        skip("no character outside of codepage %u available\n", GetACP());
+        return;
+    }
+
+    GetCurrentDirectoryW(ARRAY_SIZE(cwd), cwd);
+    GetTempPathW(ARRAY_SIZE(temp_dir), temp_dir);
+
+    wcscpy(dir_name, temp_dir);
+    wcscat(dir_name, L"wine_mmio_");
+    len = wcslen(dir_name);
+    dir_name[len] = wc;
+    dir_name[len + 1] = 0;
+
+    /* clean up after a previous aborted run */
+    wcscpy(name, dir_name);
+    wcscat(name, L"\\test_mmio_path");
+    DeleteFileW(name);
+    RemoveDirectoryW(dir_name);
+
+    ret = CreateDirectoryW(dir_name, NULL);
+    ok(ret, "failed to create %s, error %lu\n", debugstr_w(dir_name), GetLastError());
+    SetCurrentDirectoryW(dir_name);
+
+    file = CreateFileW(L"test_mmio_path", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL, NULL);
+    ok(file != INVALID_HANDLE_VALUE, "got error %lu\n", GetLastError());
+    CloseHandle(file);
+
+    /* A relative name is resolved against the current directory, whose name
+     * cannot be represented in the ANSI codepage here. The name itself is
+     * plain ASCII, so this has to work regardless of the codepage.
+     */
+    wcscpy(name, L"test_mmio_path");
+    info.wErrorRet = 0xdead;
+    hmmio = mmioOpenW(name, &info, MMIO_ALLOCBUF | MMIO_DENYWRITE | MMIO_READ);
+    ok(!!hmmio, "failed to open file, error %#x\n", info.wErrorRet);
+    if (hmmio)
+        mmioClose(hmmio, 0);
+
+    ret = DeleteFileW(L"test_mmio_path");
+    ok(ret, "got error %lu\n", GetLastError());
+
+    SetCurrentDirectoryW(cwd);
+
+    ret = RemoveDirectoryW(dir_name);
+    ok(ret, "got error %lu\n", GetLastError());
+}
+
 static void test_mmioSetBuffer(char *fname)
 {
     char buf[256];
@@ -1133,6 +1217,7 @@ START_TEST(mmio)
     test_mmioOpen(NULL);
     test_mmioOpen(fname);
     test_mmioOpen_create();
+    test_mmioOpen_unicode_path();
     test_mmioSetBuffer(NULL);
     test_mmioSetBuffer(fname);
     test_mmioOpen_fourcc();
