@@ -2706,24 +2706,27 @@ static NTSTATUS derive_key_hash( struct secret *secret, BCryptBufferDesc *desc, 
 {
     struct key_asymmetric_derive_key_params params;
     ULONG hash_len, derived_key_len = len_from_bitlen( secret->privkey->u.a.bitlen );
+    ULONG buffer_count = desc ? desc->cBuffers : 0;
     UCHAR hash_buf[MAX_HASH_OUTPUT_BYTES];
     struct algorithm *alg = NULL;
+    ULONG secret_len = 0;
     UCHAR *derived_key;
     NTSTATUS status;
     ULONG i;
 
-    for (i = 0; i < (desc ? desc->cBuffers : 0); i++)
+    for (i = 0; i < buffer_count; i++)
     {
         if (desc->pBuffers[i].BufferType == KDF_HASH_ALGORITHM)
         {
             alg = get_hash_alg( desc->pBuffers + i, FALSE );
             if (!alg) return STATUS_NOT_SUPPORTED;
         }
+        else if (desc->pBuffers[i].BufferType == KDF_SECRET_PREPEND) secret_len += desc->pBuffers[i].cbBuffer;
         else FIXME( "buffer type %lu not supported\n", desc->pBuffers[i].BufferType );
     }
     if (!alg) alg = get_alg_object( BCRYPT_SHA1_ALG_HANDLE );
 
-    if (!(derived_key = malloc( derived_key_len ))) return STATUS_NO_MEMORY;
+    if (!(derived_key = malloc( derived_key_len + secret_len ))) return STATUS_NO_MEMORY;
 
     params.privkey    = secret->privkey;
     params.pubkey     = secret->pubkey;
@@ -2735,10 +2738,25 @@ static NTSTATUS derive_key_hash( struct secret *secret, BCryptBufferDesc *desc, 
         free( derived_key );
         return status;
     }
+    derived_key_len = *params.ret_len;
+
+    if (secret_len)
+    {
+        memmove( derived_key + secret_len, derived_key, derived_key_len );
+
+        secret_len = 0;
+        for (i = 0; i < buffer_count; i++)
+        {
+            if (desc->pBuffers[i].BufferType != KDF_SECRET_PREPEND) continue;
+            memcpy( derived_key + secret_len, desc->pBuffers[i].pvBuffer, desc->pBuffers[i].cbBuffer );
+            secret_len += desc->pBuffers[i].cbBuffer;
+        }
+        derived_key_len += secret_len;
+    }
 
     hash_len = builtin_algorithms[alg->id].hash_length;
     assert( hash_len <= sizeof(hash_buf) );
-    if (!(status = hash_single( alg, NULL, 0, derived_key, *params.ret_len, hash_buf, hash_len )))
+    if (!(status = hash_single( alg, NULL, 0, derived_key, derived_key_len, hash_buf, hash_len )))
     {
         if (!output) *ret_len = hash_len;
         else
