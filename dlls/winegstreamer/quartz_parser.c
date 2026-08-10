@@ -1858,6 +1858,24 @@ static HRESULT decodebin_parser_source_get_media_type(struct parser_source *pin,
     TRACE("pin %p, index %d, mt %p.\n", pin, (int)index, mt);
 
     wg_parser_stream_get_current_format(pin->wg_stream, &format);
+
+    /* HACK: Use MPEG1 type for Making Lovers. */
+    {
+        const char *sgi;
+        if (format.major_type == WG_MAJOR_TYPE_VIDEO
+                && (sgi = getenv("SteamGameId")) && !strcmp(sgi, "1200720"))
+        {
+            if (!index)
+            {
+                format.major_type = WG_MAJOR_TYPE_VIDEO_MPEG1;
+                if (!amt_from_wg_format(mt, &format, false))
+                    return E_OUTOFMEMORY;
+                return S_OK;
+            }
+            --index;
+        }
+    }
+
     return get_raw_media_type(&format, index, mt);
 }
 
