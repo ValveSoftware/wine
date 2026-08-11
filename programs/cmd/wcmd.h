@@ -233,6 +233,17 @@ enum read_parse_line WCMD_ReadAndParseLine(CMD_NODE **output);
 void node_dispose_tree(CMD_NODE *cmds);
 RETURN_CODE node_execute(CMD_NODE *node);
 
+struct search_command
+{
+    WCHAR path[MAX_PATH];
+    BOOL has_path; /* if input has path part (ie cannot be a builtin command) */
+    BOOL has_extension; /* if extension was given to input */
+    BOOL is_command_file; /* when has_path is set, tells whether its a command file, or an external executable */
+    int cmd_index; /* potential index to builtin command */
+};
+
+RETURN_CODE WCMD_search_command(WCHAR *command, struct search_command *sc, BOOL fast);
+
 RETURN_CODE WCMD_call_batch(const WCHAR *, WCHAR *);
 RETURN_CODE WCMD_call_command(WCHAR *command);
 RETURN_CODE WCMD_run_builtin_command(int cmd_index, WCHAR *cmd);
