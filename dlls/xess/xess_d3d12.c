@@ -228,20 +228,18 @@ struct xess_d3d12_state_tracker
 {
     struct list entry;
     xess_context_handle_t context;
-    /* held to keep VkDevice alive until our teardown completes */
+    /* held to keep the D3D12 device alive until our teardown completes */
     ID3D12Device *d3d12_device;
-    /* for pipeline cache*/
+    /* pipeline cache state */
     VkDevice vk_device;
     VkPipelineCache pipeline_cache;
-    PFN_vkDestroyPipelineCache pfn_vkDestroyPipelineCache;
-    /* for temporary heaps */
+    /* temporary heap state */
     ID3D12Heap *temp_buffer_heap;
     ID3D12Heap *temp_texture_heap;
     uint64_t buffer_heap_base_offset;
     uint64_t texture_heap_base_offset;
-    /* Keep image views alive after command recording and reuse them across executes. */
+    /* image view state */
     struct list image_view_entries;
-    PFN_vkDestroyImageView pfn_vkDestroyImageView;
 };
 
 struct xess_d3d12_image_view_entry
@@ -262,7 +260,8 @@ static struct list xess_d3d12_state_trackers = LIST_INIT(xess_d3d12_state_tracke
 static void xess_d3d12_release_state_tracker(struct xess_d3d12_state_tracker *entry)
 {
     PFN_vkDeviceWaitIdle pfn_vkDeviceWaitIdle;
-    PFN_vkDestroyImageView pfn_vkDestroyImageView = entry->pfn_vkDestroyImageView;
+    PFN_vkDestroyImageView pfn_vkDestroyImageView;
+    PFN_vkDestroyPipelineCache pfn_vkDestroyPipelineCache;
     struct xess_d3d12_image_view_entry *view_entry, *view_entry_next;
     VkResult vk_result;
 
@@ -283,41 +282,37 @@ static void xess_d3d12_release_state_tracker(struct xess_d3d12_state_tracker *en
     if (!list_empty(&entry->image_view_entries))
     {
         TRACE("Releasing %u cached image views for context %p\n", list_count(&entry->image_view_entries), entry->context);
-
-        if (!pfn_vkDestroyImageView && entry->vk_device) {
-            TRACE("vkDestroyImageView not set, trying to resolve from device %p\n", entry->vk_device);
-            pfn_vkDestroyImageView = (PFN_vkDestroyImageView)vkGetDeviceProcAddr(entry->vk_device, "vkDestroyImageView");
-        } else {
-            TRACE("vkDestroyImageView already set to %p\n", pfn_vkDestroyImageView);
-        }
-
-        if (!pfn_vkDestroyImageView) {
+        pfn_vkDestroyImageView = (PFN_vkDestroyImageView)vkGetDeviceProcAddr(entry->vk_device, "vkDestroyImageView");
+        if (!pfn_vkDestroyImageView)
+        {
             WARN("Unable to resolve vkDestroyImageView for %p, leaking %u cached image views.\n", entry->context,
                 list_count(&entry->image_view_entries));
-
-        } else {
+        }
+        else
+        {
             LIST_FOR_EACH_ENTRY_SAFE(view_entry, view_entry_next, &entry->image_view_entries,
                 struct xess_d3d12_image_view_entry, entry)
             {
                 TRACE("Destroying VkImageView %#I64x (image %#I64x), reused %u times.\n",
                     (UINT64)view_entry->image_view, (UINT64)view_entry->image, view_entry->reuse_count);
                 list_remove(&view_entry->entry);
-                if (pfn_vkDestroyImageView)
-                    pfn_vkDestroyImageView(entry->vk_device, view_entry->image_view, NULL);
+                pfn_vkDestroyImageView(entry->vk_device, view_entry->image_view, NULL);
                 free(view_entry);
             }
         }
     }
 
-    if (entry->pipeline_cache != VK_NULL_HANDLE && entry->pfn_vkDestroyPipelineCache)
+    if (entry->pipeline_cache != VK_NULL_HANDLE)
     {
-        TRACE("Destroying VkPipelineCache %#I64x for context %p.\n", (UINT64)entry->pipeline_cache, entry->context);
-        entry->pfn_vkDestroyPipelineCache(entry->vk_device, entry->pipeline_cache, NULL);
+        pfn_vkDestroyPipelineCache = (PFN_vkDestroyPipelineCache)vkGetDeviceProcAddr(entry->vk_device, "vkDestroyPipelineCache");
+        if (pfn_vkDestroyPipelineCache)
+        {
+            TRACE("Destroying VkPipelineCache %#I64x for context %p.\n", (UINT64)entry->pipeline_cache, entry->context);
+            pfn_vkDestroyPipelineCache(entry->vk_device, entry->pipeline_cache, NULL);
+        }
         entry->pipeline_cache = VK_NULL_HANDLE;
     }
     entry->vk_device = VK_NULL_HANDLE;
-    entry->pfn_vkDestroyPipelineCache = NULL;
-    entry->pfn_vkDestroyImageView = NULL;
 
     if (entry->temp_texture_heap)
     {
@@ -353,15 +348,6 @@ static struct xess_d3d12_state_tracker *xess_d3d12_find_state_tracker(xess_conte
     }
 
     return NULL;
-}
-
-static void xess_d3d12_set_image_view_destroy_proc(xess_context_handle_t hContext,
-    PFN_vkDestroyImageView pfn_vkDestroyImageView)
-{
-    struct xess_d3d12_state_tracker *entry;
-
-    if ((entry = xess_d3d12_find_state_tracker(hContext)))
-        entry->pfn_vkDestroyImageView = pfn_vkDestroyImageView;
 }
 
 static VkImageView xess_d3d12_get_or_create_image_view(xess_context_handle_t hContext,
@@ -536,15 +522,13 @@ static BOOL xess_d3d12_create_state_tracker(xess_context_handle_t hContext, VkDe
     if (disable_pipeline_cache)
     {
         entry->pipeline_cache = VK_NULL_HANDLE;
-        entry->pfn_vkDestroyPipelineCache = NULL;
         TRACE("PROTON_XESS_DISABLE_INTERNAL_PIPELINE_CACHE=1 disabling internal VkPipelineCache for context %p\n",
             hContext);
         return TRUE;
     }
 
     pfn_vkCreatePipelineCache = (PFN_vkCreatePipelineCache)vkGetDeviceProcAddr(vk_device, "vkCreatePipelineCache");
-    entry->pfn_vkDestroyPipelineCache = (PFN_vkDestroyPipelineCache)vkGetDeviceProcAddr(vk_device, "vkDestroyPipelineCache");
-    if (!pfn_vkCreatePipelineCache || !entry->pfn_vkDestroyPipelineCache)
+    if (!pfn_vkCreatePipelineCache)
     {
         WARN("Failed to get Vulkan pipeline cache function pointers for context %p.\n", hContext);
         return FALSE;
@@ -557,7 +541,6 @@ static BOOL xess_d3d12_create_state_tracker(xess_context_handle_t hContext, VkDe
     if (vk_result != VK_SUCCESS)
     {
         WARN("Failed to create VkPipelineCache for context %p: %d\n", hContext, vk_result);
-        entry->pfn_vkDestroyPipelineCache = NULL;
         entry->vk_device = VK_NULL_HANDLE;
         return FALSE;
     }
@@ -967,9 +950,6 @@ xess_result_t CDECL xessD3D12Execute(xess_context_handle_t hContext,
         ID3D12Device_Release(pDevice);
         return XESS_RESULT_ERROR_UNSUPPORTED;
     }
-    xess_d3d12_set_image_view_destroy_proc(hContext,
-        (PFN_vkDestroyImageView)vkGetDeviceProcAddr(vk_device, "vkDestroyImageView"));
-
     TRACE("Got Vulkan function pointer pfn_vkCreateImageView=%p\n", pfn_vkCreateImageView);
 
     /* Get Vulkan command buffer from D3D12 command list */
