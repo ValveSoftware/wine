@@ -856,7 +856,7 @@ static HRESULT source_reader_pull_transform_samples(struct source_reader *reader
         return hr;
     stream_info.cbSize = max(stream_info.cbSize, entry->min_buffer_size);
 
-    while (SUCCEEDED(hr))
+    do
     {
         MFT_OUTPUT_DATA_BUFFER out_buffer = {0};
         IMFMediaType *media_type;
@@ -905,6 +905,7 @@ static HRESULT source_reader_pull_transform_samples(struct source_reader *reader
         if (out_buffer.pEvents)
             IMFCollection_Release(out_buffer.pEvents);
     }
+    while (SUCCEEDED(hr) && next); /* queue only one output sample to avoid transform allocators becoming empty on drain */
 
     return hr;
 }
@@ -921,6 +922,8 @@ static HRESULT source_reader_drain_transform_samples(struct source_reader *reade
 
     if (FAILED(hr = IMFTransform_ProcessMessage(entry->transform, MFT_MESSAGE_COMMAND_DRAIN, 0)))
         WARN("Failed to drain transform %p, hr %#lx\n", entry->transform, hr);
+    /* MF_E_SAMPLEALLOCATOR_EMPTY can occur here if many samples are drained
+     * from a transform, but it's not an issue if a later call succeeds. */
     if (FAILED(hr = source_reader_pull_transform_samples(reader, stream, entry))
             && hr != MF_E_TRANSFORM_NEED_MORE_INPUT)
         WARN("Failed to pull pending samples, hr %#lx.\n", hr);
@@ -1291,6 +1294,7 @@ static BOOL source_reader_get_read_result(struct source_reader *reader, struct m
 {
     struct stream_response *response = NULL;
     BOOL request_sample = FALSE;
+    struct list *ptr;
 
     if ((response = media_stream_pop_response(reader, stream)))
     {
@@ -1300,7 +1304,16 @@ static BOOL source_reader_get_read_result(struct source_reader *reader, struct m
         *timestamp = response->timestamp;
         *sample = response->sample;
         if (*sample)
+        {
             IMFSample_AddRef(*sample);
+            if (stream->state == STREAM_STATE_EOS && (ptr = list_head(&stream->transforms)))
+            {
+                struct transform_entry *entry = LIST_ENTRY(ptr, struct transform_entry, entry);
+                /* Try to drain another sample in case the decoder emits many while draining.
+                 * Draining one at a time prevents exhaustion of the allocator in some cases. */
+                source_reader_drain_transform_samples(reader, stream, entry);
+            }
+        }
 
         source_reader_release_response(response);
     }
