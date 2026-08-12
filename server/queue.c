@@ -894,17 +894,23 @@ static int merge_mousemove( struct thread_input *input, const struct message *ms
 
     if (!(prev = find_mouse_message( input, msg ))) return 0;
 
+    if (msg->type == MSG_HARDWARE && prev->data && msg->data)
+    {
+        struct hardware_msg_data *prev_data = prev->data;
+        struct hardware_msg_data *msg_data = msg->data;
+
+        if ((prev_data->mi_flags | msg_data->mi_flags) & MOUSEEVENTF_ABSOLUTE)
+        {
+            if (prev_data->mi_flags & MOUSEEVENTF_MOVE_NOCOALESCE) return 0;
+            prev_data->info = msg_data->info;
+            prev_data->mi_flags = msg_data->mi_flags;
+        }
+    }
     prev->wparam  = msg->wparam;
     prev->lparam  = msg->lparam;
     prev->x       = msg->x;
     prev->y       = msg->y;
     prev->time    = msg->time;
-    if (msg->type == MSG_HARDWARE && prev->data && msg->data)
-    {
-        struct hardware_msg_data *prev_data = prev->data;
-        struct hardware_msg_data *msg_data = msg->data;
-        prev_data->info = msg_data->info;
-    }
     list_remove( &prev->entry );
     list_add_tail( &input->msg_list, &prev->entry );
     return 1;
@@ -2267,6 +2273,7 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
     struct hw_msg_source source = { IMDT_MOUSE, origin };
     lparam_t wparam = input->mouse.data << 16;
     int wait = 0, x, y;
+    unsigned int mi_flags;
 
     static const unsigned int messages[] =
     {
@@ -2315,6 +2322,7 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         x = desktop_shm->cursor.x;
         y = desktop_shm->cursor.y;
     }
+    mi_flags = flags;
 
     if (!(send_flags & SEND_HWMSG_NO_RAW) && (foreground = get_foreground_thread( desktop, win )))
     {
@@ -2348,6 +2356,7 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         msg->lparam    = 0;
         msg->x         = x;
         msg->y         = y;
+        msg_data->mi_flags = mi_flags;
         if (origin == IMO_INJECTED) msg_data->flags = LLMHF_INJECTED;
 
         /* specify a sender only when sending the last message */
