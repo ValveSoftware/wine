@@ -4023,6 +4023,27 @@ static BOOL accept_mouse_messages_nomove( UINT msg )
     return is_mouse_message( msg ) && msg != WM_MOUSEMOVE;
 }
 
+static BOOL peek_mouse_move( UINT *x, UINT *y, LPARAM *extra_info )
+{
+    MSG msg;
+
+    *x = *y = 0xdeadbeef;
+    *extra_info = 0xdeadbeef;
+    while (PeekMessageA( &msg, NULL, 0, 0, PM_REMOVE ))
+    {
+        if (msg.message == WM_MOUSEMOVE)
+        {
+            *x = LOWORD(msg.lParam);
+            *y = HIWORD(msg.lParam);
+            *extra_info = GetMessageExtraInfo();
+            return TRUE;
+        }
+        DispatchMessageA( &msg );
+        if (msg.message == WM_MOUSEMOVE) return TRUE;
+    }
+    return FALSE;
+}
+
 static void test_SendInput_mouse_messages(void)
 {
 #define WIN_MSG(m, h, w, l, ...) {.func = MSG_TEST_WIN, .message = {.msg = m, .hwnd = h, .wparam = w, .lparam = l}, ## __VA_ARGS__}
@@ -4092,10 +4113,124 @@ static void test_SendInput_mouse_messages(void)
         {.color = RGB(50, 100, 255), .alpha = 1, .flags = LWA_COLORKEY | LWA_ALPHA, .expect_click = TRUE},
     };
 
+#define BROKEN_INFO(val) ((val) << 16)
+#define BROKEN_OPTIONAL(val) ((val) | 0x80000000)
+#define MM_ABSOLUTE (MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK | MOUSEEVENTF_MOVE)
+#define MM_RELATIVE MOUSEEVENTF_MOVE
+#define MM_NOCOALESCE MOUSEEVENTF_MOVE_NOCOALESCE
+#define MM_NO_POS_INCREMENT 0x100
+    static const struct coalesce_test
+    {
+        unsigned int line;
+        DWORD input_flags[8];
+        LPARAM expected_info[8];
+    }
+    coalesce_tests[] =
+    {
+        /* Relative only. */
+        {
+            __LINE__, { MM_RELATIVE, MM_RELATIVE, },
+            { 2 | BROKEN_INFO(1), },
+        },
+        {
+            __LINE__, { MM_RELATIVE, MM_RELATIVE | MM_NOCOALESCE, },
+            { 2 | BROKEN_INFO(1), },
+        },
+        {
+            __LINE__, { MM_RELATIVE | MM_NOCOALESCE, MM_RELATIVE, },
+            { 1, BROKEN_OPTIONAL(2), },
+        },
+        {
+            __LINE__, { MM_RELATIVE | MM_NOCOALESCE, MM_RELATIVE | MM_NOCOALESCE, },
+            { 1, BROKEN_OPTIONAL(2), },
+        },
+        /* Absolute only, only no_coalesce flag of already queued message matters, a new message can be coalesced
+         * regardless of the flag on it. If the new position is the same the message is skipped regardless
+         * of no_coalesce flag. extra_info from newer event replaces the old one. */
+        {
+            __LINE__, { MM_ABSOLUTE, MM_ABSOLUTE, },
+            { 2, },
+        },
+        {
+            __LINE__, { MM_ABSOLUTE, MM_ABSOLUTE, },
+            { 2, },
+        },
+        {
+            __LINE__, { MM_ABSOLUTE | MM_NOCOALESCE, MM_ABSOLUTE | MM_NOCOALESCE, },
+            { 1, 2, },
+        },
+        {
+            __LINE__, { MM_ABSOLUTE, MM_ABSOLUTE | MM_NOCOALESCE, },
+            { 2, },
+        },
+        {
+            __LINE__, { MM_ABSOLUTE | MM_NOCOALESCE, MM_ABSOLUTE, },
+            { 1, 2, },
+        },
+        {
+            __LINE__, { MM_ABSOLUTE | MM_NOCOALESCE | MM_NO_POS_INCREMENT, MM_ABSOLUTE, },
+            { 2 | BROKEN_INFO(1), BROKEN_INFO(2), },
+        },
+        /* One relative, one absolute. Only no_coalesce on the first queued message affects result.
+         * extra_info from newer event replaces the old one. */
+        {
+            __LINE__, { MM_ABSOLUTE, MM_RELATIVE, },
+            { 2, },
+        },
+        {
+            __LINE__, { MM_ABSOLUTE, MM_RELATIVE | MM_NOCOALESCE, },
+            { 2, },
+        },
+        {
+            __LINE__, { MM_ABSOLUTE | MM_NOCOALESCE, MM_RELATIVE, },
+            { 1, 2, },
+        },
+        {
+            __LINE__, { MM_ABSOLUTE | MM_NOCOALESCE, MM_RELATIVE | MM_NOCOALESCE, },
+            { 1, 2, },
+        },
+        {
+            __LINE__, { MM_RELATIVE, MM_ABSOLUTE, },
+            { 2, },
+        },
+        {
+            __LINE__, { MM_RELATIVE, MM_ABSOLUTE | MM_NOCOALESCE, },
+            { 2, },
+        },
+        {
+            __LINE__, { MM_RELATIVE | MM_NOCOALESCE, MM_ABSOLUTE, },
+            { 1, 2, },
+        },
+        {
+            __LINE__, { MM_RELATIVE | MM_NOCOALESCE, MM_ABSOLUTE | MM_NOCOALESCE, },
+            { 1, 2, },
+        },
+        /* Some random combinations of absolute and relative events. */
+        {
+            __LINE__, { MM_RELATIVE, MM_ABSOLUTE | MM_NOCOALESCE, MM_ABSOLUTE | MM_NOCOALESCE, },
+            { 2, 3, },
+        },
+        {
+            __LINE__, { MM_ABSOLUTE | MM_NOCOALESCE, MM_RELATIVE, MM_ABSOLUTE | MM_NOCOALESCE, },
+            { 1, 3, },
+        },
+        {
+            __LINE__, { MM_RELATIVE | MM_NOCOALESCE, MM_ABSOLUTE | MM_NOCOALESCE, MM_ABSOLUTE | MM_NOCOALESCE, },
+            { 1, 2, 3, },
+        },
+    };
+#undef BROKEN_INFO
+#undef BROKEN_OPTIONAL
+#undef MM_ABSOLUTE
+#undef MM_RELATIVE
+#undef MM_NOCOALESCE
+#undef MM_NO_POS_INCREMENT
+
     struct create_transparent_window_params params = {0};
     ULONG_PTR old_proc, old_other_proc;
     RECT clip_rect = {55, 55, 55, 55};
-    UINT dblclk_time, i;
+    UINT dblclk_time, i, j, x, y, virt_cx, virt_cy;
+    LPARAM extra_info;
     HWND hwnd, other;
     DWORD thread_id;
     HANDLE thread;
@@ -4524,6 +4659,76 @@ static void test_SendInput_mouse_messages(void)
 
 
     ok_ret( 1, SetDoubleClickTime( dblclk_time ) );
+
+    /* Test MOUSEEVENTF_MOVE_NOCOALESCE. */
+    hwnd = CreateWindowW( L"static", NULL, WS_VISIBLE | WS_POPUP, 100, 100, 100, 100, NULL, NULL, NULL, NULL );
+    ok_ne( NULL, hwnd, HWND, "%p" );
+    wait_messages( 100, FALSE );
+    current_sequence_len = 0;
+
+    virt_cx = GetSystemMetrics( SM_CXVIRTUALSCREEN );
+    virt_cy = GetSystemMetrics( SM_CYVIRTUALSCREEN );
+    SetCapture( hwnd );
+    for (i = 0; i < ARRAY_SIZE(coalesce_tests); ++i)
+    {
+        const struct coalesce_test *test = &coalesce_tests[i];
+        UINT event_x, event_y;
+        BOOL bres;
+
+        winetest_push_context( "test %u (at %u)", i, test->line );
+        SetCursorPos( 130, 130 );
+        wait_messages( 50, FALSE );
+
+        event_x = event_y = 130;
+        for (j = 0; test->input_flags[j]; ++j)
+        {
+            DWORD flags = test->input_flags[j];
+            int inc;
+
+            if (flags & 0x100)
+            {
+                flags &= ~0x100;
+                inc = 0;
+            }
+            else if (flags & MOUSEEVENTF_ABSOLUTE) inc = 10;
+            else                                   inc = 20;
+
+            if (flags & MOUSEEVENTF_ABSOLUTE)
+            {
+                event_x += inc;
+                event_y += inc;
+                mouse_event( flags, event_x * 65535 / (virt_cx - 1), event_y * 65535 / (virt_cy - 1), 0, j + 1 );
+            }
+            else
+            {
+                mouse_event( flags, inc, inc, 0, j + 1 );
+            }
+        }
+        /* Timing affects coalescing on Windows, regardless of the flags, let it settle. */
+        Sleep( 10 );
+        for (j = 0; test->expected_info[j] & 0xffff; ++j)
+        {
+            winetest_push_context( "msg %u", j );
+            bres = peek_mouse_move( &x, &y, &extra_info );
+            ok( bres || broken( !bres && test->expected_info[j] & 0x80000000 ), "missing WM_MOUSEMOVE.\n" );
+            if (bres && extra_info)
+            {
+                ok( extra_info == (test->expected_info[j] & 0xffff) || broken( extra_info == (test->expected_info[j] >> 16)),
+                    "got %Iu, expected %Iu.\n", extra_info, test->expected_info[j] );
+            }
+            winetest_pop_context();
+        }
+        bres = peek_mouse_move( &x, &y, &extra_info );
+        /* Sometimes with real hardware mouse connected a real mouse move gets through after ours,
+         * ignore that if that is not our message. */
+        ok( !bres || !extra_info || broken( (test->expected_info[j] >> 16) && extra_info == (test->expected_info[j] >> 16)),
+            "extra WM_MOUSEMOVE, extra_info %Iu.\n", extra_info );
+        winetest_pop_context();
+    }
+
+    SetCapture( 0 );
+    ok_ret( 1, DestroyWindow( hwnd ) );
+    wait_messages( 0, FALSE );
 }
 
 
