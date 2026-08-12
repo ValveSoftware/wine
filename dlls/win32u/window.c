@@ -4914,6 +4914,7 @@ static BOOL show_window( HWND hwnd, INT cmd )
             || !strcmp( sgi, "2138140" )    /* Didactic Jesus Game */
             || !strcmp( sgi, "2208730" )    /* Raiders of Ruin */
             || !strcmp( sgi, "782330" )     /* DOOM Eternal */
+            || !strcmp( sgi, "107410" )     /* Arma 3 */
             ))
             goto done;
     }
