@@ -856,30 +856,31 @@ static int msvcrt_flush_buffer(FILE* file)
 /*********************************************************************
  *		_isatty (MSVCRT.@)
  */
-#if defined(__x86_64__) && !defined(__arm64ec__)
 int CDECL MSVCRT__isatty(int fd)
 {
     TRACE(":fd (%d)\n",fd);
 
     return get_ioinfo_nolock(fd)->wxflag & WX_TTY;
 }
+#if defined(__x86_64__) && !defined(__arm64ec__)
 __ASM_GLOBAL_FUNC( _isatty,
-        "sub $0x30,%rsp\n\t"
-        __ASM_SEH(".seh_stackalloc 0x30\n\t")
+        "sub $0x28,%rsp\n\t"
+        __ASM_SEH(".seh_stackalloc 0x28\n\t")
         __ASM_SEH(".seh_endprologue\n\t")
+        __ASM_CFI(".cfi_adjust_cfa_offset 0x28\n\t")
+        /* This instruction is needed for Ruby runtime to find internal pioinfo address. */
         "lea MSVCRT___pioinfo(%rip),%rdx\n\t"
-        "nop;nop;nop;nop;nop;nop;nop;nop;nop\n\t"
-        "add $0x30,%rsp\n\t"
-        "jmp " __ASM_NAME( "MSVCRT__isatty" ) )
+        "call " __ASM_NAME("MSVCRT__isatty") "\n\t"
+        /* add nn,%rsp; ret should appear in the end of the function for the same. */
+        "add $0x28,%rsp\n\t"
+        __ASM_CFI(".cfi_adjust_cfa_offset -0x28\n\t")
+        "ret" )
 #else
 int CDECL _isatty(int fd)
 {
-    TRACE(":fd (%d)\n",fd);
-
-    return get_ioinfo_nolock(fd)->wxflag & WX_TTY;
+    return MSVCRT__isatty(fd);
 }
 #endif
-
 
 /* INTERNAL: Allocate stdio file buffer */
 static BOOL msvcrt_alloc_buffer(FILE* file)
