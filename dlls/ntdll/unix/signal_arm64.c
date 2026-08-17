@@ -1371,6 +1371,7 @@ static void usr1_handler( int signal, siginfo_t *siginfo, void *sigcontext )
         {
             CONTEXT *user_context = (CONTEXT *)((context.Sp - sizeof(CONTEXT)) & ~15);
 
+            chpe->InSimulation = 1;
             *user_context = context;
             user_context->ContextFlags = CONTEXT_FULL;
             context.Sp = (ULONG_PTR)user_context;
@@ -1399,6 +1400,7 @@ static void usr2_handler( int signal, siginfo_t *siginfo, void *_sigcontext )
     {
         CONTEXT *user_context = (CONTEXT *)((frame->sp - sizeof(CONTEXT)) & ~15);
 
+        NtCurrentTeb()->ChpeV2CpuAreaInfo->InSimulation = 1;
         user_context->ContextFlags = CONTEXT_FULL;
         NtGetContextThread( GetCurrentThread(), user_context );
         SP_sig(sigcontext) = (ULONG_PTR)user_context;
