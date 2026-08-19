@@ -265,8 +265,16 @@ static HRESULT WINAPI property_put_Value( ISWbemProperty *iface, VARIANT *varVal
 
 static HRESULT WINAPI property_get_Name( ISWbemProperty *iface, BSTR *strName )
 {
-    FIXME( "\n" );
-    return E_NOTIMPL;
+    struct property *property = impl_from_ISWbemProperty( iface );
+    WCHAR *name;
+
+    TRACE( "%p %p\n", property, strName );
+
+    if (!(name = SysAllocString( property->name )))
+        return E_OUTOFMEMORY;
+
+    *strName = name;
+    return S_OK;
 }
 
 static HRESULT WINAPI property_get_IsLocal( ISWbemProperty *iface, VARIANT_BOOL *bIsLocal )
