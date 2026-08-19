@@ -340,15 +340,11 @@ static void test_ParseDisplayName(void)
                         ISWbemPropertySet_Release( props );
 
                         hr = ISWbemMethodSet_get__NewEnum( methods, (IUnknown **)&setenumvar );
-                        todo_wine
                         ok( hr == S_OK, "got %#lx\n", hr );
-                        if (hr == S_OK)
-                        {
                         hr = IEnumVARIANT_Next( setenumvar, ARRAY_SIZE(vars), vars, &fetched );
                         ok( hr == S_FALSE, "got %#lx\n", hr );
                         ok( !fetched, "got %lu\n", fetched );
                         IEnumVARIANT_Release( setenumvar );
-                        }
 
                         ISWbemMethodSet_Release( methods );
 
