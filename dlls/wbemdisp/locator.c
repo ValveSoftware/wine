@@ -54,6 +54,7 @@ enum enum_variant_type
 {
     ENUM_OBJECTS,
     ENUM_PROPERTIES,
+    ENUM_METHODS,
 };
 
 struct services;
@@ -933,9 +934,11 @@ static HRESULT WINAPI methodset_get__NewEnum(
     ISWbemMethodSet *iface,
     IUnknown **unk )
 {
-    FIXME("\n");
+    struct methodset *set = impl_from_ISWbemMethodSet( iface );
 
-    return E_NOTIMPL;
+    TRACE( "%p, %p\n", iface, unk );
+
+    return EnumVARIANT_create( ENUM_METHODS, NULL, &set->object->ISWbemObject_iface, (IEnumVARIANT **)unk );
 }
 
 static HRESULT WINAPI methodset_Item(
@@ -2095,7 +2098,7 @@ static HRESULT WINAPI enumvar_Next( IEnumVARIANT *iface, ULONG celt, VARIANT *va
             HRESULT hr;
 
             if (object->members[cursor].is_system) continue;
-            if (object->members[cursor].is_method) continue;
+            if (object->members[cursor].is_method != (enumvar->enum_type == ENUM_METHODS)) continue;
 
             hr = SWbemProperty_create( object->object, object->members[cursor].name, &prop );
             if (FAILED( hr ))
