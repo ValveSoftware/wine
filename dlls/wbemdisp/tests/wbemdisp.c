@@ -284,7 +284,6 @@ static void test_ParseDisplayName(void)
                         hr = ISWbemObject_get_Methods_( object, &methods );
                         ok( hr == S_OK, "got %#lx\n", hr );
                         hr = ISWbemObject_get_Qualifiers_( object, &quals );
-                        todo_wine
                         ok( hr == S_OK, "got %#lx\n", hr );
                         ISWbemObject_Release( object );
 
@@ -343,8 +342,6 @@ static void test_ParseDisplayName(void)
 
                         ISWbemMethodSet_Release( methods );
 
-                        if (quals)
-                        {
                         hr = ISWbemQualifierSet_get__NewEnum( quals, (IUnknown **)&setenumvar );
                         todo_wine
                         ok( hr == S_OK, "got %#lx\n", hr );
@@ -360,7 +357,6 @@ static void test_ParseDisplayName(void)
                         }
 
                         ISWbemQualifierSet_Release( quals );
-                        }
 
                         VariantClear( &var );
 
