@@ -63,6 +63,7 @@ static HRESULT EnumVARIANT_create( enum enum_variant_type, struct services *, vo
 static HRESULT ISWbemSecurity_create( ISWbemSecurity ** );
 static HRESULT SWbemObject_create( struct services *, IWbemClassObject *, ISWbemObject ** );
 static HRESULT SWbemObjectPath_create( IWbemClassObject *, ISWbemObjectPath ** );
+static HRESULT SWbemQualifierSet_create( ISWbemQualifierSet ** );
 
 enum type_id
 {
@@ -78,6 +79,7 @@ enum type_id
     ISWbemMethodSet_tid,
     ISWbemMethod_tid,
     ISWbemObjectPath_tid,
+    ISWbemQualifierSet_tid,
     last_tid
 };
 
@@ -98,6 +100,7 @@ static REFIID wbemdisp_tid_id[] =
     &IID_ISWbemMethodSet,
     &IID_ISWbemMethod,
     &IID_ISWbemObjectPath,
+    &IID_ISWbemQualifierSet,
 };
 
 static HRESULT get_typeinfo( enum type_id tid, ITypeInfo **ret )
@@ -1602,8 +1605,7 @@ static HRESULT WINAPI object_get_Qualifiers_(
     ISWbemObject *iface,
     ISWbemQualifierSet **objWbemQualifierSet )
 {
-    FIXME( "\n" );
-    return E_NOTIMPL;
+    return SWbemQualifierSet_create( objWbemQualifierSet );
 }
 
 static HRESULT WINAPI object_get_Properties_( ISWbemObject *iface, ISWbemPropertySet **prop_set )
@@ -3639,6 +3641,183 @@ HRESULT SWbemNamedValueSet_create( void **obj )
     *obj = &set->ISWbemNamedValueSet_iface;
     TRACE( "returning iface %p\n", *obj );
     return hr;
+}
+
+struct qualifierset
+{
+    ISWbemQualifierSet ISWbemQualifierSet_iface;
+    LONG refs;
+};
+
+static struct qualifierset *impl_from_ISWbemQualifierSet( ISWbemQualifierSet *iface )
+{
+    return CONTAINING_RECORD( iface, struct qualifierset, ISWbemQualifierSet_iface );
+}
+
+static HRESULT WINAPI qualifierset_QueryInterface( ISWbemQualifierSet *iface, REFIID riid, void **ppvObject )
+{
+    struct qualifierset *qualifierset = impl_from_ISWbemQualifierSet( iface );
+
+    TRACE( "%p %s %p\n", qualifierset, debugstr_guid( riid ), ppvObject );
+
+    if (IsEqualGUID( riid, &IID_ISWbemQualifierSet ) ||
+        IsEqualGUID( riid, &IID_IDispatch ) ||
+        IsEqualGUID( riid, &IID_IUnknown ))
+    {
+        *ppvObject = iface;
+    }
+    else
+    {
+        WARN( "interface %s not implemented\n", debugstr_guid( riid ) );
+        *ppvObject = NULL;
+        return E_NOINTERFACE;
+    }
+
+    ISWbemQualifierSet_AddRef( iface );
+    return S_OK;
+}
+
+static ULONG WINAPI qualifierset_AddRef( ISWbemQualifierSet *iface )
+{
+    struct qualifierset *qualifierset = impl_from_ISWbemQualifierSet( iface );
+    return InterlockedIncrement( &qualifierset->refs );
+}
+
+static ULONG WINAPI qualifierset_Release( ISWbemQualifierSet *iface )
+{
+    struct qualifierset *qualifierset = impl_from_ISWbemQualifierSet( iface );
+    LONG refs = InterlockedDecrement( &qualifierset->refs );
+
+    if (!refs)
+    {
+        TRACE( "destroying %p\n", qualifierset );
+        free( qualifierset );
+    }
+
+    return refs;
+}
+
+static HRESULT WINAPI qualifierset_GetTypeInfoCount( ISWbemQualifierSet *iface, UINT *count )
+{
+    struct qualifierset *qualifierset = impl_from_ISWbemQualifierSet( iface );
+
+    TRACE( "%p, %p\n", qualifierset, count );
+
+    *count = 1;
+    return S_OK;
+}
+
+static HRESULT WINAPI qualifierset_GetTypeInfo( ISWbemQualifierSet *iface, UINT index, LCID lcid, ITypeInfo **info )
+{
+    struct qualifierset *qualifierset = impl_from_ISWbemQualifierSet( iface );
+
+    TRACE( "%p, %u, %#lx, %p\n", qualifierset, index, lcid, info );
+
+    return get_typeinfo( ISWbemQualifierSet_tid, info );
+}
+
+static HRESULT WINAPI qualifierset_GetIDsOfNames( ISWbemQualifierSet *iface, REFIID riid,
+        LPOLESTR *names, UINT count, LCID lcid, DISPID *dispid )
+{
+    struct qualifierset *qualifierset = impl_from_ISWbemQualifierSet( iface );
+    ITypeInfo *typeinfo;
+    HRESULT hr;
+
+    TRACE( "%p, %s, %p, %u, %#lx, %p\n", qualifierset, debugstr_guid( riid ), names, count, lcid, dispid );
+
+    if (!names || !count || !dispid) return E_INVALIDARG;
+
+    hr = get_typeinfo( ISWbemQualifierSet_tid, &typeinfo );
+    if (SUCCEEDED(hr))
+    {
+        hr = ITypeInfo_GetIDsOfNames( typeinfo, names, count, dispid );
+        ITypeInfo_Release( typeinfo );
+    }
+    return hr;
+}
+
+static HRESULT WINAPI qualifierset_Invoke( ISWbemQualifierSet *iface, DISPID member, REFIID riid, LCID lcid,
+        WORD flags, DISPPARAMS *params, VARIANT *result, EXCEPINFO *excep_info, UINT *arg_err )
+{
+    struct qualifierset *qualifierset = impl_from_ISWbemQualifierSet( iface );
+    ITypeInfo *typeinfo;
+    HRESULT hr;
+
+    TRACE( "%p, %ld, %s, %#lx, %#x, %p, %p, %p, %p\n", qualifierset, member, debugstr_guid( riid ),
+            lcid, flags, params, result, excep_info, arg_err );
+
+    hr = get_typeinfo( ISWbemQualifierSet_tid, &typeinfo );
+    if (SUCCEEDED(hr))
+    {
+        hr = ITypeInfo_Invoke( typeinfo, &qualifierset->ISWbemQualifierSet_iface, member, flags,
+                params, result, excep_info, arg_err );
+        ITypeInfo_Release( typeinfo );
+    }
+    return hr;
+}
+
+static HRESULT WINAPI qualifierset__NewEnum( ISWbemQualifierSet *iface, IUnknown **unk )
+{
+    FIXME( "\n" );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI qualifierset_Item( ISWbemQualifierSet *iface, BSTR name, LONG iFlags, ISWbemQualifier **objWbemQualifier )
+{
+    FIXME( "\n" );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI qualifierset_get_Count( ISWbemQualifierSet *iface, LONG *iCount )
+{
+    FIXME( "\n" );
+    *iCount = 0;
+    return S_OK;
+}
+
+static HRESULT WINAPI qualifierset_Add( ISWbemQualifierSet *iface, BSTR strName, VARIANT *varVal,
+        VARIANT_BOOL bPropagatesToSubclass, VARIANT_BOOL bPropagatesToInstance, VARIANT_BOOL bIsOverridable,
+        LONG iFlags, ISWbemQualifier **objWbemQualifier )
+{
+    FIXME( "\n" );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI qualifierset_Remove( ISWbemQualifierSet *iface, BSTR strName, LONG iFlags )
+{
+    FIXME( "\n" );
+    return E_NOTIMPL;
+}
+
+static const ISWbemQualifierSetVtbl qualifierset_vtbl =
+{
+    qualifierset_QueryInterface,
+    qualifierset_AddRef,
+    qualifierset_Release,
+    qualifierset_GetTypeInfoCount,
+    qualifierset_GetTypeInfo,
+    qualifierset_GetIDsOfNames,
+    qualifierset_Invoke,
+    qualifierset__NewEnum,
+    qualifierset_Item,
+    qualifierset_get_Count,
+    qualifierset_Add,
+    qualifierset_Remove,
+};
+
+static HRESULT SWbemQualifierSet_create( ISWbemQualifierSet **obj )
+{
+    struct qualifierset *qualifierset;
+
+    TRACE( "%p\n", obj );
+
+    if (!(qualifierset = calloc( 1, sizeof(*qualifierset) ))) return E_OUTOFMEMORY;
+    qualifierset->ISWbemQualifierSet_iface.lpVtbl = &qualifierset_vtbl;
+    qualifierset->refs = 1;
+
+    *obj = &qualifierset->ISWbemQualifierSet_iface;
+    TRACE( "returning iface %p\n", *obj );
+    return S_OK;
 }
 
 struct objectpath
