@@ -296,7 +296,6 @@ static void test_ParseDisplayName(void)
                         ok( !!fetched, "got %lu\n", fetched );
                         ok ( V_VT( vars + ARRAY_SIZE(vars) - 1 ) == VT_EMPTY, "got %u\n", V_VT( vars + ARRAY_SIZE(vars) - 1 ) );
 
-                        dispname = NULL;
                         for (i = 0; i < fetched; ++i)
                         {
                             ok( V_VT( vars + i ) == VT_DISPATCH, "got %u\n", V_VT( vars + i ) );
@@ -304,7 +303,6 @@ static void test_ParseDisplayName(void)
                             ok( hr == S_OK, "got %#lx\n", hr );
                             VariantClear( vars + i );
                             hr = ISWbemProperty_get_Name( prop, &dispname );
-                            todo_wine
                             ok( hr == S_OK, "got %#lx\n", hr );
                             SysFreeString( dispname );
                             hr = ISWbemProperty_get_Value( prop, &res );
@@ -323,13 +321,10 @@ static void test_ParseDisplayName(void)
                         hr = IEnumVARIANT_Next( setenumvar, 1, vars + 1, &fetched );
                         ok( hr == S_OK, "got %#lx\n", hr );
                         hr = ISWbemProperty_get_Name( (ISWbemProperty *)V_DISPATCH(vars), &dispname );
-                        todo_wine
                         ok( hr == S_OK, "got %#lx\n", hr );
-                        dispname2 = NULL;
                         hr = ISWbemProperty_get_Name( (ISWbemProperty *)V_DISPATCH(vars + 1), &dispname2 );
-                        todo_wine
                         ok( hr == S_OK, "got %#lx\n", hr );
-                        if (dispname) ok( wcscmp( dispname, dispname2 ), "got equal names\n" );
+                        ok( wcscmp( dispname, dispname2 ), "got equal names\n" );
                         SysFreeString( dispname );
                         SysFreeString( dispname2 );
                         VariantClear( vars );
