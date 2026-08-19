@@ -55,6 +55,7 @@ enum enum_variant_type
     ENUM_OBJECTS,
     ENUM_PROPERTIES,
     ENUM_METHODS,
+    ENUM_QUALIFIERS,
 };
 
 struct services;
@@ -2037,7 +2038,7 @@ static ULONG WINAPI enumvar_Release(
         TRACE( "destroying %p\n", enumvar );
         if (enumvar->enum_type == ENUM_OBJECTS)
             IEnumWbemClassObject_Release( enumvar->u.objectenum );
-        else
+        else if (enumvar->enum_type == ENUM_PROPERTIES || enumvar->enum_type == ENUM_METHODS)
             ISWbemObject_Release( enumvar->u.members.object );
         if (enumvar->services) ISWbemServices_Release( &enumvar->services->ISWbemServices_iface );
         free( enumvar );
@@ -2097,6 +2098,10 @@ static HRESULT WINAPI enumvar_Next( IEnumVARIANT *iface, ULONG celt, VARIANT *va
             V_DISPATCH( var ) = (IDispatch *)sobj;
         }
     }
+    else if (enumvar->enum_type == ENUM_QUALIFIERS)
+    {
+        count = 0;
+    }
     else
     {
         struct object *object = impl_from_ISWbemObject( enumvar->u.members.object );
@@ -2136,6 +2141,8 @@ static HRESULT WINAPI enumvar_Skip( IEnumVARIANT *iface, ULONG celt )
 
     if (enumvar->enum_type == ENUM_OBJECTS)
         return IEnumWbemClassObject_Skip( enumvar->u.objectenum, WBEM_INFINITE, celt );
+    else if (enumvar->enum_type == ENUM_QUALIFIERS)
+        return S_FALSE;
     else
     {
         struct object *object = impl_from_ISWbemObject( enumvar->u.members.object );
@@ -2160,7 +2167,7 @@ static HRESULT WINAPI enumvar_Reset( IEnumVARIANT *iface )
 
     if (enumvar->enum_type == ENUM_OBJECTS)
         hr = IEnumWbemClassObject_Reset( enumvar->u.objectenum );
-    else
+    else if (enumvar->enum_type == ENUM_PROPERTIES || enumvar->enum_type == ENUM_METHODS)
         enumvar->u.members.cursor = 0;
 
     return hr;
@@ -2197,7 +2204,7 @@ static HRESULT EnumVARIANT_create( enum enum_variant_type enum_type, struct serv
         enumvar->u.objectenum = object;
         IEnumWbemClassObject_AddRef( enumvar->u.objectenum );
     }
-    else
+    else if (enumvar->enum_type == ENUM_PROPERTIES || enumvar->enum_type == ENUM_METHODS)
     {
         enumvar->u.members.object = object;
         ISWbemObject_AddRef( enumvar->u.members.object );
@@ -3758,8 +3765,8 @@ static HRESULT WINAPI qualifierset_Invoke( ISWbemQualifierSet *iface, DISPID mem
 
 static HRESULT WINAPI qualifierset__NewEnum( ISWbemQualifierSet *iface, IUnknown **unk )
 {
-    FIXME( "\n" );
-    return E_NOTIMPL;
+    FIXME( "%p %p stub\n", iface, unk );
+    return EnumVARIANT_create( ENUM_QUALIFIERS, NULL, NULL, (IEnumVARIANT **)unk );
 }
 
 static HRESULT WINAPI qualifierset_Item( ISWbemQualifierSet *iface, BSTR name, LONG iFlags, ISWbemQualifier **objWbemQualifier )

@@ -343,10 +343,7 @@ static void test_ParseDisplayName(void)
                         ISWbemMethodSet_Release( methods );
 
                         hr = ISWbemQualifierSet_get__NewEnum( quals, (IUnknown **)&setenumvar );
-                        todo_wine
                         ok( hr == S_OK, "got %#lx\n", hr );
-                        if (hr == S_OK)
-                        {
                         hr = IEnumVARIANT_Next( setenumvar, ARRAY_SIZE(vars), vars, &fetched );
                         ok( hr == S_FALSE, "got %#lx\n", hr );
                         todo_wine
@@ -354,7 +351,6 @@ static void test_ParseDisplayName(void)
                         for (i = 0; i < fetched; ++i)
                             VariantClear( vars + i );
                         IEnumVARIANT_Release( setenumvar );
-                        }
 
                         ISWbemQualifierSet_Release( quals );
 
