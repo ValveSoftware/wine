@@ -332,7 +332,7 @@ struct propertyset
 {
     ISWbemPropertySet ISWbemPropertySet_iface;
     LONG refs;
-    IWbemClassObject *object;
+    IWbemClassObject *class_object;
 };
 
 static inline struct propertyset *impl_from_ISWbemPropertySet(
@@ -354,7 +354,7 @@ static ULONG WINAPI propertyset_Release( ISWbemPropertySet *iface )
     if (!refs)
     {
         TRACE( "destroying %p\n", propertyset );
-        IWbemClassObject_Release( propertyset->object );
+        IWbemClassObject_Release( propertyset->class_object );
         free( propertyset );
     }
     return refs;
@@ -456,10 +456,10 @@ static HRESULT WINAPI propertyset_Item( ISWbemPropertySet *iface, BSTR name,
 
     TRACE( "%p, %s, %#lx, %p\n", propertyset, debugstr_w(name), flags, prop );
 
-    hr = IWbemClassObject_Get( propertyset->object, name, 0, &var, NULL, NULL );
+    hr = IWbemClassObject_Get( propertyset->class_object, name, 0, &var, NULL, NULL );
     if (SUCCEEDED(hr))
     {
-        hr = SWbemProperty_create( propertyset->object, name, prop );
+        hr = SWbemProperty_create( propertyset->class_object, name, prop );
         VariantClear( &var );
     }
     return hr;
@@ -473,7 +473,7 @@ static HRESULT WINAPI propertyset_get_Count( ISWbemPropertySet *iface, LONG *cou
 
     TRACE( "%p, %p\n", propertyset, count );
 
-    hr = IWbemClassObject_Get( propertyset->object, L"__PROPERTY_COUNT", 0, &val, NULL, NULL );
+    hr = IWbemClassObject_Get( propertyset->class_object, L"__PROPERTY_COUNT", 0, &val, NULL, NULL );
     if (SUCCEEDED(hr))
     {
         *count = V_I4( &val );
@@ -519,8 +519,8 @@ static HRESULT SWbemPropertySet_create( IWbemClassObject *wbem_object, ISWbemPro
     if (!(propertyset = malloc( sizeof(*propertyset) ))) return E_OUTOFMEMORY;
     propertyset->ISWbemPropertySet_iface.lpVtbl = &propertyset_vtbl;
     propertyset->refs = 1;
-    propertyset->object = wbem_object;
-    IWbemClassObject_AddRef( propertyset->object );
+    propertyset->class_object = wbem_object;
+    IWbemClassObject_AddRef( propertyset->class_object );
     *obj = &propertyset->ISWbemPropertySet_iface;
 
     TRACE( "returning iface %p\n", *obj );
