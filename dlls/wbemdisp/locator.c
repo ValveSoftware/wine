@@ -2066,6 +2066,8 @@ static HRESULT WINAPI enumvar_Next( IEnumVARIANT *iface, ULONG celt, VARIANT *va
 
     if (!var) return S_FALSE;
 
+    for (count = 0; count < celt; ++count) VariantInit( var + count );
+
     if (enumvar->enum_type == ENUM_OBJECTS)
     {
         if (celt) IEnumWbemClassObject_Next( enumvar->u.objectenum, WBEM_INFINITE, 1, &obj, &count );

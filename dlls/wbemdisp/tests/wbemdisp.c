@@ -294,7 +294,6 @@ static void test_ParseDisplayName(void)
                         hr = IEnumVARIANT_Next( setenumvar, ARRAY_SIZE(vars), vars, &fetched );
                         ok( hr == S_FALSE, "got %#lx\n", hr );
                         ok( !!fetched, "got %lu\n", fetched );
-                        todo_wine
                         ok ( V_VT( vars + ARRAY_SIZE(vars) - 1 ) == VT_EMPTY, "got %u\n", V_VT( vars + ARRAY_SIZE(vars) - 1 ) );
 
                         dispname = NULL;
