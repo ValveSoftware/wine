@@ -50,9 +50,15 @@ static IWbemContext * unsafe_get_context_from_namedvalueset( IDispatch *disp )
     return valueset ? valueset->context : NULL;
 }
 
+enum enum_variant_type
+{
+    ENUM_OBJECTS,
+    ENUM_PROPERTIES,
+};
+
 struct services;
 
-static HRESULT EnumVARIANT_create( struct services *, IEnumWbemClassObject *, IEnumVARIANT ** );
+static HRESULT EnumVARIANT_create( enum enum_variant_type, struct services *, void *, IEnumVARIANT ** );
 static HRESULT ISWbemSecurity_create( ISWbemSecurity ** );
 static HRESULT SWbemObject_create( struct services *, IWbemClassObject *, ISWbemObject ** );
 static HRESULT SWbemObjectPath_create( IWbemClassObject *, ISWbemObjectPath ** );
@@ -333,6 +339,7 @@ struct propertyset
     ISWbemPropertySet ISWbemPropertySet_iface;
     LONG refs;
     IWbemClassObject *class_object;
+    ISWbemObject *object;
 };
 
 static inline struct propertyset *impl_from_ISWbemPropertySet(
@@ -355,6 +362,7 @@ static ULONG WINAPI propertyset_Release( ISWbemPropertySet *iface )
     {
         TRACE( "destroying %p\n", propertyset );
         IWbemClassObject_Release( propertyset->class_object );
+        ISWbemObject_Release( propertyset->object );
         free( propertyset );
     }
     return refs;
@@ -443,8 +451,11 @@ static HRESULT WINAPI propertyset_Invoke( ISWbemPropertySet *iface, DISPID membe
 
 static HRESULT WINAPI propertyset_get__NewEnum( ISWbemPropertySet *iface, IUnknown **unk )
 {
-    FIXME( "\n" );
-    return E_NOTIMPL;
+    struct propertyset *propertyset = impl_from_ISWbemPropertySet( iface );
+
+    TRACE( "%p, %p\n", iface, unk );
+
+    return EnumVARIANT_create( ENUM_PROPERTIES, NULL, propertyset->object, (IEnumVARIANT **)unk );
 }
 
 static HRESULT WINAPI propertyset_Item( ISWbemPropertySet *iface, BSTR name,
@@ -510,17 +521,19 @@ static const ISWbemPropertySetVtbl propertyset_vtbl =
     propertyset_Remove
 };
 
-static HRESULT SWbemPropertySet_create( IWbemClassObject *wbem_object, ISWbemPropertySet **obj )
+static HRESULT SWbemPropertySet_create( IWbemClassObject *wbem_object, ISWbemObject *object, ISWbemPropertySet **obj )
 {
     struct propertyset *propertyset;
 
     TRACE( "%p, %p\n", obj, wbem_object );
 
-    if (!(propertyset = malloc( sizeof(*propertyset) ))) return E_OUTOFMEMORY;
+    if (!(propertyset = calloc( 1, sizeof(*propertyset) ))) return E_OUTOFMEMORY;
     propertyset->ISWbemPropertySet_iface.lpVtbl = &propertyset_vtbl;
     propertyset->refs = 1;
     propertyset->class_object = wbem_object;
     IWbemClassObject_AddRef( propertyset->class_object );
+    propertyset->object = object;
+    ISWbemObject_AddRef( propertyset->object );
     *obj = &propertyset->ISWbemPropertySet_iface;
 
     TRACE( "returning iface %p\n", *obj );
@@ -537,6 +550,7 @@ struct services
 struct member
 {
     BSTR name;
+    BOOL is_system;
     BOOL is_method;
     DISPID dispid;
     CIMTYPE type;
@@ -1105,6 +1119,7 @@ static HRESULT init_members( struct object *object )
     IWbemClassObject *sig_in, *sig_out;
     unsigned int i, capacity = 0, count = 0;
     CIMTYPE type;
+    LONG flavor;
     HRESULT hr;
     BSTR name;
 
@@ -1113,10 +1128,11 @@ static HRESULT init_members( struct object *object )
     hr = IWbemClassObject_BeginEnumeration( object->object, 0 );
     if (SUCCEEDED( hr ))
     {
-        while (IWbemClassObject_Next( object->object, 0, &name, NULL, &type, NULL ) == S_OK)
+        while (IWbemClassObject_Next( object->object, 0, &name, NULL, &type, &flavor ) == S_OK)
         {
             if (!object_reserve_member( object, count + 1, &capacity )) goto error;
             object->members[count].name      = name;
+            object->members[count].is_system = !!(flavor & WBEM_FLAVOR_ORIGIN_SYSTEM);
             object->members[count].is_method = FALSE;
             object->members[count].dispid    = 0;
             object->members[count].type      = type;
@@ -1133,6 +1149,7 @@ static HRESULT init_members( struct object *object )
         {
             if (!object_reserve_member( object, count + 1, &capacity )) goto error;
             object->members[count].name      = name;
+            object->members[count].is_system = FALSE;
             object->members[count].is_method = TRUE;
             object->members[count].dispid    = 0;
             count++;
@@ -1581,9 +1598,14 @@ static HRESULT WINAPI object_get_Qualifiers_(
 static HRESULT WINAPI object_get_Properties_( ISWbemObject *iface, ISWbemPropertySet **prop_set )
 {
     struct object *object = impl_from_ISWbemObject( iface );
+    HRESULT hr;
 
     TRACE( "%p, %p\n", object, prop_set );
-    return SWbemPropertySet_create( object->object, prop_set );
+
+    hr = init_members( object );
+    if (FAILED( hr )) return hr;
+
+    return SWbemPropertySet_create( object->object, iface, prop_set );
 }
 
 static HRESULT WINAPI object_get_Methods_(
@@ -1842,7 +1864,7 @@ static HRESULT WINAPI objectset_get__NewEnum(
     hr = IEnumWbemClassObject_Clone( objectset->objectenum, &objectenum );
     if (FAILED( hr )) return hr;
 
-    hr = EnumVARIANT_create( objectset->services, objectenum, (IEnumVARIANT **)pUnk );
+    hr = EnumVARIANT_create( ENUM_OBJECTS, objectset->services, objectenum, (IEnumVARIANT **)pUnk );
     IEnumWbemClassObject_Release( objectenum );
     return hr;
 }
@@ -1966,8 +1988,17 @@ struct enumvar
 {
     IEnumVARIANT IEnumVARIANT_iface;
     LONG refs;
-    IEnumWbemClassObject *objectenum;
+    union
+    {
+        struct
+        {
+            ISWbemObject *object;
+            ULONG cursor;
+        } members;
+        IEnumWbemClassObject *objectenum;
+    } u;
     struct services *services;
+    enum enum_variant_type enum_type;
 };
 
 static inline struct enumvar *impl_from_IEnumVARIANT(
@@ -1991,8 +2022,11 @@ static ULONG WINAPI enumvar_Release(
     if (!refs)
     {
         TRACE( "destroying %p\n", enumvar );
-        IEnumWbemClassObject_Release( enumvar->objectenum );
-        ISWbemServices_Release( &enumvar->services->ISWbemServices_iface );
+        if (enumvar->enum_type == ENUM_OBJECTS)
+            IEnumWbemClassObject_Release( enumvar->u.objectenum );
+        else
+            ISWbemObject_Release( enumvar->u.members.object );
+        if (enumvar->services) ISWbemServices_Release( &enumvar->services->ISWbemServices_iface );
         free( enumvar );
     }
     return refs;
@@ -2032,19 +2066,49 @@ static HRESULT WINAPI enumvar_Next( IEnumVARIANT *iface, ULONG celt, VARIANT *va
 
     if (!var) return S_FALSE;
 
-    if (celt) IEnumWbemClassObject_Next( enumvar->objectenum, WBEM_INFINITE, 1, &obj, &count );
-    if (count)
+    if (enumvar->enum_type == ENUM_OBJECTS)
     {
-        ISWbemObject *sobj;
-        HRESULT hr;
+        if (celt) IEnumWbemClassObject_Next( enumvar->u.objectenum, WBEM_INFINITE, 1, &obj, &count );
+        if (count)
+        {
+            ISWbemObject *sobj;
+            HRESULT hr;
 
-        hr = SWbemObject_create( enumvar->services, obj, &sobj );
-        IWbemClassObject_Release( obj );
-        if (FAILED( hr )) return hr;
+            hr = SWbemObject_create( enumvar->services, obj, &sobj );
+            IWbemClassObject_Release( obj );
+            if (FAILED( hr )) return hr;
 
-        V_VT( var ) = VT_DISPATCH;
-        V_DISPATCH( var ) = (IDispatch *)sobj;
+            V_VT( var ) = VT_DISPATCH;
+            V_DISPATCH( var ) = (IDispatch *)sobj;
+        }
     }
+    else
+    {
+        struct object *object = impl_from_ISWbemObject( enumvar->u.members.object );
+        ULONG cursor = enumvar->u.members.cursor;
+
+        for (count = 0; count < celt && cursor < object->nb_members; ++cursor)
+        {
+            ISWbemProperty *prop;
+            HRESULT hr;
+
+            if (object->members[cursor].is_system) continue;
+            if (object->members[cursor].is_method) continue;
+
+            hr = SWbemProperty_create( object->object, object->members[cursor].name, &prop );
+            if (FAILED( hr ))
+            {
+                WARN( "Failed to create property, hr %#lx\n", hr );
+                break;
+            }
+
+            V_VT( var + count ) = VT_DISPATCH;
+            V_DISPATCH( var + count ) = (IDispatch *)prop;
+            ++count;
+        }
+        enumvar->u.members.cursor = cursor;
+    }
+
     if (fetched) *fetched = count;
     return (count < celt) ? S_FALSE : S_OK;
 }
@@ -2055,16 +2119,36 @@ static HRESULT WINAPI enumvar_Skip( IEnumVARIANT *iface, ULONG celt )
 
     TRACE( "%p, %lu\n", iface, celt );
 
-    return IEnumWbemClassObject_Skip( enumvar->objectenum, WBEM_INFINITE, celt );
+    if (enumvar->enum_type == ENUM_OBJECTS)
+        return IEnumWbemClassObject_Skip( enumvar->u.objectenum, WBEM_INFINITE, celt );
+    else
+    {
+        struct object *object = impl_from_ISWbemObject( enumvar->u.members.object );
+
+        if (enumvar->u.members.cursor + celt < celt || enumvar->u.members.cursor + celt > object->nb_members)
+        {
+            enumvar->u.members.cursor = object->nb_members;
+            return S_FALSE;
+        }
+
+        enumvar->u.members.cursor += celt;
+        return S_OK;
+    }
 }
 
 static HRESULT WINAPI enumvar_Reset( IEnumVARIANT *iface )
 {
     struct enumvar *enumvar = impl_from_IEnumVARIANT( iface );
+    HRESULT hr = S_OK;
 
     TRACE( "%p\n", iface );
 
-    return IEnumWbemClassObject_Reset( enumvar->objectenum );
+    if (enumvar->enum_type == ENUM_OBJECTS)
+        hr = IEnumWbemClassObject_Reset( enumvar->u.objectenum );
+    else
+        enumvar->u.members.cursor = 0;
+
+    return hr;
 }
 
 static HRESULT WINAPI enumvar_Clone( IEnumVARIANT *iface, IEnumVARIANT **penum )
@@ -2084,18 +2168,27 @@ static const struct IEnumVARIANTVtbl enumvar_vtbl =
     enumvar_Clone
 };
 
-static HRESULT EnumVARIANT_create( struct services *services, IEnumWbemClassObject *objectenum,
+static HRESULT EnumVARIANT_create( enum enum_variant_type enum_type, struct services *services, void *object,
         IEnumVARIANT **obj )
 {
     struct enumvar *enumvar;
 
-    if (!(enumvar = malloc( sizeof(*enumvar) ))) return E_OUTOFMEMORY;
+    if (!(enumvar = calloc( 1, sizeof(*enumvar) ))) return E_OUTOFMEMORY;
     enumvar->IEnumVARIANT_iface.lpVtbl = &enumvar_vtbl;
     enumvar->refs = 1;
-    enumvar->objectenum = objectenum;
-    IEnumWbemClassObject_AddRef( enumvar->objectenum );
+    enumvar->enum_type = enum_type;
+    if (enum_type == ENUM_OBJECTS)
+    {
+        enumvar->u.objectenum = object;
+        IEnumWbemClassObject_AddRef( enumvar->u.objectenum );
+    }
+    else
+    {
+        enumvar->u.members.object = object;
+        ISWbemObject_AddRef( enumvar->u.members.object );
+    }
     enumvar->services = services;
-    ISWbemServices_AddRef( &services->ISWbemServices_iface );
+    if (services) ISWbemServices_AddRef( &services->ISWbemServices_iface );
 
     *obj = &enumvar->IEnumVARIANT_iface;
     TRACE( "returning iface %p\n", *obj );

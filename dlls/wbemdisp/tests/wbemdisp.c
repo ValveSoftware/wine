@@ -289,10 +289,7 @@ static void test_ParseDisplayName(void)
                         ISWbemObject_Release( object );
 
                         hr = ISWbemPropertySet_get__NewEnum( props, (IUnknown **)&setenumvar );
-                        todo_wine
                         ok( hr == S_OK, "got %#lx\n", hr );
-                        if (hr == S_OK)
-                        {
                         V_VT( vars + ARRAY_SIZE(vars) - 1 ) = VT_ERROR;
                         hr = IEnumVARIANT_Next( setenumvar, ARRAY_SIZE(vars), vars, &fetched );
                         ok( hr == S_FALSE, "got %#lx\n", hr );
@@ -340,7 +337,6 @@ static void test_ParseDisplayName(void)
                         VariantClear( vars + 1 );
                         IEnumVARIANT_Release( setenumvar );
                         IEnumVARIANT_Release( propenumvar );
-                        }
 
                         ISWbemPropertySet_Release( props );
 
