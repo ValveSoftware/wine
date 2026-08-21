@@ -1842,8 +1842,7 @@ __ASM_GLOBAL_FUNC( call_user_mode_callback,
                    "movq %rcx,%r10\n\t"
                    "movq %r13,%rdi\n\t"
                    "xorl %esi,%esi\n\t"
-                   "movl $0x3000003,%eax\n\t"  /* _thread_set_tsd_base */
-                   "syscall\n\t"
+                   "call _thread_set_tsd_base\n\t"
                    "movq %r10,%rcx\n\t"
 #endif
                    "movq 0x330(%r13),%r10\n\t" /* amd64_thread_data()->instrumentation_callback */
@@ -3461,8 +3460,7 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
 #elif defined __APPLE__
                    "movq 0x320(%r13),%rdi\n\t"     /* amd64_thread_data()->pthread_teb */
                    "xorl %esi,%esi\n\t"
-                   "movl $0x3000003,%eax\n\t"      /* _thread_set_tsd_base */
-                   "syscall\n\t"
+                   "call _thread_set_tsd_base\n\t"
                    "leaq -0x98(%rbp),%rcx\n"
 #endif
                    "ldmxcsr 0x33c(%r13)\n\t"       /* amd64_thread_data()->mxcsr */
@@ -3515,8 +3513,7 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "movq %rcx,%rdx\n\t"
                    "movq %r13,%rdi\n\t"            /* teb */
                    "xorl %esi,%esi\n\t"
-                   "movl $0x3000003,%eax\n\t"      /* _thread_set_tsd_base */
-                   "syscall\n\t"
+                   "call _thread_set_tsd_base\n\t"
                    "movq %rdx,%rcx\n\t"
                    "movq %r8,%rax\n\t"
 #endif
@@ -3749,8 +3746,7 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
 #elif defined __APPLE__
                    "movq 0x320(%r13),%rdi\n\t"     /* amd64_thread_data()->pthread_teb */
                    "xorl %esi,%esi\n\t"
-                   "movl $0x3000003,%eax\n\t"      /* _thread_set_tsd_base */
-                   "syscall\n\t"
+                   "call _thread_set_tsd_base\n\t"
 #endif
                    "ldmxcsr 0x33c(%r13)\n\t"       /* amd64_thread_data()->mxcsr */
                    "movq %r8,%rdi\n\t"             /* args */
@@ -3783,8 +3779,7 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
                    "movq %rcx,%r14\n\t"
                    "movq %r13,%rdi\n\t"            /* teb */
                    "xorl %esi,%esi\n\t"
-                   "movl $0x3000003,%eax\n\t"      /* _thread_set_tsd_base */
-                   "syscall\n\t"
+                   "call _thread_set_tsd_base\n\t"
                    "movq %r14,%rcx\n\t"
                    "movq %rdx,%rax\n\t"
                    "movq 0x60(%rcx),%r14\n\t"
