@@ -64,14 +64,10 @@ const __attribute((visibility("default"))) struct wine_preload_info *wine_main_p
 
 static void init_reserved_areas(void)
 {
-    int i;
-
-    for (i = 0; wine_main_preload_info[i].size != 0; i++)
-    {
-        /* Match how the preloader maps reserved areas: */
-        mmap(wine_main_preload_info[i].addr, wine_main_preload_info[i].size, PROT_NONE,
-             MAP_FIXED | MAP_NORESERVE | MAP_PRIVATE | MAP_ANON, -1, 0);
-    }
+    /* Mach-O zerofill sections WINE_RESERVE and WINE_TOP_DOWN are already
+     * mapped by dyld at process start. Calling mmap(MAP_FIXED, PROT_NONE)
+     * over them would overwrite existing pthread stacks with PROT_NONE and cause SIGBUS.
+     */
 }
 
 #else
