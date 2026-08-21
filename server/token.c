@@ -220,6 +220,19 @@ void init_user_sid(void)
     size_t n;
     FILE *f;
 
+#ifdef __APPLE__
+    uuid_t mac_uuid;
+    struct timespec timeout = { 1, 0 };
+    if (gethostuuid( mac_uuid, &timeout ) == 0)
+    {
+        uint64_t *p = (uint64_t *)mac_uuid;
+        local_user_sid.sub_auth[1] = (unsigned int)(p[0] >> 32);
+        local_user_sid.sub_auth[2] = (unsigned int)p[0];
+        local_user_sid.sub_auth[3] = getuid();
+        return;
+    }
+#endif
+
     f = fopen( "/etc/machine-id", "r" );
     if (!f)
     {

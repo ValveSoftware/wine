@@ -1839,11 +1839,13 @@ __ASM_GLOBAL_FUNC( call_user_mode_callback,
                    "movw %ax,%fs\n"
                    "1:\n\t"
 #elif defined __APPLE__
-                   "movq %rcx,%r10\n\t"
+                   "pushq %rcx\n\t"
+                   "subq $8,%rsp\n\t"
                    "movq %r13,%rdi\n\t"
                    "xorl %esi,%esi\n\t"
-                   "call _thread_set_tsd_base\n\t"
-                   "movq %r10,%rcx\n\t"
+                   "call " __ASM_NAME("_thread_set_tsd_base") "\n\t"
+                   "addq $8,%rsp\n\t"
+                   "popq %rcx\n\t"
 #endif
                    "movq 0x330(%r13),%r10\n\t" /* amd64_thread_data()->instrumentation_callback */
                    "movq (%r10),%r10\n\t"
@@ -2997,6 +2999,7 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     extern const void *__wine_syscall_dispatcher_prolog_end_ptr;
     ucontext_t *ucontext = init_handler( sigcontext );
     struct syscall_frame *frame = get_syscall_frame();
+    TEB *teb = NtCurrentTeb();
 
     TRACE_(seh)("SIGSYS, rax %#llx, rip %#llx.\n", RAX_sig(ucontext), RIP_sig(ucontext));
 
@@ -3006,6 +3009,7 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     frame->restore_flags = 0;
     if (instrumentation_callback) frame->restore_flags |= RESTORE_FLAGS_INSTRUMENTATION;
     RCX_sig(ucontext) = (ULONG_PTR)frame;
+    R13_sig(ucontext) = (ULONG_PTR)teb;
     R11_sig(ucontext) = frame->eflags;
     if (EFL_sig(ucontext) & 0x100)
     {
@@ -3203,7 +3207,10 @@ void set_thread_teb( TEB *teb )
 #elif defined(__NetBSD__)
     sysarch( X86_64_SET_GSBASE, &teb );
 #elif defined (__APPLE__)
-    _thread_set_tsd_base( (uint64_t)teb );
+    /* On macOS x86_64, %gs is used for pthread TSD. Setting TEB here would corrupt
+     * pthread TLS while Unix initialization code runs. The transition to Windows
+     * code in signal_start_thread / __wine_syscall_dispatcher_return handles setting
+     * TSD base to TEB. */
 #else
 # error Please define setting %gs for your architecture
 #endif
@@ -3387,7 +3394,9 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "movw %ss,0x90(%rcx)\n\t"
                    "movq %rbp,0x98(%rcx)\n\t"
                    __ASM_CFI_REG_IS_AT2(rbp, rcx, 0x98, 0x01)
+#ifndef __APPLE__
                    "movq %gs:0x30,%r13\n\t"        /* teb */
+#endif
                    "movl %eax,0xb0(%rcx)\n\t"      /* frame->syscall_id */
                    /* Legends of Runeterra hooks the first system call return instruction, and
                     * depends on us returning to it. Adjust the return address accordingly. */
@@ -3458,10 +3467,17 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "leaq -0x98(%rbp),%rcx\n"
                    "2:\n\t"
 #elif defined __APPLE__
+                   "pushq %r10\n\t"
+                   "pushq %r8\n\t"
+                   "pushq %r9\n\t"
+                   "pushq %rcx\n\t"
                    "movq 0x320(%r13),%rdi\n\t"     /* amd64_thread_data()->pthread_teb */
                    "xorl %esi,%esi\n\t"
-                   "call _thread_set_tsd_base\n\t"
-                   "leaq -0x98(%rbp),%rcx\n"
+                   "call " __ASM_NAME("_thread_set_tsd_base") "\n\t"
+                   "popq %rcx\n\t"
+                   "popq %r9\n\t"
+                   "popq %r8\n\t"
+                   "popq %r10\n\t"
 #endif
                    "ldmxcsr 0x33c(%r13)\n\t"       /* amd64_thread_data()->mxcsr */
                    "movl 0xb0(%rcx),%eax\n\t"      /* frame->syscall_id */
@@ -3509,13 +3525,13 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "movw %dx,%fs\n"
                    "1:\n\t"
 #elif defined __APPLE__
-                   "movq %rax,%r8\n\t"
-                   "movq %rcx,%rdx\n\t"
+                   "pushq %rcx\n\t"
+                   "pushq %rax\n\t"
                    "movq %r13,%rdi\n\t"            /* teb */
                    "xorl %esi,%esi\n\t"
-                   "call _thread_set_tsd_base\n\t"
-                   "movq %rdx,%rcx\n\t"
-                   "movq %r8,%rax\n\t"
+                   "call " __ASM_NAME("_thread_set_tsd_base") "\n\t"
+                   "popq %rax\n\t"
+                   "popq %rcx\n\t"
 #endif
                    "movl 0xb4(%rcx),%edx\n\t"      /* frame->restore_flags */
                    "testl $0x48,%edx\n\t"          /* CONTEXT_FLOATING_POINT | CONTEXT_XSTATE */
@@ -3744,9 +3760,17 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
                    "syscall\n\t"
                    "2:\n\t"
 #elif defined __APPLE__
+                   "pushq %r10\n\t"
+                   "pushq %rdx\n\t"
+                   "pushq %r8\n\t"
+                   "subq $8,%rsp\n\t"
                    "movq 0x320(%r13),%rdi\n\t"     /* amd64_thread_data()->pthread_teb */
                    "xorl %esi,%esi\n\t"
-                   "call _thread_set_tsd_base\n\t"
+                   "call " __ASM_NAME("_thread_set_tsd_base") "\n\t"
+                   "addq $8,%rsp\n\t"
+                   "popq %r8\n\t"
+                   "popq %rdx\n\t"
+                   "popq %r10\n\t"
 #endif
                    "ldmxcsr 0x33c(%r13)\n\t"       /* amd64_thread_data()->mxcsr */
                    "movq %r8,%rdi\n\t"             /* args */
@@ -3775,14 +3799,13 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
                    "movw %dx,%fs\n"
                    "1:\n\t"
 #elif defined __APPLE__
-                   "movq %rax,%rdx\n\t"
-                   "movq %rcx,%r14\n\t"
+                   "pushq %rax\n\t"
+                   "pushq %rcx\n\t"
                    "movq %r13,%rdi\n\t"            /* teb */
                    "xorl %esi,%esi\n\t"
-                   "call _thread_set_tsd_base\n\t"
-                   "movq %r14,%rcx\n\t"
-                   "movq %rdx,%rax\n\t"
-                   "movq 0x60(%rcx),%r14\n\t"
+                   "call " __ASM_NAME("_thread_set_tsd_base") "\n\t"
+                   "popq %rcx\n\t"
+                   "popq %rax\n\t"
 #endif
                    "movq 0x58(%rcx),%r13\n\t"
                    "movq 0x28(%rcx),%rdi\n\t"

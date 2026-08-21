@@ -2610,9 +2610,41 @@ static void apple_create_wine_thread( void *arg )
 {
     pthread_t thread;
     pthread_attr_t attr;
+    void *stack;
+    size_t stack_size = 8 * 1024 * 1024;  /* 8 MB, same as macOS default */
 
     pthread_attr_init( &attr );
     pthread_attr_setdetachstate( &attr, PTHREAD_CREATE_JOINABLE );
+
+    /* The Mach-O .zerofill WINE_RESERVE segment spans 0x1000–0x200000000 (low 8 GB).
+     * macOS places secondary pthread stacks inside that range by default (typically
+     * around 0x7fde0000), which are then PROT_NONE due to the zerofill mapping.
+     * When the wine thread writes to deep stack frames it hits KERN_PROTECTION_FAILURE / SIGBUS.
+     *
+     * Fix: allocate the stack explicitly above 0x200000000 with MAP_FIXED_NOREPLACE
+     * so it lands outside WINE_RESERVE, and hand it to pthread via pthread_attr_setstack.
+     *
+     * Try addresses from 0x200100000 upward in 8 MB steps until mmap succeeds.
+     */
+    stack = MAP_FAILED;
+    {
+        uintptr_t addr = 0x200100000ul;  /* just above WINE_RESERVE end (0x200000000) */
+        int tries;
+        for (tries = 0; tries < 64 && stack == MAP_FAILED; tries++, addr += stack_size)
+        {
+#ifdef MAP_FIXED_NOREPLACE
+            stack = mmap( (void *)addr, stack_size, PROT_READ | PROT_WRITE,
+                          MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANON, -1, 0 );
+#else
+            stack = mmap( (void *)addr, stack_size, PROT_READ | PROT_WRITE,
+                          MAP_PRIVATE | MAP_ANON, -1, 0 );
+#endif
+        }
+    }
+
+    if (stack != MAP_FAILED)
+        pthread_attr_setstack( &attr, stack, stack_size );
+
     if (pthread_create( &thread, &attr, apple_wine_thread, NULL )) exit(1);
     pthread_attr_destroy( &attr );
 }
