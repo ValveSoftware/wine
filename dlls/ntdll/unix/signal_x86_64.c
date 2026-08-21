@@ -3372,6 +3372,7 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "popq 0x80(%rcx)\n\t"
                    __ASM_CFI(".cfi_adjust_cfa_offset -8\n\t")
                    "movl $0,0xb4(%rcx)\n\t"        /* frame->restore_flags */
+                   "movq %gs:0x30,%r13\n\t"        /* teb */
                    __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_prolog_end") ":\n\t"
                    "movq %rbx,0x08(%rcx)\n\t"
                    __ASM_CFI_REG_IS_AT1(rbx, rcx, 0x08)
@@ -3394,9 +3395,6 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "movw %ss,0x90(%rcx)\n\t"
                    "movq %rbp,0x98(%rcx)\n\t"
                    __ASM_CFI_REG_IS_AT2(rbp, rcx, 0x98, 0x01)
-#ifndef __APPLE__
-                   "movq %gs:0x30,%r13\n\t"        /* teb */
-#endif
                    "movl %eax,0xb0(%rcx)\n\t"      /* frame->syscall_id */
                    /* Legends of Runeterra hooks the first system call return instruction, and
                     * depends on us returning to it. Adjust the return address accordingly. */
