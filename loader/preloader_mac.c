@@ -326,17 +326,25 @@ __ASM_GLOBAL_FUNC( start,
 #error preloader not implemented for this CPU
 #endif
 
-void wld_exit( int code ) __attribute__((noreturn));
-SYSCALL_NOERR( wld_exit, 1 /* SYS_exit */ );
+void wld_exit( int code )
+{
+    exit( code );
+}
 
-ssize_t wld_write( int fd, const void *buffer, size_t len );
-SYSCALL_FUNC( wld_write, 4 /* SYS_write */ );
+ssize_t wld_write( int fd, const void *buffer, size_t len )
+{
+    return write( fd, buffer, len );
+}
 
-void *wld_mmap( void *start, size_t len, int prot, int flags, int fd, off_t offset );
-SYSCALL_FUNC( wld_mmap, 197 /* SYS_mmap */ );
+void *wld_mmap( void *start, size_t len, int prot, int flags, int fd, off_t offset )
+{
+    return mmap( start, len, prot, flags, fd, offset );
+}
 
-void *wld_munmap( void *start, size_t len );
-SYSCALL_FUNC( wld_munmap, 73 /* SYS_munmap */ );
+int wld_munmap( void *start, size_t len )
+{
+    return munmap( start, len );
+}
 
 static intptr_t (*p_dyld_get_image_slide)( const struct target_mach_header* mh );
 

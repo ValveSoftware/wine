@@ -31,9 +31,11 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include <xf86drm.h>
-#include <amdgpu_drm.h>
-#include <amdgpu.h>
+#ifdef __linux__
+# include <xf86drm.h>
+# include <amdgpu_drm.h>
+# include <amdgpu.h>
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -45,6 +47,8 @@
 #include "unixlib.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(amd_ags);
+
+#ifdef __linux__
 
 #define MAX_DEVICE_COUNT 64
 
@@ -275,6 +279,21 @@ static NTSTATUS get_device_info( void *args )
     TRACE("Device %04x not found.\n", params->device_id);
     return STATUS_NOT_FOUND;
 }
+
+#else
+
+static NTSTATUS init( void *args )
+{
+    WARN("AMD AGS device discovery requires the Linux DRM subsystem.\n");
+    return STATUS_NOT_SUPPORTED;
+}
+
+static NTSTATUS get_device_info( void *args )
+{
+    return STATUS_NOT_FOUND;
+}
+
+#endif
 
 const unixlib_entry_t __wine_unix_call_funcs[] =
 {

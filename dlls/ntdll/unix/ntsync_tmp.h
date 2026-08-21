@@ -8,7 +8,17 @@
 #ifndef __LINUX_NTSYNC_H
 #define __LINUX_NTSYNC_H
 
+#include <sys/ioctl.h>
+
+#ifdef HAVE_LINUX_TYPES_H
 #include <linux/types.h>
+#elif defined(__linux__)
+#include <linux/types.h>
+#else
+#include <stdint.h>
+typedef uint32_t __u32;
+typedef uint64_t __u64;
+#endif
 
 struct ntsync_sem_args {
 	__u32 count;

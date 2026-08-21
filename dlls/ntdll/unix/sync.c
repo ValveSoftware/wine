@@ -61,7 +61,9 @@
 # include <sys/event.h>
 #endif
 
+#ifdef __linux__
 # include "ntsync_tmp.h"
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS

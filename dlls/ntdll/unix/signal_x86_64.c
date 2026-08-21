@@ -2279,7 +2279,7 @@ __ASM_GLOBAL_FUNC( dump_syscall_fault_return,
                    "movq %rdi,%rsp\n\t"
                    "movq %rsi,%rax\n\t"
                    "movq %rdx,%r13\n\t"
-                   "jmp %rcx")
+                   "jmpq *%rcx")
 
 
 static void dump_syscall_fault( CONTEXT *context, DWORD exc_code )
@@ -3197,7 +3197,17 @@ void signal_init_process(void)
 
 void set_thread_teb( TEB *teb )
 {
+#if defined __linux__
     arch_prctl( ARCH_SET_GS, teb );
+#elif defined (__FreeBSD__) || defined (__FreeBSD_kernel__)
+    amd64_set_gsbase( teb );
+#elif defined(__NetBSD__)
+    sysarch( X86_64_SET_GSBASE, &teb );
+#elif defined (__APPLE__)
+    _thread_set_tsd_base( (uint64_t)teb );
+#else
+# error Please define setting %gs for your architecture
+#endif
 }
 
 /***********************************************************************

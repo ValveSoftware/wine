@@ -765,8 +765,10 @@ void init_shared_data_cpuinfo( KUSER_SHARED_DATA *data )
 
 #endif /* End architecture specific feature detection for CPUs */
 
+#ifdef __linux__
 static void fill_performance_core_info(void);
 static BOOL sysfs_parse_bitmap(const char *filename, ULONG_PTR *mask);
+#endif
 
 void fill_cpu_override(void)
 {
@@ -832,8 +834,8 @@ void fill_cpu_override(void)
             return;
         }
 
+#ifdef __linux__
         fill_performance_core_info();
-
         for (i = 0; i < host_cpu_count; ++i)
         {
             snprintf(name, sizeof(name), core_info, i, "thread_siblings");
@@ -866,6 +868,13 @@ skip_cpu:
             if (count == cpu_override.mapping.cpu_count) break;
         }
         assert( count == cpu_override.mapping.cpu_count );
+#else
+        for (i = 0; i < cpu_override.mapping.cpu_count; ++i)
+        {
+            cpu_override.mapping.host_cpu_id[i] = i;
+            cpu_override.siblings_mask[i] = (ULONG_PTR)1 << i;
+        }
+#endif
         goto done;
     }
 

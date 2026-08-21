@@ -1569,6 +1569,29 @@ static void init_egl_platforms( struct opengl_funcs *funcs, const struct opengl_
 {
 }
 
+static BOOL needs_framebuffer_surface( HWND hwnd )
+{
+    return FALSE;
+}
+
+static const struct opengl_drawable_funcs framebuffer_surface_funcs;
+
+struct framebuffer_surface
+{
+    struct opengl_drawable base;
+    struct opengl_drawable *target;
+};
+
+static inline struct framebuffer_surface *framebuffer_from_opengl_drawable( struct opengl_drawable *base )
+{
+    return NULL;
+}
+
+static inline struct opengl_drawable *framebuffer_surface_create( int format, struct client_surface *client, struct opengl_drawable *target )
+{
+    return NULL;
+}
+
 #endif /* SONAME_LIBEGL */
 
 static UINT read_drm_device_prop( const char *name, const char *prop )

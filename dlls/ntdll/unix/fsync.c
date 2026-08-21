@@ -141,15 +141,25 @@ static void simulate_sched_quantum(void)
 static inline int futex_wait_multiple( const struct futex_waitv *futexes,
         int count, const struct timespec64 *end, clockid_t clock_id )
 {
+#ifdef __linux__
    if (end)
         return syscall( __NR_futex_waitv, futexes, count, 0, end, clock_id );
    else
         return syscall( __NR_futex_waitv, futexes, count, 0, NULL, 0 );
+#else
+    errno = ENOSYS;
+    return -1;
+#endif
 }
 
 static inline int futex_wake( int *addr, int val )
 {
+#ifdef __linux__
     return syscall( __NR_futex, addr, 1, val, NULL, 0, 0 );
+#else
+    errno = ENOSYS;
+    return -1;
+#endif
 }
 
 struct fsync
@@ -455,6 +465,11 @@ void fsync_init( DWORD pid )
     struct stat st;
 
 
+#ifndef __linux__
+    ERR("WINEFSYNC is not supported on this platform.\n");
+    fsync_enabled = 0;
+    return;
+#else
     fsync_enabled = 1;
     syscall( __NR_futex_waitv, NULL, 0, 0, NULL, 0 );
     if (errno == ENOSYS || errno == EPERM)
@@ -462,6 +477,7 @@ void fsync_init( DWORD pid )
         ERR("Server is running with WINEFSYNC but this process can't use __NR_futex_waitv.\n");
         exit(1);
     }
+#endif
 
     if (stat( config_dir, &st ) == -1)
         ERR("Cannot stat %s\n", config_dir);

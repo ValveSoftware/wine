@@ -310,7 +310,12 @@ int fsync_grab_shm_idx( unsigned int shm_idx )
 
 static inline int futex_wake( int *addr, int val )
 {
+#ifdef __linux__
     return syscall( __NR_futex, addr, 1, val, NULL, 0, 0 );
+#else
+    errno = ENOSYS;
+    return -1;
+#endif
 }
 
 /* shm layout for events or event-like objects. */
