@@ -4006,7 +4006,8 @@ static HRESULT WINAPI objectpath_get_DisplayName( ISWbemObjectPath *iface, BSTR 
     FIXME( "%p, %p semi-stub\n", objectpath, strDisplayName );
 
     if (FAILED( hr = IWbemPath_GetText( objectpath->path, WBEMPATH_GET_SERVER_TOO, &len, NULL ) )) return hr;
-    if (!(buf = SysAllocStringLen( L"winmgmts:", len + ARRAY_SIZE( L"winmgmts:" ) - 2 ) )) return E_OUTOFMEMORY;
+    if (!(buf = SysAllocStringLen( NULL, len + ARRAY_SIZE( L"winmgmts:" ) - 2 ) )) return E_OUTOFMEMORY;
+    lstrcpyW( buf, L"winmgmts:" );
     /* TODO: add 'authenticationLevel' and 'impersonationLevel' from the security object. Native also
      * includes 'Name', 'SoftwareElementID', 'SoftwareElementState' and 'TargetOperatingSystem' values.
      * The last three are currently missing from the properties. */
