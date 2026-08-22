@@ -1977,8 +1977,19 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     ucontext_t *ucontext = sigcontext;
     void *stack = setup_exception_record( sigcontext, &rec, &xcontext );
     void *steamclient_addr = NULL;
+    int trap = TRAP_sig(ucontext);
 
-    switch (TRAP_sig(ucontext))
+    /* qemu-user synthesizes signal frames without filling in the trap number,
+     * leaving it -1, so the dispatch below falls through to the default case and
+     * the fault is never serviced. Infer it from the signal instead. */
+    if (trap < 0) switch (signal)
+    {
+    case SIGSEGV: trap = TRAP_x86_PAGEFLT;   break;
+    case SIGBUS:  trap = TRAP_x86_ALIGNFLT;  break;
+    case SIGILL:  trap = TRAP_x86_PRIVINFLT; break;
+    }
+
+    switch (trap)
     {
     case TRAP_x86_OFLOW:   /* Overflow exception */
         rec.ExceptionCode = EXCEPTION_INT_OVERFLOW;
