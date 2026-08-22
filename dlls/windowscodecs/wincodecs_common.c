@@ -188,7 +188,18 @@ HRESULT CDECL stream_getsize(IStream *stream, ULONGLONG *size)
 
 HRESULT CDECL stream_read(IStream *stream, void *buffer, ULONG read, ULONG *bytes_read)
 {
-    return IStream_Read(stream, buffer, read, bytes_read);
+    ULONG nread;
+    HRESULT hr;
+
+    /* Ensure that we always pass a non-NULL bytes_read pointer, as some
+     * implementations (e.g. SharpDX) can't handle it being NULL. */
+    if (!bytes_read)
+        bytes_read = &nread;
+
+    hr = IStream_Read(stream, buffer, read, bytes_read);
+    if (SUCCEEDED(hr) && *bytes_read != read)
+        return S_FALSE;
+    return hr;
 }
 
 HRESULT CDECL stream_seek(IStream *stream, LONGLONG ofs, DWORD origin, ULONGLONG *new_position)
