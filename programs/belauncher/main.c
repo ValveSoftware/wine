@@ -169,6 +169,15 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
     battleye_status = 0x9; /* Launching Game */
     _write(1, &battleye_status, 1);
 
+    /* Windows BattlEye treats a singleton leading-backslash 64BitExe as
+     * install-relative; strip it so the joined launch_cmd doesn't end up
+     * with a doubled separator.  Skip if a second '\' follows so UNC paths
+     * are preserved. */
+    if (game_exeW[0] == L'\\' && game_exeW[1] != L'\\')
+    {
+        memmove(game_exeW, game_exeW + 1, game_exe_len * sizeof(*game_exeW));
+        --game_exe_len;
+    }
     if (PathIsRelativeW(game_exeW))
         path_len = wcslen(path);
     else
