@@ -3025,6 +3025,18 @@ static void *get_host_addr_space_limit(void)
 #ifdef __aarch64__
 
 /***********************************************************************
+ *           is_emulated_code
+ */
+BOOL is_emulated_code( ULONG_PTR ptr )
+{
+    const UINT64 *map = (const UINT64 *)peb->EcCodeBitMap;
+    ULONG_PTR page = ptr / page_size;
+    if (!is_arm64ec() || ptr >= (ULONG_PTR)user_space_limit) return FALSE;
+    return !((map[page / 64] >> (page & 63)) & 1);
+}
+
+
+/***********************************************************************
  *           alloc_arm64ec_map
  */
 static void alloc_arm64ec_map(void)
