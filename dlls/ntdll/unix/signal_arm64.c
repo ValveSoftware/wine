@@ -1643,15 +1643,15 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "stp x24, x25, [x10, #0xc0]\n\t"
                    "stp x26, x27, [x10, #0xd0]\n\t"
                    "stp x28, x29, [x10, #0xe0]\n\t"
-                   "mov x19, sp\n\t"
-                   "stp x9, x19, [x10, #0xf0]\n\t"
-                   "mrs x9, NZCV\n\t"
-                   "stp x30, x9, [x10, #0x100]\n\t"
+                   "mov x11, sp\n\t"
+                   "stp x9, x11, [x10, #0xf0]\n\t"
+                   "mrs x12, NZCV\n\t"
+                   "stp x30, x12, [x10, #0x100]\n\t"
                    "str w8, [x10, #0x120]\n\t"
-                   "mrs x9, FPCR\n\t"
-                   "str w9, [x10, #0x128]\n\t"
-                   "mrs x9, FPSR\n\t"
-                   "str w9, [x10, #0x12c]\n\t"
+                   "mrs x12, FPCR\n\t"
+                   "str w12, [x10, #0x128]\n\t"
+                   "mrs x12, FPSR\n\t"
+                   "str w12, [x10, #0x12c]\n\t"
                    "stp q0,  q1,  [x10, #0x130]\n\t"
                    "stp q2,  q3,  [x10, #0x150]\n\t"
                    "stp q4,  q5,  [x10, #0x170]\n\t"
@@ -1668,11 +1668,10 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "stp q26, q27, [x10, #0x2d0]\n\t"
                    "stp q28, q29, [x10, #0x2f0]\n\t"
                    "stp q30, q31, [x10, #0x310]\n\t"
-                   "mov x22, x10\n\t"
                    /* switch to kernel stack */
                    "mov sp, x10\n\t"
                    /* we're now on the kernel stack, stitch unwind info with previous frame */
-                   __ASM_CFI_CFA_IS_AT2(x22, 0x98, 0x02) /* frame->syscall_cfa */
+                   __ASM_CFI_CFA_IS_AT2(sp, 0x98, 0x02) /* frame->syscall_cfa */
                    __ASM_CFI(".cfi_offset 29, -0xc0\n\t")
                    __ASM_CFI(".cfi_offset 30, -0xb8\n\t")
                    __ASM_CFI(".cfi_offset 19, -0xb0\n\t")
@@ -1685,6 +1684,8 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    __ASM_CFI(".cfi_offset 26, -0x78\n\t")
                    __ASM_CFI(".cfi_offset 27, -0x70\n\t")
                    __ASM_CFI(".cfi_offset 28, -0x68\n\t")
+                   "mov x22, sp\n\t"
+                   __ASM_CFI_CFA_IS_AT2(x22, 0x98, 0x02) /* frame->syscall_cfa */
                    "and x20, x8, #0xfff\n\t"    /* syscall number */
                    "ubfx x21, x8, #12, #2\n\t"  /* syscall table number */
                    "ldr x16, [x18, #0x370]\n\t" /* thread_data->syscall_table */
@@ -1700,7 +1701,7 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "tbz x9, #3, 1f\n\t"
                    "sub sp, sp, #8\n"
                    "1:\tsub x9, x9, #8\n\t"
-                   "ldr x10, [x19, x9]\n\t"
+                   "ldr x10, [x11, x9]\n\t"
                    "str x10, [sp, x9]\n\t"
                    "cbnz x9, 1b\n"
                    "2:\tldr x16, [x21]\n\t"     /* table->ServiceTable */
@@ -1819,11 +1820,10 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
                    "stp x30, x9, [x10, #0xf0]\n\t"
                    "mrs x9, NZCV\n\t"
                    "stp x30, x9, [x10, #0x100]\n\t"
-                   "mov x19, x10\n\t"
                    /* switch to kernel stack */
                    "mov sp, x10\n\t"
                    /* we're now on the kernel stack, stitch unwind info with previous frame */
-                   __ASM_CFI_CFA_IS_AT2(x19, 0x98, 0x02) /* frame->syscall_cfa */
+                   __ASM_CFI_CFA_IS_AT2(sp, 0x98, 0x02) /* frame->syscall_cfa */
                    __ASM_CFI(".cfi_offset 29, -0xc0\n\t")
                    __ASM_CFI(".cfi_offset 30, -0xb8\n\t")
                    __ASM_CFI(".cfi_offset 19, -0xb0\n\t")
@@ -1836,6 +1836,8 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
                    __ASM_CFI(".cfi_offset 26, -0x78\n\t")
                    __ASM_CFI(".cfi_offset 27, -0x70\n\t")
                    __ASM_CFI(".cfi_offset 28, -0x68\n\t")
+                   "mov x19, sp\n\t"
+                   __ASM_CFI_CFA_IS_AT2(x19, 0x98, 0x02) /* frame->syscall_cfa */
                    "ldr x16, [x0, x1, lsl 3]\n\t"
                    "mov x0, x2\n\t"             /* args */
                    "blr x16\n\t"
