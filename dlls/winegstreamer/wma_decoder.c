@@ -1110,3 +1110,14 @@ HRESULT wma_decoder_create(IUnknown *outer, IUnknown **out)
     TRACE("Created decoder %p\n", *out);
     return S_OK;
 }
+
+HRESULT WINAPI winegstreamer_create_wma_decoder(IUnknown *outer, IUnknown **out)
+{
+    TRACE("outer %p, out %p\n", outer, out);
+
+    if (!init_gstreamer())
+        return E_FAIL;
+
+    return wma_decoder_create(outer, out);
+}
+

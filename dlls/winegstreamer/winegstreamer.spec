@@ -5,3 +5,4 @@
 @ stdcall winegstreamer_create_wm_sync_reader(ptr ptr)
 @ stdcall winegstreamer_create_video_decoder(ptr)
 @ stdcall winegstreamer_create_color_converter(ptr)
+@ stdcall winegstreamer_create_wma_decoder(ptr ptr)
