@@ -549,8 +549,14 @@ static void preloader_exec( char **argv, WORD machine )
 {
 #ifdef HAVE_WINE_PRELOADER
 #if !defined(__arm__) && !defined(__aarch64__)
-    if (machine == IMAGE_FILE_MACHINE_AMD64)
-        asprintf( &argv[0], "%s64-preloader", argv[1] );
+    const char *eac, *p;
+
+    if (machine == IMAGE_FILE_MACHINE_AMD64 && (eac = getenv( "PROTON_EOS_EAC" )) && *eac == '1'
+        && (p = remove_tail( argv[1], "x86_64-unix/wine" )))
+    {
+        asprintf( &argv[0], "%si386-unix/wine64-preloader", p );
+        asprintf( &argv[1], "%si386-unix/wine64", p );
+    }
     else
 #endif
         asprintf( &argv[0], "%s-preloader", argv[1] );
