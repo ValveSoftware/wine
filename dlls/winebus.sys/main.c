@@ -453,7 +453,9 @@ static DEVICE_OBJECT *bus_find_device_from_vid_pid(const BOOL is_hidraw, struct 
 
     LIST_FOR_EACH_ENTRY(ext, &device_list, struct device_extension, entry)
     {
-        found_usages = get_device_usages(ext->unix_device, &buttons);
+        if (ext->unix_device) found_usages = get_device_usages(ext->unix_device, &buttons);
+        else found_usages = *usages;
+
         if (ext->desc.is_hidraw == is_hidraw && ext->desc.vid == desc->vid &&
             ext->desc.pid == desc->pid && found_usages.UsagePage == usages->UsagePage &&
             found_usages.Usage == usages->Usage) return ext->device;
@@ -1025,7 +1027,23 @@ static DWORD CALLBACK bus_main_thread(void *args)
             RtlEnterCriticalSection(&device_list_cs);
             device = bus_find_unix_device(event->device);
             if (!device) WARN("could not find device for %s bus device %#I64x\n", debugstr_w(bus.name), event->device);
-            else bus_unlink_hid_device(device);
+            else
+            {
+                struct device_extension *ext = (struct device_extension *)device->DeviceExtension;
+                const char *sgi = getenv("SteamGameId");
+
+                if (ext->desc.vid == 0x28de && ext->desc.pid == 0x11ff && sgi && !strcmp(sgi, "298110"))
+                {
+                    struct device_remove_params params = {.device = ext->unix_device};
+                    TRACE("Not removing steam input device from list, only removing the unix device to stop it\n");
+                    winebus_call(device_remove, &params);
+                    ext->unix_device = 0;
+                    RtlLeaveCriticalSection(&device_list_cs);
+                    break;
+                }
+
+                bus_unlink_hid_device(device);
+            }
             RtlLeaveCriticalSection(&device_list_cs);
             IoInvalidateDeviceRelations(bus_pdo, BusRelations);
             break;
@@ -1035,10 +1053,32 @@ static DWORD CALLBACK bus_main_thread(void *args)
             USAGE_AND_PAGE usages;
             UINT buttons;
             BOOL hidraw_enabled;
+            BOOL reused = FALSE;
+            BOOL is_steam_input = (desc.vid == 0x28de) && (desc.pid == 0x11ff);
 
             usages = get_device_usages(event->device, &buttons);
             hidraw_enabled = is_hidraw_enabled(desc.vid, desc.pid, &usages, buttons);
-            if (desc.is_hidraw && !hidraw_enabled)
+            if (is_steam_input)
+            {
+                FIXME("steam input device created\n");
+                RtlEnterCriticalSection(&device_list_cs);
+                if ((device = bus_find_device_from_vid_pid(FALSE, &event->device_created.desc, &usages)))
+                {
+                    struct device_extension *ext = (struct device_extension *)device->DeviceExtension;
+                    TRACE("Found stale steam input device, reusing it\n");
+                    if (ext->unix_device) FIXME("unix_device not 0?!\n");
+                    ext->unix_device = event->device;
+                    if (ext->state == DEVICE_STATE_STARTED)
+                    {
+                        struct device_start_params params = {.device = ext->unix_device};
+                        NTSTATUS status = winebus_call(device_start, &params);
+                        if (status) ERR("Couldn't start steam input device\n");
+                    }
+                    reused = TRUE;
+                } else device = bus_create_hid_device(&event->device_created.desc, event->device);
+                RtlLeaveCriticalSection(&device_list_cs);
+            }
+            else if (desc.is_hidraw && !hidraw_enabled)
             {
                 struct device_remove_params params = {.device = event->device};
                 WARN("ignoring %shidraw device %04x:%04x with usages %04x:%04x\n", desc.is_hidraw ? "" : "non-",
@@ -1067,7 +1107,10 @@ static DWORD CALLBACK bus_main_thread(void *args)
                 TRACE("creating %shidraw device %04x:%04x with usages %04x:%04x\n", desc.is_hidraw ? "" : "non-",
                       desc.vid, desc.pid, usages.UsagePage, usages.Usage);
 
-            if (device) IoInvalidateDeviceRelations(bus_pdo, BusRelations);
+            if (device)
+            {
+                if (!reused) IoInvalidateDeviceRelations(bus_pdo, BusRelations);
+            }
             else
             {
                 struct device_remove_params params = {.device = event->device};
