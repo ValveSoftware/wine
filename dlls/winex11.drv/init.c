@@ -502,10 +502,9 @@ static void X11DRV_client_surface_present( struct client_surface *client, HDC hd
 
     window = X11DRV_get_whole_window( toplevel );
 
-    if (NtUserGetPresentRect( toplevel, &rect_dst, -1 /* raw dpi */ ))
+    if (toplevel == hwnd && NtUserGetPresentRect( toplevel, &rect_dst, -1 /* raw dpi */ ))
     {
         region = 0; /* window is exclusive fullscreen, ignore everything else */
-        if (toplevel != hwnd) return; /* toplevel is exclusive fullscreen, don't present */
         OffsetRect( &rect_dst, -rect_dst.left, -rect_dst.top );
     }
     else
