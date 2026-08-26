@@ -12,6 +12,7 @@ SOURCES = \
 	d3dx10_43_main.c \
 	d3dx_helpers.c \
 	font.c \
+	math.c \
 	mesh.c \
 	sprite.c \
 	texture.c \
