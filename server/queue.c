@@ -92,7 +92,7 @@ struct message
     unsigned int           data_size; /* size of message data */
     unsigned int           unique_id; /* unique id for nested hw message waits */
     struct message_result *result;    /* result in sender queue */
-    bool                   mergeable; /* message can be coalesced if eligible for that */
+    int                    mergeable; /* message can be coalesced if eligible for that */
 };
 
 struct timer
