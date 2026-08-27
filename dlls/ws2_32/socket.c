@@ -974,6 +974,169 @@ static void WINAPI socket_apc( void *apc_user, IO_STATUS_BLOCK *io, ULONG reserv
     func( NtStatusToWSAError( io->Status ), io->Information, (OVERLAPPED *)io, 0 );
 }
 
+/* HACK: The Crew Motorfest drops BattlEye report fragment 2
+ * when RTT exceeds its 100ms send tick. Delaying the 94 byte
+ * control record sent before each round frees a buffer. */
+
+#define TCM_REPORT_PORT       4000
+#define TCM_REPORT_CTRL_SIZE  94
+#define TCM_REPORT_FRAG_MIN   1000
+#define TCM_REPORT_ACK_SIZE   62
+#define TCM_REPORT_MAX_BUFS   8
+#define TCM_RTT_SAMPLES       32
+#define TCM_RTT_MIN_SAMPLES   8
+#define TCM_RTT_MIN_SAMPLE    30
+#define TCM_RTT_MAX_SAMPLE    600
+#define TCM_PENDING_SENDS     64
+#define TCM_DEFAULT_DELAY     330
+#define TCM_DELAY_ADAPTIVE    -1
+
+static struct
+{
+    SOCKET socket;
+    ULONGLONG pending[TCM_PENDING_SENDS];
+    unsigned int pending_head, pending_count;
+    unsigned int rtt[TCM_RTT_SAMPLES];
+    unsigned int rtt_pos, rtt_count;
+    unsigned int rounds;
+    BOOL warned_slow;
+} tcm_state;
+
+DECLARE_CRITICAL_SECTION(cs_tcm);
+
+/* 0 disables, >0 is a fixed delay, TCM_DELAY_ADAPTIVE measures RTT */
+static int tcm_report_mode(void)
+{
+    static int cached = -2;
+
+    if (cached == -2)
+    {
+        const char *s;
+        if ((s = getenv( "WINE_TCM_REPORT_DELAY_MS" )))
+            cached = !strcmp( s, "auto" ) ? TCM_DELAY_ADAPTIVE : atoi( s );
+        else
+            cached = (s = getenv( "SteamGameId" )) && !strcmp( s, "2698940" ) ? TCM_DELAY_ADAPTIVE : 0;
+        if (cached < 0 && cached != TCM_DELAY_ADAPTIVE) cached = 0;
+        if (cached > 0 && cached < 10) cached = 10;
+        if (cached > 10000) cached = 10000;
+    }
+    return cached;
+}
+
+static ULONGLONG tcm_now_ms(void)
+{
+    static LARGE_INTEGER freq;
+    LARGE_INTEGER now;
+
+    if (!freq.QuadPart) QueryPerformanceFrequency( &freq );
+    QueryPerformanceCounter( &now );
+    return now.QuadPart * 1000 / freq.QuadPart;
+}
+
+static BOOL tcm_is_report_peer( const struct sockaddr *addr, int addr_len )
+{
+    const struct sockaddr_in *sin = (const struct sockaddr_in *)addr;
+
+    return addr && addr_len >= sizeof(*sin) && sin->sin_family == AF_INET
+           && ntohs( sin->sin_port ) == TCM_REPORT_PORT;
+}
+
+static void tcm_reset_locked( SOCKET s )
+{
+    memset( &tcm_state, 0, sizeof(tcm_state) );
+    tcm_state.socket = s;
+}
+
+static void tcm_pop_pending_locked(void)
+{
+    tcm_state.pending_head = (tcm_state.pending_head + 1) % TCM_PENDING_SENDS;
+    tcm_state.pending_count--;
+}
+
+static void tcm_note_send( SOCKET s )
+{
+    ULONGLONG now = tcm_now_ms();
+
+    EnterCriticalSection( &cs_tcm );
+    if (tcm_state.socket != s) tcm_reset_locked( s );
+    while (tcm_state.pending_count && now - tcm_state.pending[tcm_state.pending_head] > 1500)
+        tcm_pop_pending_locked();
+    /* on overflow the send/ack alignment is unrecoverable */
+    if (tcm_state.pending_count == TCM_PENDING_SENDS)
+        tcm_state.pending_head = tcm_state.pending_count = 0;
+    tcm_state.pending[(tcm_state.pending_head + tcm_state.pending_count++) % TCM_PENDING_SENDS] = now;
+    LeaveCriticalSection( &cs_tcm );
+}
+
+static void tcm_note_ack( SOCKET s )
+{
+    ULONGLONG now = tcm_now_ms();
+
+    EnterCriticalSection( &cs_tcm );
+    if (tcm_state.socket == s)
+    {
+        /* a send older than this lost its ack */
+        while (tcm_state.pending_count && now - tcm_state.pending[tcm_state.pending_head] > 1500)
+            tcm_pop_pending_locked();
+        if (tcm_state.pending_count)
+        {
+            ULONGLONG rtt = now - tcm_state.pending[tcm_state.pending_head];
+
+            tcm_pop_pending_locked();
+            /* an ack for an untracked send pairs short, setup pairs long */
+            if (rtt >= TCM_RTT_MIN_SAMPLE && rtt <= TCM_RTT_MAX_SAMPLE)
+            {
+                tcm_state.rtt[tcm_state.rtt_pos] = rtt;
+                tcm_state.rtt_pos = (tcm_state.rtt_pos + 1) % TCM_RTT_SAMPLES;
+                if (tcm_state.rtt_count < TCM_RTT_SAMPLES) tcm_state.rtt_count++;
+            }
+        }
+    }
+    LeaveCriticalSection( &cs_tcm );
+}
+
+static unsigned int tcm_median_rtt_locked(void)
+{
+    unsigned int sorted[TCM_RTT_SAMPLES], i, j, v;
+
+    if (tcm_state.rtt_count < TCM_RTT_MIN_SAMPLES) return 0;
+    for (i = 0; i < tcm_state.rtt_count; i++)
+    {
+        v = tcm_state.rtt[i];
+        for (j = i; j && sorted[j - 1] > v; j--) sorted[j] = sorted[j - 1];
+        sorted[j] = v;
+    }
+    return sorted[tcm_state.rtt_count / 2];
+}
+
+/* The record's ack has to land inside one 100ms tick, so the
+ * hold is whatever puts delay + RTT at 550. The window is only
+ * about 40ms wide: do not spread the value around. */
+static unsigned int tcm_pick_delay( SOCKET s, unsigned int *rtt )
+{
+    int mode = tcm_report_mode(), delay;
+
+    *rtt = 0;
+    if (mode != TCM_DELAY_ADAPTIVE) return mode;
+
+    EnterCriticalSection( &cs_tcm );
+    if (tcm_state.socket != s) tcm_reset_locked( s );
+    *rtt = tcm_median_rtt_locked();
+    if (*rtt > 300 && !tcm_state.warned_slow)
+    {
+        FIXME( "RTT %u ms: above 300 ms the report drops two fragments in four "
+               "and delaying the control record cannot complete it.\n", *rtt );
+        tcm_state.warned_slow = TRUE;
+    }
+    if (!*rtt) delay = TCM_DEFAULT_DELAY;
+    else if (*rtt < 190) delay = 0;
+    else delay = 550 - (int)*rtt;
+    if (delay > 450) delay = 450;
+    tcm_state.rounds++;
+    LeaveCriticalSection( &cs_tcm );
+    return delay;
+}
+
 static int WS2_recv_base( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *ret_size, DWORD *flags,
                           struct sockaddr *addr, int *addr_len, OVERLAPPED *overlapped,
                           LPWSAOVERLAPPED_COMPLETION_ROUTINE completion, WSABUF *control )
@@ -1025,9 +1188,153 @@ static int WS2_recv_base( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *
         status = piosb->Status;
     }
     if (!status && ret_size) *ret_size = piosb->Information;
+    if (!status && !overlapped && piosb->Information == TCM_REPORT_ACK_SIZE && addr_len
+        && tcm_report_mode() && tcm_is_report_peer( addr, *addr_len ))
+        tcm_note_ack( s );
     SetLastError( NtStatusToWSAError( status ) );
     TRACE( "status %#lx.\n", status );
     return status ? -1 : 0;
+}
+
+struct tcm_deferred_send
+{
+    HANDLE socket;
+    HANDLE timer;
+    HANDLE event;
+    void *cvalue;
+    IO_STATUS_BLOCK *piosb;
+    IO_STATUS_BLOCK iosb;
+    struct afd_sendmsg_params params;
+    WSABUF buffers[TCM_REPORT_MAX_BUFS];
+    SOCKADDR_STORAGE addr;
+    char data[TCM_REPORT_CTRL_SIZE];
+};
+
+static void CALLBACK tcm_deferred_send_cb( void *ctx, BOOLEAN fired )
+{
+    struct tcm_deferred_send *d = ctx;
+    BOOL sync = (d->piosb == &d->iosb);
+    NTSTATUS status;
+
+    tcm_note_send( (SOCKET)d->socket );
+    status = NtDeviceIoControlFile( d->socket, d->event, NULL, d->cvalue, d->piosb,
+                                    IOCTL_AFD_WINE_SENDMSG, &d->params, sizeof(d->params), NULL, 0 );
+    if (status == STATUS_PENDING && sync)
+    {
+        WaitForSingleObject( d->event, INFINITE );
+        status = d->iosb.Status;
+    }
+    TRACE( "deferred send on socket %p, status %#lx.\n", d->socket, status );
+    if (status != STATUS_SUCCESS && status != STATUS_PENDING)
+        WARN( "deferred send on socket %p failed, status %#lx.\n", d->socket, status );
+
+    DeleteTimerQueueTimer( NULL, d->timer, NULL );
+    if (sync) CloseHandle( d->event );
+    /* ntdll keeps d->addr until the queued send runs */
+    if (status != STATUS_PENDING) free( d );
+}
+
+/* Synchronous sends (piosb NULL) are copied and completed at
+ * once, so only the wire is delayed. Overlapped sends keep the
+ * caller's buffers and complete when the deferred ioctl runs. */
+static BOOL tcm_defer_send( SOCKET s, const WSABUF *buffers, DWORD buffer_count, DWORD flags,
+                            const struct sockaddr *addr, int addr_len, HANDLE event,
+                            void *cvalue, IO_STATUS_BLOCK *piosb, DWORD *ret_size,
+                            void *completion )
+{
+    struct tcm_deferred_send *d;
+    unsigned int delay, rtt;
+    SOCKADDR_STORAGE peer;
+    DWORD i, total = 0;
+
+    if (!tcm_report_mode()) return FALSE;
+    if (!buffer_count) return FALSE;
+
+    for (i = 0; i < buffer_count; i++) total += buffers[i].len;
+    if (total != TCM_REPORT_CTRL_SIZE && total < TCM_REPORT_FRAG_MIN) return FALSE;
+
+    if (!addr)
+    {
+        /* the game also sends these on the connected socket */
+        int len = sizeof(peer);
+
+        if (getpeername( s, (struct sockaddr *)&peer, &len )) return FALSE;
+        if (!tcm_is_report_peer( (const struct sockaddr *)&peer, len )) return FALSE;
+    }
+    else if (!tcm_is_report_peer( addr, addr_len ) || addr_len > sizeof(d->addr)) return FALSE;
+
+    if (total >= TCM_REPORT_FRAG_MIN)
+    {
+        tcm_note_send( s );
+        return FALSE;
+    }
+    if (completion || (piosb && buffer_count > TCM_REPORT_MAX_BUFS))
+    {
+        WARN( "HACK: not deferring, completion %p, %lu buffers.\n", completion, buffer_count );
+        tcm_note_send( s );
+        return FALSE;
+    }
+    if (!(delay = tcm_pick_delay( s, &rtt )))
+    {
+        WARN( "HACK: not deferring, rtt %u ms.\n", rtt );
+        tcm_note_send( s );
+        return FALSE;
+    }
+
+    if (!(d = calloc( 1, sizeof(*d) ))) return FALSE;
+
+    WARN( "HACK: delaying report control record by %u ms (rtt %u ms, %s%s).\n", delay, rtt,
+          piosb ? "overlapped" : "sync", addr ? "" : ", connected" );
+
+    if (piosb)
+    {
+        memcpy( d->buffers, buffers, buffer_count * sizeof(*buffers) );
+        d->event = event;
+        d->cvalue = cvalue;
+        d->piosb = piosb;
+        d->params.force_async = 1;
+        d->params.count = buffer_count;
+    }
+    else
+    {
+        char *p = d->data;
+
+        for (i = 0; i < buffer_count; i++)
+        {
+            memcpy( p, buffers[i].buf, buffers[i].len );
+            p += buffers[i].len;
+        }
+        if (!(d->event = CreateEventW( NULL, TRUE, FALSE, NULL )))
+        {
+            free( d );
+            return FALSE;
+        }
+        d->buffers[0].buf = d->data;
+        d->buffers[0].len = total;
+        d->piosb = &d->iosb;
+        d->params.count = 1;
+        *ret_size = total;
+    }
+
+    /* a connected send stays connected when it is reissued */
+    if (addr)
+    {
+        memcpy( &d->addr, addr, addr_len );
+        d->params.addr_ptr = u64_from_user_ptr( &d->addr );
+        d->params.addr_len = addr_len;
+    }
+    d->socket = (HANDLE)s;
+    d->params.ws_flags = flags;
+    d->params.buffers_ptr = u64_from_user_ptr( d->buffers );
+
+    /* the timer thread persists; pool workers do not */
+    if (CreateTimerQueueTimer( &d->timer, NULL, tcm_deferred_send_cb, d, delay, 0,
+                               WT_EXECUTEONLYONCE | WT_EXECUTEINTIMERTHREAD ))
+        return TRUE;
+
+    WARN( "failed to create timer, error %lu.\n", GetLastError() );
+    free( d );
+    return FALSE;
 }
 
 static int WS2_sendto( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *ret_size, DWORD flags,
@@ -1074,6 +1381,18 @@ static int WS2_sendto( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *ret
         event = NULL;
         cvalue = completion;
         apc = socket_apc;
+    }
+
+    if (tcm_defer_send( s, buffers, buffer_count, flags, addr, addr_len, event, cvalue,
+                        overlapped ? piosb : NULL, ret_size, completion ))
+    {
+        if (!overlapped)
+        {
+            SetLastError( 0 );
+            return 0;
+        }
+        SetLastError( WSA_IO_PENDING );
+        return -1;
     }
 
     params.addr_ptr = u64_from_user_ptr( addr );
