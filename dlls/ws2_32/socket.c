@@ -974,6 +974,26 @@ static void WINAPI socket_apc( void *apc_user, IO_STATUS_BLOCK *io, ULONG reserv
     func( NtStatusToWSAError( io->Status ), io->Information, (OVERLAPPED *)io, 0 );
 }
 
+/* HACK: The Crew Motorfest resends its BattlEye report until
+ * kicked when the ack (62 bytes, byte 2 0xdb) of the record
+ * it sends first (94 bytes) is seen before fragment 0. */
+static SOCKET tcm_hold_socket;
+static ULONGLONG tcm_query_at, tcm_hold_until;
+
+static BOOL tcm_relay_peer( const struct sockaddr *addr, int len )
+{
+    static int enabled = -1;
+    const struct sockaddr_in *sin = (const struct sockaddr_in *)addr;
+
+    if (enabled < 0)
+    {
+        const char *s = getenv( "SteamGameId" );
+        enabled = s && !strcmp( s, "2698940" );
+    }
+    return enabled && addr && len >= sizeof(*sin) && sin->sin_family == AF_INET
+           && ntohs( sin->sin_port ) == 4000;
+}
+
 static int WS2_recv_base( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *ret_size, DWORD *flags,
                           struct sockaddr *addr, int *addr_len, OVERLAPPED *overlapped,
                           LPWSAOVERLAPPED_COMPLETION_ROUTINE completion, WSABUF *control )
@@ -1008,6 +1028,23 @@ static int WS2_recv_base( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *
         apc = socket_apc;
     }
 
+    if (!overlapped && s == tcm_hold_socket && !(*flags & MSG_PEEK))
+    {
+        unsigned char peek[64];
+        WSABUF peek_buf = { sizeof(peek), (char *)peek };
+        SOCKADDR_STORAGE peek_addr;
+        int peek_addr_len = sizeof(peek_addr);
+        DWORD peek_size, peek_flags = MSG_PEEK;
+
+        if (GetTickCount64() > tcm_hold_until) tcm_hold_socket = 0;
+        else if (!WS2_recv_base( s, &peek_buf, 1, &peek_size, &peek_flags, (struct sockaddr *)&peek_addr,
+                                 &peek_addr_len, NULL, NULL, NULL ) && peek_size == 62 && peek[2] == 0xdb)
+        {
+            SetLastError( WSAEWOULDBLOCK );
+            return -1;
+        }
+    }
+
     params.control_ptr = u64_from_user_ptr(control);
     params.addr_ptr = u64_from_user_ptr(addr);
     params.addr_len_ptr = u64_from_user_ptr(addr_len);
@@ -1025,6 +1062,8 @@ static int WS2_recv_base( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *
         status = piosb->Status;
     }
     if (!status && ret_size) *ret_size = piosb->Information;
+    if (!status && !overlapped && piosb->Information >= 1000 && addr_len && tcm_relay_peer( addr, *addr_len ))
+        tcm_query_at = GetTickCount64();
     SetLastError( NtStatusToWSAError( status ) );
     TRACE( "status %#lx.\n", status );
     return status ? -1 : 0;
@@ -1074,6 +1113,23 @@ static int WS2_sendto( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *ret
         event = NULL;
         cvalue = completion;
         apc = socket_apc;
+    }
+
+    if (!overlapped && buffer_count == 1 && tcm_relay_peer( addr, addr_len ))
+    {
+        ULONGLONG now = GetTickCount64();
+
+        if (buffers[0].len == 94 && now - tcm_query_at < 1000)
+        {
+            tcm_hold_socket = s;
+            tcm_hold_until = now + 900;
+            WARN( "HACK: control record after a query, holding its ack.\n" );
+        }
+        else if (buffers[0].len >= 1000 && tcm_hold_socket)
+        {
+            tcm_hold_socket = 0;
+            WARN( "HACK: fragment 0 sent, ack released.\n" );
+        }
     }
 
     params.addr_ptr = u64_from_user_ptr( addr );
