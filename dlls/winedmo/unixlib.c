@@ -197,7 +197,7 @@ static NTSTATUS wow64_demuxer_destroy( void *arg )
         struct winedmo_demuxer demuxer;
         PTR32 context;
     } *params32 = arg;
-    struct demuxer_create_params params;
+    struct demuxer_destroy_params params;
     NTSTATUS status;
 
     params.demuxer = params32->demuxer;
