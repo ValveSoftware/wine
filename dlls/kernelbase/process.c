@@ -811,7 +811,6 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
                 exe_path[p - app_name] = 0;
                 cur_dir = exe_path;
             }
-            __wine_set_unix_env( "PROTON_EOS_EAC", "1" );
         }
 
         RtlInitUnicodeString( &name, L"PROTON_EAC_LAUNCHER_PROCESS" );
