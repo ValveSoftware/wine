@@ -1909,6 +1909,20 @@ BOOL wrap_wglBindTexImageARB( TEB *teb, HPBUFFERARB handle, int buffer )
     return funcs->p_wglBindTexImageARB( pbuffer, buffer );
 }
 
+static const int *get_compat_attribs( const int *attribs )
+{
+    static const int compat_attribs[] =
+    {
+        WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+        0, 0,
+    };
+    static int cached = -1;
+    const char *sgi;
+
+    if (cached == -1) cached = (sgi = getenv( "SteamGameId" )) && !strcmp( sgi, "2462810");
+    return cached ? compat_attribs : attribs;
+}
+
 HGLRC wrap_wglCreateContextAttribsARB( TEB *teb, HDC hdc, HGLRC share, const int *attribs )
 {
     HGLRC ret = 0;
@@ -1925,6 +1939,9 @@ HGLRC wrap_wglCreateContextAttribsARB( TEB *teb, HDC hdc, HGLRC share, const int
         RtlSetLastWin32Error( ERROR_INVALID_OPERATION );
         return 0;
     }
+
+    attribs = get_compat_attribs( attribs );
+
     if ((context = calloc( 1, sizeof(*context) )))
     {
         context->hdc = hdc;
