@@ -296,7 +296,6 @@ static void test_mdl_map(void)
     MmUnmapLockedPages(addr, mdl);
 
     addr = MmMapLockedPagesSpecifyCache(mdl, KernelMode, MmCached, NULL, FALSE, NormalPagePriority);
-    todo_wine
     ok(addr != NULL, "MmMapLockedPagesSpecifyCache failed\n");
     if (addr != NULL)
         ok(!kmemcmp(addr, buffer, sizeof(buffer)), "Unexpected data in mapped memory\n");
