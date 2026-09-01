@@ -285,24 +285,35 @@ static void test_mdl_map(void)
 
     mdl = IoAllocateMdl(buffer, sizeof(buffer), FALSE, FALSE, NULL);
     ok(mdl != NULL, "IoAllocateMdl failed\n");
+    ok(!(mdl->MdlFlags & MDL_PAGES_LOCKED), "got flags %#x\n", mdl->MdlFlags);
+    ok(!(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA), "got flags %#x\n", mdl->MdlFlags);
 
     MmProbeAndLockPages(mdl, KernelMode, IoReadAccess);
+    todo_wine ok(mdl->MdlFlags & MDL_PAGES_LOCKED, "got flags %#x\n", mdl->MdlFlags);
 
     addr = MmMapLockedPages(mdl, KernelMode);
     ok(addr != NULL, "MmMapLockedPages failed\n");
+    ok(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA, "got flags %#x\n", mdl->MdlFlags);
+    ok(mdl->MappedSystemVa == addr, "got %p, expected %p\n", mdl->MappedSystemVa, addr);
     if (addr != NULL)
         ok(!kmemcmp(addr, buffer, sizeof(buffer)), "Unexpected data in mapped memory\n");
 
     MmUnmapLockedPages(addr, mdl);
+    todo_wine ok(!(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA), "got flags %#x\n", mdl->MdlFlags);
+    todo_wine ok(mdl->MdlFlags & MDL_PAGES_LOCKED, "got flags %#x\n", mdl->MdlFlags);
 
     addr = MmMapLockedPagesSpecifyCache(mdl, KernelMode, MmCached, NULL, FALSE, NormalPagePriority);
     ok(addr != NULL, "MmMapLockedPagesSpecifyCache failed\n");
+    ok(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA, "got flags %#x\n", mdl->MdlFlags);
+    ok(mdl->MappedSystemVa == addr, "got %p, expected %p\n", mdl->MappedSystemVa, addr);
     if (addr != NULL)
         ok(!kmemcmp(addr, buffer, sizeof(buffer)), "Unexpected data in mapped memory\n");
 
     MmUnmapLockedPages(addr, mdl);
+    todo_wine ok(!(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA), "got flags %#x\n", mdl->MdlFlags);
 
     MmUnlockPages(mdl);
+    ok(!(mdl->MdlFlags & MDL_PAGES_LOCKED), "got flags %#x\n", mdl->MdlFlags);
     IoFreeMdl(mdl);
 }
 
