@@ -299,7 +299,7 @@ static void test_mdl_map(void)
         ok(!kmemcmp(addr, buffer, sizeof(buffer)), "Unexpected data in mapped memory\n");
 
     MmUnmapLockedPages(addr, mdl);
-    todo_wine ok(!(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA), "got flags %#x\n", mdl->MdlFlags);
+    ok(!(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA), "got flags %#x\n", mdl->MdlFlags);
     todo_wine ok(mdl->MdlFlags & MDL_PAGES_LOCKED, "got flags %#x\n", mdl->MdlFlags);
 
     addr = MmMapLockedPagesSpecifyCache(mdl, KernelMode, MmCached, NULL, FALSE, NormalPagePriority);
@@ -310,7 +310,7 @@ static void test_mdl_map(void)
         ok(!kmemcmp(addr, buffer, sizeof(buffer)), "Unexpected data in mapped memory\n");
 
     MmUnmapLockedPages(addr, mdl);
-    todo_wine ok(!(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA), "got flags %#x\n", mdl->MdlFlags);
+    ok(!(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA), "got flags %#x\n", mdl->MdlFlags);
 
     MmUnlockPages(mdl);
     ok(!(mdl->MdlFlags & MDL_PAGES_LOCKED), "got flags %#x\n", mdl->MdlFlags);

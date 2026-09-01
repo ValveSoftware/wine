@@ -3000,14 +3000,6 @@ PVOID WINAPI  MmMapLockedPagesSpecifyCache(PMDLX MemoryDescriptorList, KPROCESSO
 
     if (BaseAddress) FIXME("requested base address %p ignored\n", BaseAddress);
 
-    /* Same treatment as MmMapLockedPages(), which already ignores AccessMode:
-     * drivers run in user space here, so the "user-mode" and "system" mappings
-     * of a descriptor are the same address.
-     *
-     * Note this returns an address in the driver host process.  A driver that
-     * maps a buffer expecting a *different* client process to dereference the
-     * result will not get shareable memory out of this -- that would need the
-     * pool to be section-backed, which is not the case. */
     return MmMapLockedPages( MemoryDescriptorList, AccessMode );
 }
 
@@ -3016,7 +3008,9 @@ PVOID WINAPI  MmMapLockedPagesSpecifyCache(PMDLX MemoryDescriptorList, KPROCESSO
  */
 void WINAPI MmUnmapLockedPages( void *base, MDL *mdl )
 {
-    FIXME( "(%p %p_\n", base, mdl );
+    TRACE( "%p %p\n", base, mdl );
+
+    mdl->MdlFlags &= ~MDL_MAPPED_TO_SYSTEM_VA;
 }
 
 /***********************************************************************
