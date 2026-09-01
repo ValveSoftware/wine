@@ -632,7 +632,7 @@
 @ stub KeReadStateSemaphore
 @ stub KeReadStateTimer
 @ stdcall KeRegisterBugCheckCallback(ptr ptr ptr long ptr)
-@ stub KeRegisterBugCheckReasonCallback
+@ stdcall KeRegisterBugCheckReasonCallback(ptr ptr long ptr)
 @ stub KeReleaseInterruptSpinLock
 @ stub KeReleaseMutant
 @ stdcall KeReleaseMutex(ptr long)
