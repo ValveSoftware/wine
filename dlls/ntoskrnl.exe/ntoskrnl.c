@@ -3036,7 +3036,9 @@ PVOID WINAPI MmPageEntireDriver(PVOID AddrInSection)
  */
 void WINAPI MmProbeAndLockPages(PMDLX MemoryDescriptorList, KPROCESSOR_MODE AccessMode, LOCK_OPERATION Operation)
 {
-    FIXME("(%p, %u, %u): stub\n", MemoryDescriptorList, AccessMode, Operation);
+    TRACE("(%p, %u, %u)\n", MemoryDescriptorList, AccessMode, Operation);
+
+    MemoryDescriptorList->MdlFlags |= MDL_PAGES_LOCKED;
 }
 
 
@@ -3054,7 +3056,9 @@ void WINAPI MmResetDriverPaging(PVOID AddrInSection)
  */
 void WINAPI  MmUnlockPages(PMDLX MemoryDescriptorList)
 {
-    FIXME("(%p): stub\n", MemoryDescriptorList);
+    TRACE("(%p)\n", MemoryDescriptorList);
+
+    MemoryDescriptorList->MdlFlags &= ~MDL_PAGES_LOCKED;
 }
 
 

@@ -289,7 +289,7 @@ static void test_mdl_map(void)
     ok(!(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA), "got flags %#x\n", mdl->MdlFlags);
 
     MmProbeAndLockPages(mdl, KernelMode, IoReadAccess);
-    todo_wine ok(mdl->MdlFlags & MDL_PAGES_LOCKED, "got flags %#x\n", mdl->MdlFlags);
+    ok(mdl->MdlFlags & MDL_PAGES_LOCKED, "got flags %#x\n", mdl->MdlFlags);
 
     addr = MmMapLockedPages(mdl, KernelMode);
     ok(addr != NULL, "MmMapLockedPages failed\n");
@@ -300,7 +300,7 @@ static void test_mdl_map(void)
 
     MmUnmapLockedPages(addr, mdl);
     ok(!(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA), "got flags %#x\n", mdl->MdlFlags);
-    todo_wine ok(mdl->MdlFlags & MDL_PAGES_LOCKED, "got flags %#x\n", mdl->MdlFlags);
+    ok(mdl->MdlFlags & MDL_PAGES_LOCKED, "got flags %#x\n", mdl->MdlFlags);
 
     addr = MmMapLockedPagesSpecifyCache(mdl, KernelMode, MmCached, NULL, FALSE, NormalPagePriority);
     ok(addr != NULL, "MmMapLockedPagesSpecifyCache failed\n");
