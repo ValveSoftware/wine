@@ -2843,6 +2843,15 @@ BOOLEAN WINAPI KeRegisterBugCheckReasonCallback(void *record, void *routine, ULO
 }
 
 /***********************************************************************
+ *           KeDeregisterBugCheckReasonCallback   (NTOSKRNL.EXE.@)
+ */
+BOOLEAN WINAPI KeDeregisterBugCheckReasonCallback(void *record)
+{
+    FIXME("%p stub.\n", record);
+    return TRUE;
+}
+
+/***********************************************************************
  *           IoRegisterFileSystem   (NTOSKRNL.EXE.@)
  */
 VOID WINAPI IoRegisterFileSystem(PDEVICE_OBJECT DeviceObject)
