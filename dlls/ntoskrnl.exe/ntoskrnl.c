@@ -2944,7 +2944,10 @@ PMDL WINAPI MmAllocatePagesForMdl(PHYSICAL_ADDRESS lowaddress, PHYSICAL_ADDRESS 
  */
 void WINAPI MmBuildMdlForNonPagedPool(MDL *mdl)
 {
-    FIXME("stub: %p\n", mdl);
+    TRACE("%p\n", mdl);
+
+    mdl->MdlFlags |= MDL_SOURCE_IS_NONPAGED_POOL;
+    mdl->MappedSystemVa = (char *)mdl->StartVa + mdl->ByteOffset;
 }
 
 /***********************************************************************

@@ -325,8 +325,8 @@ static void test_mdl_map(void)
     ok(!(mdl->MdlFlags & MDL_SOURCE_IS_NONPAGED_POOL), "got flags %#x\n", mdl->MdlFlags);
 
     MmBuildMdlForNonPagedPool(mdl);
-    todo_wine ok(mdl->MdlFlags & MDL_SOURCE_IS_NONPAGED_POOL, "got flags %#x\n", mdl->MdlFlags);
-    todo_wine ok(mdl->MappedSystemVa == (char *)mdl->StartVa + mdl->ByteOffset,
+    ok(mdl->MdlFlags & MDL_SOURCE_IS_NONPAGED_POOL, "got flags %#x\n", mdl->MdlFlags);
+    ok(mdl->MappedSystemVa == (char *)mdl->StartVa + mdl->ByteOffset,
        "got %p, expected %p\n", mdl->MappedSystemVa, (char *)mdl->StartVa + mdl->ByteOffset);
     ok(!(mdl->MdlFlags & MDL_PAGES_LOCKED), "got flags %#x\n", mdl->MdlFlags);
     ok(!(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA), "got flags %#x\n", mdl->MdlFlags);
