@@ -280,7 +280,7 @@ static void test_queue(void)
 static void test_mdl_map(void)
 {
     char buffer[20] = "test buffer";
-    void *addr;
+    void *addr, *pool;
     MDL *mdl;
 
     mdl = IoAllocateMdl(buffer, sizeof(buffer), FALSE, FALSE, NULL);
@@ -315,6 +315,30 @@ static void test_mdl_map(void)
     MmUnlockPages(mdl);
     ok(!(mdl->MdlFlags & MDL_PAGES_LOCKED), "got flags %#x\n", mdl->MdlFlags);
     IoFreeMdl(mdl);
+
+    pool = ExAllocatePool(NonPagedPool, sizeof(buffer));
+    ok(pool != NULL, "ExAllocatePool failed\n");
+    memcpy(pool, buffer, sizeof(buffer));
+
+    mdl = IoAllocateMdl(pool, sizeof(buffer), FALSE, FALSE, NULL);
+    ok(mdl != NULL, "IoAllocateMdl failed\n");
+    ok(!(mdl->MdlFlags & MDL_SOURCE_IS_NONPAGED_POOL), "got flags %#x\n", mdl->MdlFlags);
+
+    MmBuildMdlForNonPagedPool(mdl);
+    todo_wine ok(mdl->MdlFlags & MDL_SOURCE_IS_NONPAGED_POOL, "got flags %#x\n", mdl->MdlFlags);
+    todo_wine ok(mdl->MappedSystemVa == (char *)mdl->StartVa + mdl->ByteOffset,
+       "got %p, expected %p\n", mdl->MappedSystemVa, (char *)mdl->StartVa + mdl->ByteOffset);
+    ok(!(mdl->MdlFlags & MDL_PAGES_LOCKED), "got flags %#x\n", mdl->MdlFlags);
+    ok(!(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA), "got flags %#x\n", mdl->MdlFlags);
+
+    addr = MmMapLockedPages(mdl, KernelMode);
+    ok(addr != NULL, "MmMapLockedPages failed\n");
+    ok(mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA, "got flags %#x\n", mdl->MdlFlags);
+    if (addr != NULL)
+        ok(!kmemcmp(addr, buffer, sizeof(buffer)), "Unexpected data in mapped memory\n");
+
+    IoFreeMdl(mdl);
+    ExFreePool(pool);
 }
 
 static void test_init_funcs(void)
