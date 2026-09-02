@@ -376,16 +376,30 @@ static HRESULT WINAPI d3dx10_sprite_End(ID3DX10Sprite *iface)
 
 static HRESULT WINAPI d3dx10_sprite_GetViewTransform(ID3DX10Sprite *iface, D3DXMATRIX *transform)
 {
-    FIXME("iface %p, transform %p stub!\n", iface, transform);
+    struct d3dx10_sprite *sprite = impl_from_ID3DX10Sprite(iface);
 
-    return E_NOTIMPL;
+    TRACE("iface %p, transform %p.\n", iface, transform);
+
+    if (!transform)
+        return E_FAIL;
+
+    *transform = sprite->view;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI d3dx10_sprite_SetViewTransform(ID3DX10Sprite *iface, D3DXMATRIX *transform)
 {
-    FIXME("iface %p, transform %p stub!\n", iface, transform);
+    struct d3dx10_sprite *sprite = impl_from_ID3DX10Sprite(iface);
 
-    return E_NOTIMPL;
+    TRACE("iface %p, transform %p.\n", iface, transform);
+
+    if (!transform)
+        return E_FAIL;
+
+    sprite->view = *transform;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI d3dx10_sprite_GetProjectionTransform(ID3DX10Sprite *iface,
