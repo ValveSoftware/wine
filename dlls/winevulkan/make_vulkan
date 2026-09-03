@@ -1855,20 +1855,19 @@ class VkStruct(Sequence):
         # marked as 'returnedonly'.
         returnedonly = True if struct.attrib.get("returnedonly") else False
 
-        # Those structs seem to be broken in spec, they are specified as
-        # returned only, but documented as input structs.
-        if name in ["VkPipelineShaderStageRequiredSubgroupSizeCreateInfo"]:
-            returnedonly = False
-
-        # Those structs don't have returnedonly in spec, but they could (should?).
-        if name in ["VkSurfaceCapabilitiesPresentBarrierNV"]:
-            returnedonly = True
-
         structextends = struct.attrib.get("structextends")
         structextends = structextends.split(",") if structextends else []
 
         members = filter(is_api_supported, struct.findall("member"))
         members = [VkMember.from_xml(registry, member, returnedonly) for member in members]
+
+        # don't flag dynamic arrays with input/output lengths as returnedonly
+        for member in filter(lambda m: m.returnedonly, members):
+            for len in filter(lambda m: m.name == member.dyn_array_len, members):
+                len.returnedonly = False
+            if member.is_dynamic_array():
+                member.returnedonly = False
+
         return VkStruct(registry, name, members, returnedonly, structextends, union=union)
 
     def set_order(self, order, structs):
