@@ -1,5 +1,6 @@
 MODULE    = wmadmod.dll
-IMPORTS   = combase mfplat msdmo mfuuid dmoguids strmiids wmcodecdspuuid uuid winegstreamer
+IMPORTS   = combase mfplat msdmo mfuuid dmoguids strmiids wmcodecdspuuid uuid
+DELAYIMPORTS = winegstreamer
 
 SOURCES = \
 	wmadmod.c \
