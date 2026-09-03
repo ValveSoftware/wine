@@ -481,6 +481,8 @@ static void test_current_thread(BOOL is_system)
     PROCESS_BASIC_INFORMATION info;
     DISPATCHER_HEADER *header;
     HANDLE process_handle, id;
+    KERNEL_USER_TIMES times;
+    LONGLONG create_time;
     ULONG session_id;
     PEPROCESS current;
     PETHREAD thread;
@@ -533,6 +535,16 @@ static void test_current_thread(BOOL is_system)
     /* the system process reports session 0 on windows */
     todo_wine ok(!PsGetProcessSessionId(*pPsInitialSystemProcess), "got session id %lu for the system process\n",
                  PsGetProcessSessionId(*pPsInitialSystemProcess));
+
+    memset(&times, 0xcc, sizeof(times));
+    ret = ZwQueryInformationProcess(process_handle, ProcessTimes, &times, sizeof(times), NULL);
+    ok(!ret, "ZwQueryInformationProcess failed: %#lx\n", ret);
+    create_time = PsGetProcessCreateTimeQuadPart(current);
+    ok(create_time == times.CreateTime.QuadPart, "got create time %#I64x, expected %#I64x\n",
+       create_time, times.CreateTime.QuadPart);
+
+    create_time = PsGetProcessCreateTimeQuadPart(*pPsInitialSystemProcess);
+    ok(create_time != 0, "got create time %#I64x for the system process\n", create_time);
 
     ret = ZwClose(process_handle);
     ok(!ret, "ZwClose failed: %#lx\n", ret);
