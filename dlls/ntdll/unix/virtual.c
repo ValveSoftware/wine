@@ -574,7 +574,12 @@ static void mmap_add_reserved_area( void *addr, SIZE_T size )
     assert( !((UINT_PTR)addr & host_page_mask) );
     assert( !(size & host_page_mask) );
 
-    if (!((intptr_t)addr + size)) size--;  /* avoid wrap-around */
+    /* An area ending exactly at the 4GB boundary wraps addr+size to 0. Back it off
+     * by a whole page rather than a single byte, so that the area bounds stay page
+     * aligned as the asserts above require; consumers such as alloc_virtual_heap()
+     * derive addresses from the area end and would otherwise be handed an
+     * unaligned one. */
+    if (size >= host_page_size && !((intptr_t)addr + size)) size -= host_page_size;
     end = (char *)addr + size;
 
     LIST_FOR_EACH( ptr, &reserved_areas )
@@ -626,7 +631,12 @@ static void mmap_remove_reserved_area( void *addr, SIZE_T size )
     assert( !((UINT_PTR)addr & host_page_mask) );
     assert( !(size & host_page_mask) );
 
-    if (!((intptr_t)addr + size)) size--;  /* avoid wrap-around */
+    /* An area ending exactly at the 4GB boundary wraps addr+size to 0. Back it off
+     * by a whole page rather than a single byte, so that the area bounds stay page
+     * aligned as the asserts above require; consumers such as alloc_virtual_heap()
+     * derive addresses from the area end and would otherwise be handed an
+     * unaligned one. */
+    if (size >= host_page_size && !((intptr_t)addr + size)) size -= host_page_size;
 
     ptr = list_head( &reserved_areas );
     /* find the first area covering address */
