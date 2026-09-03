@@ -244,6 +244,34 @@ error:
 	LOG_FUNC_EXIT(voice->audio)
 }
 
+static HRESULT create_wma_decoder(IMFTransform **out)
+{
+	static HRESULT (WINAPI *pDllGetClassObject)(REFCLSID, REFIID, void **);
+	IClassFactory *factory;
+	HMODULE wmadmod;
+	HRESULT hr;
+
+	if (!pDllGetClassObject)
+	{
+		if (!(wmadmod = LoadLibraryW(L"wmadmod.dll")))
+			return E_FAIL;
+
+		pDllGetClassObject = (HRESULT (WINAPI *)(REFCLSID, REFIID, void **)) GetProcAddress(wmadmod, "DllGetClassObject");
+
+		if (!pDllGetClassObject)
+			return E_FAIL;
+	}
+
+	hr = pDllGetClassObject(&CLSID_CWMADecMediaObject, &IID_IClassFactory, (void **)&factory);
+	if (FAILED(hr))
+		return hr;
+
+	hr = IClassFactory_CreateInstance(factory, NULL, &IID_IMFTransform, (void **)out);
+	IClassFactory_Release(factory);
+
+	return hr;
+}
+
 uint32_t FAudio_WMADEC_init(FAudioSourceVoice *voice, uint32_t type)
 {
 	static const uint8_t fake_codec_data[16] = {0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -263,13 +291,7 @@ uint32_t FAudio_WMADEC_init(FAudioSourceVoice *voice, uint32_t type)
 	if (!(impl = voice->audio->pMalloc(sizeof(*impl)))) return -1;
 	FAudio_memset(impl, 0, sizeof(*impl));
 
-	hr = CoCreateInstance(
-		&CLSID_CWMADecMediaObject,
-		0,
-		CLSCTX_INPROC_SERVER,
-		&IID_IMFTransform,
-		(void **)&decoder
-	);
+	hr = create_wma_decoder(&decoder);
 	if (FAILED(hr))
 	{
 		voice->audio->pFree(impl->output_buf);
