@@ -94,7 +94,7 @@ static inline void leave_syscall_callback(void)
 
     cpu_area->InSyscallCallback = 0;
 
-    if (cpu_area->SuspendDoorbell && *cpu_area->SuspendDoorbell)
+    if (!cpu_area->InSimulation && cpu_area->SuspendDoorbell && *cpu_area->SuspendDoorbell)
     {
         RtlCaptureContext( &ctx );
         if (*cpu_area->SuspendDoorbell) NtContinue( &ctx, FALSE );
