@@ -1110,3 +1110,26 @@ HRESULT wma_decoder_create(IUnknown *outer, IUnknown **out)
     TRACE("Created decoder %p\n", *out);
     return S_OK;
 }
+
+HRESULT WINAPI winegstreamer_create_wma_decoder(IUnknown *outer, REFIID riid, void **out)
+{
+    IUnknown *unk;
+    HRESULT hr;
+
+    TRACE("outer %p, riid %s, out %p\n", outer, debugstr_guid(riid), out);
+
+    if (!init_gstreamer())
+        return E_FAIL;
+
+    if (outer && !IsEqualGUID(riid, &IID_IUnknown))
+        return E_NOINTERFACE;
+
+    *out = NULL;
+    if (FAILED(hr = wma_decoder_create(outer, &unk)))
+        return hr;
+
+    hr = IUnknown_QueryInterface(unk, riid, out);
+    IUnknown_Release(unk);
+
+    return hr;
+}
