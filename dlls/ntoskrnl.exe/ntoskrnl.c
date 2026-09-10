@@ -3474,6 +3474,15 @@ NTSTATUS WINAPI PsReferenceProcessFilePointer(PEPROCESS process, FILE_OBJECT **f
 }
 
 /*********************************************************************
+ *           PsDereferencePrimaryToken    (NTOSKRNL.@)
+ */
+void WINAPI PsDereferencePrimaryToken( PACCESS_TOKEN token )
+{
+    TRACE("%p\n", token);
+    ObDereferenceObject(token);
+}
+
+/*********************************************************************
  *           PsReferencePrimaryToken    (NTOSKRNL.@)
  */
 PACCESS_TOKEN WINAPI PsReferencePrimaryToken( PEPROCESS process )
