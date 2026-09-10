@@ -3415,6 +3415,70 @@ static VkResult win32u_vkQueueSubmit2KHR( VkQueue client_queue, uint32_t count, 
     return queue_submit( queue, count, submits, client_fence, device->p_vkQueueSubmit2KHR );
 }
 
+static VkResult win32u_vkGetSemaphoreCounterValue( VkDevice client_device, VkSemaphore client_semaphore, uint64_t *value )
+{
+    struct vulkan_device *device = vulkan_device_from_handle( client_device );
+    struct semaphore *semaphore = semaphore_from_handle( client_semaphore );
+
+    return device->p_vkGetSemaphoreCounterValue( device->host.device, semaphore->obj.host.semaphore, value );
+}
+
+static VkResult win32u_vkGetSemaphoreCounterValueKHR( VkDevice client_device, VkSemaphore client_semaphore, uint64_t *value )
+{
+    struct vulkan_device *device = vulkan_device_from_handle( client_device );
+    struct semaphore *semaphore = semaphore_from_handle( client_semaphore );
+
+    return device->p_vkGetSemaphoreCounterValueKHR( device->host.device, semaphore->obj.host.semaphore, value );
+}
+
+static VkResult win32u_vkSignalSemaphore( VkDevice client_device, const VkSemaphoreSignalInfo *signal_info)
+{
+    struct semaphore *semaphore = semaphore_from_handle( signal_info->semaphore );
+    struct vulkan_device *device = vulkan_device_from_handle( client_device );
+    VkSemaphoreSignalInfo host_info = *signal_info;
+
+    host_info.semaphore = semaphore->obj.host.semaphore;
+    return device->p_vkSignalSemaphore( device->host.device, &host_info );
+}
+
+static VkResult win32u_vkSignalSemaphoreKHR( VkDevice client_device, const VkSemaphoreSignalInfo *signal_info)
+{
+    struct semaphore *semaphore = semaphore_from_handle( signal_info->semaphore );
+    struct vulkan_device *device = vulkan_device_from_handle( client_device );
+    VkSemaphoreSignalInfo host_info = *signal_info;
+
+    host_info.semaphore = semaphore->obj.host.semaphore;
+    return device->p_vkSignalSemaphoreKHR( device->host.device, &host_info );
+}
+
+static VkResult wait_semaphores( struct vulkan_device *device, const VkSemaphoreWaitInfo *wait_info, uint64_t timeout,
+                          PFN_vkWaitSemaphores p_vkWaitSemaphores )
+{
+    unsigned int i;
+
+    for (i = 0; i < wait_info->semaphoreCount; ++i)
+    {
+        struct semaphore *semaphore = semaphore_from_handle( wait_info->pSemaphores[i] );
+        /* cast away const, it has been copied in the thunks */
+        ((VkSemaphore *)wait_info->pSemaphores)[i] = semaphore->obj.host.semaphore;
+    }
+    return p_vkWaitSemaphores( device->host.device, wait_info, timeout );
+}
+
+VkResult win32u_vkWaitSemaphores( VkDevice client_device, const VkSemaphoreWaitInfo *wait_info, uint64_t timeout )
+{
+    struct vulkan_device *device = vulkan_device_from_handle( client_device );
+
+    return wait_semaphores( device, wait_info, timeout, device->p_vkWaitSemaphores );
+}
+
+VkResult win32u_vkWaitSemaphoresKHR( VkDevice client_device, const VkSemaphoreWaitInfo *wait_info, uint64_t timeout )
+{
+    struct vulkan_device *device = vulkan_device_from_handle( client_device );
+
+    return wait_semaphores( device, wait_info, timeout, device->p_vkWaitSemaphoresKHR );
+}
+
 static HANDLE create_shared_semaphore_handle( D3DKMT_HANDLE local, const VkExportSemaphoreWin32HandleInfoKHR *info )
 {
     SECURITY_DESCRIPTOR *security = info->pAttributes ? info->pAttributes->lpSecurityDescriptor : NULL;
@@ -3988,6 +4052,12 @@ static struct vulkan_funcs vulkan_funcs =
     .p_vkQueueSubmit2KHR = win32u_vkQueueSubmit2KHR,
     .p_vkUnmapMemory = win32u_vkUnmapMemory,
     .p_vkUnmapMemory2KHR = win32u_vkUnmapMemory2KHR,
+    .p_vkGetSemaphoreCounterValue = win32u_vkGetSemaphoreCounterValue,
+    .p_vkGetSemaphoreCounterValueKHR = win32u_vkGetSemaphoreCounterValueKHR,
+    .p_vkSignalSemaphore = win32u_vkSignalSemaphore,
+    .p_vkSignalSemaphoreKHR = win32u_vkSignalSemaphoreKHR,
+    .p_vkWaitSemaphores = win32u_vkWaitSemaphores,
+    .p_vkWaitSemaphoresKHR = win32u_vkWaitSemaphoresKHR,
 };
 
 static VkResult nulldrv_vulkan_surface_create( HWND hwnd, BOOL raw, const struct vulkan_instance *instance,
