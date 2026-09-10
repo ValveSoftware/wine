@@ -242,6 +242,12 @@ USER_DRIVER_FUNCS = {
     "vkQueueSubmit2KHR",
     "vkUnmapMemory",
     "vkUnmapMemory2KHR",
+    "vkGetSemaphoreCounterValue",
+    "vkGetSemaphoreCounterValueKHR",
+    "vkSignalSemaphore",
+    "vkSignalSemaphoreKHR",
+    "vkWaitSemaphores",
+    "vkWaitSemaphoresKHR",
 }
 
 # functions for which the unix thunk is manually implemented

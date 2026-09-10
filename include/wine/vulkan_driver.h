@@ -359,6 +359,12 @@ struct vulkan_funcs
     PFN_vkQueueSubmit2KHR p_vkQueueSubmit2KHR;
     PFN_vkUnmapMemory p_vkUnmapMemory;
     PFN_vkUnmapMemory2KHR p_vkUnmapMemory2KHR;
+    PFN_vkGetSemaphoreCounterValue p_vkGetSemaphoreCounterValue;
+    PFN_vkGetSemaphoreCounterValueKHR p_vkGetSemaphoreCounterValueKHR;
+    PFN_vkSignalSemaphore p_vkSignalSemaphore;
+    PFN_vkSignalSemaphoreKHR p_vkSignalSemaphoreKHR;
+    PFN_vkWaitSemaphores p_vkWaitSemaphores;
+    PFN_vkWaitSemaphoresKHR p_vkWaitSemaphoresKHR;
 };
 
 /* interface between win32u and the user drivers */
