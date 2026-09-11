@@ -850,7 +850,6 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputSetState(DWORD index, XINPUT_VIBRATION *vib
 static DWORD xinput_get_state(DWORD index, XINPUT_STATE *state)
 {
     DWORD ret;
-    const char *sgi;
 
     if (!state) return ERROR_BAD_ARGUMENTS;
 
@@ -860,8 +859,6 @@ static DWORD xinput_get_state(DWORD index, XINPUT_STATE *state)
 
     ret = get_current_state(index, state) ? ERROR_SUCCESS : ERROR_DEVICE_NOT_CONNECTED;
     if (ret == ERROR_SUCCESS) goto done;
-    sgi = getenv("SteamGameId");
-    if (!strcmp(sgi, "298110")) goto done;
 
     EnterCriticalSection(&xinput_cs);
     update_controller_list();
