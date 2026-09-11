@@ -1507,6 +1507,8 @@ static DWORD CALLBACK read_thread(void *arg)
     struct parser *filter = arg;
     LONGLONG file_size, unused;
     size_t buffer_size = 4096;
+    uint64_t prev_offset = 0;
+    uint32_t prev_size = 0;
     void *data = NULL;
 
     if (!(data = malloc(buffer_size)))
@@ -1518,9 +1520,9 @@ static DWORD CALLBACK read_thread(void *arg)
 
     while (filter->sink_connected)
     {
+        uint32_t size, to_read;
+        HRESULT hr = S_OK;
         uint64_t offset;
-        uint32_t size;
-        HRESULT hr;
 
         if (!wg_parser_get_next_read_offset(filter->wg_parser, &offset, &size))
             continue;
@@ -1542,9 +1544,34 @@ static DWORD CALLBACK read_thread(void *arg)
             return 0;
         }
 
-        hr = IAsyncReader_SyncRead(filter->reader, offset, size, data);
+        /* For AV1 video, data is often re-read at the same offset or a slightly greater
+         * and overlapping offset. This is effectively a seek, and causes an issue for
+         * IAsyncReader implementations which are slow when seeking. */
+        if (prev_size && prev_offset <= offset && prev_offset + prev_size > offset)
+        {
+            if (offset != prev_offset)
+            {
+                size_t delta = offset - prev_offset;
+                prev_size -= delta;
+                memmove(data, (BYTE *)data + delta, prev_size);
+            }
+            to_read = size > prev_size ? size - prev_size : 0;
+        }
+        else
+        {
+            prev_size = 0;
+            to_read = size;
+        }
+
+        if (to_read)
+            hr = IAsyncReader_SyncRead(filter->reader, offset + prev_size, to_read, (BYTE *)data + prev_size);
         if (FAILED(hr))
             ERR("Failed to read %u bytes at offset %I64u, hr %#lx.\n", size, offset, hr);
+        else
+        {
+            prev_offset = offset;
+            prev_size += to_read;
+        }
 
         wg_parser_push_data(filter->wg_parser, SUCCEEDED(hr) ? data : NULL, size);
     }
