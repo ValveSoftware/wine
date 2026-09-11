@@ -3264,10 +3264,10 @@ static void import_semaphore( GLuint semaphore, GLenum type, void *handle )
     switch (type)
     {
     case GL_HANDLE_TYPE_OPAQUE_WIN32_EXT:
-        local = d3dkmt_open_sync( 0, handle );
+        local = d3dkmt_open_sync( 0, handle, NULL, 0 );
         break;
     case GL_HANDLE_TYPE_OPAQUE_WIN32_KMT_EXT:
-        local = d3dkmt_open_sync( PtrToUlong( handle ), NULL );
+        local = d3dkmt_open_sync( PtrToUlong( handle ), NULL, NULL, 0 );
         break;
     default: return set_gl_error( GL_INVALID_ENUM );
     }
