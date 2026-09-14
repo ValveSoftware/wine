@@ -1092,12 +1092,18 @@ static void build_spec_obj( const char *spec_file, const char *output_file,
 {
     struct strarray spec_args = get_winebuild_args( target_name );
     struct strarray tool;
-    const char *spec_o_name, *output_name;
+    const char *spec_o_name, *output_name, *cc_target = target_name;
 
     /* get the filename from the path */
     output_name = get_basename( output_file );
 
-    tool = build_tool_name( target_name, tool_cc );
+    if (target_name && get_cpu_from_name( target_name ) == CPU_ARM64EC)
+    {
+        const char *suffix = strchr( target_name, '-' );
+        cc_target = strmake( "x86_64%s", suffix ? suffix : "" );
+    }
+
+    tool = build_tool_name( cc_target, tool_cc );
     strarray_add( &spec_args, strmake( "--cc-cmd=%s", strarray_tostring( tool, " " )));
     if (!is_pe)
     {
