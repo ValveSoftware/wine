@@ -5810,16 +5810,19 @@ int disable_gamescope_max_size_hack(void)
 static void style_fixup_workarounds( CREATESTRUCTW *cs, const UNICODE_STRING *class_name )
 {
     static const WCHAR BlockClickMASKWndW[] = {'B','l','o','c','k','C','l','i','c','k','M','A','S','K','W','n','d'};
+    static const WCHAR EASteamLauncherSplash[] = {'E','A','S','t','e','a','m','L','a','u','n','c','h','e','r','S','p','l','a','s','h'};
     static const struct
     {
         const WCHAR *class_name;
         const char *wm;
         const char *game_id;
-        unsigned exstyle;
+        unsigned int set_exstyle;
+        unsigned int clear_exstyle;
     }
     workarounds[] =
     {
         { BlockClickMASKWndW, "steamcompmgr", "3839850", WS_EX_NOACTIVATE },
+        { EASteamLauncherSplash, "steamcompmgr", NULL, 0, WS_EX_TOOLWINDOW },
     };
     const char *sgi = getenv( "SteamGameId" );
     unsigned int i;
@@ -5834,8 +5837,9 @@ static void style_fixup_workarounds( CREATESTRUCTW *cs, const UNICODE_STRING *cl
                  (class_name->Length == wcslen( workarounds[i].class_name ) * sizeof(WCHAR)
                  && !memcmp( class_name->Buffer, workarounds[i].class_name, class_name->Length ))))
         {
-            FIXME( "HACK: adding %#x exstyle for %s.\n", workarounds[i].exstyle, debugstr_w( cs->lpszClass ));
-            cs->dwExStyle |= workarounds[i].exstyle;
+            FIXME( "HACK: %#x/%#x for %s.\n", workarounds[i].set_exstyle, workarounds[i].clear_exstyle, debugstr_us(class_name) );
+            cs->dwExStyle |= workarounds[i].set_exstyle;
+            cs->dwExStyle &= ~workarounds[i].clear_exstyle;
         }
     }
 }
