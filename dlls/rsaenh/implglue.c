@@ -78,12 +78,14 @@ BOOL init_hash_impl( ALG_ID algid, struct hash *hash )
 
 BOOL update_hash_impl( struct hash *hash, const BYTE *data, DWORD len )
 {
+    if (!hash->desc) return FALSE;
     hash->desc->process( &hash->state, data, len );
     return TRUE;
 }
 
 BOOL finalize_hash_impl( struct hash *hash, BYTE *hash_value, DWORD hash_size )
 {
+    if (!hash->desc) return FALSE;
     hash->desc->done( &hash->state, hash_value );
     return TRUE;
 }
