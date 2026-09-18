@@ -694,10 +694,22 @@ static inline BOOL init_hash(CRYPTHASH *pCryptHash) {
                     /* A number of hash algorithms (e. g., _SHA256) are supported for HMAC even for providers
                      * which don't list the algorithm, so print a fixme here. */
                     FIXME("Hash algroithm %#x not found.\n", pCryptHash->pHMACInfo->HashAlgid);
+                    SetLastError(NTE_BAD_ALGID);
                     return FALSE;
                 }
                 pCryptHash->dwHashSize = pAlgInfo->dwDefaultLen >> 3;
                 init_hash_impl(pCryptHash->pHMACInfo->HashAlgid, &pCryptHash->hash);
+                if (!pCryptHash->hash.desc)
+                {
+                    /* init_hash_impl() unconditionally returns TRUE, even for an algorithm
+                     * it has no case for (e.g. CALG_SSL3_SHAMD5), leaving hash.desc unset.
+                     * Catch that here instead of letting the next update_hash_impl() call
+                     * dereference a NULL descriptor. */
+                    FIXME("HMAC inner hash algorithm %#lx has no implementation.\n",
+                          pCryptHash->pHMACInfo->HashAlgid);
+                    SetLastError(NTE_BAD_ALGID);
+                    return FALSE;
+                }
                 update_hash_impl(&pCryptHash->hash, pCryptHash->pHMACInfo->pbInnerString,
                                  pCryptHash->pHMACInfo->cbInnerString);
             }
@@ -4803,7 +4815,7 @@ BOOL WINAPI RSAENH_CPSetHashParam(HCRYPTPROV hProv, HCRYPTHASH hHash, DWORD dwPa
                 pCryptHash->pHMACInfo->pbOuterString[i] ^= pCryptKey->abKeyValue[i];
             }
             
-            init_hash(pCryptHash);
+            if (!init_hash(pCryptHash)) return FALSE;
             return TRUE;
 
         case HP_HASHVAL:
