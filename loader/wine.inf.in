@@ -1542,6 +1542,7 @@ HKCU,Software\Wine\AppDefaults\RDR2.exe\DllOverrides,"vulkan-1",,"native"
 HKCU,Software\Wine\AppDefaults\ActOfWar.exe,"Version",,"winxp"
 HKCU,Software\Wine\AppDefaults\DarkOmen.exe,"Version",,"winxp"
 HKLM,Software\Khronos\OpenXR\1,"ActiveRuntime",,"C:\openxr\wineopenxr64.json"
+HKLM,Software\Wow6432Node\Khronos\OpenXR\1,"ActiveRuntime",,"C:\openxr\wineopenxr64.json"
 ;;Other app-specific overrides
 HKCU,Software\Wine\AppDefaults\Pentiment.exe\DllOverrides,"SpeechSynthesisWrapper",4,
 HKCU,Software\Wine\AppDefaults\Maine-Win64-Shipping.exe\DllOverrides,"SpeechSynthWrapper",4,
