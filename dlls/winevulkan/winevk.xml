@@ -29,18 +29,13 @@
             <member><type>UINT64</type> <name>context</name></member>
         </type>
 
-        <type category="funcpointer" requires="VkDevice">
-            <proto><type>PFN_vkVoidFunction</type> <name>PFN_vkGetDeviceProcAddrWINE</name></proto>
-            <param><type>VkDevice</type> <name>device</name></param>
-            <param>const <type>char</type>* <name>name</name></param>
-        </type>
         <type category="funcpointer">
             <proto><type>VkResult</type> <name>PFN_vkCreateDeviceCallbackWINE</name></proto>
             <param><type>VkPhysicalDevice</type> <name>physical_device</name></param>
             <param>const <type>void</type>* <name>create_info</name></param>
             <param>const <type>void</type>* <name>allocator</name></param>
             <param><type>VkDevice</type>* <name>device</name></param>
-            <param><type>PFN_vkGetDeviceProcAddrWINE</type> <name>get_device_proc_addr</name></param>
+            <param><type>PFN_vkGetInstanceProcAddrWINE</type> <name>get_instance_proc_addr</name></param>
             <param><type>void</type>* <name>context</name></param>
         </type>
         <type category="struct" name="VkCreateInfoWineDeviceCallback" structextends="VkDeviceCreateInfo">
@@ -72,7 +67,7 @@
                 <enum value="1"                                                 name="VK_WINE_OPENXR_DEVICE_EXTENSIONS_SPEC_VERSION"/>
                 <enum value="&quot;VK_WINE_openxr_device_extensions&quot;"      name="VK_WINE_OPENXR_DEVICE_EXTENSIONS_EXTENSION_NAME"/>
                 <enum offset="0" extends="VkStructureType"                      name="VK_STRUCTURE_TYPE_CREATE_INFO_WINE_DEVICE_CALLBACK"/>
-                <type name="PFN_vkGetDeviceProcAddrWINE"/>
+                <type name="PFN_vkGetInstanceProcAddrWINE"/>
                 <type name="PFN_vkCreateDeviceCallbackWINE"/>
                 <type name="VkCreateInfoWineDeviceCallback"/>
             </require>
