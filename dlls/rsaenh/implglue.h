@@ -66,6 +66,11 @@ static inline DWORD hash_len_impl(const struct hash *hash)
     return hash->desc->hashsize;
 }
 
+static inline DWORD hash_block_len_impl(const struct hash *hash)
+{
+    return hash->desc->blocksize;
+}
+
 BOOL export_public_key_impl(BYTE *pbDest, const KEY_CONTEXT *pKeyContext, DWORD dwKeyLen,
                             DWORD *pdwPubExp);
 BOOL import_public_key_impl(const BYTE *pbSrc, KEY_CONTEXT *pKeyContext, DWORD dwKeyLen,
