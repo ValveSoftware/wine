@@ -222,6 +222,9 @@ extern BOOL fsync_yield_to_waiters;
 
 extern BOOL ac_odyssey;
 
+extern BOOL handle_cpuid_fault( ULONG_PTR *pc, ULONG_PTR *ax, ULONG_PTR *bx, ULONG_PTR *cx, ULONG_PTR *dx );
+extern void emulate_cpuid(void);
+
 extern void init_environment(void);
 extern void init_startup_info(void);
 extern void *create_startup_info( const UNICODE_STRING *nt_image, ULONG process_flags,

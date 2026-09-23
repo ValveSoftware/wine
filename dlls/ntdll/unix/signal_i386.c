@@ -1975,8 +1975,17 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     EXCEPTION_RECORD rec = { 0 };
     struct xcontext xcontext;
     ucontext_t *ucontext = sigcontext;
-    void *stack = setup_exception_record( sigcontext, &rec, &xcontext );
+    void *stack;
     void *steamclient_addr = NULL;
+
+    /* cpuid fault may happen in native thread. */
+    if (TRAP_sig(ucontext) == TRAP_x86_PROTFLT && siginfo->si_code == 0x80 && !ERROR_sig(ucontext)
+        && handle_cpuid_fault( (ULONG_PTR *)&EIP_sig(ucontext), (ULONG_PTR *)&EAX_sig(ucontext),
+                               (ULONG_PTR *)&EBX_sig(ucontext), (ULONG_PTR *)&ECX_sig(ucontext),
+                               (ULONG_PTR *)&EDX_sig(ucontext) ))
+        return;
+
+    stack = setup_exception_record( sigcontext, &rec, &xcontext );
 
     switch (TRAP_sig(ucontext))
     {
@@ -2462,6 +2471,8 @@ void signal_init_process(void)
     if (sigaction( SIGSEGV, &sig_act, NULL ) == -1) goto error;
     if (sigaction( SIGILL, &sig_act, NULL ) == -1) goto error;
     if (sigaction( SIGBUS, &sig_act, NULL ) == -1) goto error;
+
+    emulate_cpuid();
     return;
 
  error:

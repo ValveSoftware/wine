@@ -2691,11 +2691,19 @@ static inline BOOL check_invalid_gsbase( ucontext_t *ucontext )
  */
 static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
 {
-    ucontext_t *ucontext = init_handler( sigcontext );
+    ucontext_t *ucontext = sigcontext;
     EXCEPTION_RECORD rec = { 0 };
     struct xcontext context;
     void *steamclient_addr = NULL;
 
+    /* cpuid fault may happen in native thread. */
+    if (TRAP_sig(ucontext) == TRAP_x86_PROTFLT && siginfo->si_code == 0x80 && !ERROR_sig(ucontext)
+        && handle_cpuid_fault( (ULONG_PTR *)&RIP_sig(ucontext), (ULONG_PTR *)&RAX_sig(ucontext),
+                               (ULONG_PTR *)&RBX_sig(ucontext), (ULONG_PTR *)&RCX_sig(ucontext),
+                               (ULONG_PTR *)&RDX_sig(ucontext) ))
+        return;
+
+    init_handler( sigcontext );
     rec.ExceptionAddress = (void *)RIP_sig(ucontext);
     save_context( &context, ucontext );
 
@@ -3188,6 +3196,8 @@ void signal_init_process(void)
     if (sigaction( SIGSYS, &sig_act, NULL ) == -1) goto error;
 #endif
     install_bpf(&sig_act);
+
+    emulate_cpuid();
     return;
 
  error:
