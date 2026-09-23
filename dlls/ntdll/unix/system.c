@@ -343,10 +343,84 @@ void copy_xstate( XSAVE_AREA_HEADER *dst, XSAVE_AREA_HEADER *src, UINT64 mask )
     }
 }
 
+static BOOL hack_hide_amd_cpu(void);
+
 static inline void do_cpuid( unsigned int ax, unsigned int cx, unsigned int *p )
 {
     __asm__ ( "cpuid" : "=a" (p[0]), "=b" (p[1]), "=c" (p[2]), "=d" (p[3]) : "a" (ax), "c" (cx) );
+    if (!ax && hack_hide_amd_cpu())
+    {
+        /* "GenuineIntel" */
+        p[1] = 0x756e6547;
+        p[2] = 0x6c65746e;
+        p[3] = 0x49656e69;
+    }
 }
+
+#ifdef __linux__
+#include <asm/prctl.h>
+#include <syscall.h>
+static inline int arch_prctl( int func, void *ptr ) { return syscall( __NR_arch_prctl, func, ptr ); }
+
+static BOOL hack_hide_amd_cpu(void)
+{
+    static int cached = -1;
+
+    if (cached == -1)
+    {
+        const char *env_str;
+        unsigned int regs[4];
+
+        cached = 0;
+        if ((env_str = getenv( "WINE_HIDE_AMD_CPU" )) && *env_str == '1')
+        {
+            do_cpuid( 0, 0, regs );
+            /* AuthenticAMD */
+            cached = (regs[1] == 0x68747541 && regs[2] == 0x444D4163 && regs[3] == 0x69746e65);
+            if (cached) ERR( "HACK: hiding AMD CPU.\n" );
+        }
+    }
+    return cached;
+}
+
+BOOL handle_cpuid_fault( ULONG_PTR *pc, ULONG_PTR *ax, ULONG_PTR *bx, ULONG_PTR *cx, ULONG_PTR *dx )
+{
+    const BYTE *p = (BYTE *)*pc;
+    unsigned int regs[4];
+
+    if (!hack_hide_amd_cpu()) return FALSE;
+    if (p[0] != 0xf || p[1] != 0xa2) return FALSE;
+
+    arch_prctl( ARCH_SET_CPUID, (void*)1 );
+    do_cpuid( *ax, *cx, regs );
+    *ax = regs[0];
+    *bx = regs[1];
+    *cx = regs[2];
+    *dx = regs[3];
+    arch_prctl( ARCH_SET_CPUID, 0 );
+    *pc += 2;
+    return TRUE;
+}
+
+void emulate_cpuid(void)
+{
+    if (hack_hide_amd_cpu() && arch_prctl( ARCH_SET_CPUID, 0 ))
+        ERR( "ARCH_SET_CPUID failed, err %d.\n", errno );
+}
+
+#else
+BOOL handle_cpuid_fault( ULONG_PTR *pc, ULONG_PTR *ax, ULONG_PTR *bx, ULONG_PTR *cx, ULONG_PTR *dx )
+{
+    return FALSE;
+}
+static BOOL hack_hide_amd_cpu(void)
+{
+    return FALSE;
+}
+void emulate_cpuid(void)
+{
+}
+#endif
 
 static inline UINT64 do_xgetbv( unsigned int cx )
 {
