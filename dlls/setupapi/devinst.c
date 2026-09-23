@@ -170,6 +170,20 @@ static WCHAR *concat_path(const WCHAR *root, const WCHAR *path)
     return sprintf_path(L"%s\\%s", root, path);
 }
 
+static BOOL guid_from_string_w(WCHAR *str, GUID *guid)
+{
+    RPC_STATUS ret;
+
+    if (wcslen(str) != 38 || (str[0] != '{') || (str[37] != '}'))
+        return FALSE;
+
+    str[37] = 0;
+    ret = UuidFromStringW(&str[1], guid);
+    str[37] = '}';
+
+    return ret == RPC_S_OK;
+}
+
 static struct DeviceInfoSet *get_device_set(HDEVINFO devinfo)
 {
     struct DeviceInfoSet *set = devinfo;
@@ -3665,7 +3679,7 @@ BOOL WINAPI SetupDiOpenDeviceInfoW(HDEVINFO devinfo, PCWSTR instance_id, HWND hw
     GUID guid;
     HKEY enumKey = NULL;
     HKEY instanceKey = NULL;
-    DWORD phantom;
+    DWORD phantom = 0;
     DWORD size;
     DWORD error = ERROR_NO_SUCH_DEVINST;
 
@@ -3699,16 +3713,15 @@ BOOL WINAPI SetupDiOpenDeviceInfoW(HDEVINFO devinfo, PCWSTR instance_id, HWND hw
 
     /* If it's an unregistered instance, aka phantom instance, report ERROR_NO_SUCH_DEVINST */
     size = sizeof(phantom);
-    if (!RegQueryValueExW(instanceKey, L"Phantom", NULL, NULL, (BYTE *)&phantom, &size))
+    if (!RegQueryValueExW(instanceKey, L"Phantom", NULL, NULL, (BYTE *)&phantom, &size)
+            && phantom != 0)
         goto done;
 
-    /* Check class GUID */
+    /* Check class GUID, and use it if present. */
     size = sizeof(classW);
-    if (RegQueryValueExW(instanceKey, L"ClassGUID", NULL, NULL, (BYTE *)classW, &size))
-        goto done;
-
-    classW[37] = 0;
-    UuidFromStringW(&classW[1], &guid);
+    if (RegGetValueW(instanceKey, NULL, L"ClassGUID", RRF_RT_REG_SZ, NULL, classW, &size)
+            || !guid_from_string_w(classW, &guid))
+        guid = GUID_NULL;
 
     if (!IsEqualGUID(&set->ClassGuid, &GUID_NULL) && !IsEqualGUID(&guid, &set->ClassGuid))
     {
