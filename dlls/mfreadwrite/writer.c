@@ -60,6 +60,7 @@ struct stream
     IMFStreamSink *stream_sink;
     IMFTransform *converter, *encoder;
     MF_SINK_WRITER_STATISTICS stats;
+    BOOL type_is_default;
     struct list queue; /* struct pending_item. */
 };
 
@@ -315,6 +316,7 @@ static HRESULT sink_writer_add_stream(struct sink_writer *writer, IMFStreamSink 
             hr = IMFMediaTypeHandler_SetCurrentMediaType(type_handler, media_type);
             IMFMediaType_Release(media_type);
         }
+        stream->type_is_default = TRUE;
     }
     IMFMediaTypeHandler_Release(type_handler);
 
@@ -357,10 +359,10 @@ static HRESULT WINAPI sink_writer_SetInputMediaType(IMFSinkWriterEx *iface, DWOR
         IMFAttributes *parameters)
 {
     struct sink_writer *writer = impl_from_IMFSinkWriterEx(iface);
+    HRESULT hr = MF_E_INVALIDMEDIATYPE;
     IMFMediaType *stream_type = NULL;
     struct stream *stream;
     DWORD flags;
-    HRESULT hr;
 
     TRACE("%p, %lu, %p, %p.\n", iface, index, type, parameters);
 
@@ -375,22 +377,40 @@ static HRESULT WINAPI sink_writer_SetInputMediaType(IMFSinkWriterEx *iface, DWOR
         goto done;
     }
 
-    if (FAILED(hr = stream_get_type(stream, &stream_type))
-            || FAILED(hr = IMFMediaType_IsEqual(type, stream_type, &flags)))
-        goto done;
-
-    if (!(flags & MF_MEDIATYPE_EQUAL_MAJOR_TYPES))
+    /* Stream media type may be set once only, if the sink supports the type. If the stream
+     * sink had a type when the stream was added, that counts and type_is_default is false.
+     * Subsequent type changes will add transform(s) as required. */
+    if (stream->type_is_default)
     {
-        hr = MF_E_INVALIDMEDIATYPE;
-        goto done;
+        IMFMediaTypeHandler *type_handler;
+
+        if (FAILED(hr = IMFStreamSink_GetMediaTypeHandler(stream->stream_sink, &type_handler)))
+            goto done;
+        if (FAILED(hr = IMFMediaTypeHandler_SetCurrentMediaType(type_handler, type)))
+            FIXME("Type not supported (which may not match native), inserting a transform.\n");
+        IMFMediaTypeHandler_Release(type_handler);
+        stream->type_is_default = FALSE;
     }
 
-    /* Types are not compatible, create transforms. */
-    if (!(flags & MF_MEDIATYPE_EQUAL_FORMAT_DATA))
+    if (FAILED(hr))
     {
-        /* TODO: Try only using converter first, then try again with encoder. */
-        FIXME("Not implemented.\n");
-        hr = E_NOTIMPL;
+        if (FAILED(hr = stream_get_type(stream, &stream_type))
+                || FAILED(hr = IMFMediaType_IsEqual(type, stream_type, &flags)))
+            goto done;
+
+        if (!(flags & MF_MEDIATYPE_EQUAL_MAJOR_TYPES))
+        {
+            hr = MF_E_INVALIDMEDIATYPE;
+            goto done;
+        }
+
+        /* Types are not compatible, create transforms. */
+        if (!(flags & MF_MEDIATYPE_EQUAL_FORMAT_DATA))
+        {
+            /* TODO: Try only using converter first, then try again with encoder. */
+            FIXME("Not implemented.\n");
+            hr = E_NOTIMPL;
+        }
     }
 
 done:
