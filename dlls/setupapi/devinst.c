@@ -333,6 +333,20 @@ static BOOL is_valid_property_type(DEVPROPTYPE prop_type)
     return TRUE;
 }
 
+static BOOL is_valid_device_instance_id(const WCHAR *device_instance_id)
+{
+    int separators = 0;
+    const WCHAR *tmp;
+
+    if (!*device_instance_id) return FALSE;
+    if (wcslen(device_instance_id) >= MAX_DEVICE_ID_LEN) return FALSE;
+
+    for (tmp = wcschr(device_instance_id, '\\'); tmp && *tmp; tmp = wcschr(tmp + 1, '\\')) separators++;
+    if (separators != 2) return FALSE;
+    tmp = wcsrchr(device_instance_id, '\\') + 1;
+    return *tmp;
+}
+
 static LPWSTR SETUPDI_CreateSymbolicLinkPath(LPCWSTR instanceId,
         const GUID *InterfaceClassGuid, LPCWSTR ReferenceString)
 {
@@ -1382,6 +1396,13 @@ BOOL WINAPI SetupDiCreateDeviceInfoW(HDEVINFO devinfo, const WCHAR *name, const 
         return FALSE;
     }
 
+    if ((!(flags & DICD_GENERATE_ID) && !is_valid_device_instance_id(name))
+            || ((flags & DICD_GENERATE_ID) && wcschr(name, '\\')))
+    {
+        SetLastError(ERROR_INVALID_DEVINST_NAME);
+        return FALSE;
+    }
+
     if (!(set = get_device_set(devinfo)))
         return FALSE;
 
@@ -1399,12 +1420,6 @@ BOOL WINAPI SetupDiCreateDeviceInfoW(HDEVINFO devinfo, const WCHAR *name, const 
     if ((flags & DICD_GENERATE_ID))
     {
         unsigned int instance_id;
-
-        if (wcschr(name, '\\'))
-        {
-            SetLastError(ERROR_INVALID_DEVINST_NAME);
-            return FALSE;
-        }
 
         for (instance_id = 0; ; ++instance_id)
         {
@@ -3622,9 +3637,15 @@ BOOL WINAPI SetupDiOpenDeviceInfoA(HDEVINFO devinfo, PCSTR instance_id, HWND hwn
 
     TRACE("%p %s %p 0x%08lx %p\n", devinfo, debugstr_a(instance_id), hwnd_parent, flags, device_data);
 
-    if (!instance_id || strlen(instance_id) >= MAX_DEVICE_ID_LEN)
+    if (!instance_id)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    if (strlen(instance_id) >= MAX_DEVICE_ID_LEN)
+    {
+        SetLastError(ERROR_INVALID_DEVINST_NAME);
         return FALSE;
     }
 
@@ -3656,6 +3677,12 @@ BOOL WINAPI SetupDiOpenDeviceInfoW(HDEVINFO devinfo, PCWSTR instance_id, HWND hw
     if (!instance_id)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    if (!is_valid_device_instance_id(instance_id))
+    {
+        SetLastError(ERROR_INVALID_DEVINST_NAME);
         return FALSE;
     }
 
