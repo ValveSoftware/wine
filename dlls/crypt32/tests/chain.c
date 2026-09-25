@@ -121,6 +121,89 @@ static void testCreateCertChainEngine(void)
     CertCloseStore(store, 0);
 }
 
+static void testChainEngineConfigLayouts(void)
+{
+    static const DWORD sizes[] = {
+        sizeof(CERT_CHAIN_ENGINE_CONFIG_NO_EXCLUSIVE_ROOT),
+        FIELD_OFFSET(CERT_CHAIN_ENGINE_CONFIG, dwExclusiveFlags),
+        sizeof(CERT_CHAIN_ENGINE_CONFIG)
+    };
+    CERT_CHAIN_PARA para = { sizeof(para) };
+    CERT_CHAIN_ENGINE_CONFIG invalid = { 0 }, *config;
+    PCCERT_CHAIN_CONTEXT chain;
+    PCCERT_CONTEXT cert;
+    HCERTCHAINENGINE engine;
+    HCERTSTORE store;
+    SYSTEM_INFO info;
+    DWORD old_protect, i;
+    BYTE *memory;
+    BOOL ret;
+
+    GetSystemInfo(&info);
+    memory = VirtualAlloc(NULL, info.dwPageSize * 2, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    ok(!!memory, "VirtualAlloc failed: %lu\n", GetLastError());
+    if (!memory) return;
+    ret = VirtualProtect(memory + info.dwPageSize, info.dwPageSize, PAGE_NOACCESS, &old_protect);
+    ok(ret, "VirtualProtect failed: %lu\n", GetLastError());
+    if (!ret)
+    {
+        VirtualFree(memory, 0, MEM_RELEASE);
+        return;
+    }
+
+    store = CertOpenStore(CERT_STORE_PROV_MEMORY, 0, 0, CERT_STORE_CREATE_NEW_FLAG, NULL);
+    ok(!!store, "CertOpenStore failed: %lu\n", GetLastError());
+    ret = CertAddEncodedCertificateToStore(store, X509_ASN_ENCODING, selfSignedCert,
+        sizeof(selfSignedCert), CERT_STORE_ADD_ALWAYS, &cert);
+    ok(ret, "CertAddEncodedCertificateToStore failed: %lu\n", GetLastError());
+    if (!ret)
+    {
+        CertCloseStore(store, 0);
+        VirtualFree(memory, 0, MEM_RELEASE);
+        return;
+    }
+
+    for (i = 0; i < ARRAY_SIZE(sizes); ++i)
+    {
+        /* Each legacy structure ends at a guard page: no reading newer fields. */
+        config = (CERT_CHAIN_ENGINE_CONFIG *)(memory + info.dwPageSize - sizes[i]);
+        memset(config, 0, sizes[i]);
+        config->cbSize = sizes[i];
+        if (i) config->hExclusiveRoot = store;
+        engine = NULL;
+        ret = CertCreateCertificateChainEngine(config, &engine);
+        ok(ret, "layout %lu: engine creation failed: %08lx\n", sizes[i], GetLastError());
+        if (!ret) continue;
+        if (i)
+        {
+            /* The old 80-byte layout must still honor its exclusive root. */
+            chain = NULL;
+            ret = CertGetCertificateChain(engine, cert, NULL, NULL, &para,
+                CERT_CHAIN_CACHE_ONLY_URL_RETRIEVAL, NULL, &chain);
+            ok(ret, "layout %lu: chain creation failed: %08lx\n", sizes[i], GetLastError());
+            if (ret)
+            {
+                ok(!(chain->TrustStatus.dwErrorStatus & CERT_TRUST_IS_UNTRUSTED_ROOT),
+                    "layout %lu: exclusive root ignored, trust status %08lx\n",
+                    sizes[i], chain->TrustStatus.dwErrorStatus);
+                CertFreeCertificateChain(chain);
+            }
+        }
+        CertFreeCertificateChainEngine(engine);
+    }
+
+    invalid.cbSize = sizeof(invalid) + sizeof(void *);
+    SetLastError(0xdeadbeef);
+    ret = CertCreateCertificateChainEngine(&invalid, &engine);
+    ok(!ret && GetLastError() == E_INVALIDARG,
+        "Invalid layout accepted: ret %d, error %08lx\n", ret, GetLastError());
+    if (ret) CertFreeCertificateChainEngine(engine);
+
+    CertFreeCertificateContext(cert);
+    CertCloseStore(store, 0);
+    VirtualFree(memory, 0, MEM_RELEASE);
+}
+
 static const BYTE bigCert[] = { 0x30, 0x7a, 0x02, 0x01, 0x01, 0x30, 0x02, 0x06,
  0x00, 0x30, 0x15, 0x31, 0x13, 0x30, 0x11, 0x06, 0x03, 0x55, 0x04, 0x03, 0x13,
  0x0a, 0x4a, 0x75, 0x61, 0x6e, 0x20, 0x4c, 0x61, 0x6e, 0x67, 0x00, 0x30, 0x22,
@@ -5570,6 +5653,7 @@ static void test_chain_engine_cache_update(void)
 START_TEST(chain)
 {
     testCreateCertChainEngine();
+    testChainEngineConfigLayouts();
     testVerifyCertChainPolicy();
     testGetCertChain();
     test_CERT_CHAIN_PARA_cbSize();

@@ -120,7 +120,7 @@ HCERTCHAINENGINE CRYPT_CreateChainEngine(HCERTSTORE root, DWORD system_store, co
     if (root) {
         root = CertDuplicateStore(root);
     } else {
-        if(config->cbSize >= sizeof(CERT_CHAIN_ENGINE_CONFIG) && config->hExclusiveRoot)
+        if(config->cbSize >= FIELD_OFFSET(CERT_CHAIN_ENGINE_CONFIG, dwExclusiveFlags) && config->hExclusiveRoot)
             root = CertDuplicateStore(config->hExclusiveRoot);
         else if (config->hRestrictedRoot)
             root = CertDuplicateStore(config->hRestrictedRoot);
