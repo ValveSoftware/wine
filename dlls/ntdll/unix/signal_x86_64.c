@@ -2279,7 +2279,7 @@ __ASM_GLOBAL_FUNC( dump_syscall_fault_return,
                    "movq %rdi,%rsp\n\t"
                    "movq %rsi,%rax\n\t"
                    "movq %rdx,%r13\n\t"
-                   "jmp %rcx")
+                   "jmp *%rcx")
 
 
 static void dump_syscall_fault( CONTEXT *context, DWORD exc_code )
