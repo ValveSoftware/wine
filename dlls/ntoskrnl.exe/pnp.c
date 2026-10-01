@@ -379,6 +379,43 @@ static void start_device( DEVICE_OBJECT *device, HDEVINFO set, SP_DEVINFO_DATA *
     create_dyn_data_key( device );
 }
 
+static HKEY get_device_registry_key( const WCHAR *device_instance_id )
+{
+    WCHAR path[MAX_PATH];
+    LSTATUS ret;
+    HKEY hkey;
+
+    swprintf( path, ARRAY_SIZE(path), L"System\\CurrentControlSet\\Enum\\%s", device_instance_id );
+    if ((ret = RegOpenKeyExW( HKEY_LOCAL_MACHINE, path, 0, KEY_ALL_ACCESS, &hkey )))
+        ERR( "Failed to open device instance %s registry key, ret %#lx.\n", debugstr_w(device_instance_id), ret );
+
+    return !ret ? hkey : INVALID_HANDLE_VALUE;
+}
+
+static BOOL create_or_open_setupapi_device_info(HDEVINFO set, const WCHAR *device_instance_id, SP_DEVINFO_DATA *sp_device)
+{
+    HKEY key;
+    BOOL ret;
+
+    if ((ret = SetupDiCreateDeviceInfoW( set, device_instance_id, &GUID_NULL, NULL, NULL, 0, sp_device ))
+            || (ret = SetupDiOpenDeviceInfoW( set, device_instance_id, NULL, 0, sp_device ))
+            || GetLastError() != ERROR_NO_SUCH_DEVINST)
+         return ret;
+
+    if ((key = get_device_registry_key( device_instance_id )) == INVALID_HANDLE_VALUE)
+        return FALSE;
+
+    /*
+     * It's possible there's a half-created device info key in the registry
+     * causing both creating and opening to fail, delete it and try opening
+     * again.
+     */
+    if (!RegDeleteValueW( key, L"Phantom" ))
+        WARN("Found a preexisting device key for %s with a phantom key value, deleting.\n", debugstr_w(device_instance_id));
+    RegCloseKey( key );
+    return SetupDiOpenDeviceInfoW( set, device_instance_id, NULL, 0, sp_device );
+}
+
 static void enumerate_new_device( DEVICE_OBJECT *device, HDEVINFO set, DEVICE_OBJECT *parent_device )
 {
     static const WCHAR infpathW[] = {'I','n','f','P','a','t','h',0};
@@ -395,8 +432,7 @@ static void enumerate_new_device( DEVICE_OBJECT *device, HDEVINFO set, DEVICE_OB
     if (get_device_instance_id( device, device_instance_id ))
         return;
 
-    if (!SetupDiCreateDeviceInfoW( set, device_instance_id, &GUID_NULL, NULL, NULL, 0, &sp_device )
-            && !SetupDiOpenDeviceInfoW( set, device_instance_id, NULL, 0, &sp_device ))
+    if (!create_or_open_setupapi_device_info( set, device_instance_id, &sp_device ))
     {
         ERR("Failed to create or open device %s, error %#lx.\n", debugstr_w(device_instance_id), GetLastError());
         return;
