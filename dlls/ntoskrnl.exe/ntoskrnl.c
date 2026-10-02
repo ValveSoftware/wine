@@ -2521,6 +2521,15 @@ HANDLE WINAPI PsGetProcessInheritedFromUniqueProcessId( PEPROCESS process )
     return id;
 }
 
+/*********************************************************************
+ *           PsGetProcessExitProcessCalled    (NTOSKRNL.@)
+ */
+BOOLEAN WINAPI PsGetProcessExitProcessCalled( PEPROCESS process )
+{
+    TRACE( "%p\n", process );
+    return FALSE;
+}
+
 static void *create_thread_object( HANDLE handle )
 {
     THREAD_BASIC_INFORMATION info;
@@ -4301,6 +4310,16 @@ NTSTATUS WINAPI SeLocateProcessImageName(PEPROCESS process, UNICODE_STRING **ima
 }
 
 /*********************************************************************
+ *           SeQueryInformationToken    (NTOSKRNL.@)
+ */
+NTSTATUS WINAPI SeQueryInformationToken(PACCESS_TOKEN token, TOKEN_INFORMATION_CLASS token_info_class, PVOID *token_info)
+{
+    FIXME("stub: %p %u %p\n", token, token_info_class, token_info);
+    if (token_info) *token_info = NULL;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+/*********************************************************************
  *           KeFlushQueuedDpcs    (NTOSKRNL.@)
  */
 void WINAPI KeFlushQueuedDpcs(void)
@@ -4676,6 +4695,107 @@ NTSTATUS WINAPI EtwUnregister(REGHANDLE handle)
 {
     FIXME("handle %I64x\n", handle);
     return STATUS_SUCCESS;
+}
+
+/*********************************************************************
+ *           InbvAcquireDisplayOwnership    (NTOSKRNL.@)
+ */
+void WINAPI InbvAcquireDisplayOwnership(void)
+{
+    TRACE("\n");
+}
+
+/*********************************************************************
+ *           InbvResetDisplay    (NTOSKRNL.@)
+ */
+BOOLEAN WINAPI InbvResetDisplay(void)
+{
+    TRACE("\n");
+    return TRUE;
+}
+
+/*********************************************************************
+ *           InbvCheckDisplayOwnership    (NTOSKRNL.@)
+ */
+BOOLEAN WINAPI InbvCheckDisplayOwnership(void)
+{
+    TRACE("\n");
+    return TRUE;
+}
+
+/*********************************************************************
+ *           InbvNotifyDisplayOwnershipLost    (NTOSKRNL.@)
+ */
+void WINAPI InbvNotifyDisplayOwnershipLost(void *callback)
+{
+    TRACE("%p\n", callback);
+}
+
+/*********************************************************************
+ *           InbvDisplayString    (NTOSKRNL.@)
+ */
+void WINAPI InbvDisplayString(char *string)
+{
+    TRACE("%s\n", debugstr_a(string));
+}
+
+/*********************************************************************
+ *           InbvEnableBootDriver    (NTOSKRNL.@)
+ */
+void WINAPI InbvEnableBootDriver(BOOLEAN enable)
+{
+    TRACE("%u\n", enable);
+}
+
+/*********************************************************************
+ *           InbvEnableDisplayString    (NTOSKRNL.@)
+ */
+BOOLEAN WINAPI InbvEnableDisplayString(BOOLEAN enable)
+{
+    TRACE("%u\n", enable);
+    return TRUE;
+}
+
+/*********************************************************************
+ *           InbvInstallDisplayStringFilter    (NTOSKRNL.@)
+ */
+void WINAPI InbvInstallDisplayStringFilter(void *filter)
+{
+    TRACE("%p\n", filter);
+}
+
+/*********************************************************************
+ *           InbvIsBootDriverInstalled    (NTOSKRNL.@)
+ */
+BOOLEAN WINAPI InbvIsBootDriverInstalled(void)
+{
+    TRACE("\n");
+    return FALSE;
+}
+
+/*********************************************************************
+ *           InbvSetScrollRegion    (NTOSKRNL.@)
+ */
+void WINAPI InbvSetScrollRegion(ULONG left, ULONG top, ULONG right, ULONG bottom)
+{
+    TRACE("%lu %lu %lu %lu\n", left, top, right, bottom);
+}
+
+/*********************************************************************
+ *           InbvSetTextColor    (NTOSKRNL.@)
+ */
+ULONG WINAPI InbvSetTextColor(ULONG color)
+{
+    TRACE("%lx\n", color);
+    return 0;
+}
+
+/*********************************************************************
+ *           InbvSolidColorFill    (NTOSKRNL.@)
+ */
+void WINAPI InbvSolidColorFill(ULONG left, ULONG top, ULONG right, ULONG bottom, ULONG color)
+{
+    TRACE("%lu %lu %lu %lu %lx\n", left, top, right, bottom, color);
 }
 
 /*****************************************************

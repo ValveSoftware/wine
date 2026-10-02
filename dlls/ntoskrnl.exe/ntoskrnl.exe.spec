@@ -310,18 +310,18 @@
 @ stub HalDispatchTable
 @ stub HalPrivateDispatchTable
 @ stub HeadlessDispatch
-@ stub InbvAcquireDisplayOwnership
-@ stub InbvCheckDisplayOwnership
-@ stub InbvDisplayString
-@ stub InbvEnableBootDriver
-@ stub InbvEnableDisplayString
-@ stub InbvInstallDisplayStringFilter
-@ stub InbvIsBootDriverInstalled
-@ stub InbvNotifyDisplayOwnershipLost
-@ stub InbvResetDisplay
-@ stub InbvSetScrollRegion
-@ stub InbvSetTextColor
-@ stub InbvSolidColorFill
+@ stdcall InbvAcquireDisplayOwnership()
+@ stdcall InbvCheckDisplayOwnership()
+@ stdcall InbvDisplayString(str)
+@ stdcall InbvEnableBootDriver(long)
+@ stdcall InbvEnableDisplayString(long)
+@ stdcall InbvInstallDisplayStringFilter(ptr)
+@ stdcall InbvIsBootDriverInstalled()
+@ stdcall InbvNotifyDisplayOwnershipLost(ptr)
+@ stdcall InbvResetDisplay()
+@ stdcall InbvSetScrollRegion(long long long long)
+@ stdcall InbvSetTextColor(long)
+@ stdcall InbvSolidColorFill(long long long long long)
 @ extern InitSafeBootMode
 @ stdcall IoAcquireCancelSpinLock(ptr)
 @ stdcall IoAcquireRemoveLockEx(ptr ptr str long long)
@@ -919,7 +919,7 @@
 @ stub PsGetJobUIRestrictionsClass
 @ stub PsGetProcessCreateTimeQuadPart
 @ stub PsGetProcessDebugPort
-@ stub PsGetProcessExitProcessCalled
+@ stdcall PsGetProcessExitProcessCalled(ptr)
 @ stub PsGetProcessExitStatus
 @ stub PsGetProcessExitTime
 @ stdcall PsGetProcessId(ptr)
@@ -1362,7 +1362,7 @@
 @ stub SePrivilegeObjectAuditAlarm
 @ stub SePublicDefaultDacl
 @ stub SeQueryAuthenticationIdToken
-@ stub SeQueryInformationToken
+@ stdcall SeQueryInformationToken(ptr long ptr)
 @ stub SeQuerySecurityDescriptorInfo
 @ stub SeQuerySessionIdToken
 @ stub SeRegisterLogonSessionTerminatedRoutine
