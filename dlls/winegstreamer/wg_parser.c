@@ -1290,7 +1290,7 @@ static bool stream_decodebin_create(struct wg_parser_stream *stream)
     gst_bin_add(GST_BIN(parser->container), stream->decodebin);
 
     g_signal_connect(stream->decodebin, "pad-added", G_CALLBACK(stream_decodebin_pad_added_cb), stream);
-    g_signal_connect(stream->decodebin, "autoplug-select", G_CALLBACK(autoplug_select_cb), stream);
+    g_signal_connect(stream->decodebin, "autoplug-select", G_CALLBACK(autoplug_select_cb), parser);
     g_signal_connect(stream->decodebin, "no-more-pads", G_CALLBACK(stream_decodebin_no_more_pads_cb), stream);
 
     pthread_mutex_lock(&parser->mutex);
