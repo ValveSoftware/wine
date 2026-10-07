@@ -2653,6 +2653,11 @@ BOOL WINAPI NtUserUpdateLayeredWindow( HWND hwnd, HDC hdc_dst, const POINT *pts_
     TRACE( "window %p new_rects %s\n", hwnd, debugstr_window_rects( &new_rects ) );
 
     surface = get_window_surface( hwnd, swp_flags, TRUE, &new_rects, &surface_rect );
+    if (hdc_src && surface && surface != &dummy_surface)
+    {
+        if (!(flags & ULW_COLORKEY)) key = CLR_INVALID;
+        window_surface_set_layered( surface, key, -1, 0xff000000 );
+    }
     apply_window_pos( hwnd, 0, swp_flags, surface, &new_rects, NULL );
     if (!surface) return FALSE;
 
@@ -2688,9 +2693,6 @@ BOOL WINAPI NtUserUpdateLayeredWindow( HWND hwnd, HDC hdc_dst, const POINT *pts_
 
         NtGdiDeleteObjectApp( hdc );
         window_surface_unlock( surface );
-
-        if (!(flags & ULW_COLORKEY)) key = CLR_INVALID;
-        window_surface_set_layered( surface, key, -1, 0xff000000 );
 
         user_driver->pUpdateLayeredWindow( hwnd, source_alpha, flags );
         window_surface_flush( surface );
