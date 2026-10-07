@@ -1260,9 +1260,6 @@ static void fill_frame_padded_bits(GstBuffer *buffer, const GstVideoAlignment *a
     guint i, j, plane, padded_height, width, height, stride, pixel_stride, padding_bottom = align->padding_bottom;
     GstVideoFrame frame;
 
-    if (!padding_bottom) action &= ~FILL_BOTTOM;
-    if (!align->padding_right) action &= ~FILL_RIGHT;
-
     if (!action || !gst_video_frame_map(&frame, info, buffer, GST_MAP_WRITE)) return;
 
     /* Windows uses the data in the last scanline for its bottom padding, and the last pixel
@@ -1303,12 +1300,22 @@ static NTSTATUS read_transform_output_video(struct wg_sample *sample, GstBuffer 
         const GstVideoInfo *src_video_info, const GstVideoInfo *dst_video_info, const GstVideoAlignment *align)
 {
     GstBuffer *dst_buffer = NULL;
+    enum fill_action action = 0;
     gsize total_size;
     NTSTATUS status;
     bool needs_copy;
     const char *sgi;
 
-    if (!(needs_copy = sample_needs_buffer_copy(sample, buffer, &total_size)))
+    if ((align->padding_bottom || align->padding_right) && (sgi = getenv("SteamGameId")))
+    {
+        if (align->padding_bottom && (!strcmp(sgi, "1449280") || !strcmp(sgi, "1839950")))
+            action |= FILL_BOTTOM;
+        else if (align->padding_right && !strcmp(sgi, "536280"))
+            action |= FILL_RIGHT;
+    }
+    needs_copy = !!action;
+
+    if (!needs_copy && !(needs_copy = sample_needs_buffer_copy(sample, buffer, &total_size)))
         status = STATUS_SUCCESS;
     else
         status = copy_video_buffer(buffer, src_video_info, dst_video_info, sample, &total_size, &dst_buffer);
@@ -1320,17 +1327,7 @@ static NTSTATUS read_transform_output_video(struct wg_sample *sample, GstBuffer 
         return status;
     }
 
-    if ((sgi = getenv("SteamGameId")))
-    {
-        enum fill_action action = 0;
-
-        if (!strcmp(sgi, "1449280") || !strcmp(sgi, "1839950"))
-            action |= FILL_BOTTOM;
-        else if (!strcmp(sgi, "536280"))
-            action |= FILL_RIGHT;
-
-        fill_frame_padded_bits(dst_buffer ? dst_buffer : buffer, align, dst_video_info, action);
-    }
+    fill_frame_padded_bits(dst_buffer ? dst_buffer : buffer, align, dst_video_info, action);
 
     if (dst_buffer)
         gst_buffer_unref(dst_buffer);
