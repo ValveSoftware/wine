@@ -1324,7 +1324,7 @@ static NTSTATUS read_transform_output_video(struct wg_sample *sample, GstBuffer 
     {
         enum fill_action action = 0;
 
-        if (!strcmp(sgi, "1449280"))
+        if (!strcmp(sgi, "1449280") || !strcmp(sgi, "1839950"))
             action |= FILL_BOTTOM;
         else if (!strcmp(sgi, "536280"))
             action |= FILL_RIGHT;
