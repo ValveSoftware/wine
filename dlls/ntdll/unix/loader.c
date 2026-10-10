@@ -39,6 +39,11 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <malloc.h>
+#ifndef M_PERTURB
+/* musl does not implement mallopt(). Only used for debugging; use a no-op. */
+#define M_PERTURB 0
+static inline int mallopt( int param, int value ) { return 1; }
+#endif
 #include <dlfcn.h>
 #ifdef HAVE_PWD_H
 # include <pwd.h>
