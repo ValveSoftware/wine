@@ -5023,7 +5023,7 @@ static void test_winmm_joystick(void)
     check_member( caps, expect_caps2, "%#x", wPid );
 
     ret = joyGetPosEx( 0, &infoex );
-    todo_wine ok( ret == JOYERR_UNPLUGGED, "joyGetPosEx returned %u\n", ret );
+    ok( ret == JOYERR_UNPLUGGED, "joyGetPosEx returned %u\n", ret );
     ret = joyGetPosEx( 1, &infoex );
     ok( !ret, "joyGetPosEx returned %u\n", ret );
 
@@ -5039,7 +5039,7 @@ static void test_winmm_joystick(void)
     check_member( caps, expect_caps2, "%#x", wPid );
 
     ret = joyGetPosEx( 0, &infoex );
-    todo_wine ok( !ret, "joyGetPosEx returned %u\n", ret );
+    ok( !ret, "joyGetPosEx returned %u\n", ret );
     ret = joyGetPosEx( 1, &infoex );
     ok( !ret, "joyGetPosEx returned %u\n", ret );
 
