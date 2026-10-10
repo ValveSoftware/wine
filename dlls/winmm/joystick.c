@@ -272,7 +272,7 @@ static void update_connected_state(void)
 static void add_joystick( const DIDEVICEINSTANCEW *instance )
 {
     int first_disconnected = -1, index = -1;
-    IDirectInputDevice8W *device;
+    IDirectInputDevice8W *device = NULL;
     unsigned int i;
     HANDLE event;
     HRESULT hr;
