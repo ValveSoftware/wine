@@ -6329,7 +6329,9 @@ static HRESULT ddraw_surface_reserve_memory(struct wined3d_texture *wined3d_text
 
 static BOOL force_3ddevice(struct ddraw *ddraw, const DDSURFACEDESC2 *desc, unsigned int surface_version)
 {
-    return surface_version == 1 && desc->ddsCaps.dwCaps & DDSCAPS_PRIMARYSURFACE && !(ddraw->flags & DDRAW_NO3D);
+    if ((ddraw->flags & DDRAW_NO3D) || !(surface_version == 1 && desc->ddsCaps.dwCaps & DDSCAPS_PRIMARYSURFACE))
+        return FALSE;
+    return !format_is_paletteindexed(&desc->ddpfPixelFormat);
 }
 
 static void wined3d_resource_desc_from_ddraw(struct ddraw *ddraw,
