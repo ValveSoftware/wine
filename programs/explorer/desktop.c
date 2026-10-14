@@ -1225,7 +1225,7 @@ static HANDLE start_tabtip_process(void)
     return pi.hProcess;
 }
 
-static void start_xalia_process(void)
+static HANDLE start_xalia_process(void)
 {
     PROCESS_INFORMATION pi;
     STARTUPINFOW si = { sizeof(si) };
@@ -1237,12 +1237,12 @@ static void start_xalia_process(void)
     /* check if xalia is enabled */
     ret = GetEnvironmentVariableW(L"PROTON_USE_XALIA", use_envvar, ARRAY_SIZE(use_envvar));
     if (!ret || (ret <= ARRAY_SIZE(use_envvar) && lstrcmpW(use_envvar, L"0") == 0))
-        return;
+        return NULL;
 
     /* locate xalia.exe */
     ret = GetEnvironmentVariableW(L"WINEDATADIR", NULL, 0);
     if (ret == 0)
-        return;
+        return NULL;
 
     buffersize = ret + lstrlenW(path_suffix);
     path = HeapAlloc(GetProcessHeap(), 0, buffersize * sizeof(*path));
@@ -1258,11 +1258,10 @@ static void start_xalia_process(void)
                         NULL, NULL, TRUE, DETACHED_PROCESS, NULL, NULL, &si, &pi))
     {
         WINE_ERR("Couldn't start xalia.exe: error %lu\n", GetLastError());
-        return;
+        return NULL;
     }
     CloseHandle(pi.hThread);
-    CloseHandle(pi.hProcess);
-    return;
+    return pi.hProcess;
 }
 
 /* main desktop management function */
@@ -1282,7 +1281,7 @@ void manage_desktop( WCHAR *arg )
     HANDLE thread;
     DWORD id;
     NTSTATUS status;
-    HANDLE tabtip = NULL;
+    HANDLE tabtip = NULL, xalia = NULL;
 
     {
         char s[1024];
@@ -1412,7 +1411,7 @@ void manage_desktop( WCHAR *arg )
         /* FIXME: hack, run tabtip.exe on startup. */
         tabtip = start_tabtip_process();
 
-        start_xalia_process();
+        xalia = start_xalia_process();
 
         TRACE( "desktop message loop starting on hwnd %p\n", hwnd );
         while (GetMessageW( &msg, 0, 0, 0 )) DispatchMessageW( &msg );
@@ -1426,6 +1425,13 @@ void manage_desktop( WCHAR *arg )
         TerminateProcess( tabtip, 0 );
         WaitForSingleObject( tabtip, INFINITE );
         CloseHandle( tabtip );
+    }
+
+    if (xalia)
+    {
+        TerminateProcess( xalia, 0 );
+        WaitForSingleObject( xalia, INFINITE );
+        CloseHandle( xalia );
     }
 
     ExitProcess( 0 );
