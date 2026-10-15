@@ -630,7 +630,7 @@ void WINAPI RtlReleaseSRWLockShared( RTL_SRWLOCK *lock )
         --new.s.owners;
     } while (InterlockedCompareExchange( u.l, new.l, old.l ) != old.l);
 
-    if (!new.s.owners)
+    if (!new.s.owners && new.s.exclusive_waiters)
         RtlWakeAddressSingle( &u.s->owners );
 }
 
