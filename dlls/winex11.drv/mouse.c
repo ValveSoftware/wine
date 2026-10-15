@@ -1889,6 +1889,8 @@ static BOOL X11DRV_RawButtonEvent( XGenericEventCookie *cookie )
         button_flags = button_down_flags;
     }
 
+    if (!button_flags[button]) return TRUE;
+
     input.type = INPUT_MOUSE;
     input.mi.mouseData   = button_data[button];
     input.mi.dwFlags     = button_flags[button] | MOUSEEVENTF_MOVE;
