@@ -1802,6 +1802,8 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input, BOOL send_raw
         input->mi.dy = round( y_raw );
         TRACE( "event %f,%f raw value %f,%f, raw input %d,%d\n", x_value, y_value, x_raw, y_raw,
                (int)input->mi.dx, (int)input->mi.dy );
+
+        if (!input->mi.dx && !input->mi.dy) input->mi.dwFlags &= ~MOUSEEVENTF_MOVE;
     }
     else
     {
