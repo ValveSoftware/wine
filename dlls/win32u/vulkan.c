@@ -1871,8 +1871,11 @@ static void fixup_device_id_vulkan( UINT *vendor_id, UINT *device_id )
     id_real.vendor = *vendor_id;
     id_real.device = *device_id;
     fixup_device_id( &id );
-    *vendor_id = id->vendor;
-    *device_id = id->device;
+    if (id != &id_real)
+    {
+        *vendor_id = id->vendor;
+        *device_id = id->device;
+    }
 }
 
 static void get_physical_device_properties2( struct vulkan_physical_device *physical_device, VkPhysicalDeviceProperties2 *properties2,
