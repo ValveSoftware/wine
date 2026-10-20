@@ -26,6 +26,7 @@
 
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 #include <dlfcn.h>
 
 #include "ntstatus.h"
@@ -187,10 +188,40 @@ static xess_result_t (*p_xessVKInit)(xess_context_handle_t, const xess_vk_init_p
 static xess_result_t (*p_xessVKGetInitParams)(xess_context_handle_t, xess_vk_init_params_t *);
 static xess_result_t (*p_xessVKExecute)(xess_context_handle_t, VkCommandBuffer, const xess_vk_execute_params_t*);
 
+static UINT64 log_dispatcher;
+static UINT64 client_log_callback;
+
+/* XeSS may log from its own worker threads, which can't call into PE code. */
+static void host_log_callback( const char *message, xess_logging_level_t level )
+{
+    struct xess_log_callback_params *params;
+    UINT64 callback = __atomic_load_n( &client_log_callback, __ATOMIC_ACQUIRE );
+    size_t len = strlen( message );
+    ULONG ret_len;
+    void *ret_ptr;
+
+    if (!callback || !NtCurrentTeb())
+    {
+        TRACE( "XeSS: %s\n", debugstr_a(message) );
+        return;
+    }
+
+    if (!(params = malloc( offsetof(struct xess_log_callback_params, message[len + 1]) ))) return;
+    params->dispatch.callback = log_dispatcher;
+    params->callback = callback;
+    params->level = level;
+    memcpy( params->message, message, len + 1 );
+    KeUserDispatchCallback( &params->dispatch, offsetof(struct xess_log_callback_params, message[len + 1]),
+                            &ret_ptr, &ret_len );
+    free( params );
+}
+
 static NTSTATUS xess_init( void *args )
 {
     struct xess_init_params *params = args;
     const char *xess_lib_path;
+
+    log_dispatcher = params->log_dispatcher;
 
     TRACE("Initializing XeSS translation...\n");
 
@@ -399,7 +430,9 @@ static NTSTATUS xess_set_logging_callback( void *args )
 {
     struct xess_set_logging_callback_params *params = args;
     if (!override_library) { params->result = XESS_RESULT_ERROR_CANT_LOAD_LIBRARY; return STATUS_SUCCESS; }
-    params->result = p_xessSetLoggingCallback( params->hContext, params->loggingLevel, params->loggingFunction );
+    __atomic_store_n( &client_log_callback, (UINT64)(UINT_PTR)params->loggingFunction, __ATOMIC_RELEASE );
+    params->result = p_xessSetLoggingCallback( params->hContext, params->loggingLevel,
+                                               params->loggingFunction ? host_log_callback : NULL );
     return STATUS_SUCCESS;
 }
 
