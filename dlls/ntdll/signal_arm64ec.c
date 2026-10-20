@@ -1941,11 +1941,22 @@ static void __attribute__((naked)) arm64x_check_call(void)
          "ldr x17, .Lffwd_seq + 8\n\t"
          "eor x17, x16, x17\n\t"            /* compare only first two bytes */
          "tst x17, #0xffff\n\t"
-         "b.ne .Lexit\n\t"
+         "b.ne .Lffwd_imp\n\t"
          "add x11, x11, #14\n\t"            /* address after jump */
          "lsr x9, x16, #16\n\t"
          "add x11, x11, w9, sxtw\n\t"       /* add offset */
          "ret\n"
+         /* check for fast-forward sequence with an indirect jump */
+         ".Lffwd_imp:\n\t"
+         "and w17, w16, #0xffffff\n\t"
+         "mov w9, #0xff5d\n\t"
+         "movk w9, #0x25, lsl #16\n\t"      /* pop %rbp; jmp *xxx(%rip) */
+         "cmp w17, w9\n\t"
+         "b.ne .Lexit\n\t"
+         "sbfx x9, x16, #24, #32\n\t"       /* offset */
+         "add x16, x11, #15\n\t"            /* address after jump */
+         "ldr x11, [x16, x9]\n\t"
+         "b \"#arm64x_check_call\"\n"       /* restart checks with jump destination */
          /* check for syscall sequence */
          ".Lsyscall:\n\t"
          "ldr w17, .Lsyscall_seq\n\t"
