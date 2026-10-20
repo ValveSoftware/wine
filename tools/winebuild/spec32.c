@@ -395,6 +395,78 @@ static void output_relay_debug( struct exports *exports )
 }
 
 /*******************************************************************
+ *         get_import_thunk_name
+ *
+ * Get the name of the thunk for a function re-exported from another dll.
+ */
+static const char *get_import_thunk_name( struct exports *exports, int ordinal )
+{
+    ORDDEF *odp = exports->ordinals[ordinal];
+    const char *name = odp->name ? odp->name : odp->export_name;
+
+    if (name) return strmake( "%s_%s", asm_name("__wine_spec_imp"), name );
+    return strmake( "%s_%u", asm_name("__wine_spec_imp"), ordinal );
+}
+
+/*******************************************************************
+ *         output_import_thunks
+ *
+ * Output the thunks for functions re-exported from another dll.
+ */
+static void output_import_thunks( struct exports *exports )
+{
+    int i;
+
+    output( "\t.text\n" );
+    for (i = exports->base; i <= exports->limit; i++)
+    {
+        ORDDEF *odp = exports->ordinals[i];
+        const char *label;
+
+        if (!odp) continue;
+        if (!(odp->flags & FLAG_IMPORT)) continue;
+
+        label = get_import_thunk_name( exports, i );
+
+        if (target.cpu == CPU_ARM64EC)
+        {
+            output( "\t.def %s\n\t.scl 2\n\t.type 32\n\t.endef\n", label );
+            output( "\t.balign 16\n" );
+        }
+        else
+        {
+            output( "\t.balign 4\n" );
+            output( "\t.long 0x90909090,0x90909090\n" );
+        }
+        output( "%s:\n", label );
+
+        switch (target.cpu)
+        {
+        case CPU_i386:
+            output( "\t.byte 0x8b,0xff,0x55,0x8b,0xec,0x5d\n" );  /* hotpatch prolog */
+            if (UsePIC)
+            {
+                output( "\tcall %s\n", asm_name("__wine_spec_get_pc_thunk_eax") );
+                output( "1:\tjmp *__imp_%s-1b(%%eax)\n", asm_name( get_link_name( odp )));
+                needs_get_pc_thunk = 1;
+            }
+            else output( "\tjmp *__imp_%s\n", asm_name( get_link_name( odp )));
+            break;
+        case CPU_x86_64:
+            output( "\t.byte 0x48,0x8d,0xa4,0x24,0x00,0x00,0x00,0x00\n" );  /* hotpatch prolog */
+            output( "\tjmp *__imp_%s(%%rip)\n", asm_name( get_link_name( odp )));
+            break;
+        case CPU_ARM64EC:
+            output( "\t.byte 0x48,0x8b,0xc4,0x48,0x89,0x58,0x20,0x55,0x5d\n" );  /* fast-forward sequence */
+            output( "\tjmp *__imp_%s(%%rip)\n", asm_name( get_link_name( odp )));
+            break;
+        default:
+            assert(0);
+        }
+    }
+}
+
+/*******************************************************************
  *         output_exports
  *
  * Output the export table for a Win32 module.
@@ -407,7 +479,6 @@ void output_exports( DLLSPEC *spec )
     int needs_relay = has_relays( exports );
     int nr_exports = get_exports_count( exports );
     const char *func_ptr = is_pe() ? ".rva" : get_asm_ptr_keyword();
-    const char *name;
 
     if (!nr_exports) return;
 
@@ -427,6 +498,11 @@ void output_exports( DLLSPEC *spec )
                 symbol = odp->link_name;
             else if (odp->flags & FLAG_EXT_LINK)
                 symbol = strmake( "%s_%s", asm_name("__wine_spec_ext_link"), odp->link_name );
+            else if (odp->flags & FLAG_IMPORT)
+            {
+                symbol = get_import_thunk_name( exports, i );
+                needs_imports = 1;
+            }
             else
                 symbol = asm_name( get_link_name( odp ));
 
@@ -436,6 +512,7 @@ void output_exports( DLLSPEC *spec )
                     odp->name ? "" : ",NONAME",
                     odp->type == TYPE_EXTERN ? ",DATA" : "" );
         }
+        if (needs_imports) output_import_thunks( exports );
         return;
     }
 
@@ -479,9 +556,7 @@ void output_exports( DLLSPEC *spec )
         }
         else if ((odp->flags & FLAG_IMPORT) && (target.cpu == CPU_i386 || target.cpu == CPU_x86_64))
         {
-            name = odp->name ? odp->name : odp->export_name;
-            if (name) output( "\t%s %s_%s\n", func_ptr, asm_name("__wine_spec_imp"), name );
-            else output( "\t%s %s_%u\n", func_ptr, asm_name("__wine_spec_imp"), i );
+            output( "\t%s %s\n", func_ptr, get_import_thunk_name( exports, i ));
             needs_imports = 1;
         }
         else if (odp->flags & FLAG_EXT_LINK)
@@ -580,43 +655,7 @@ void output_exports( DLLSPEC *spec )
             output( "\t%s 0\n", get_asm_ptr_keyword() );
     }
 
-    /* output import thunks */
-
-    if (!needs_imports) return;
-    output( "\t.text\n" );
-    for (i = exports->base; i <= exports->limit; i++)
-    {
-        ORDDEF *odp = exports->ordinals[i];
-        if (!odp) continue;
-        if (!(odp->flags & FLAG_IMPORT)) continue;
-
-        name = odp->name ? odp->name : odp->export_name;
-
-        output( "\t.balign 4\n" );
-        output( "\t.long 0x90909090,0x90909090\n" );
-        if (name) output( "%s_%s:\n", asm_name("__wine_spec_imp"), name );
-        else output( "%s_%u:\n", asm_name("__wine_spec_imp"), i );
-
-        switch (target.cpu)
-        {
-        case CPU_i386:
-            output( "\t.byte 0x8b,0xff,0x55,0x8b,0xec,0x5d\n" );  /* hotpatch prolog */
-            if (UsePIC)
-            {
-                output( "\tcall %s\n", asm_name("__wine_spec_get_pc_thunk_eax") );
-                output( "1:\tjmp *__imp_%s-1b(%%eax)\n", asm_name( get_link_name( odp )));
-                needs_get_pc_thunk = 1;
-            }
-            else output( "\tjmp *__imp_%s\n", asm_name( get_link_name( odp )));
-            break;
-        case CPU_x86_64:
-            output( "\t.byte 0x48,0x8d,0xa4,0x24,0x00,0x00,0x00,0x00\n" );  /* hotpatch prolog */
-            output( "\tjmp *__imp_%s(%%rip)\n", asm_name( get_link_name( odp )));
-            break;
-        default:
-            assert(0);
-        }
-    }
+    if (needs_imports) output_import_thunks( exports );
 }
 
 
