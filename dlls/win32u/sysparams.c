@@ -1684,6 +1684,12 @@ static BOOL write_gpu_to_registry( const struct gpu *gpu, const struct pci_id *p
     set_reg_value( hkey, bios_stringW, REG_SZ, gpu->name, name_size );
     set_reg_value( hkey, chip_typeW, REG_SZ, gpu->name, name_size );
     set_reg_value( hkey, dac_typeW, REG_SZ, ramdacW, sizeof(ramdacW) );
+    if (pci->vendor == 0x1002 /* AMD */)
+    {
+        set_reg_ascii_value( hkey, "RadeonSoftwareEdition", "AMD Software: Adrenalin Edition" );
+        /* some version in the future */
+        set_reg_ascii_value( hkey, "RadeonSoftwareVersion", "28.10.10" );
+    }
 
     set_reg_value( hkey, qw_memory_sizeW, REG_QWORD, &memory_size, sizeof(memory_size) );
     value = (ULONG)min( memory_size, (ULONGLONG)ULONG_MAX );
