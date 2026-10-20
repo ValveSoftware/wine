@@ -19,6 +19,9 @@
 
 #include <stdarg.h>
 
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+
 #include "windef.h"
 #include "winbase.h"
 #include "wine/debug.h"
@@ -27,9 +30,18 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(xess);
 
+static NTSTATUS WINAPI xess_log_callback_dispatcher(void *args, ULONG size)
+{
+    struct xess_log_callback_params *params = args;
+    xess_app_log_callback_t callback = (xess_app_log_callback_t)(UINT_PTR)params->callback;
+
+    callback(params->message, params->level);
+    return NtCallbackReturn(NULL, 0, STATUS_SUCCESS);
+}
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
-    struct xess_init_params params = {0};
+    struct xess_init_params params = { .log_dispatcher = (UINT_PTR)xess_log_callback_dispatcher };
     NTSTATUS status;
 
     TRACE("(%p, %lu, %p)\n", instance, reason, reserved);
@@ -200,9 +212,10 @@ XESS_API xess_result_t xessGetMaxResponsiveMaskValue(xess_context_handle_t hCont
 
 XESS_API xess_result_t xessSetLoggingCallback(xess_context_handle_t hContext, xess_logging_level_t loggingLevel, xess_app_log_callback_t loggingFunction)
 {
+    struct xess_set_logging_callback_params params = { hContext, loggingLevel, loggingFunction };
     TRACE("(%p, %d, %p)\n", hContext, loggingLevel, loggingFunction);
-    // There is no known Wine mechanism to handle callbacks from the Unix side to the Windows side, so this function is not implemented.
-    return XESS_RESULT_ERROR_NOT_IMPLEMENTED;
+    XESS_WINE_UNIX_CALL(unix_xessSetLoggingCallback, &params);
+    return params.result;
 }
 
 XESS_API xess_result_t xessIsOptimalDriver(xess_context_handle_t hContext)

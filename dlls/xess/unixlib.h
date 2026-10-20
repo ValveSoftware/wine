@@ -22,6 +22,7 @@
 #define __XESS_UNIXLIB_H
 
 #include "wine/unixlib.h"
+#include "ntuser.h"
 #include "xess_wine.h"
 
 #define XESS_UNIX_DISPATCH_ERROR XESS_RESULT_ERROR_CANT_LOAD_LIBRARY
@@ -76,7 +77,17 @@ enum xess_funcs
 
 struct xess_init_params
 {
+    UINT64 log_dispatcher;
     xess_result_t result;
+};
+
+/* Passed to the client's logging callback through KeUserModeCallback. */
+struct xess_log_callback_params
+{
+    struct dispatch_callback_params dispatch;
+    UINT64 callback;
+    UINT32 level;
+    char message[1];
 };
 
 struct xess_destroy_context_params
