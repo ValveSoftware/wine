@@ -2627,7 +2627,7 @@ static VkResult win32u_vkCreateSwapchainKHR( VkDevice client_device, const VkSwa
             return res;
         }
 
-        WARN( "Enabled fullscreen hack on swapchain %p, scalind from %s -> %s\n", swapchain,
+        WARN( "Enabled fullscreen hack on swapchain %p, scaling from %s -> %s\n", swapchain,
               debugstr_vkextent2d(&swapchain->extents), debugstr_vkextent2d(&swapchain->host_extents) );
     }
 
