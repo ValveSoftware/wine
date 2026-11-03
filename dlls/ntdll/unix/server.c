@@ -1679,6 +1679,7 @@ size_t server_init_process(void)
 
     fill_cpu_override();
     cpu_override = get_cpu_topology_override();
+    close( reply_pipe );
 
     SERVER_START_REQ( init_first_thread )
     {
@@ -1712,7 +1713,6 @@ size_t server_init_process(void)
         }
     }
     SERVER_END_REQ;
-    close( reply_pipe );
 
     if (ret) server_protocol_error( "init_first_thread failed with status %x\n", ret );
 
@@ -1818,6 +1818,8 @@ void server_init_thread( void *entry_point, BOOL *suspend )
     /* always send the native TEB */
     if (!(teb = NtCurrentTeb64())) teb = NtCurrentTeb();
 
+    close( reply_pipe );
+
     SERVER_START_REQ( init_thread )
     {
         req->unix_tid  = get_unix_tid();
@@ -1829,7 +1831,6 @@ void server_init_thread( void *entry_point, BOOL *suspend )
         *suspend = reply->suspend;
     }
     SERVER_END_REQ;
-    close( reply_pipe );
 }
 
 NTSTATUS WINAPI NtAllocateReserveObject( HANDLE *handle, const OBJECT_ATTRIBUTES *attr,
