@@ -649,6 +649,19 @@ void wg_transform_notify_qos(wg_transform_t transform,
     WINE_UNIX_CALL(unix_wg_transform_notify_qos, &params);
 }
 
+void wg_transform_enable_edge_replication(wg_transform_t transform, enum wg_transform_edge_replication edge_replication)
+{
+    struct wg_transform_enable_edge_replication_params params =
+    {
+        .transform = transform,
+        .edge_replication = edge_replication,
+    };
+
+    TRACE("transform %#I64x, edge_replication %u.\n", transform, edge_replication);
+
+    WINE_UNIX_CALL(unix_wg_transform_enable_edge_replication, &params);
+}
+
 HRESULT wg_muxer_create(const char *format, wg_muxer_t *muxer)
 {
     struct wg_muxer_create_params params =

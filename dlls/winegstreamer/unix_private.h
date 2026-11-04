@@ -78,6 +78,7 @@ extern NTSTATUS wg_transform_get_status(void *args);
 extern NTSTATUS wg_transform_drain(void *args);
 extern NTSTATUS wg_transform_flush(void *args);
 extern NTSTATUS wg_transform_notify_qos(void *args);
+extern NTSTATUS wg_transform_enable_edge_replication(void *args);
 
 /* wg_media_type.c */
 

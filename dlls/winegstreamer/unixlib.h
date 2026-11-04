@@ -334,6 +334,13 @@ struct wg_parser_stream_seek_params
     DWORD start_flags, stop_flags;
 };
 
+enum wg_transform_edge_replication
+{
+    WG_TRANSFORM_EDGE_REPLICATION_NEVER,
+    WG_TRANSFORM_EDGE_REPLICATION_ALWAYS,
+    WG_TRANSFORM_EDGE_REPLICATION_BY_FORMAT,
+};
+
 struct wg_transform_attrs
 {
     UINT32 output_plane_align;
@@ -342,6 +349,7 @@ struct wg_transform_attrs
     BOOL allow_format_change;
     BOOL low_latency;
     BOOL preserve_timestamps;
+    enum wg_transform_edge_replication edge_replication;
 };
 
 struct wg_transform_create_params
@@ -391,6 +399,12 @@ struct wg_transform_notify_qos_params
     DOUBLE proportion;
     INT64 diff;
     UINT64 timestamp;
+};
+
+struct wg_transform_enable_edge_replication_params
+{
+    wg_transform_t transform;
+    enum wg_transform_edge_replication edge_replication;
 };
 
 struct wg_muxer_create_params
@@ -462,6 +476,7 @@ enum unix_funcs
     unix_wg_transform_drain,
     unix_wg_transform_flush,
     unix_wg_transform_notify_qos,
+    unix_wg_transform_enable_edge_replication,
 
     unix_wg_muxer_create,
     unix_wg_muxer_destroy,

@@ -1113,8 +1113,82 @@ NTSTATUS wg_transform_push_data(void *args)
     return STATUS_SUCCESS;
 }
 
+static void gst_frame_replicate_edges(GstVideoFrame *frame, guint padding_bottom)
+{
+    guint i, j, plane, padding_height, width, height, stride, pixel_stride;
+    gint comp[GST_VIDEO_MAX_COMPONENTS];
+    guint8 *data;
+
+    /* Windows replicates the data in the last scanline into its bottom padding, and the last pixel
+     * in a row into the right padding. GStreamer videobox can only do solid colour fill. */
+    for (plane = 0; plane < GST_VIDEO_FRAME_N_PLANES(frame); plane++)
+    {
+        gst_video_format_info_component(frame->info.finfo, plane, comp);
+
+        pixel_stride = GST_VIDEO_FRAME_COMP_PSTRIDE(frame, comp[0]);
+        width = GST_VIDEO_FRAME_COMP_WIDTH(frame, comp[0]) * pixel_stride;
+        height = GST_VIDEO_FRAME_COMP_HEIGHT(frame, comp[0]);
+        stride = GST_VIDEO_FRAME_PLANE_STRIDE(frame, plane);
+
+        data = GST_VIDEO_FRAME_PLANE_DATA(frame, plane);
+
+        if (frame->info.finfo->format == GST_VIDEO_FORMAT_YUY2)
+        {
+            /* pixel_stride is 2 in this case but we need to copy from -4 bytes,
+             * and only the last Y value should be duplicated initially. */
+            pixel_stride = 4;
+
+            if (width < stride) for (i = 0; i < height; i++)
+            {
+                data[width] = data[width + 2] = data[width - 2];
+                data[width + 1] = data[width - 3];
+                data[width + 3] = data[width - 1];
+                for (j = width + 4; j < stride; j++)
+                    data[j] = data[j - pixel_stride];
+                data += stride;
+            }
+        }
+        else
+        {
+            for (i = 0; i < height; i++)
+            {
+                for (j = width; j < stride; j++)
+                    data[j] = data[j - pixel_stride];
+                data += stride;
+            }
+        }
+
+        data = GST_VIDEO_FRAME_PLANE_DATA(frame, plane);
+        padding_height = GST_VIDEO_FORMAT_INFO_SCALE_HEIGHT(frame->info.finfo, comp[0], frame->info.height + padding_bottom) - height;
+        data += height * stride;
+
+        for (i = 0; i < padding_height; i++)
+        {
+            memcpy(data, data - stride, stride);
+            data += stride;
+        }
+    }
+}
+
+static bool edge_replication_enabled(enum wg_transform_edge_replication edge_replication, GstVideoFormat format)
+{
+    if (edge_replication != WG_TRANSFORM_EDGE_REPLICATION_BY_FORMAT)
+        return edge_replication == WG_TRANSFORM_EDGE_REPLICATION_ALWAYS;
+
+    switch (format)
+    {
+        case GST_VIDEO_FORMAT_I420:
+        case GST_VIDEO_FORMAT_YUY2:
+        case GST_VIDEO_FORMAT_YV12:
+            return true;
+        default:
+            return false;
+    }
+}
+
 static NTSTATUS copy_video_buffer(GstBuffer *buffer, GstVideoInfo *src_video_info,
-        GstVideoInfo *dst_video_info, struct wg_sample *sample, gsize *total_size, GstBuffer **ret_buffer)
+        GstVideoInfo *dst_video_info, guint padding_bottom, enum wg_transform_edge_replication edge_replication,
+        struct wg_sample *sample, gsize *total_size)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     GstVideoFrame src_frame, dst_frame;
@@ -1144,7 +1218,11 @@ static NTSTATUS copy_video_buffer(GstBuffer *buffer, GstVideoInfo *src_video_inf
         else
         {
             if (gst_video_frame_copy(&dst_frame, &src_frame))
+            {
+                if (edge_replication_enabled(edge_replication, dst_video_info->finfo->format))
+                    gst_frame_replicate_edges(&dst_frame, padding_bottom);
                 status = STATUS_SUCCESS;
+            }
             else
                 GST_ERROR("Failed to copy video frame.");
             gst_video_frame_unmap(&dst_frame);
@@ -1152,10 +1230,7 @@ static NTSTATUS copy_video_buffer(GstBuffer *buffer, GstVideoInfo *src_video_inf
         gst_video_frame_unmap(&src_frame);
     }
 
-    if (status == STATUS_SUCCESS)
-        *ret_buffer = dst_buffer;
-    else
-        gst_buffer_unref(dst_buffer);
+    gst_buffer_unref(dst_buffer);
     return status;
 }
 
@@ -1248,77 +1323,49 @@ static bool sample_needs_buffer_copy(struct wg_sample *sample, GstBuffer *buffer
     return needs_copy;
 }
 
-enum fill_action
+static void sample_replicate_edges(struct wg_sample *sample, GstVideoInfo *info, const GstVideoAlignment *align)
 {
-    FILL_RIGHT  = 1,
-    FILL_BOTTOM = 2,
-};
-
-static void fill_frame_padded_bits(GstBuffer *buffer, const GstVideoAlignment *align, const GstVideoInfo *info,
-        enum fill_action action)
-{
-    guint i, j, plane, padded_height, width, height, stride, pixel_stride, padding_bottom = align->padding_bottom;
     GstVideoFrame frame;
+    GstBuffer *buffer;
 
-    if (!action || !gst_video_frame_map(&frame, info, buffer, GST_MAP_WRITE)) return;
+    if (!align->padding_bottom && !align->padding_right)
+        return;
 
-    /* Windows uses the data in the last scanline for its bottom padding, and the last pixel
-     * in a row for right padding. GStreamer can do this, but it requires cropping first, then
-     * edge replication using videobox, so it has a larger performance cost than this hack. */
-    for (plane = 0; plane < GST_VIDEO_FRAME_N_PLANES(&frame); plane++)
+    if (!(buffer = gst_buffer_new_wrapped_full(0, wg_sample_data(sample), sample->max_size,
+            0, sample->max_size, 0, NULL)))
     {
-        gint comp[GST_VIDEO_MAX_COMPONENTS];
-
-        gst_video_format_info_component(frame.info.finfo, plane, comp);
-        height = GST_VIDEO_FRAME_COMP_HEIGHT(&frame, comp[0]);
-        stride = GST_VIDEO_FRAME_PLANE_STRIDE(&frame, plane);
-
-        if (action & FILL_RIGHT)
-        {
-            guint8 *data = GST_VIDEO_FRAME_PLANE_DATA(&frame, plane);
-            pixel_stride = GST_VIDEO_FRAME_COMP_PSTRIDE(&frame, plane);
-            width = GST_VIDEO_FRAME_COMP_WIDTH(&frame, comp[0]) * pixel_stride;
-            data += width;
-            for (i = 0; i < height; i++)
-                for (j = 0; j < stride - width; j += pixel_stride)
-                    memcpy(data + i * stride + j, data + i * stride - pixel_stride, pixel_stride);
-        }
-
-        if (action & FILL_BOTTOM)
-        {
-            guint8 *data = GST_VIDEO_FRAME_PLANE_DATA(&frame, plane);
-            padded_height = GST_VIDEO_FORMAT_INFO_SCALE_HEIGHT(frame.info.finfo, comp[0], info->height + padding_bottom);
-            data += height * stride;
-            for (i = 0; i < padded_height - height; i++) memcpy(data + i * stride, data - stride, stride);
-        }
+        GST_WARNING("Failed to wrap wg_sample into GstBuffer for edge replication");
+        return;
     }
 
-    gst_video_frame_unmap(&frame);
+    if (!gst_video_frame_map(&frame, info, buffer, GST_MAP_WRITE))
+        GST_WARNING("Failed to map GstBuffer for edge replication");
+    else
+    {
+        gst_frame_replicate_edges(&frame, align->padding_bottom);
+        gst_video_frame_unmap(&frame);
+    }
+
+    gst_buffer_unref(buffer);
 }
 
 static NTSTATUS read_transform_output_video(struct wg_sample *sample, GstBuffer *buffer,
-        const GstVideoInfo *src_video_info, const GstVideoInfo *dst_video_info, const GstVideoAlignment *align)
+        const GstVideoInfo *src_video_info, const GstVideoInfo *dst_video_info, const GstVideoAlignment *align,
+        enum wg_transform_edge_replication edge_replication)
 {
-    GstBuffer *dst_buffer = NULL;
-    enum fill_action action = 0;
     gsize total_size;
     NTSTATUS status;
     bool needs_copy;
-    const char *sgi;
 
-    if ((align->padding_bottom || align->padding_right) && (sgi = getenv("SteamGameId")))
+    if (!(needs_copy = sample_needs_buffer_copy(sample, buffer, &total_size)))
     {
-        if (align->padding_bottom && (!strcmp(sgi, "1449280") || !strcmp(sgi, "1839950")))
-            action |= FILL_BOTTOM;
-        else if (align->padding_right && !strcmp(sgi, "536280"))
-            action |= FILL_RIGHT;
-    }
-    needs_copy = !!action;
-
-    if (!needs_copy && !(needs_copy = sample_needs_buffer_copy(sample, buffer, &total_size)))
+        if (edge_replication_enabled(edge_replication, src_video_info->finfo->format))
+            sample_replicate_edges(sample, src_video_info, align);
         status = STATUS_SUCCESS;
+    }
     else
-        status = copy_video_buffer(buffer, src_video_info, dst_video_info, sample, &total_size, &dst_buffer);
+        status = copy_video_buffer(buffer, src_video_info, dst_video_info, align->padding_bottom,
+                edge_replication, sample, &total_size);
 
     if (status)
     {
@@ -1326,11 +1373,6 @@ static NTSTATUS read_transform_output_video(struct wg_sample *sample, GstBuffer 
         sample->size = 0;
         return status;
     }
-
-    fill_frame_padded_bits(dst_buffer ? dst_buffer : buffer, align, dst_video_info, action);
-
-    if (dst_buffer)
-        gst_buffer_unref(dst_buffer);
 
     set_sample_flags_from_buffer(sample, buffer, total_size);
 
@@ -1497,7 +1539,7 @@ NTSTATUS wg_transform_read_data(void *args)
 
     if (!strcmp(output_mime, "video/x-raw"))
         status = read_transform_output_video(sample, output_buffer,
-                &src_video_info, &dst_video_info, &align);
+                &src_video_info, &dst_video_info, &align, transform->attrs.edge_replication);
     else
         status = read_transform_output(sample, output_buffer);
 
@@ -1620,6 +1662,15 @@ NTSTATUS wg_transform_notify_qos(void *args)
     push_event(transform->my_sink, event);
 
     return S_OK;
+}
+
+NTSTATUS wg_transform_enable_edge_replication(void *args)
+{
+    struct wg_transform_enable_edge_replication_params *params = args;
+    struct wg_transform *transform = get_transform(params->transform);
+
+    transform->attrs.edge_replication = params->edge_replication;
+    return STATUS_SUCCESS;
 }
 
 /* Move events and at most one buffer from the internal fifo queue to the output src pad.
