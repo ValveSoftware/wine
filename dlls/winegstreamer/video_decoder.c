@@ -1683,8 +1683,15 @@ static HRESULT video_decoder_create_with_types(const GUID *const *input_types, U
 
     {
         const char *sgi;
-        if ((sgi = getenv("SteamGameId")) && ((!strcmp(sgi, "2009100")) || (!strcmp(sgi, "2555360"))))
+        if ((sgi = getenv("SteamGameId")) && (
+                !strcmp(sgi, "2009100")
+                || !strcmp(sgi, "2555360")
+                || !strcmp(sgi, "4115450")
+            ))
+        {
+            FIXME("HACK: setting MF_SA_D3D11_AWARE to FALSE.\n");
             IMFAttributes_SetUINT32(decoder->attributes, &MF_SA_D3D11_AWARE, FALSE);
+        }
     }
 
     if (FAILED(hr = MFCreateAttributes(&decoder->output_attributes, 0)))
