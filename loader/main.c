@@ -86,6 +86,9 @@ static void init_reserved_areas(void)
 
 #endif
 
+static char *remove_tail( const char *str, const char *tail );
+static char *build_path( const char *dir, const char *name );
+
 /* canonicalize path and return its directory name */
 static char *realpath_dirname( const char *name )
 {
@@ -93,6 +96,15 @@ static char *realpath_dirname( const char *name )
 
     if (fullpath)
     {
+        if ((p = remove_tail( fullpath, "i386-unix/wine64-preloader")) || (p = remove_tail( fullpath, "i386-unix/wine64")))
+        {
+            char *path;
+
+            free( fullpath );
+            path = build_path( p, "x86_64-unix" );
+            free( p );
+            return path;
+        }
         p = strrchr( fullpath, '/' );
         if (p == fullpath) p++;
         if (p) *p = 0;
@@ -154,15 +166,6 @@ static void *try_dlopen( const char *argv0 )
     void *handle;
 
     if (!argv0) return NULL;
-
-    if ((p = remove_tail( argv0, "i386-unix/wine64")))
-    {
-        path = build_path( p, "x86_64-unix/ntdll.so" );
-        free( p );
-        handle = dlopen( path, RTLD_NOW );
-        free( path );
-        return handle;
-    }
 
     if (!(dir = realpath_dirname( argv0 ))) return NULL;
 
