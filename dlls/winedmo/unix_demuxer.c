@@ -214,6 +214,9 @@ static void parse_stream_names( struct demuxer *demuxer, UINT32 root, UINT64 siz
             break;
 #undef CASE
         }
+
+        /* Danganronpa V3: Killing Harmony uses a hacky IMFByteStream which cycles the position back to 0. */
+        if (!context->position) break;
     }
 }
 
