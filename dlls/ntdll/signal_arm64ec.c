@@ -661,16 +661,18 @@ NTSTATUS SYSCALL_API NtAllocateVirtualMemoryEx( HANDLE process, PVOID *ret, SIZE
 NTSTATUS SYSCALL_API NtContinue( CONTEXT *context, BOOLEAN alertable )
 {
     ARM64_NT_CONTEXT arm_ctx;
+    NTSTATUS status;
 
-    context_x64_to_arm( &arm_ctx, (ARM64EC_NT_CONTEXT *)context );
+    if ((status = context_x64_to_arm( &arm_ctx, (ARM64EC_NT_CONTEXT *)context ))) return status;
     return syscall_NtContinue( &arm_ctx, alertable );
 }
 
 NTSTATUS SYSCALL_API NtContinueEx( CONTEXT *context, KCONTINUE_ARGUMENT *args )
 {
     ARM64_NT_CONTEXT arm_ctx;
+    NTSTATUS status;
 
-    context_x64_to_arm( &arm_ctx, (ARM64EC_NT_CONTEXT *)context );
+    if ((status = context_x64_to_arm( &arm_ctx, (ARM64EC_NT_CONTEXT *)context ))) return status;
     return syscall_NtContinueEx( &arm_ctx, args );
 }
 
@@ -800,8 +802,9 @@ NTSTATUS SYSCALL_API NtQuerySystemInformation( SYSTEM_INFORMATION_CLASS class, v
 NTSTATUS SYSCALL_API NtRaiseException( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL first_chance )
 {
     ARM64_NT_CONTEXT arm_ctx;
+    NTSTATUS status;
 
-    context_x64_to_arm( &arm_ctx, (ARM64EC_NT_CONTEXT *)context );
+    if ((status = context_x64_to_arm( &arm_ctx, (ARM64EC_NT_CONTEXT *)context ))) return status;
     return syscall_NtRaiseException( rec, &arm_ctx, first_chance );
 }
 
@@ -828,8 +831,9 @@ NTSTATUS SYSCALL_API NtReadFile( HANDLE handle, HANDLE event, PIO_APC_ROUTINE ap
 NTSTATUS SYSCALL_API NtSetContextThread( HANDLE handle, const CONTEXT *context )
 {
     ARM64_NT_CONTEXT arm_ctx;
+    NTSTATUS status;
 
-    context_x64_to_arm( &arm_ctx, (ARM64EC_NT_CONTEXT *)context );
+    if ((status = context_x64_to_arm( &arm_ctx, (ARM64EC_NT_CONTEXT *)context ))) return status;
     return syscall_NtSetContextThread( handle, &arm_ctx );
 }
 
