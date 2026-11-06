@@ -70,10 +70,15 @@ static unsigned int set_startup_info_flags( unsigned int mask, unsigned int flag
 
 void init_startup_info(void)
 {
+    const char *env = getenv( "WINE_IGNORE_STARTUP_SHOW_WINDOW" );
+    unsigned int ignore_flags = 0;
+
     RTL_USER_PROCESS_PARAMETERS *p = NtCurrentTeb()->Peb->ProcessParameters;
 
     startup_show_window = p->wShowWindow;
-    set_startup_info_flags( ~0u, p->dwFlags );
+
+    if (env && *env != '0') ignore_flags = STARTF_USESHOWWINDOW;
+    set_startup_info_flags( ~0u, p->dwFlags & ~ignore_flags );
 }
 
 /***********************************************************************
