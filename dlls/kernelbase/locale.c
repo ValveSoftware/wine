@@ -7327,6 +7327,25 @@ BOOL WINAPI DECLSPEC_HOTPATCH SystemTimeToTzSpecificLocalTime( const TIME_ZONE_I
 
 
 /***********************************************************************
+ *	SystemTimeToTzSpecificLocalTimeEx   (kernelbase.@)
+ */
+BOOL WINAPI DECLSPEC_HOTPATCH SystemTimeToTzSpecificLocalTimeEx( const DYNAMIC_TIME_ZONE_INFORMATION *info,
+                                                                 const SYSTEMTIME *system,
+                                                                 SYSTEMTIME *local )
+{
+    TIME_ZONE_INFORMATION tzinfo;
+
+    if (!system || !local)
+    {
+        SetLastError( ERROR_INVALID_PARAMETER );
+        return FALSE;
+    }
+    if (!GetTimeZoneInformationForYear( system->wYear, (DYNAMIC_TIME_ZONE_INFORMATION *)info, &tzinfo )) return FALSE;
+    return SystemTimeToTzSpecificLocalTime( &tzinfo, system, local );
+}
+
+
+/***********************************************************************
  *	TzSpecificLocalTimeToSystemTime   (kernelbase.@)
  */
 BOOL WINAPI DECLSPEC_HOTPATCH TzSpecificLocalTimeToSystemTime( const TIME_ZONE_INFORMATION *info,
@@ -7358,6 +7377,25 @@ BOOL WINAPI DECLSPEC_HOTPATCH TzSpecificLocalTimeToSystemTime( const TIME_ZONE_I
         return FALSE;
     }
     return FileTimeToSystemTime( (FILETIME *)&ft, system );
+}
+
+
+/***********************************************************************
+ *	TzSpecificLocalTimeToSystemTimeEx   (kernelbase.@)
+ */
+BOOL WINAPI DECLSPEC_HOTPATCH TzSpecificLocalTimeToSystemTimeEx( const DYNAMIC_TIME_ZONE_INFORMATION *info,
+                                                                 const SYSTEMTIME *local,
+                                                                 SYSTEMTIME *system )
+{
+    TIME_ZONE_INFORMATION tzinfo;
+
+    if (!local || !system)
+    {
+        SetLastError( ERROR_INVALID_PARAMETER );
+        return FALSE;
+    }
+    if (!GetTimeZoneInformationForYear( local->wYear, (DYNAMIC_TIME_ZONE_INFORMATION *)info, &tzinfo )) return FALSE;
+    return TzSpecificLocalTimeToSystemTime( &tzinfo, local, system );
 }
 
 
