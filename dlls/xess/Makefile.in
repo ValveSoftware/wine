@@ -1,0 +1,12 @@
+MODULE    = libxess.dll
+IMPORTS   = dxgi d3d12 ntdll winevulkan
+UNIXLIB   = libxess.so
+
+EXTRADLLFLAGS = -mno-cygwin
+EXTRAINCL = $(VKD3D_PE_CFLAGS)
+
+SOURCES = \
+	unixlib.c \
+	xess_wine.c \
+	xess_vk.c \
+	xess_d3d12.c
