@@ -2103,13 +2103,59 @@ static NTSTATUS set_output_info( struct screen_buffer *screen_buffer,
     return STATUS_SUCCESS;
 }
 
+/* A line being read with echo while the program writes (a background thread logging while the
+ * main thread waits in ReadConsole): the line being edited stays below the output. Its home
+ * position was taken when the read started, so without this the next keystroke redraws it there,
+ * moving the cursor back up, and later output overwrites the text written meanwhile. */
+static BOOL edit_line_follows_output( struct screen_buffer *screen_buffer )
+{
+    struct console *console = screen_buffer->console;
+    return console->edit_line.status == STATUS_PENDING && console->active == screen_buffer &&
+           (console->mode & (ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT)) == (ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT);
+}
+
+/* Erase the echoed line and put the cursor where it starts, so output takes its place. */
+static void edit_line_hide( struct console *console )
+{
+    struct screen_buffer *screen_buffer = console->active;
+    struct edit_line *ctx = &console->edit_line;
+    RECT update_rect;
+    unsigned int i;
+
+    empty_update_rect( screen_buffer, &update_rect );
+    screen_buffer->cursor_x = ctx->home_x;
+    screen_buffer->cursor_y = ctx->home_y;
+    for (i = 0; i < ctx->end_offset && screen_buffer->cursor_y < screen_buffer->height; i++)
+        write_char( screen_buffer, ' ', &update_rect, &ctx->home_y );
+    screen_buffer->cursor_x = ctx->home_x;
+    screen_buffer->cursor_y = ctx->home_y;
+    update_output( screen_buffer, &update_rect );
+}
+
+/* The line starts where the output ended and is drawn there again. */
+static void edit_line_show( struct console *console )
+{
+    struct screen_buffer *screen_buffer = console->active;
+    struct edit_line *ctx = &console->edit_line;
+
+    ctx->home_x = min( screen_buffer->cursor_x, screen_buffer->width - 1 );
+    ctx->home_y = screen_buffer->cursor_y;
+    ctx->end_offset = 0;
+    if (!ctx->len) return;
+    ctx->update_begin = 0;
+    ctx->update_end = ctx->len - 1;
+    update_read_output( console, FALSE );
+}
+
 static NTSTATUS write_console( struct screen_buffer *screen_buffer, const WCHAR *buffer, size_t len )
 {
     RECT update_rect;
     size_t i, j;
+    BOOL editing = edit_line_follows_output( screen_buffer );
 
     TRACE( "%s\n", debugstr_wn(buffer, len) );
 
+    if (editing && screen_buffer->console->edit_line.end_offset) edit_line_hide( screen_buffer->console );
     empty_update_rect( screen_buffer, &update_rect );
 
     for (i = 0; i < len; i++)
@@ -2166,6 +2212,7 @@ static NTSTATUS write_console( struct screen_buffer *screen_buffer, const WCHAR 
 
     scroll_to_cursor( screen_buffer );
     update_output( screen_buffer, &update_rect );
+    if (editing) edit_line_show( screen_buffer->console );
     tty_sync( screen_buffer->console );
     update_window_config( screen_buffer->console, TRUE );
     return STATUS_SUCCESS;
