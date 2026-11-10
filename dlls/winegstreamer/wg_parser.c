@@ -665,7 +665,8 @@ static void no_more_pads_cb(GstElement *element, gpointer user)
     pthread_mutex_unlock(&parser->mutex);
     pthread_cond_signal(&parser->init_cond);
 }
-static void set_dav1d_n_threads(GstElement *element)
+
+static void set_element_properties(GstElement *element)
 {
     GstElementFactory *factory = NULL;
     const char *name = NULL;
@@ -676,7 +677,10 @@ static void set_dav1d_n_threads(GstElement *element)
     if (factory)
         name = gst_element_factory_get_longname(factory);
 
-    if (name && strstr(name, "Dav1d"))
+    if (!name)
+        return;
+
+    if (strstr(name, "Dav1d"))
     {
 #if defined(__x86_64__)
         GST_DEBUG("%s found, setting n-threads to 4.", name);
@@ -686,6 +690,15 @@ static void set_dav1d_n_threads(GstElement *element)
         g_object_set(element, "n-threads", G_GINT64_CONSTANT(1), NULL);
 #endif
     }
+
+    if (strstr(name, "HLS"))
+    {
+        /* HACK: A network stream may have multiple resolutions available, and
+         * the http live streaming demuxer may switch after measuring bandwidth.
+         * Prevent this instead of trying to support it. */
+        GST_DEBUG("%s found, setting bitrate-limit to 0.", name);
+        g_object_set(element, "bitrate-limit", 0.0f, NULL);
+    }
 }
 
 static void deep_element_added_cb(GstBin *self, GstBin *sub_bin, GstElement *element, gpointer user)
@@ -693,7 +706,7 @@ static void deep_element_added_cb(GstBin *self, GstBin *sub_bin, GstElement *ele
     if (element)
         set_max_threads(element);
 
-    set_dav1d_n_threads(element);
+    set_element_properties(element);
 }
 
 static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
