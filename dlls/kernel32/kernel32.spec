@@ -1542,7 +1542,7 @@
 @ stdcall -import SwitchToThread()
 @ stdcall -import SystemTimeToFileTime(ptr ptr)
 @ stdcall -import SystemTimeToTzSpecificLocalTime (ptr ptr ptr)
-# @ stub SystemTimeToTzSpecificLocalTimeEx
+@ stdcall -import SystemTimeToTzSpecificLocalTimeEx(ptr ptr ptr)
 @ stdcall TerminateJobObject(long long)
 @ stdcall -import TerminateProcess(long long)
 @ stdcall -import TerminateThread(long long)
