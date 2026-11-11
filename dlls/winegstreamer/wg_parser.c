@@ -792,11 +792,13 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
             GstStructure *structure;
             GstVideoInfo video_info;
             bool fix_nv12 = false, fix_yv12 = false;
+            const char *sgi;
             GstCaps *caps;
 
             gst_event_parse_caps(event, &caps);
             structure = gst_caps_get_structure(caps, 0);
-            if (gst_structure_has_name(structure, "video/x-raw") && gst_video_info_from_caps(&video_info, caps))
+            if ((sgi = getenv("SteamGameId")) && (!strcmp(sgi, "339340") || !strcmp(sgi, "1196590"))
+                    && gst_structure_has_name(structure, "video/x-raw") && gst_video_info_from_caps(&video_info, caps))
             {
                 fix_nv12 = video_info.stride[0] > GST_ROUND_UP_2(video_info.width)
                         && GST_VIDEO_INFO_FORMAT(&video_info) == GST_VIDEO_FORMAT_NV12;
