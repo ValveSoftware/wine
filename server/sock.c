@@ -2746,6 +2746,23 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
         if (unix_addr.addr.sa_family == AF_INET && !memcmp( &unix_addr.in.sin_addr, magic_loopback_addr, 4 ))
             unix_addr.in.sin_addr.s_addr = htonl( INADDR_LOOPBACK );
 
+        /* On Windows, connecting an unconnected datagram socket to the
+         * unspecified address fails. Each attempt signals FD_CONNECT, and
+         * select() and poll() report a connect error on the socket until it is
+         * connected. Some applications use this to wake up a thread waiting in
+         * select(). Connecting a connected socket to the unspecified address
+         * dissolves the association instead, which is handled below. */
+        if (sock->type == WS_SOCK_DGRAM && !sock->peer_addr_len && is_any_addr( &unix_addr ))
+        {
+            sock->errors[AFD_POLL_BIT_CONNECT_ERR] = EADDRNOTAVAIL;
+            sock->reported_events &= ~AFD_POLL_CONNECT_ERR;
+            post_socket_event( sock, AFD_POLL_BIT_CONNECT_ERR );
+            post_sock_messages( sock );
+            complete_async_polls( sock, POLLERR, EADDRNOTAVAIL );
+            set_error( STATUS_INVALID_ADDRESS_COMPONENT );
+            return;
+        }
+
         memcpy( &peer_addr, &unix_addr, sizeof(unix_addr) );
         ret = connect( unix_fd, &unix_addr.addr, unix_len );
         if (ret < 0 && errno == ECONNABORTED)
@@ -2800,6 +2817,10 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
             {
                 sock->state = SOCK_CONNECTED;
                 sock->connect_time = current_time;
+            }
+            else
+            {
+                sock->errors[AFD_POLL_BIT_CONNECT_ERR] = 0;
             }
 
             if (!send_len) return;
@@ -3276,6 +3297,8 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
         {
             for (i = 0; i < ARRAY_SIZE( sock->errors ); ++i)
             {
+                /* a failed datagram connect() does not set SO_ERROR */
+                if (i == AFD_POLL_BIT_CONNECT_ERR && sock->type == WS_SOCK_DGRAM) continue;
                 if (sock->errors[i])
                 {
                     error = sock->errors[i];
