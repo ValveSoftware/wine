@@ -14369,6 +14369,135 @@ static void test_connect_udp(void)
     closesocket(client);
 }
 
+static BOOL select_except_now(SOCKET s)
+{
+    struct timeval timeout = {0};
+    fd_set exceptfds;
+    int ret;
+
+    FD_ZERO(&exceptfds);
+    FD_SET(s, &exceptfds);
+    ret = select(0, NULL, NULL, &exceptfds, &timeout);
+    return ret == 1 && FD_ISSET(s, &exceptfds);
+}
+
+static DWORD WINAPI connect_any_thread(void *arg)
+{
+    const struct sockaddr_in any_addr = {.sin_family = AF_INET};
+    SOCKET s = *(SOCKET *)arg;
+
+    Sleep(100);
+    connect(s, (const struct sockaddr *)&any_addr, sizeof(any_addr));
+    return 0;
+}
+
+static void test_connect_udp_any_addr(void)
+{
+    const struct sockaddr_in bind_addr = {.sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
+    const struct sockaddr_in6 any_addr6 = {.sin6_family = AF_INET6};
+    struct sockaddr_in any_addr = {.sin_family = AF_INET}, addr;
+    struct timeval timeout = {5, 0};
+    WSANETWORKEVENTS events;
+    fd_set exceptfds;
+    SOCKET s, server;
+    HANDLE thread;
+    WSAEVENT event;
+    int ret, len;
+
+    server = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    ret = bind(server, (const struct sockaddr *)&bind_addr, sizeof(bind_addr));
+    ok(!ret, "got error %u\n", WSAGetLastError());
+    len = sizeof(addr);
+    ret = getsockname(server, (struct sockaddr *)&addr, &len);
+    ok(!ret, "got error %u\n", WSAGetLastError());
+
+    s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    set_blocking(s, FALSE);
+    ok(!select_except_now(s), "expected no exception\n");
+
+    WSASetLastError(0xdeadbeef);
+    ret = connect(s, (const struct sockaddr *)&any_addr, sizeof(any_addr));
+    todo_wine ok(ret == -1, "got %d\n", ret);
+    todo_wine ok(WSAGetLastError() == WSAEADDRNOTAVAIL, "got error %u\n", WSAGetLastError());
+    todo_wine ok(select_except_now(s), "expected an exception\n");
+    /* the exception stays signaled */
+    todo_wine ok(select_except_now(s), "expected an exception\n");
+
+    len = sizeof(ret);
+    ret = 0xdeadbeef;
+    getsockopt(s, SOL_SOCKET, SO_ERROR, (char *)&ret, &len);
+    ok(!ret, "got SO_ERROR %d\n", ret);
+
+    any_addr.sin_port = htons(1234);
+    WSASetLastError(0xdeadbeef);
+    ret = connect(s, (const struct sockaddr *)&any_addr, sizeof(any_addr));
+    todo_wine ok(ret == -1, "got %d\n", ret);
+    todo_wine ok(WSAGetLastError() == WSAEADDRNOTAVAIL, "got error %u\n", WSAGetLastError());
+    any_addr.sin_port = 0;
+
+    ret = send(s, "data", 4, 0);
+    todo_wine ok(ret == -1, "got %d\n", ret);
+    todo_wine ok(WSAGetLastError() == WSAENOTCONN, "got error %u\n", WSAGetLastError());
+
+    /* a successful connect() clears the exception */
+    ret = connect(s, (const struct sockaddr *)&addr, sizeof(addr));
+    ok(!ret, "got error %u\n", WSAGetLastError());
+    ok(!select_except_now(s), "expected no exception\n");
+
+    /* connecting a connected socket to the unspecified address succeeds */
+    ret = connect(s, (const struct sockaddr *)&any_addr, sizeof(any_addr));
+    ok(!ret, "got error %u\n", WSAGetLastError());
+    ok(!select_except_now(s), "expected no exception\n");
+    closesocket(s);
+
+    /* the failure wakes up a select() waiting on the socket */
+    s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    set_blocking(s, FALSE);
+    FD_ZERO(&exceptfds);
+    FD_SET(s, &exceptfds);
+    thread = CreateThread(NULL, 0, connect_any_thread, &s, 0, NULL);
+    ret = select(0, NULL, NULL, &exceptfds, &timeout);
+    todo_wine ok(ret == 1, "got %d\n", ret);
+    todo_wine ok(FD_ISSET(s, &exceptfds), "expected an exception\n");
+    WaitForSingleObject(thread, INFINITE);
+    CloseHandle(thread);
+    closesocket(s);
+
+    /* every failed attempt signals FD_CONNECT */
+    s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    event = WSACreateEvent();
+    ret = WSAEventSelect(s, event, FD_CONNECT);
+    ok(!ret, "got error %u\n", WSAGetLastError());
+    ret = connect(s, (const struct sockaddr *)&any_addr, sizeof(any_addr));
+    todo_wine ok(ret == -1, "got %d\n", ret);
+    todo_wine ok(WSAGetLastError() == WSAEADDRNOTAVAIL, "got error %u\n", WSAGetLastError());
+    ret = WSAEnumNetworkEvents(s, event, &events);
+    ok(!ret, "got error %u\n", WSAGetLastError());
+    todo_wine ok(events.lNetworkEvents == FD_CONNECT, "got events %#lx\n", events.lNetworkEvents);
+    todo_wine ok(events.iErrorCode[FD_CONNECT_BIT] == WSAEADDRNOTAVAIL, "got error %d\n", events.iErrorCode[FD_CONNECT_BIT]);
+    ret = connect(s, (const struct sockaddr *)&any_addr, sizeof(any_addr));
+    todo_wine ok(ret == -1, "got %d\n", ret);
+    ret = WSAEnumNetworkEvents(s, event, &events);
+    ok(!ret, "got error %u\n", WSAGetLastError());
+    todo_wine ok(events.lNetworkEvents == FD_CONNECT, "got events %#lx\n", events.lNetworkEvents);
+    todo_wine ok(events.iErrorCode[FD_CONNECT_BIT] == WSAEADDRNOTAVAIL, "got error %d\n", events.iErrorCode[FD_CONNECT_BIT]);
+    WSACloseEvent(event);
+    closesocket(s);
+
+    s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+    if (s != INVALID_SOCKET)
+    {
+        WSASetLastError(0xdeadbeef);
+        ret = connect(s, (const struct sockaddr *)&any_addr6, sizeof(any_addr6));
+        todo_wine ok(ret == -1, "got %d\n", ret);
+        todo_wine ok(WSAGetLastError() == WSAEADDRNOTAVAIL, "got error %u\n", WSAGetLastError());
+        todo_wine ok(select_except_now(s), "expected an exception\n");
+        closesocket(s);
+    }
+
+    closesocket(server);
+}
+
 static void test_tcp_sendto_recvfrom(void)
 {
     SOCKET client, server = 0;
@@ -15000,6 +15129,7 @@ START_TEST( sock )
     test_icmp();
     test_icmpv6();
     test_connect_udp();
+    test_connect_udp_any_addr();
     test_tcp_sendto_recvfrom();
     test_broadcast();
     test_send_buffering();
