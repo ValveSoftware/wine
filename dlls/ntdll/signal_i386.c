@@ -31,6 +31,7 @@
 #define WIN32_NO_STATUS
 #include "windef.h"
 #include "ntdll_misc.h"
+#include "ddk/wdm.h"
 #include "wine/exception.h"
 #include "wine/debug.h"
 #include "ntsyscalls.h"
@@ -446,6 +447,15 @@ NTSTATUS WINAPI RtlGetNativeSystemInformation( SYSTEM_INFORMATION_CLASS class,
 BOOLEAN WINAPI RtlIsProcessorFeaturePresent( UINT feature )
 {
     return NtWow64IsProcessorFeaturePresent( feature );
+}
+
+
+/**********************************************************************
+ *              RtlGetEnabledExtendedFeatures   (NTDLL.@)
+ */
+ULONG64 WINAPI RtlGetEnabledExtendedFeatures( ULONG64 feature_mask )
+{
+    return user_shared_data->XState.EnabledFeatures & feature_mask;
 }
 
 
