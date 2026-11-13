@@ -26,8 +26,6 @@
 
 static BOOL (WINAPI *pTzSpecificLocalTimeToSystemTime)(LPTIME_ZONE_INFORMATION, LPSYSTEMTIME, LPSYSTEMTIME);
 static BOOL (WINAPI *pSystemTimeToTzSpecificLocalTime)(LPTIME_ZONE_INFORMATION, LPSYSTEMTIME, LPSYSTEMTIME);
-static BOOL (WINAPI *pSystemTimeToTzSpecificLocalTimeEx)(const DYNAMIC_TIME_ZONE_INFORMATION *, const SYSTEMTIME *, SYSTEMTIME *);
-static BOOL (WINAPI *pTzSpecificLocalTimeToSystemTimeEx)(const DYNAMIC_TIME_ZONE_INFORMATION *, const SYSTEMTIME *, SYSTEMTIME *);
 static BOOL (WINAPI *pGetSystemTimes)(LPFILETIME, LPFILETIME, LPFILETIME);
 static int (WINAPI *pGetCalendarInfoA)(LCID,CALID,CALTYPE,LPSTR,int,LPDWORD);
 static int (WINAPI *pGetCalendarInfoW)(LCID,CALID,CALTYPE,LPWSTR,int,LPDWORD);
@@ -641,93 +639,6 @@ static void test_TzSpecificLocalTimeToSystemTime(void)
     }        
 }
 
-static void test_TzSpecificLocalTimeEx(void)
-{
-    static const SYSTEMTIME times[] =
-    {
-        { 2010, 1, 2, 5, 12, 0, 0, 0 },
-        { 2010, 7, 0, 4, 12, 0, 0, 0 },
-        { 2024, 1, 5, 12, 12, 30, 15, 0 },
-        { 2024, 7, 1, 15, 12, 30, 15, 0 },
-    };
-    DYNAMIC_TIME_ZONE_INFORMATION dtzi;
-    TIME_ZONE_INFORMATION tzi;
-    SYSTEMTIME utc, expect, systime;
-    WCHAR curr_tz_name[256];
-    DWORD id;
-    BOOL ret;
-    unsigned int i, tzindex;
-
-    if (!pSystemTimeToTzSpecificLocalTimeEx || !pTzSpecificLocalTimeToSystemTimeEx)
-    {
-        win_skip( "SystemTimeToTzSpecificLocalTimeEx not available.\n" );
-        return;
-    }
-    if (!pGetDynamicTimeZoneInformation || !pGetTimeZoneInformationForYear ||
-        !pSystemTimeToTzSpecificLocalTime)
-    {
-        win_skip( "time zone functions not available.\n" );
-        return;
-    }
-
-    id = pGetDynamicTimeZoneInformation( &dtzi );
-    ok( id != TIME_ZONE_ID_INVALID, "got error %lu.\n", GetLastError() );
-    wcscpy( curr_tz_name, dtzi.TimeZoneKeyName );
-
-    for (tzindex = 0; !EnumDynamicTimeZoneInformation( tzindex, &dtzi ); ++tzindex)
-    {
-        for (i = 0; i < ARRAY_SIZE(times); i++)
-        {
-            winetest_push_context("test %u", i);
-            utc = times[i];
-
-            ret = pGetTimeZoneInformationForYear( utc.wYear, &dtzi, &tzi );
-            ok( ret, "got error %lu\n", GetLastError() );
-
-            memset( &expect, 0xcc, sizeof(expect) );
-            ret = pSystemTimeToTzSpecificLocalTime( &tzi, &utc, &expect );
-            ok( ret, "got error %lu\n", GetLastError() );
-
-            memset( &systime, 0xcc, sizeof(systime) );
-            ret = pSystemTimeToTzSpecificLocalTimeEx( &dtzi, &utc, &systime );
-            ok( ret, "got error %lu\n", GetLastError() );
-            ok( !memcmp( &systime, &expect, sizeof(systime) ),
-                "got %04u-%02u-%02u %02u:%02u:%02u, expected %04u-%02u-%02u %02u:%02u:%02u\n",
-                systime.wYear, systime.wMonth, systime.wDay, systime.wHour, systime.wMinute, systime.wSecond,
-                expect.wYear, expect.wMonth, expect.wDay, expect.wHour, expect.wMinute, expect.wSecond );
-
-            if (!wcscmp( curr_tz_name, dtzi.TimeZoneKeyName ))
-            {
-                /* NULL means the current time zone, which is what dtzi describes. */
-                memset( &systime, 0xcc, sizeof(systime) );
-                ret = pSystemTimeToTzSpecificLocalTimeEx( NULL, &utc, &systime );
-                ok( ret, "got error %lu\n", GetLastError() );
-                ok( !memcmp( &systime, &expect, sizeof(systime) ),
-                    "got %04u-%02u-%02u %02u:%02u:%02u, expected %04u-%02u-%02u %02u:%02u:%02u\n",
-                    systime.wYear, systime.wMonth, systime.wDay, systime.wHour, systime.wMinute, systime.wSecond,
-                    expect.wYear, expect.wMonth, expect.wDay, expect.wHour, expect.wMinute, expect.wSecond );
-            }
-            memset( &systime, 0xcc, sizeof(systime) );
-            ret = pTzSpecificLocalTimeToSystemTimeEx( &dtzi, &expect, &systime );
-            ok( ret, "got error %lu\n", GetLastError() );
-            ok( !memcmp( &systime, &utc, sizeof(systime) ), "got %04u-%02u-%02u %02u:%02u:%02u\n", systime.wYear,
-                systime.wMonth, systime.wDay, systime.wHour, systime.wMinute, systime.wSecond );
-            winetest_pop_context();
-        }
-    }
-
-    /* Invalid time */
-    utc = times[0];
-    utc.wMonth = 13;
-    SetLastError( 0xdeadbeef );
-    ret = pSystemTimeToTzSpecificLocalTimeEx( &dtzi, &utc, &systime );
-    ok( !ret, "SystemTimeToTzSpecificLocalTimeEx succeeded with invalid time\n" );
-    ok( GetLastError() == ERROR_INVALID_PARAMETER, "got error %lu.\n", GetLastError() );
-    SetLastError( 0xdeadbeef );
-    ret = pTzSpecificLocalTimeToSystemTimeEx( &dtzi, &utc, &systime );
-    ok( GetLastError() == ERROR_INVALID_PARAMETER, "got error %lu.\n", GetLastError() );
-}
-
 static void test_FileTimeToDosDateTime(void)
 {
     FILETIME ft = { 0 };
@@ -1293,8 +1204,6 @@ START_TEST(time)
     HMODULE hntdll = GetModuleHandleA("ntdll");
     pTzSpecificLocalTimeToSystemTime = (void *)GetProcAddress(hKernel, "TzSpecificLocalTimeToSystemTime");
     pSystemTimeToTzSpecificLocalTime = (void *)GetProcAddress( hKernel, "SystemTimeToTzSpecificLocalTime");
-    pSystemTimeToTzSpecificLocalTimeEx = (void *)GetProcAddress( hKernel, "SystemTimeToTzSpecificLocalTimeEx");
-    pTzSpecificLocalTimeToSystemTimeEx = (void *)GetProcAddress( hKernel, "TzSpecificLocalTimeToSystemTimeEx");
     pGetSystemTimes = (void *)GetProcAddress( hKernel, "GetSystemTimes");
     pGetCalendarInfoA = (void *)GetProcAddress(hKernel, "GetCalendarInfoA");
     pGetCalendarInfoW = (void *)GetProcAddress(hKernel, "GetCalendarInfoW");
@@ -1311,7 +1220,6 @@ START_TEST(time)
     test_FileTimeToSystemTime();
     test_FileTimeToLocalFileTime();
     test_TzSpecificLocalTimeToSystemTime();
-    test_TzSpecificLocalTimeEx();
     test_GetSystemTimes();
     test_FileTimeToDosDateTime();
     test_GetCalendarInfo();
