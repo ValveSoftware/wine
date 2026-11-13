@@ -736,7 +736,7 @@ static ULONGLONG get_cpu_features(void)
 
 void init_shared_data_cpuinfo( KUSER_SHARED_DATA *data )
 {
-    BOOLEAN *features = data->ProcessorFeatures;
+    BOOLEAN *features = data->ProcessorFeatures, have_x86 = FALSE;
 
 #ifdef linux
     FILE *f = fopen("/proc/cpuinfo", "r");
@@ -804,18 +804,24 @@ void init_shared_data_cpuinfo( KUSER_SHARED_DATA *data )
             features[PF_ARM_DIVIDE_INSTRUCTION_AVAILABLE] = TRUE;
             break;
         case IMAGE_FILE_MACHINE_I386:
-            features[PF_MMX_INSTRUCTIONS_AVAILABLE]    = TRUE;
-            features[PF_XMMI_INSTRUCTIONS_AVAILABLE]   = TRUE;
-            features[PF_RDTSC_INSTRUCTION_AVAILABLE]   = TRUE;
-            features[PF_XMMI64_INSTRUCTIONS_AVAILABLE] = TRUE;
-            features[PF_SSE3_INSTRUCTIONS_AVAILABLE]   = TRUE;
-            features[PF_COMPARE_EXCHANGE128]           = TRUE;
-            features[PF_RDTSCP_INSTRUCTION_AVAILABLE]  = TRUE;
-            features[PF_SSSE3_INSTRUCTIONS_AVAILABLE]  = TRUE;
-            features[PF_SSE4_1_INSTRUCTIONS_AVAILABLE] = TRUE;
-            features[PF_SSE4_2_INSTRUCTIONS_AVAILABLE] = TRUE;
+        case IMAGE_FILE_MACHINE_AMD64:
+            have_x86 = TRUE;
             break;
         }
+    }
+
+    if (have_x86)
+    {
+        features[PF_MMX_INSTRUCTIONS_AVAILABLE]    = TRUE;
+        features[PF_XMMI_INSTRUCTIONS_AVAILABLE]   = TRUE;
+        features[PF_RDTSC_INSTRUCTION_AVAILABLE]   = TRUE;
+        features[PF_XMMI64_INSTRUCTIONS_AVAILABLE] = TRUE;
+        features[PF_SSE3_INSTRUCTIONS_AVAILABLE]   = TRUE;
+        features[PF_COMPARE_EXCHANGE128]           = TRUE;
+        features[PF_RDTSCP_INSTRUCTION_AVAILABLE]  = TRUE;
+        features[PF_SSSE3_INSTRUCTIONS_AVAILABLE]  = TRUE;
+        features[PF_SSE4_1_INSTRUCTIONS_AVAILABLE] = TRUE;
+        features[PF_SSE4_2_INSTRUCTIONS_AVAILABLE] = TRUE;
     }
 }
 
