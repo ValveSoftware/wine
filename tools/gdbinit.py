@@ -49,7 +49,7 @@ class LoadSymbolFiles(gdb.Command):
     libs = {}
     with open('/proc/{}/maps'.format(pid), 'r') as maps:
       for line in maps:
-        addr, _, _, _, node, path = re.split(r'\s+', line, 5)
+        addr, _, _, _, node, path = re.split(r'\s+', line, maxsplit=5)
         path = path.strip()
         if node == '0': continue
         if path in libs: continue
