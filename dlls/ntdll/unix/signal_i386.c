@@ -2509,7 +2509,11 @@ void init_syscall_frame( LPTHREAD_START_ROUTINE entry, void *arg, BOOL suspend, 
     context.FloatSave.ControlWord = 0x27f;
     ((XSAVE_FORMAT *)context.ExtendedRegisters)->ControlWord = 0x27f;
     ((XSAVE_FORMAT *)context.ExtendedRegisters)->MxCsr = 0x1f80;
-    if ((ctx = get_cpu_area( IMAGE_FILE_MACHINE_I386 ))) *ctx = context;
+    if ((ctx = get_cpu_area( IMAGE_FILE_MACHINE_I386 )))
+    {
+        *ctx = context;
+        if (user_shared_data->XState.EnabledFeatures) ctx->ContextFlags |= CONTEXT_XSTATE;
+    }
 
     if (suspend)
     {
