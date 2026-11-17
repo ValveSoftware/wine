@@ -270,7 +270,8 @@ static void apply_thread_priority( struct thread *thread )
 {
     int effective_priority = get_effective_thread_priority( thread );
 
-    if (nice_limit > 0) return;
+    /* HACK: If nice_limit > 0, still allow threads themselves to lower their priorities. */
+    if (nice_limit > 0 && (thread->base_priority >= 0 || effective_priority > 8)) return;
 
     /* FIXME: handle realtime priorities using SCHED_RR if possible */
     if (effective_priority >= LOW_REALTIME_PRIORITY) effective_priority = LOW_REALTIME_PRIORITY - 1;
