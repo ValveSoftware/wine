@@ -252,23 +252,29 @@ void init_threading(void)
         setrlimit( RLIMIT_NICE, &rlimit );
         if (rlimit.rlim_max <= 40) nice_limit = 20 - rlimit.rlim_max;
         else if (rlimit.rlim_max == -1) nice_limit = -20;
-        if (nice_limit >= 0 && debug_level) fprintf(stderr, "wine: RLIMIT_NICE is <= 20, unable to use setpriority safely\n");
+        if (nice_limit > 0 && debug_level) fprintf(stderr, "wine: RLIMIT_NICE is < 20, unable to use setpriority safely\n");
     }
-    if (nice_limit < 0 && debug_level) fprintf(stderr, "wine: Using setpriority to control niceness in the [%d,%d] range\n", nice_limit, -nice_limit );
+    if (nice_limit <= 0 && debug_level) fprintf(stderr, "wine: Using setpriority to control niceness in the [19, %d] range\n", nice_limit);
+}
+
+static int get_unix_niceness( int effective_priority )
+{
+    /* Map an NT application band [1, 15] priority to [19, nice_limit], where nice_limit <= 0.
+     * For low NT priorities [1, 8], map linearly to [19, 0], and
+     * for higher NT priorities [8, 15], map linearly to [0, nice_limit]. */
+    if (effective_priority <= 8) return 19 - (effective_priority - 1) * 19 / 7;
+    return (effective_priority - 8) * nice_limit / 7;
 }
 
 static void apply_thread_priority( struct thread *thread )
 {
-    int min = -nice_limit, max = nice_limit, range = max - min, niceness;
     int effective_priority = get_effective_thread_priority( thread );
 
-    if (nice_limit >= 0) return;
+    if (nice_limit > 0) return;
 
     /* FIXME: handle realtime priorities using SCHED_RR if possible */
     if (effective_priority >= LOW_REALTIME_PRIORITY) effective_priority = LOW_REALTIME_PRIORITY - 1;
-    /* map an NT application band [1,15] priority to [-nice_limit, nice_limit] */
-    niceness = (min + (effective_priority - 1) * range / 14);
-    setpriority( PRIO_PROCESS, thread->unix_tid, niceness );
+    setpriority( PRIO_PROCESS, thread->unix_tid, get_unix_niceness( effective_priority ) );
 }
 
 #elif defined(__APPLE__)
