@@ -907,7 +907,7 @@ int get_inproc_alert_fd(void)
         {
             if (!server_call_unlocked( req ))
             {
-                if (do_fsync()) data->alert_fd = fd = reply->fsync_shm_idx;
+                if (do_fsync()) fd = reply->fsync_shm_idx;
                 else
                 {
                     data->alert_fd = fd = wine_server_receive_fd( &token );
