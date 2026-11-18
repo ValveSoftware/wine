@@ -440,17 +440,25 @@ static BOOL thickframe_managed( DWORD style )
 
     if (cached == -1)
     {
-        static const WCHAR app_name[] = u"\\SocialClubHelper.exe";
+        static const WCHAR *const app_names[] =
+        {
+            u"\\SocialClubHelper.exe",
+            u"\\iRacingUI.exe",
+        };
         UNICODE_STRING *name;
         DWORD len, name_len;
+        UINT i;
 
         cached = 1;
 
         name = &NtCurrentTeb()->Peb->ProcessParameters->ImagePathName;
         len = name->Length / sizeof(WCHAR);
-        name_len = ARRAY_SIZE(app_name) - 1;
-        if (len >= name_len)
-            cached = !!memcmp( name->Buffer + len - name_len, app_name, name_len * sizeof(*app_name) );
+        for (i = 0; i < ARRAY_SIZE(app_names); i++)
+        {
+            name_len = wcslen( app_names[i] );
+            if (len >= name_len && !wcsncmp( name->Buffer + len - name_len, app_names[i], name_len ))
+                cached = 0;
+        }
         if (!cached) FIXME( "HACK: making popups with WS_THICKFRAME not managed.\n" );
     }
     return cached;
