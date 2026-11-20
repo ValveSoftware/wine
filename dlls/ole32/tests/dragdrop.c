@@ -663,8 +663,8 @@ static void test_Register_Revoke(void)
 
     RemovePropA(hwnd, "OleDropTargetInterface");
     hr = RegisterDragDrop(hwnd, &DropTarget);
-    todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
-    todo_wine ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
+    ok(hr == S_OK, "got %#lx.\n", hr);
+    ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
 
     SetPropA(hwnd, "OleDropTargetInterface", (void *)0xdeadbeef);
     hr = RevokeDragDrop(hwnd);
@@ -676,8 +676,8 @@ static void test_Register_Revoke(void)
     ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
     RemovePropA(hwnd, "OleDropTargetInterface");
     hr = RevokeDragDrop(hwnd);
-    todo_wine ok(hr == DRAGDROP_E_NOTREGISTERED, "got %#lx.\n", hr);
-    todo_wine ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
+    ok(hr == DRAGDROP_E_NOTREGISTERED, "got %#lx.\n", hr);
+    ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
 
     OleUninitialize();
     ok(!droptarget_refs, "got %d.\n", droptarget_refs);

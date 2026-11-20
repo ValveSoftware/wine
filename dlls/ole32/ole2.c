@@ -276,7 +276,7 @@ static inline HANDLE get_droptarget_handle(HWND hwnd)
  */
 static inline BOOL is_droptarget(HWND hwnd)
 {
-    return get_droptarget_handle(hwnd) != 0;
+    return GetPropW(hwnd, prop_oledroptarget) != 0;
 }
 
 /*************************************************************
@@ -628,7 +628,7 @@ HRESULT WINAPI RevokeDragDrop(HWND hwnd)
   }
 
   /* no registration data */
-  if (!(map = get_droptarget_handle(hwnd)))
+  if (!is_droptarget(hwnd) || !(map = get_droptarget_handle(hwnd)))
     return DRAGDROP_E_NOTREGISTERED;
 
   hr = create_stream_from_map(map, &stream);
