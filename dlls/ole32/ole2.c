@@ -374,6 +374,7 @@ static HRESULT create_stream_from_map(HANDLE map, IStream **stream)
 typedef struct {
     IDropTarget IDropTarget_iface;
     HWND hwnd;
+    IDropTarget *target;
     LONG refs;
 } DropTargetWrapper;
 
@@ -408,7 +409,14 @@ static ULONG WINAPI DropTargetWrapper_Release(IDropTarget* iface)
 {
     DropTargetWrapper* This = impl_from_IDropTarget(iface);
     ULONG refs = InterlockedDecrement(&This->refs);
-    if (!refs) HeapFree(GetProcessHeap(), 0, This);
+
+    if (!refs)
+    {
+        TRACE("hwnd %p, iface %p destroying.\n", This->hwnd, iface);
+        if (IsWindow(This->hwnd))
+            IDropTarget_Release(This->target);
+        HeapFree(GetProcessHeap(), 0, This);
+    }
     return refs;
 }
 
@@ -416,8 +424,7 @@ static inline HRESULT get_target_from_wrapper( IDropTarget *wrapper, IDropTarget
 {
     DropTargetWrapper* This = impl_from_IDropTarget( wrapper );
     *target = GetPropW( This->hwnd, prop_oledroptarget );
-    if (!*target) return DRAGDROP_E_NOTREGISTERED;
-    IDropTarget_AddRef( *target );
+    if (*target != This->target) return DRAGDROP_E_NOTREGISTERED;
     return S_OK;
 }
 
@@ -431,10 +438,8 @@ static HRESULT WINAPI DropTargetWrapper_DragEnter(IDropTarget* iface,
     HRESULT r = get_target_from_wrapper( iface, &target );
 
     if (SUCCEEDED( r ))
-    {
         r = IDropTarget_DragEnter( target, pDataObj, grfKeyState, pt, pdwEffect );
-        IDropTarget_Release( target );
-    }
+
     return r;
 }
 
@@ -447,10 +452,7 @@ static HRESULT WINAPI DropTargetWrapper_DragOver(IDropTarget* iface,
     HRESULT r = get_target_from_wrapper( iface, &target );
 
     if (SUCCEEDED( r ))
-    {
         r = IDropTarget_DragOver( target, grfKeyState, pt, pdwEffect );
-        IDropTarget_Release( target );
-    }
     return r;
 }
 
@@ -460,10 +462,7 @@ static HRESULT WINAPI DropTargetWrapper_DragLeave(IDropTarget* iface)
     HRESULT r = get_target_from_wrapper( iface, &target );
 
     if (SUCCEEDED( r ))
-    {
         r = IDropTarget_DragLeave( target );
-        IDropTarget_Release( target );
-    }
     return r;
 }
 
@@ -477,10 +476,7 @@ static HRESULT WINAPI DropTargetWrapper_Drop(IDropTarget* iface,
     HRESULT r = get_target_from_wrapper( iface, &target );
 
     if (SUCCEEDED( r ))
-    {
         r = IDropTarget_Drop( target, pDataObj, grfKeyState, pt, pdwEffect );
-        IDropTarget_Release( target );
-    }
     return r;
 }
 
@@ -495,14 +491,16 @@ static const IDropTargetVtbl DropTargetWrapperVTbl =
     DropTargetWrapper_Drop
 };
 
-static IDropTarget* WrapDropTarget( HWND hwnd )
+static IDropTarget* WrapDropTarget( HWND hwnd, IDropTarget *target )
 {
     DropTargetWrapper* This = HeapAlloc(GetProcessHeap(), 0, sizeof(*This));
 
     if (This)
     {
         This->IDropTarget_iface.lpVtbl = &DropTargetWrapperVTbl;
+        IDropTarget_AddRef( target );
         This->hwnd = hwnd;
+        This->target = target;
         This->refs = 1;
     }
     return &This->IDropTarget_iface;
@@ -582,7 +580,7 @@ HRESULT WINAPI RegisterDragDrop(HWND hwnd, LPDROPTARGET pDropTarget)
   if(FAILED(hr)) return hr;
 
   /* IDropTarget::QueryInterface() shouldn't be called, some (broken) apps depend on this. */
-  wrapper = WrapDropTarget( hwnd );
+  wrapper = WrapDropTarget( hwnd, pDropTarget );
   if(!wrapper)
   {
     IStream_Release(stream);
@@ -596,7 +594,6 @@ HRESULT WINAPI RegisterDragDrop(HWND hwnd, LPDROPTARGET pDropTarget)
     hr = create_map_from_stream(stream, &map);
     if(SUCCEEDED(hr))
     {
-      IDropTarget_AddRef(pDropTarget);
       SetPropW(hwnd, prop_oledroptarget, pDropTarget);
       SetPropW(hwnd, prop_marshalleddroptarget, map);
     }
@@ -620,7 +617,6 @@ HRESULT WINAPI RevokeDragDrop(HWND hwnd)
 {
   HANDLE map;
   IStream *stream;
-  IDropTarget *drop_target;
   HRESULT hr;
 
   TRACE("(%p)\n", hwnd);
@@ -635,12 +631,6 @@ HRESULT WINAPI RevokeDragDrop(HWND hwnd)
   if (!(map = get_droptarget_handle(hwnd)))
     return DRAGDROP_E_NOTREGISTERED;
 
-  drop_target = GetPropW(hwnd, prop_oledroptarget);
-  if(drop_target) IDropTarget_Release(drop_target);
-
-  RemovePropW(hwnd, prop_oledroptarget);
-  RemovePropW(hwnd, prop_marshalleddroptarget);
-
   hr = create_stream_from_map(map, &stream);
   if(SUCCEEDED(hr))
   {
@@ -648,6 +638,9 @@ HRESULT WINAPI RevokeDragDrop(HWND hwnd)
       IStream_Release(stream);
   }
   CloseHandle(map);
+
+  RemovePropW(hwnd, prop_oledroptarget);
+  RemovePropW(hwnd, prop_marshalleddroptarget);
 
   return hr;
 }

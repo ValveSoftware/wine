@@ -651,37 +651,49 @@ static void test_Register_Revoke(void)
     ok(droptarget_refs >= 1, "DropTarget refs should be at least one\n");
     OleUninitialize();
 
-    /* Win 8 releases the ref in OleUninitialize() */
-    if (droptarget_refs >= 1)
-    {
-        hr = RevokeDragDrop(hwnd);
-        ok_ole_success(hr, "RevokeDragDrop");
-        ok(droptarget_refs == 0 ||
-           broken(droptarget_refs == 1), /* NT4 */
-           "DropTarget refs should be zero not %d\n", droptarget_refs);
-    }
+    ok(!droptarget_refs, "got %d.\n", droptarget_refs);
+
+    prop = GetPropA(hwnd, "OleDropTargetInterface");
+    ok(prop == &DropTarget, "expected %p, got %p\n", &DropTarget, prop);
 
     hr = RevokeDragDrop(NULL);
     ok(hr == DRAGDROP_E_INVALIDHWND, "RevokeDragDrop with NULL hwnd should return DRAGDROP_E_INVALIDHWND instead of 0x%08lx\n", hr);
 
-    DestroyWindow(hwnd);
-
-    /* try to revoke with already destroyed window */
     OleInitialize(NULL);
 
-    hwnd = CreateWindowA("WineOleTestClass", "Test", 0,
-        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL,
-        NULL, NULL, NULL);
+    RemovePropA(hwnd, "OleDropTargetInterface");
+    hr = RegisterDragDrop(hwnd, &DropTarget);
+    todo_wine ok(hr == S_OK, "got %#lx.\n", hr);
+    todo_wine ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
+
+    SetPropA(hwnd, "OleDropTargetInterface", (void *)0xdeadbeef);
+    hr = RevokeDragDrop(hwnd);
+    ok(hr == S_OK, "got %#lx.\n", hr);
+    ok(!droptarget_refs, "got %d.\n", droptarget_refs);
 
     hr = RegisterDragDrop(hwnd, &DropTarget);
-    ok(hr == S_OK, "got 0x%08lx\n", hr);
+    ok(hr == S_OK, "got %#lx.\n", hr);
+    ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
+    RemovePropA(hwnd, "OleDropTargetInterface");
+    hr = RevokeDragDrop(hwnd);
+    todo_wine ok(hr == DRAGDROP_E_NOTREGISTERED, "got %#lx.\n", hr);
+    todo_wine ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
 
+    OleUninitialize();
+    ok(!droptarget_refs, "got %d.\n", droptarget_refs);
+
+    OleInitialize(NULL);
+    hr = RegisterDragDrop(hwnd, &DropTarget);
+    ok(hr == S_OK, "got %#lx.\n", hr);
     DestroyWindow(hwnd);
 
     hr = RevokeDragDrop(hwnd);
-    ok(hr == DRAGDROP_E_INVALIDHWND, "got 0x%08lx\n", hr);
+    ok(hr == DRAGDROP_E_INVALIDHWND, "got %#lx.\n", hr);
+    ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
 
     OleUninitialize();
+    ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
+    droptarget_refs = 0;
 }
 
 static void test_DoDragDrop(void)
