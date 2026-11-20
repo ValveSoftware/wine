@@ -2693,7 +2693,29 @@ NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc
 #endif
 
         case IOCTL_AFD_WINE_GET_IPV6_V6ONLY:
+        {
+            union unix_sockaddr addr;
+            socklen_t len = sizeof(addr);
+
+            if ((status = server_get_unix_fd( handle, 0, &fd, &needs_close, NULL, NULL )))
+                return status;
+
+            if (!getsockname( fd, &addr.addr, &len ) && addr.addr.sa_family == AF_INET)
+            {
+                /* querying IPV6_V6ONLY succeeds on an IPv4 socket, and returns 1 */
+                if (needs_close) close( fd );
+                memset( out_buffer, 0, out_size );
+                if (out_size) *(char *)out_buffer = 1;
+                if (io)
+                {
+                    io->Status = STATUS_SUCCESS;
+                    io->Information = out_size;
+                }
+                return STATUS_SUCCESS;
+            }
+            if (needs_close) close( fd );
             return do_getsockopt( handle, io, IPPROTO_IPV6, IPV6_V6ONLY, out_buffer, out_size );
+        }
 
         case IOCTL_AFD_WINE_SET_IPV6_V6ONLY:
         {
