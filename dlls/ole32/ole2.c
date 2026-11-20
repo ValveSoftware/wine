@@ -637,7 +637,8 @@ HRESULT WINAPI RevokeDragDrop(HWND hwnd)
       hr = create_stream_from_map(map, &stream);
       if(SUCCEEDED(hr))
       {
-          CoReleaseMarshalData(stream);
+          if (FAILED(CoReleaseMarshalData(stream)))
+            hr = RPC_E_WRONG_THREAD;
           IStream_Release(stream);
       }
       CloseHandle(map);

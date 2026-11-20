@@ -673,6 +673,13 @@ static void test_Register_Revoke(void)
 
     OleInitialize(NULL);
 
+    hr = RegisterDragDrop(hwnd, &DropTarget);
+    ok(hr == DRAGDROP_E_ALREADYREGISTERED, "got %#lx.\n", hr);
+    hr = RevokeDragDrop(hwnd);
+    ok(hr == RPC_E_WRONG_THREAD, "got %#lx.\n", hr);
+    hr = RevokeDragDrop(hwnd);
+    ok(hr == DRAGDROP_E_NOTREGISTERED, "got %#lx.\n", hr);
+
     RemovePropA(hwnd, "OleDropTargetInterface");
     hr = RegisterDragDrop(hwnd, &DropTarget);
     ok(hr == S_OK, "got %#lx.\n", hr);
