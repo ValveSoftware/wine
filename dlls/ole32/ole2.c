@@ -618,10 +618,11 @@ HRESULT WINAPI RevokeDragDrop(HWND hwnd)
   HANDLE map;
   IStream *stream;
   HRESULT hr;
+  DWORD tid, pid;
 
   TRACE("(%p)\n", hwnd);
 
-  if (!IsWindow(hwnd))
+  if (!(tid = GetWindowThreadProcessId(hwnd, &pid)))
   {
     ERR("invalid hwnd %p\n", hwnd);
     return DRAGDROP_E_INVALIDHWND;
@@ -631,14 +632,21 @@ HRESULT WINAPI RevokeDragDrop(HWND hwnd)
   if (!is_droptarget(hwnd) || !(map = get_droptarget_handle(hwnd)))
     return DRAGDROP_E_NOTREGISTERED;
 
-  hr = create_stream_from_map(map, &stream);
-  if(SUCCEEDED(hr))
+  if (tid == GetCurrentThreadId())
   {
-      CoReleaseMarshalData(stream);
-      IStream_Release(stream);
+      hr = create_stream_from_map(map, &stream);
+      if(SUCCEEDED(hr))
+      {
+          CoReleaseMarshalData(stream);
+          IStream_Release(stream);
+      }
+      CloseHandle(map);
   }
-  CloseHandle(map);
-
+  else
+  {
+      WARN("Wrong thread.\n");
+      hr = RPC_E_WRONG_THREAD;
+  }
   RemovePropW(hwnd, prop_oledroptarget);
   RemovePropW(hwnd, prop_marshalleddroptarget);
 

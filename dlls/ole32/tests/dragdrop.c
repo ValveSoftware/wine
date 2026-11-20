@@ -611,11 +611,23 @@ static ATOM register_dummy_class(void)
     return RegisterClassA(&wc);
 }
 
+static DWORD WINAPI revoke_thread(void *param)
+{
+    HWND hwnd = param;
+    HRESULT hr;
+
+    OleInitialize(NULL);
+    hr = RevokeDragDrop(hwnd);
+    ok(hr == RPC_E_WRONG_THREAD, "got hr %#lx.\n", hr);
+    return 0;
+}
+
 static void test_Register_Revoke(void)
 {
     HANDLE prop;
     HRESULT hr;
     HWND hwnd;
+    HANDLE thread;
 
     hwnd = CreateWindowA("WineOleTestClass", "Test", 0,
         CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL,
@@ -694,6 +706,31 @@ static void test_Register_Revoke(void)
     OleUninitialize();
     ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
     droptarget_refs = 0;
+
+    hwnd = CreateWindowA("WineOleTestClass", "Test", 0,
+        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL,
+        NULL, NULL, NULL);
+
+    OleInitialize(NULL);
+    hr = RegisterDragDrop(hwnd, &DropTarget);
+    ok(hr == S_OK, "got %#lx.\n", hr);
+    ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
+
+    prop = GetPropA(hwnd, "OleDropTargetInterface");
+    ok(!!prop, "got %p.\n", prop);
+
+    thread = CreateThread(NULL, 0, revoke_thread, hwnd, 0, NULL);
+    ok(!!thread, "got error %lu.\n", GetLastError());
+    WaitForSingleObject(thread, INFINITE);
+    CloseHandle(thread);
+
+    prop = GetPropA(hwnd, "OleDropTargetInterface");
+    ok(!prop, "got %p.\n", prop);
+
+    ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
+    OleUninitialize();
+    ok(!droptarget_refs, "got %d.\n", droptarget_refs);
+    DestroyWindow(hwnd);
 }
 
 static void test_DoDragDrop(void)
