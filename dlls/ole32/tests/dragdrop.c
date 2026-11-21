@@ -638,6 +638,7 @@ static void test_Register_Revoke(void)
         broken(hr == CO_E_NOTINITIALIZED), /* NT4 */
         "RegisterDragDrop without OLE initialized should have returned E_OUTOFMEMORY instead of 0x%08lx\n", hr);
 
+    CoInitialize(NULL);
     OleInitialize(NULL);
 
     hr = RegisterDragDrop(hwnd, NULL);
@@ -662,7 +663,8 @@ static void test_Register_Revoke(void)
 
     ok(droptarget_refs >= 1, "DropTarget refs should be at least one\n");
     OleUninitialize();
-
+    ok(droptarget_refs == 1, "got %d.\n", droptarget_refs);
+    CoUninitialize();
     ok(!droptarget_refs, "got %d.\n", droptarget_refs);
 
     prop = GetPropA(hwnd, "OleDropTargetInterface");
