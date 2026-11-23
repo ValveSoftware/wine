@@ -2052,6 +2052,34 @@ static inline DWORD is_privileged_instr( CONTEXT *context )
 
 
 /***********************************************************************
+ *           handle_syscall_opcode
+ *
+ * Handle syscall or 0x2e opcode.
+ */
+static void handle_syscall_opcode( ucontext_t *sigcontext )
+{
+    extern const void *__wine_syscall_dispatcher_prolog_end_ptr;
+    struct syscall_frame *frame = get_syscall_frame();
+
+    TRACE_(seh)( "rax %#lx, rip %#lx.\n", (long)RAX_sig(sigcontext), (long)RIP_sig(sigcontext) );
+
+    frame->rip = RIP_sig(sigcontext) + 0xb;
+    frame->rcx = RIP_sig(sigcontext);
+    frame->eflags = EFL_sig(sigcontext);
+    frame->restore_flags = 0;
+    if (instrumentation_callback) frame->restore_flags |= RESTORE_FLAGS_INSTRUMENTATION;
+    RCX_sig(sigcontext) = (ULONG_PTR)frame;
+    R11_sig(sigcontext) = frame->eflags;
+    if (EFL_sig(sigcontext) & 0x100)
+    {
+        EFL_sig(sigcontext) &= ~0x100;  /* clear single-step flag */
+        frame->restore_flags |= CONTEXT_CONTROL;
+    }
+    RIP_sig(sigcontext) = (ULONG64)__wine_syscall_dispatcher_prolog_end_ptr;
+}
+
+
+/***********************************************************************
  *           handle_interrupt
  *
  * Handle an interrupt.
@@ -2831,9 +2859,6 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
 {
     extern const void *__wine_syscall_dispatcher_prolog_end_ptr;
     ucontext_t *ucontext = init_handler( sigcontext );
-    struct syscall_frame *frame = get_syscall_frame();
-
-    TRACE_(seh)("SIGSYS, rax %#llx, rip %#llx.\n", RAX_sig(ucontext), RIP_sig(ucontext));
 
 #ifdef __linux__
     if (!syscall_dispatch_enabled)
@@ -2854,19 +2879,7 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     }
 #endif
 
-    frame->rip = RIP_sig(ucontext) + 0xb;
-    frame->rcx = RIP_sig(ucontext);
-    frame->eflags = EFL_sig(ucontext);
-    frame->restore_flags = 0;
-    if (instrumentation_callback) frame->restore_flags |= RESTORE_FLAGS_INSTRUMENTATION;
-    RCX_sig(ucontext) = (ULONG_PTR)frame;
-    R11_sig(ucontext) = frame->eflags;
-    if (EFL_sig(ucontext) & 0x100)
-    {
-        EFL_sig(ucontext) &= ~0x100;  /* clear single-step flag */
-        frame->restore_flags |= CONTEXT_CONTROL;
-    }
-    RIP_sig(ucontext) = (ULONG64)__wine_syscall_dispatcher_prolog_end_ptr;
+    handle_syscall_opcode( ucontext );
 }
 #endif
 
