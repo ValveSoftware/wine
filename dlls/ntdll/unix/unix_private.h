@@ -211,7 +211,6 @@ extern ULONG process_cookie;
 
 extern BOOL process_termination_delay;
 extern BOOL fsync_help_simulated_pulse;
-extern BOOL localsystem_sid;
 extern BOOL simulate_writecopy;
 extern long long ram_reporting_bias;
 extern BOOL wine_allocs_2g_limit;

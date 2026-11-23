@@ -2233,7 +2233,6 @@ static ULONG_PTR get_image_address(void)
 BOOL process_termination_delay;
 BOOL ac_odyssey;
 BOOL fsync_help_simulated_pulse;
-BOOL localsystem_sid;
 BOOL simulate_writecopy;
 BOOL wine_allocs_2g_limit;
 SIZE_T kernel_stack_size = 0x100000;
@@ -2352,13 +2351,6 @@ static void hacks_init(void)
 
     if (sgi) wine_allocs_2g_limit = !strcmp(sgi, "359870");
     if (wine_allocs_2g_limit) ERR("Allocation 2g limit enabled.\n");
-
-    if (main_argc > 1 && strstr(main_argv[1], "MicrosoftEdgeUpdate.exe"))
-    {
-        ERR("HACK: reporting LocalSystem account SID.\n");
-        localsystem_sid = TRUE;
-        return;
-    }
 
     if ((env_str = getenv( "WINE_KERNEL_STACK_SIZE" )))
         kernel_stack_size = atoll( env_str ) * 1024;
