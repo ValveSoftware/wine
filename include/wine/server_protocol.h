@@ -4743,7 +4743,7 @@ struct remove_clipboard_listener_reply
 struct create_token_request
 {
     struct request_header __header;
-    struct luid    token_id;
+    struct luid    auth_id;
     unsigned int   access;
     int            primary;
     int            impersonation_level;
@@ -7094,6 +7094,6 @@ union generic_reply
     struct d3dkmt_mutex_release_reply d3dkmt_mutex_release_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 966
+#define SERVER_PROTOCOL_VERSION 967
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
