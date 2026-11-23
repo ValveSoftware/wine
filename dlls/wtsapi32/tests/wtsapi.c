@@ -226,11 +226,11 @@ static LONGLONG get_system_time_as_longlong(void)
     return li.QuadPart;
 }
 
-static void test_WTSQuerySessionInformation(void)
+static void check_session_information(ULONG session_id)
 {
     WCHAR *buf1, usernameW[UNLEN + 1], computernameW[MAX_COMPUTERNAME_LENGTH + 1];
     char *buf2, username[UNLEN + 1], computername[MAX_COMPUTERNAME_LENGTH + 1];
-    DWORD count, tempsize, sessionId;
+    DWORD count, tempsize, expected_session_id;
     WTS_CONNECTSTATE_CLASS *state;
     WTSINFOW *wtsinfoW;
     WTSINFOA *wtsinfoA;
@@ -239,143 +239,192 @@ static void test_WTSQuerySessionInformation(void)
     BOOL ret;
 
     count = 0;
-    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSConnectState, (WCHAR **)&state, &count);
+    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, session_id, WTSConnectState, (WCHAR **)&state, &count);
     ok(ret, "got error %lu\n", GetLastError());
     ok(count == sizeof(*state), "got %lu\n", count);
-    ok(*state == WTSActive, "got %d.\n", *state);
+    todo_wine_if(session_id == 0)
+    ok(*state == (session_id == 0 ? WTSDisconnected : WTSActive), "got %d.\n", *state);
     WTSFreeMemory(state);
 
     count = 0;
-    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSConnectState, (char **)&state, &count);
+    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, session_id, WTSConnectState, (char **)&state, &count);
     ok(ret, "got error %lu\n", GetLastError());
     ok(count == sizeof(*state), "got %lu\n", count);
-    ok(*state == WTSActive, "got %d.\n", *state);
+    todo_wine_if(session_id == 0)
+    ok(*state == (session_id == 0 ? WTSDisconnected : WTSActive), "got %d.\n", *state);
     WTSFreeMemory(state);
 
     SetLastError(0xdeadbeef);
     count = 0;
-    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSUserName, NULL, &count);
+    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, session_id, WTSUserName, NULL, &count);
     ok(!ret, "got %lu\n", GetLastError());
     ok(count == 0, "got %lu\n", count);
     ok(GetLastError() == ERROR_INVALID_USER_BUFFER, "got %lu\n", GetLastError());
 
     SetLastError(0xdeadbeef);
     count = 1;
-    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSUserName, NULL, &count);
+    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, session_id, WTSUserName, NULL, &count);
     ok(!ret, "got %lu\n", GetLastError());
     ok(count == 1, "got %lu\n", count);
     ok(GetLastError() == ERROR_INVALID_USER_BUFFER, "got %lu\n", GetLastError());
 
     SetLastError(0xdeadbeef);
-    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSUserName, &buf1, NULL);
+    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, session_id, WTSUserName, &buf1, NULL);
     ok(!ret, "got %lu\n", GetLastError());
     ok(GetLastError() == ERROR_INVALID_USER_BUFFER, "got %lu\n", GetLastError());
 
     count = 0;
     buf1 = NULL;
-    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSUserName, &buf1, &count);
+    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, session_id, WTSUserName, &buf1, &count);
     ok(ret, "got %lu\n", GetLastError());
     ok(buf1 != NULL, "buf not set\n");
     ok(count == (lstrlenW(buf1) + 1) * sizeof(WCHAR), "expected %Iu, got %lu\n", (lstrlenW(buf1) + 1) * sizeof(WCHAR), count);
-    tempsize = UNLEN + 1;
-    GetUserNameW(usernameW, &tempsize);
-    /* Windows Vista, 7 and 8 return uppercase username, while the rest return lowercase. */
-    ok(!wcsicmp(buf1, usernameW), "expected %s, got %s\n", wine_dbgstr_w(usernameW), wine_dbgstr_w(buf1));
-    ok(count == tempsize * sizeof(WCHAR), "got %lu\n", count);
+    if (session_id == 0)
+    {
+        todo_wine
+        ok(buf1[0] == 0, "got %s\n", wine_dbgstr_w(buf1));
+    }
+    else
+    {
+        tempsize = UNLEN + 1;
+        GetUserNameW(usernameW, &tempsize);
+        /* Windows Vista, 7 and 8 return uppercase username, while the rest return lowercase. */
+        ok(!wcsicmp(buf1, usernameW), "expected %s, got %s\n", wine_dbgstr_w(usernameW), wine_dbgstr_w(buf1));
+        ok(count == tempsize * sizeof(WCHAR), "got %lu\n", count);
+    }
     WTSFreeMemory(buf1);
 
     count = 0;
     buf1 = NULL;
-    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSDomainName, &buf1, &count);
+    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, session_id, WTSDomainName, &buf1, &count);
     ok(ret, "got %lu\n", GetLastError());
     ok(buf1 != NULL, "buf not set\n");
     ok(count == (lstrlenW(buf1) + 1) * sizeof(WCHAR), "expected %Iu, got %lu\n", (lstrlenW(buf1) + 1) * sizeof(WCHAR), count);
-    tempsize = MAX_COMPUTERNAME_LENGTH + 1;
-    GetComputerNameW(computernameW, &tempsize);
-    /* Windows Vista, 7 and 8 return uppercase computername, while the rest return lowercase. */
-    ok(!wcsicmp(buf1, computernameW), "expected %s, got %s\n", wine_dbgstr_w(computernameW), wine_dbgstr_w(buf1));
-    ok(count == (tempsize + 1) * sizeof(WCHAR), "got %lu\n", count);
+    if (session_id == 0)
+    {
+        todo_wine
+        ok(buf1[0] == 0, "got %s\n", wine_dbgstr_w(buf1));
+    }
+    else
+    {
+        tempsize = MAX_COMPUTERNAME_LENGTH + 1;
+        GetComputerNameW(computernameW, &tempsize);
+        /* Windows Vista, 7 and 8 return uppercase computername, while the rest return lowercase. */
+        ok(!wcsicmp(buf1, computernameW), "expected %s, got %s\n", wine_dbgstr_w(computernameW), wine_dbgstr_w(buf1));
+        ok(count == (tempsize + 1) * sizeof(WCHAR), "got %lu\n", count);
+    }
     WTSFreeMemory(buf1);
 
     SetLastError(0xdeadbeef);
     count = 0;
-    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSUserName, NULL, &count);
+    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, session_id, WTSUserName, NULL, &count);
     ok(!ret, "got %lu\n", GetLastError());
     ok(count == 0, "got %lu\n", count);
     ok(GetLastError() == ERROR_INVALID_USER_BUFFER, "got %lu\n", GetLastError());
 
     SetLastError(0xdeadbeef);
     count = 1;
-    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSUserName, NULL, &count);
+    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, session_id, WTSUserName, NULL, &count);
     ok(!ret, "got %lu\n", GetLastError());
     ok(count == 1, "got %lu\n", count);
     ok(GetLastError() == ERROR_INVALID_USER_BUFFER, "got %lu\n", GetLastError());
 
     SetLastError(0xdeadbeef);
-    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSUserName, &buf2, NULL);
+    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, session_id, WTSUserName, &buf2, NULL);
     ok(!ret, "got %lu\n", GetLastError());
     ok(GetLastError() == ERROR_INVALID_USER_BUFFER, "got %lu\n", GetLastError());
 
     count = 0;
     buf2 = NULL;
-    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSUserName, &buf2, &count);
+    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, session_id, WTSUserName, &buf2, &count);
     ok(ret, "got %lu\n", GetLastError());
     ok(buf2 != NULL, "buf not set\n");
     ok(count == lstrlenA(buf2) + 1, "expected %u, got %lu\n", lstrlenA(buf2) + 1, count);
-    tempsize = UNLEN + 1;
-    GetUserNameA(username, &tempsize);
-    /* Windows Vista, 7 and 8 return uppercase username, while the rest return lowercase. */
-    ok(!stricmp(buf2, username), "expected %s, got %s\n", username, buf2);
-    ok(count == tempsize, "expected %lu, got %lu\n", tempsize, count);
+    if (session_id == 0)
+    {
+        todo_wine
+        ok(buf2[0] == 0, "got %s\n", buf2);
+    }
+    else
+    {
+        tempsize = UNLEN + 1;
+        GetUserNameA(username, &tempsize);
+        /* Windows Vista, 7 and 8 return uppercase username, while the rest return lowercase. */
+        ok(!stricmp(buf2, username), "expected %s, got %s\n", username, buf2);
+        ok(count == tempsize, "expected %lu, got %lu\n", tempsize, count);
+    }
     WTSFreeMemory(buf2);
 
     count = 0;
     buf2 = NULL;
-    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSDomainName, &buf2, &count);
+    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, session_id, WTSDomainName, &buf2, &count);
     ok(ret, "got %lu\n", GetLastError());
     ok(buf2 != NULL, "buf not set\n");
     ok(count == lstrlenA(buf2) + 1, "expected %u, got %lu\n", lstrlenA(buf2) + 1, count);
-    tempsize = MAX_COMPUTERNAME_LENGTH + 1;
-    GetComputerNameA(computername, &tempsize);
-    /* Windows Vista, 7 and 8 return uppercase computername, while the rest return lowercase. */
-    ok(!stricmp(buf2, computername), "expected %s, got %s\n", computername, buf2);
-    ok(count == tempsize + 1, "expected %lu, got %lu\n", tempsize + 1, count);
+    if (session_id == 0)
+    {
+        todo_wine
+        ok(buf2[0] == 0, "got %s\n", buf2);
+    }
+    else
+    {
+        tempsize = MAX_COMPUTERNAME_LENGTH + 1;
+        GetComputerNameA(computername, &tempsize);
+        /* Windows Vista, 7 and 8 return uppercase computername, while the rest return lowercase. */
+        ok(!stricmp(buf2, computername), "expected %s, got %s\n", computername, buf2);
+        ok(count == tempsize + 1, "expected %lu, got %lu\n", tempsize + 1, count);
+    }
     WTSFreeMemory(buf2);
 
     count = 0;
     protocol = NULL;
-    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSClientProtocolType,
+    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, session_id, WTSClientProtocolType,
                                       (char **)&protocol, &count);
     ok(ret, "got %lu\n", GetLastError());
     ok(protocol != NULL, "protocol not set\n");
     ok(count == sizeof(*protocol), "got %lu\n", count);
     WTSFreeMemory(protocol);
 
-    ProcessIdToSessionId(GetCurrentProcessId(), &sessionId);
+    if (session_id == WTS_CURRENT_SESSION)
+        ProcessIdToSessionId(GetCurrentProcessId(), &expected_session_id);
+    else
+        expected_session_id = session_id;
 
     count = 0;
     wtsinfoW = NULL;
     t1 = get_system_time_as_longlong();
-    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSSessionInfo,
+    ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, session_id, WTSSessionInfo,
                                       (WCHAR **)&wtsinfoW, &count);
     ok(ret, "got %lu\n", GetLastError());
     t2 = get_system_time_as_longlong();
     ok(count == sizeof(*wtsinfoW), "got %lu\n", count);
-    ok(wtsinfoW->State == WTSActive, "got %d.\n", wtsinfoW->State);
-    ok(wtsinfoW->SessionId == sessionId, "expected %lu, got %lu\n", sessionId, wtsinfoW->SessionId);
+    todo_wine_if(session_id == 0)
+    ok(wtsinfoW->State == (session_id == 0 ? WTSDisconnected : WTSActive), "got %d.\n", wtsinfoW->State);
+    todo_wine_if(session_id == 0)
+    ok(wtsinfoW->SessionId == expected_session_id, "expected %lu, got %lu\n", expected_session_id, wtsinfoW->SessionId);
     ok(wtsinfoW->IncomingBytes == 0, "got %lu\n", wtsinfoW->IncomingBytes);
     ok(wtsinfoW->OutgoingBytes == 0, "got %lu\n", wtsinfoW->OutgoingBytes);
     ok(wtsinfoW->IncomingFrames == 0, "got %lu\n", wtsinfoW->IncomingFrames);
     ok(wtsinfoW->OutgoingFrames == 0, "got %lu\n", wtsinfoW->OutgoingFrames);
     ok(wtsinfoW->IncomingCompressedBytes == 0, "got %lu\n", wtsinfoW->IncomingCompressedBytes);
     ok(wtsinfoW->OutgoingCompressedBytes == 0, "got %lu\n", wtsinfoW->OutgoingCompressedBytes);
-    ok(!wcscmp(wtsinfoW->WinStationName, L"Console"), "got %s\n", wine_dbgstr_w(wtsinfoW->WinStationName));
-    ok(!wcsicmp(wtsinfoW->Domain, computernameW),
-            "expected %s, got %s\n",
-            wine_dbgstr_w(computernameW), wine_dbgstr_w(wtsinfoW->Domain));
-    ok(!wcsicmp(wtsinfoW->UserName, usernameW),
-            "expected %s, got %s\n",
-            wine_dbgstr_w(usernameW), wine_dbgstr_w(wtsinfoW->UserName));
+    todo_wine_if(session_id == 0)
+    ok(!wcscmp(wtsinfoW->WinStationName, (session_id == 0 ? L"Services" : L"Console")), "got %s\n",
+       wine_dbgstr_w(wtsinfoW->WinStationName));
+    if (session_id == 0)
+    {
+        todo_wine
+        ok(wtsinfoW->Domain[0] == 0, "got %s\n", wine_dbgstr_w(wtsinfoW->Domain));
+        todo_wine
+        ok(wtsinfoW->UserName[0] == 0, "got %s\n", wine_dbgstr_w(wtsinfoW->UserName));
+    }
+    else
+    {
+        ok(!wcsicmp(wtsinfoW->Domain, computernameW), "expected %s, got %s\n",
+           wine_dbgstr_w(computernameW), wine_dbgstr_w(wtsinfoW->Domain));
+        ok(!wcsicmp(wtsinfoW->UserName, usernameW), "expected %s, got %s\n",
+           wine_dbgstr_w(usernameW), wine_dbgstr_w(wtsinfoW->UserName));
+    }
     ok(t1 <= wtsinfoW->CurrentTime.QuadPart,
             "out of order %s %s\n",
             wine_dbgstr_longlong(t1), wine_dbgstr_longlong(wtsinfoW->CurrentTime.QuadPart));
@@ -387,22 +436,35 @@ static void test_WTSQuerySessionInformation(void)
     count = 0;
     wtsinfoA = NULL;
     t1 = get_system_time_as_longlong();
-    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSSessionInfo,
+    ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, session_id, WTSSessionInfo,
                                       (char **)&wtsinfoA, &count);
     ok(ret, "got %lu\n", GetLastError());
     t2 = get_system_time_as_longlong();
     ok(count == sizeof(*wtsinfoA), "got %lu\n", count);
-    ok(wtsinfoA->State == WTSActive, "got %d.\n", wtsinfoA->State);
-    ok(wtsinfoA->SessionId == sessionId, "expected %lu, got %lu\n", sessionId, wtsinfoA->SessionId);
+    todo_wine_if(session_id == 0)
+    ok(wtsinfoA->State == (session_id == 0 ? WTSDisconnected : WTSActive), "got %d.\n", wtsinfoA->State);
+    todo_wine_if(session_id == 0)
+    ok(wtsinfoA->SessionId == expected_session_id, "expected %lu, got %lu\n", expected_session_id, wtsinfoA->SessionId);
     ok(wtsinfoA->IncomingBytes == 0, "got %lu\n", wtsinfoA->IncomingBytes);
     ok(wtsinfoA->OutgoingBytes == 0, "got %lu\n", wtsinfoA->OutgoingBytes);
     ok(wtsinfoA->IncomingFrames == 0, "got %lu\n", wtsinfoA->IncomingFrames);
     ok(wtsinfoA->OutgoingFrames == 0, "got %lu\n", wtsinfoA->OutgoingFrames);
     ok(wtsinfoA->IncomingCompressedBytes == 0, "got %lu\n", wtsinfoA->IncomingCompressedBytes);
     ok(wtsinfoA->OutgoingCompressedBytes == 0, "got %lu\n", wtsinfoA->OutgoingCompressedBytes);
-    ok(!strcmp(wtsinfoA->WinStationName, "Console"), "got %s\n", wtsinfoA->WinStationName);
-    ok(!stricmp(wtsinfoA->Domain, computername), "expected %s, got %s\n", computername, wtsinfoA->Domain);
-    ok(!stricmp(wtsinfoA->UserName, username), "expected %s, got %s\n", username, wtsinfoA->UserName);
+    todo_wine_if(session_id == 0)
+    ok(!strcmp(wtsinfoA->WinStationName, (session_id == 0 ? "Services" : "Console")), "got %s\n", wtsinfoA->WinStationName);
+    if (session_id == 0)
+    {
+        todo_wine
+        ok(wtsinfoA->Domain[0] == 0, "got %s\n", wtsinfoA->Domain);
+        todo_wine
+        ok(wtsinfoA->UserName[0] == 0, "got %s\n", wtsinfoA->UserName);
+    }
+    else
+    {
+        ok(!stricmp(wtsinfoA->Domain, computername), "expected %s, got %s\n", computername, wtsinfoA->Domain);
+        ok(!stricmp(wtsinfoA->UserName, username), "expected %s, got %s\n", username, wtsinfoA->UserName);
+    }
     ok(t1 <= wtsinfoA->CurrentTime.QuadPart,
             "out of order %s %s\n",
             wine_dbgstr_longlong(t1), wine_dbgstr_longlong(wtsinfoA->CurrentTime.QuadPart));
@@ -410,6 +472,21 @@ static void test_WTSQuerySessionInformation(void)
             "out of order %s %s\n",
             wine_dbgstr_longlong(wtsinfoA->CurrentTime.QuadPart), wine_dbgstr_longlong(t2));
     WTSFreeMemory(wtsinfoA);
+}
+
+static void test_WTSQuerySessionInformation(void)
+{
+    static const ULONG session_ids[] = {0, 1, WTS_CURRENT_SESSION};
+    int i;
+
+    for (i = 0; i < ARRAY_SIZE(session_ids); i++)
+    {
+        winetest_push_context("id %#lx", session_ids[i]);
+
+        check_session_information(session_ids[i]);
+
+        winetest_pop_context();
+    }
 }
 
 static void test_WTSQueryUserToken(void)
