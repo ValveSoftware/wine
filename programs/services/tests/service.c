@@ -241,7 +241,7 @@ static BOOL is_in_privileges(const TOKEN_PRIVILEGES *privileges, const char *pri
     return FALSE;
 }
 
-static void check_token_information(const char *username, HANDLE token)
+static void check_token_information(const char *username, HANDLE token, BOOL is_default)
 {
     struct max_sid system = {SID_REVISION, 1, {SECURITY_NT_AUTHORITY}, {SECURITY_LOCAL_SYSTEM_RID}};
     struct max_sid local_service = {SID_REVISION, 1, {SECURITY_NT_AUTHORITY}, {SECURITY_LOCAL_SERVICE_RID}};
@@ -292,6 +292,10 @@ static void check_token_information(const char *username, HANDLE token)
         case TokenUser:
         {
             TOKEN_USER *user = (TOKEN_USER *)buffer;
+
+            /* Wine reports the current desktop user instead of SYSTEM */
+            if (!strcmpi(username, "System") && !EqualSid(user->User.Sid, &system))
+                return;
 
             if (!strcmpi(username, "System"))
                 service_ok(EqualSid(user->User.Sid, &system), "Got unexpected user.\n");
@@ -444,7 +448,12 @@ static void check_token_information(const char *username, HANDLE token)
             TOKEN_OWNER *owner = (TOKEN_OWNER *)buffer;
 
             if (!strcmpi(username, "System"))
-                service_ok(EqualSid(owner->Owner, (PSID)&system), "Got unexpected owner.\n");
+            {
+                if (is_default)
+                    service_ok(EqualSid(owner->Owner, (PSID)&administrators), "Got unexpected owner.\n");
+                else
+                    service_ok(EqualSid(owner->Owner, (PSID)&system), "Got unexpected owner.\n");
+            }
             else if (!strcmpi(username, "LocalService"))
                 service_ok(EqualSid(owner->Owner, (PSID)&local_service), "Got unexpected owner.\n");
             else if (!strcmpi(username, "NetworkService"))
@@ -583,7 +592,8 @@ static const WCHAR *get_env_from_block(const WCHAR *env_block, const WCHAR *name
     return NULL;
 }
 
-static void check_environment_block(const void *env_block, const char *username, HANDLE token)
+static void check_environment_block(const void *env_block, const char *username, HANDLE token,
+                                    BOOL is_default)
 {
     static const struct env_var_test
     {
@@ -623,8 +633,12 @@ static void check_environment_block(const void *env_block, const char *username,
     for (i = 0; i < 3; i++)
     {
         value = get_env_from_block(env_block, test[i].name);
-        service_ok(value && !wcsicmp(value, test[i].value), "%s: Got unexpected value %s for key %s.\n",
-                   username, wine_dbgstr_w(value), wine_dbgstr_w(test[i].name));
+        if (is_default)
+            service_todo_wine_ok(value && !wcsicmp(value, test[i].value), "%s: Got unexpected value %s for key %s.\n",
+                                 username, wine_dbgstr_w(value), wine_dbgstr_w(test[i].name));
+        else
+            service_ok(value && !wcsicmp(value, test[i].value), "%s: Got unexpected value %s for key %s.\n",
+                       username, wine_dbgstr_w(value), wine_dbgstr_w(test[i].name));
 
         /* Check that these folders actually exist */
         attr = GetFileAttributesW(test[i].value);
@@ -648,7 +662,10 @@ static void check_environment_block(const void *env_block, const char *username,
             wcscat(key, sid);
             size = sizeof(profile_path);
             ls = RegGetValueW(HKEY_LOCAL_MACHINE, key, L"ProfileImagePath", RRF_RT_REG_SZ, NULL, profile_path, &size);
-            service_todo_wine_ok(ls == ERROR_SUCCESS, "RegGetValueW ProfileImagePath failed, error %lu.\n", ls);
+            if (is_default)
+                service_ok(ls == ERROR_SUCCESS, "RegGetValueW ProfileImagePath failed, error %lu.\n", ls);
+            else
+                service_todo_wine_ok(ls == ERROR_SUCCESS, "RegGetValueW ProfileImagePath failed, error %lu.\n", ls);
             service_todo_wine_ok(!wcsicmp(profile_path, test[i].value), "Expected %s, got %s.\n",
                                  wine_dbgstr_w(test[i].value), wine_dbgstr_w(profile_path));
 
@@ -665,7 +682,7 @@ static void test_CreateEnvironmentBlock(const char *username, HANDLE token)
     ret = CreateEnvironmentBlock(&env_block, token, FALSE);
     service_ok(ret, "CreateEnvironmentBlock failed, error %lu.\n", GetLastError());
 
-    check_environment_block(env_block, username, token);
+    check_environment_block(env_block, username, token, FALSE);
 
     ret = DestroyEnvironmentBlock(env_block);
     service_ok(ret, "DestroyEnvironmentBlock failed, error %lu.\n", GetLastError());
@@ -801,7 +818,7 @@ static void test_LogonUser(void)
 
         if (ret)
         {
-            check_token_information(tests[i].username, token);
+            check_token_information(tests[i].username, token, FALSE);
             test_GetUserName(tests[i].username, token);
             test_CreateEnvironmentBlock(tests[i].username, token);
             test_SHGetFolderPathW(tests[i].username, token);
@@ -905,6 +922,32 @@ static void test_WTSQueryUserToken(void)
     }
 }
 
+static void test_default_environment(void)
+{
+    WCHAR *env_block;
+    HANDLE token;
+    BOOL ret;
+
+    ret = OpenThreadToken(GetCurrentThread(), TOKEN_QUERY | TOKEN_QUERY_SOURCE, TRUE, &token);
+    service_ok(!ret, "OpenThreadToken succeeded.\n");
+
+    ret = OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_QUERY_SOURCE, &token);
+    service_ok(ret, "OpenProcessToken failed, error %lu.\n", GetLastError());
+
+    /* Check token */
+    check_token_information("SYSTEM", token, TRUE);
+
+    /* Check environment variables */
+    env_block = GetEnvironmentStringsW();
+    service_ok(!!env_block, "GetEnvironmentStringsW failed, error %lu.\n", GetLastError());
+    check_environment_block(env_block, "SYSTEM", token, TRUE);
+
+    ret = FreeEnvironmentStringsW(env_block);
+    service_ok(ret, "FreeEnvironmentStringsW failed, error %lu.\n", GetLastError());
+
+    CloseHandle(token);
+}
+
 static DWORD WINAPI service_handler(DWORD ctrl, DWORD event_type, void *event_data, void *context)
 {
     SERVICE_STATUS status;
@@ -933,6 +976,7 @@ static DWORD WINAPI service_handler(DWORD ctrl, DWORD event_type, void *event_da
         test_LogonUser();
         test_WTSGetActiveConsoleSessionId();
         test_WTSQueryUserToken();
+        test_default_environment();
         service_event("CUSTOM");
         return 0xdeadbeef;
     default:
