@@ -242,7 +242,6 @@ static void check_session_information(ULONG session_id)
     ret = WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, session_id, WTSConnectState, (WCHAR **)&state, &count);
     ok(ret, "got error %lu\n", GetLastError());
     ok(count == sizeof(*state), "got %lu\n", count);
-    todo_wine_if(session_id == 0)
     ok(*state == (session_id == 0 ? WTSDisconnected : WTSActive), "got %d.\n", *state);
     WTSFreeMemory(state);
 
@@ -250,7 +249,6 @@ static void check_session_information(ULONG session_id)
     ret = WTSQuerySessionInformationA(WTS_CURRENT_SERVER_HANDLE, session_id, WTSConnectState, (char **)&state, &count);
     ok(ret, "got error %lu\n", GetLastError());
     ok(count == sizeof(*state), "got %lu\n", count);
-    todo_wine_if(session_id == 0)
     ok(*state == (session_id == 0 ? WTSDisconnected : WTSActive), "got %d.\n", *state);
     WTSFreeMemory(state);
 
@@ -281,7 +279,6 @@ static void check_session_information(ULONG session_id)
     ok(count == (lstrlenW(buf1) + 1) * sizeof(WCHAR), "expected %Iu, got %lu\n", (lstrlenW(buf1) + 1) * sizeof(WCHAR), count);
     if (session_id == 0)
     {
-        todo_wine
         ok(buf1[0] == 0, "got %s\n", wine_dbgstr_w(buf1));
     }
     else
@@ -302,7 +299,6 @@ static void check_session_information(ULONG session_id)
     ok(count == (lstrlenW(buf1) + 1) * sizeof(WCHAR), "expected %Iu, got %lu\n", (lstrlenW(buf1) + 1) * sizeof(WCHAR), count);
     if (session_id == 0)
     {
-        todo_wine
         ok(buf1[0] == 0, "got %s\n", wine_dbgstr_w(buf1));
     }
     else
@@ -342,7 +338,6 @@ static void check_session_information(ULONG session_id)
     ok(count == lstrlenA(buf2) + 1, "expected %u, got %lu\n", lstrlenA(buf2) + 1, count);
     if (session_id == 0)
     {
-        todo_wine
         ok(buf2[0] == 0, "got %s\n", buf2);
     }
     else
@@ -363,7 +358,6 @@ static void check_session_information(ULONG session_id)
     ok(count == lstrlenA(buf2) + 1, "expected %u, got %lu\n", lstrlenA(buf2) + 1, count);
     if (session_id == 0)
     {
-        todo_wine
         ok(buf2[0] == 0, "got %s\n", buf2);
     }
     else
@@ -398,9 +392,7 @@ static void check_session_information(ULONG session_id)
     ok(ret, "got %lu\n", GetLastError());
     t2 = get_system_time_as_longlong();
     ok(count == sizeof(*wtsinfoW), "got %lu\n", count);
-    todo_wine_if(session_id == 0)
     ok(wtsinfoW->State == (session_id == 0 ? WTSDisconnected : WTSActive), "got %d.\n", wtsinfoW->State);
-    todo_wine_if(session_id == 0)
     ok(wtsinfoW->SessionId == expected_session_id, "expected %lu, got %lu\n", expected_session_id, wtsinfoW->SessionId);
     ok(wtsinfoW->IncomingBytes == 0, "got %lu\n", wtsinfoW->IncomingBytes);
     ok(wtsinfoW->OutgoingBytes == 0, "got %lu\n", wtsinfoW->OutgoingBytes);
@@ -408,14 +400,11 @@ static void check_session_information(ULONG session_id)
     ok(wtsinfoW->OutgoingFrames == 0, "got %lu\n", wtsinfoW->OutgoingFrames);
     ok(wtsinfoW->IncomingCompressedBytes == 0, "got %lu\n", wtsinfoW->IncomingCompressedBytes);
     ok(wtsinfoW->OutgoingCompressedBytes == 0, "got %lu\n", wtsinfoW->OutgoingCompressedBytes);
-    todo_wine_if(session_id == 0)
     ok(!wcscmp(wtsinfoW->WinStationName, (session_id == 0 ? L"Services" : L"Console")), "got %s\n",
        wine_dbgstr_w(wtsinfoW->WinStationName));
     if (session_id == 0)
     {
-        todo_wine
         ok(wtsinfoW->Domain[0] == 0, "got %s\n", wine_dbgstr_w(wtsinfoW->Domain));
-        todo_wine
         ok(wtsinfoW->UserName[0] == 0, "got %s\n", wine_dbgstr_w(wtsinfoW->UserName));
     }
     else
@@ -441,9 +430,7 @@ static void check_session_information(ULONG session_id)
     ok(ret, "got %lu\n", GetLastError());
     t2 = get_system_time_as_longlong();
     ok(count == sizeof(*wtsinfoA), "got %lu\n", count);
-    todo_wine_if(session_id == 0)
     ok(wtsinfoA->State == (session_id == 0 ? WTSDisconnected : WTSActive), "got %d.\n", wtsinfoA->State);
-    todo_wine_if(session_id == 0)
     ok(wtsinfoA->SessionId == expected_session_id, "expected %lu, got %lu\n", expected_session_id, wtsinfoA->SessionId);
     ok(wtsinfoA->IncomingBytes == 0, "got %lu\n", wtsinfoA->IncomingBytes);
     ok(wtsinfoA->OutgoingBytes == 0, "got %lu\n", wtsinfoA->OutgoingBytes);
@@ -451,13 +438,10 @@ static void check_session_information(ULONG session_id)
     ok(wtsinfoA->OutgoingFrames == 0, "got %lu\n", wtsinfoA->OutgoingFrames);
     ok(wtsinfoA->IncomingCompressedBytes == 0, "got %lu\n", wtsinfoA->IncomingCompressedBytes);
     ok(wtsinfoA->OutgoingCompressedBytes == 0, "got %lu\n", wtsinfoA->OutgoingCompressedBytes);
-    todo_wine_if(session_id == 0)
     ok(!strcmp(wtsinfoA->WinStationName, (session_id == 0 ? "Services" : "Console")), "got %s\n", wtsinfoA->WinStationName);
     if (session_id == 0)
     {
-        todo_wine
         ok(wtsinfoA->Domain[0] == 0, "got %s\n", wtsinfoA->Domain);
-        todo_wine
         ok(wtsinfoA->UserName[0] == 0, "got %s\n", wtsinfoA->UserName);
     }
     else

@@ -564,12 +564,15 @@ BOOL WINAPI WTSQuerySessionInformationW(HANDLE server, DWORD session_id, WTS_INF
         return FALSE;
     }
 
+    if (session_id == WTS_CURRENT_SESSION)
+        ProcessIdToSessionId(GetCurrentProcessId(), &session_id);
+
     if (class == WTSConnectState)
     {
         WTS_CONNECTSTATE_CLASS *state;
 
         if (!(state = malloc(sizeof(*state)))) return FALSE;
-        *state = WTSActive;
+        *state = (session_id == 0 ? WTSDisconnected : WTSActive);
         *buffer = (WCHAR *)state;
         *count = sizeof(*state);
         return TRUE;
@@ -589,27 +592,50 @@ BOOL WINAPI WTSQuerySessionInformationW(HANDLE server, DWORD session_id, WTS_INF
 
     if (class == WTSUserName)
     {
-        DWORD size = UNLEN + 1;
-        WCHAR *username;
+        if (session_id == 0)
+        {
+            WCHAR *empty;
 
-        if (!(username = malloc(size * sizeof(WCHAR)))) return FALSE;
-        GetUserNameW(username, &size);
-        *buffer = username;
-        *count = size * sizeof(WCHAR);
+            if (!(empty = calloc(1, sizeof(WCHAR)))) return FALSE;
+            *buffer = empty;
+            *count = sizeof(WCHAR);
+        }
+        else
+        {
+            DWORD size = UNLEN + 1;
+            WCHAR *username;
+
+            if (!(username = malloc(size * sizeof(WCHAR)))) return FALSE;
+            GetUserNameW(username, &size);
+            *buffer = username;
+            *count = size * sizeof(WCHAR);
+        }
+
         return TRUE;
     }
 
     if (class ==  WTSDomainName)
     {
-        DWORD size = MAX_COMPUTERNAME_LENGTH + 1;
-        WCHAR *computername;
+        if (session_id == 0)
+        {
+            WCHAR *empty;
 
-        if (!(computername = malloc(size * sizeof(WCHAR)))) return FALSE;
-        GetComputerNameW(computername, &size);
-        *buffer = computername;
-        /* GetComputerNameW() return size doesn't include terminator */
-        size++;
-        *count = size * sizeof(WCHAR);
+            if (!(empty = calloc(1, sizeof(WCHAR)))) return FALSE;
+            *buffer = empty;
+            *count = sizeof(WCHAR);
+        }
+        else
+        {
+            DWORD size = MAX_COMPUTERNAME_LENGTH + 1;
+            WCHAR *computername;
+
+            if (!(computername = malloc(size * sizeof(WCHAR)))) return FALSE;
+            GetComputerNameW(computername, &size);
+            *buffer = computername;
+            /* GetComputerNameW() return size doesn't include terminator */
+            size++;
+            *count = size * sizeof(WCHAR);
+        }
         return TRUE;
     }
 
@@ -622,17 +648,22 @@ BOOL WINAPI WTSQuerySessionInformationW(HANDLE server, DWORD session_id, WTS_INF
         if (!(info = malloc(sizeof(*info)))) return FALSE;
         FIXME("returning partial WTSINFO\n");
         memset(info, 0, sizeof(*info));
-        info->State = WTSActive;
-        if (!ProcessIdToSessionId(GetCurrentProcessId(), &info->SessionId))
+        info->State = (session_id == 0 ? WTSDisconnected : WTSActive);
+        info->SessionId = session_id;
+        if (session_id == 0)
         {
-            free(info);
-            return FALSE;
+            wcscpy(info->WinStationName, L"Services");
+            info->Domain[0] = 0;
+            info->UserName[0] = 0;
         }
-        wcscpy(info->WinStationName, L"Console");
-        size = sizeof(info->Domain) / sizeof(WCHAR);
-        GetComputerNameW(info->Domain, &size);
-        size = sizeof(info->UserName) / sizeof(WCHAR);
-        GetUserNameW(info->UserName, &size);
+        else
+        {
+            wcscpy(info->WinStationName, L"Console");
+            size = sizeof(info->Domain) / sizeof(WCHAR);
+            GetComputerNameW(info->Domain, &size);
+            size = sizeof(info->UserName) / sizeof(WCHAR);
+            GetUserNameW(info->UserName, &size);
+        }
         GetSystemTimeAsFileTime(&ft);
         info->CurrentTime.LowPart = ft.dwLowDateTime;
         info->CurrentTime.HighPart = ft.dwHighDateTime;
