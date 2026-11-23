@@ -27,6 +27,7 @@
 #include <userenv.h>
 #include <sddl.h>
 #include <shlobj.h>
+#include <wtsapi32.h>
 
 #include "wine/test.h"
 
@@ -819,6 +820,91 @@ static void test_WTSGetActiveConsoleSessionId(void)
     service_ok(session_id == 1, "Got unexpected session ID %#lx.\n", session_id);
 }
 
+/* WTSQueryUserToken needs to be called with the LocalSystem account */
+static void test_WTSQueryUserToken(void)
+{
+    static const ULONG session_ids[] = {0, 1, WTS_CURRENT_SESSION, WTS_ANY_SESSION};
+    TOKEN_ELEVATION_TYPE elevation_type;
+    TOKEN_TYPE token_type;
+    DWORD size, ui_access;
+    char buffer[1024];
+    ULONG id, id2;
+    HANDLE token;
+    BOOL ret;
+    int i;
+
+    SetLastError(0xdeadbeef);
+    ret = WTSQueryUserToken(0, NULL);
+    service_ok(!ret, "WTSQueryUserToken succeeded.\n");
+    service_ok(ERROR_INVALID_PARAMETER == GetLastError(), "Got unexpected error %lu.\n", GetLastError());
+
+    for (i = 0; i < ARRAY_SIZE(session_ids); i++)
+    {
+        id = session_ids[i];
+        winetest_push_context("id %#lx", id);
+
+        SetLastError(0xdeadbeef);
+        token = NULL;
+        ret = WTSQueryUserToken(id, &token);
+        if (id == 0)
+        {
+            service_todo_wine_ok(!ret, "Session %lu: WTSQueryUserToken succeeded.\n", id);
+            service_todo_wine_ok(ERROR_NO_TOKEN == GetLastError(), "Session %lu: Got unexpected error %lu.\n",
+                                 id, GetLastError());
+        }
+        else if (id == WTS_CURRENT_SESSION)
+        {
+            service_todo_wine_ok(!ret, "Session %lu: WTSQueryUserToken succeeded.\n", id);
+            service_todo_wine_ok(ERROR_NO_TOKEN == GetLastError(), "Session %lu: Got unexpected error %lu.\n",
+                                 id, GetLastError());
+        }
+        else if (id == WTS_ANY_SESSION)
+        {
+            service_todo_wine_ok(!ret, "Session %lu: WTSQueryUserToken succeeded.\n", id);
+            service_todo_wine_ok(ERROR_FILE_NOT_FOUND == GetLastError(), "Session %lu: Got unexpected error %lu.\n",
+                                 id, GetLastError());
+        }
+        else
+        {
+            service_ok(ret, "Session %lu: WTSQueryUserToken failed, error %lu.\n", id, GetLastError());
+
+            ret = GetTokenInformation(token, TokenUser, buffer, sizeof(buffer), &size);
+            service_ok(ret, "Session %lu: GetTokenInformation failed, error %lu.\n", id, GetLastError());
+            service_ok(!IsWellKnownSid(((TOKEN_USER *)buffer)->User.Sid, WinLocalSystemSid),
+                       "Session %lu: Got unexpected user.\n", id);
+
+            ret = GetTokenInformation(token, TokenSessionId, &id2, sizeof(id2), &size);
+            service_ok(ret, "Session %lu: GetTokenInformation failed, error %lu.\n", id, GetLastError());
+            service_ok(id2 == id, "Session %lu: Got unexpected session ID %lu.\n", id, id2);
+
+            ret = GetTokenInformation(token, TokenType, &token_type, sizeof(token_type), &size);
+            service_ok(ret, "Session %lu: GetTokenInformation failed, error %lu.\n", id, GetLastError());
+            service_ok(token_type == TokenPrimary, "Session %lu: Got unexpected type %d.\n", id, token_type);
+
+            ret = GetTokenInformation(token, TokenElevationType, &elevation_type, sizeof(elevation_type), &size);
+            service_ok(ret, "Session %lu: GetTokenInformation failed, error %lu.\n", id, GetLastError());
+            service_ok(elevation_type == TokenElevationTypeLimited, "Session %lu: Got unexpected elevation type %d.\n", id, elevation_type);
+
+            ret = GetTokenInformation(token, TokenUIAccess, &ui_access, sizeof(ui_access), &size);
+            service_ok(ret, "Session %lu: GetTokenInformation failed, error %lu.\n", id, GetLastError());
+            service_todo_wine_ok(!ui_access, "Session %lu: Got UI access.\n", id);
+
+            ret = GetTokenInformation(token, TokenIntegrityLevel, buffer, sizeof(buffer), &size);
+            service_ok(ret, "Session %lu: GetTokenInformation failed, error %lu.\n", id, GetLastError());
+            service_todo_wine_ok(IsWellKnownSid(((TOKEN_MANDATORY_LABEL *)buffer)->Label.Sid, WinMediumLabelSid),
+                                 "Session %lu: Got unexpected label.\n", id);
+        }
+
+        if (token)
+        {
+            ret = CloseHandle(token);
+            service_ok(ret, "Session %lu: CloseHandle failed, error %lu.\n", id, GetLastError());
+        }
+
+        winetest_pop_context();
+    }
+}
+
 static DWORD WINAPI service_handler(DWORD ctrl, DWORD event_type, void *event_data, void *context)
 {
     SERVICE_STATUS status;
@@ -846,6 +932,7 @@ static DWORD WINAPI service_handler(DWORD ctrl, DWORD event_type, void *event_da
         test_monitors();
         test_LogonUser();
         test_WTSGetActiveConsoleSessionId();
+        test_WTSQueryUserToken();
         service_event("CUSTOM");
         return 0xdeadbeef;
     default:

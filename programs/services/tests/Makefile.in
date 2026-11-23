@@ -1,5 +1,5 @@
 TESTDLL   = services.exe
-IMPORTS   = user32 advapi32 userenv shell32
+IMPORTS   = user32 advapi32 userenv shell32 wtsapi32
 
 SOURCES = \
 	service.c
