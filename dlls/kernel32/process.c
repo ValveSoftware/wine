@@ -541,8 +541,8 @@ DWORD WINAPI WTSGetActiveConsoleSessionId(void)
 {
     static int once;
     if (!once++) FIXME("stub\n");
-    /* Return current session id. */
-    return NtCurrentTeb()->Peb->SessionId;
+    /* Return the default desktop session id. */
+    return 1;
 }
 
 /**********************************************************************
