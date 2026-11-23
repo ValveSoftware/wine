@@ -388,12 +388,22 @@ static void test_WTSQuerySessionInformation(void)
 
 static void test_WTSQueryUserToken(void)
 {
+    HANDLE token;
     BOOL ret;
 
     SetLastError(0xdeadbeef);
     ret = WTSQueryUserToken(WTS_CURRENT_SESSION, NULL);
     ok(!ret, "expected WTSQueryUserToken to fail\n");
     ok(GetLastError()==ERROR_INVALID_PARAMETER, "expected ERROR_INVALID_PARAMETER got: %ld\n", GetLastError());
+
+    SetLastError(0xdeadbeef);
+    ret = WTSQueryUserToken(WTS_CURRENT_SESSION, &token);
+    todo_wine
+    ok(!ret, "expected WTSQueryUserToken to fail\n");
+    todo_wine
+    ok(GetLastError()==ERROR_PRIVILEGE_NOT_HELD, "expected ERROR_PRIVILEGE_NOT_HELD got: %lu\n", GetLastError());
+    if (ret)
+        CloseHandle(token);
 }
 
 static void test_WTSEnumerateSessions(void)
