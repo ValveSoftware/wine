@@ -848,9 +848,9 @@ static void test_WTSQueryUserToken(void)
         ret = WTSQueryUserToken(id, &token);
         if (id == 0)
         {
-            service_todo_wine_ok(!ret, "Session %lu: WTSQueryUserToken succeeded.\n", id);
-            service_todo_wine_ok(ERROR_NO_TOKEN == GetLastError(), "Session %lu: Got unexpected error %lu.\n",
-                                 id, GetLastError());
+            service_ok(!ret, "Session %lu: WTSQueryUserToken succeeded.\n", id);
+            service_ok(ERROR_NO_TOKEN == GetLastError(), "Session %lu: Got unexpected error %lu.\n",
+                       id, GetLastError());
         }
         else if (id == WTS_CURRENT_SESSION)
         {
@@ -860,9 +860,9 @@ static void test_WTSQueryUserToken(void)
         }
         else if (id == WTS_ANY_SESSION)
         {
-            service_todo_wine_ok(!ret, "Session %lu: WTSQueryUserToken succeeded.\n", id);
-            service_todo_wine_ok(ERROR_FILE_NOT_FOUND == GetLastError(), "Session %lu: Got unexpected error %lu.\n",
-                                 id, GetLastError());
+            service_ok(!ret, "Session %lu: WTSQueryUserToken succeeded.\n", id);
+            service_ok(ERROR_FILE_NOT_FOUND == GetLastError(), "Session %lu: Got unexpected error %lu.\n",
+                       id, GetLastError());
         }
         else
         {

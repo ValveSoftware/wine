@@ -1683,3 +1683,26 @@ DECL_HANDLER(create_linked_token)
         release_object( token );
     }
 }
+
+DECL_HANDLER(query_user_token)
+{
+    struct token *token;
+
+    if (req->session_id == 0)
+    {
+        set_error( STATUS_NO_TOKEN );
+        return;
+    }
+
+    if (req->session_id != default_session_id)
+    {
+        set_error( STATUS_NO_SUCH_FILE );
+        return;
+    }
+
+    if ((token = token_create_admin( TRUE, -1, TokenElevationTypeLimited, default_session_id )))
+    {
+        reply->handle = alloc_handle( current->process, token, TOKEN_ALL_ACCESS, 0 );
+        release_object( token );
+    }
+}

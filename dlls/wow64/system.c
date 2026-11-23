@@ -498,6 +498,22 @@ NTSTATUS WINAPI wow64_NtQuerySystemInformation( UINT *args )
         if (retlen) *retlen = sizeof(SYSTEM_REGISTRY_QUOTA_INFORMATION32);
         return status;
 
+    case SystemWineQueryUserToken: /* SYSTEM_WINE_QUERY_USER_TOKEN */
+    {
+        if (len == sizeof(SYSTEM_WINE_QUERY_USER_TOKEN32))
+        {
+            SYSTEM_WINE_QUERY_USER_TOKEN info;
+            SYSTEM_WINE_QUERY_USER_TOKEN32 *info32 = ptr;
+
+            info.session_id = info32->session_id;
+            if (!(status = NtQuerySystemInformation( class, &info, sizeof(info), NULL )))
+                info32->token = HandleToULong( info.token );
+        }
+        else status = STATUS_INFO_LENGTH_MISMATCH;
+        if (retlen) *retlen = sizeof(SYSTEM_WINE_QUERY_USER_TOKEN32);
+        return status;
+    }
+
     case SystemNumaProcessorMap:
     {
         SYSTEM_NUMA_INFORMATION info;

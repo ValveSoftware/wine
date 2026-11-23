@@ -645,7 +645,10 @@ BOOL WINAPI WTSQuerySessionInformationW(HANDLE server, DWORD session_id, WTS_INF
  */
 BOOL WINAPI WTSQueryUserToken(ULONG session_id, PHANDLE token)
 {
-    FIXME("%lu %p semi-stub!\n", session_id, token);
+    SYSTEM_WINE_QUERY_USER_TOKEN query = {0};
+    NTSTATUS status;
+
+    TRACE("%lu %p\n", session_id, token);
 
     if (!token)
     {
@@ -653,9 +656,16 @@ BOOL WINAPI WTSQueryUserToken(ULONG session_id, PHANDLE token)
         return FALSE;
     }
 
-    return DuplicateHandle(GetCurrentProcess(), GetCurrentProcessToken(),
-                           GetCurrentProcess(), token,
-                           0, FALSE, DUPLICATE_SAME_ACCESS);
+    if (session_id == WTS_CURRENT_SESSION)
+        ProcessIdToSessionId(GetCurrentProcessId(), &session_id);
+
+    query.session_id = session_id;
+    status = NtQuerySystemInformation(SystemWineQueryUserToken, &query, sizeof(query), NULL);
+    if (!status)
+        *token = query.token;
+    else
+        SetLastError(RtlNtStatusToDosError(status));
+    return !status;
 }
 
 /************************************************************

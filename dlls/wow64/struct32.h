@@ -784,4 +784,10 @@ typedef struct
     LARGE_INTEGER TimeLimit;
 } QUOTA_LIMITS32;
 
+typedef struct
+{
+    ULONG session_id;
+    ULONG token;
+} SYSTEM_WINE_QUERY_USER_TOKEN32, *PSYSTEM_WINE_QUERY_USER_TOKEN32;
+
 #endif /* __WOW64_STRUCT32_H */

@@ -2308,6 +2308,7 @@ typedef enum _SYSTEM_INFORMATION_CLASS {
     SystemHandleCountInformation = 253,
 #ifdef __WINESRC__
     SystemWineVersionInformation = 1000,
+    SystemWineQueryUserToken = 1001,
 #endif
 } SYSTEM_INFORMATION_CLASS, *PSYSTEM_INFORMATION_CLASS;
 
@@ -3293,6 +3294,14 @@ typedef struct _SYSTEM_PROCESS_ID_INFORMATION
     ULONG_PTR ProcessId;
     UNICODE_STRING ImageName;
 } SYSTEM_PROCESS_ID_INFORMATION, *PSYSTEM_PROCESS_ID_INFORMATION;
+
+#ifdef __WINESRC__
+typedef struct _SYSTEM_WINE_QUERY_USER_TOKEN
+{
+    ULONG session_id;
+    HANDLE token;
+} SYSTEM_WINE_QUERY_USER_TOKEN, *PSYSTEM_WINE_QUERY_USER_TOKEN;
+#endif
 
 typedef struct _TIME_FIELDS
 {   CSHORT Year;

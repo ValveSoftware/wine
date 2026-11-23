@@ -4407,6 +4407,25 @@ NTSTATUS WINAPI NtQuerySystemInformation( SYSTEM_INFORMATION_CLASS class,
         break;
     }
 
+    case SystemWineQueryUserToken: /* 1001 */
+    {
+        SYSTEM_WINE_QUERY_USER_TOKEN *query = info;
+
+        len = sizeof(*query);
+        if (size == len)
+        {
+            SERVER_START_REQ( query_user_token )
+            {
+                req->session_id = query->session_id;
+                if (!(ret = wine_server_call( req )))
+                    query->token = wine_server_ptr_handle( reply->handle );
+            }
+            SERVER_END_REQ;
+        }
+        else ret = STATUS_INFO_LENGTH_MISMATCH;
+        break;
+    }
+
     default:
 	FIXME( "(0x%08x,%p,0x%08x,%p) stub\n", class, info, size, ret_size );
 
