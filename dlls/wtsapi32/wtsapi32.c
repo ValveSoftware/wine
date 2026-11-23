@@ -97,8 +97,8 @@ BOOL WINAPI WTSEnumerateProcessesExW(HANDLE server, DWORD *level, DWORD session_
         return FALSE;
     }
 
-    if (session_id != WTS_ANY_SESSION)
-        FIXME("ignoring session id %#lx\n", session_id);
+    if (session_id == WTS_CURRENT_SESSION)
+        ProcessIdToSessionId(GetCurrentProcessId(), &session_id);
 
     if (*level)
     {
@@ -162,34 +162,38 @@ BOOL WINAPI WTSEnumerateProcessesExW(HANDLE server, DWORD *level, DWORD session_
     {
         HANDLE process, token;
 
-        info[count].SessionId = nt_process->SessionId;
-        info[count].ProcessId = (DWORD_PTR)nt_process->UniqueProcessId;
-
-        info[count].pProcessName = (WCHAR *)p;
-        memcpy(p, nt_process->ProcessName.Buffer, nt_process->ProcessName.Length);
-        info[count].pProcessName[nt_process->ProcessName.Length / sizeof(WCHAR)] = 0;
-        p += nt_process->ProcessName.Length + sizeof(WCHAR);
-
-        info[count].pUserSid = NULL;
-        if ((process = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, info[count].ProcessId)))
+        if (session_id == WTS_ANY_SESSION || session_id == nt_process->SessionId)
         {
-            if (OpenProcessToken(process, TOKEN_QUERY, &token))
-            {
-                char buffer[sizeof(TOKEN_USER) + offsetof(SID, SubAuthority[SID_MAX_SUB_AUTHORITIES])];
-                TOKEN_USER *user = (TOKEN_USER *)buffer;
-                DWORD size;
+            info[count].SessionId = nt_process->SessionId;
+            info[count].ProcessId = (DWORD_PTR)nt_process->UniqueProcessId;
 
-                GetTokenInformation(token, TokenUser, buffer, sizeof(buffer), &size);
-                info[count].pUserSid = p;
-                size = GetLengthSid(user->User.Sid);
-                memcpy(p, user->User.Sid, size);
-                p += size;
-                CloseHandle(token);
+            info[count].pProcessName = (WCHAR *)p;
+            memcpy(p, nt_process->ProcessName.Buffer, nt_process->ProcessName.Length);
+            info[count].pProcessName[nt_process->ProcessName.Length / sizeof(WCHAR)] = 0;
+            p += nt_process->ProcessName.Length + sizeof(WCHAR);
+
+            info[count].pUserSid = NULL;
+            if ((process = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, info[count].ProcessId)))
+            {
+                if (OpenProcessToken(process, TOKEN_QUERY, &token))
+                {
+                    char buffer[sizeof(TOKEN_USER) + offsetof(SID, SubAuthority[SID_MAX_SUB_AUTHORITIES])];
+                    TOKEN_USER *user = (TOKEN_USER *)buffer;
+                    DWORD size;
+
+                    GetTokenInformation(token, TokenUser, buffer, sizeof(buffer), &size);
+                    info[count].pUserSid = p;
+                    size = GetLengthSid(user->User.Sid);
+                    memcpy(p, user->User.Sid, size);
+                    p += size;
+                    CloseHandle(token);
+                }
+                CloseHandle(process);
             }
-            CloseHandle(process);
+
+            ++count;
         }
 
-        ++count;
         if (!nt_process->NextEntryOffset)
             break;
         nt_process = (SYSTEM_PROCESS_INFORMATION *)((char *)nt_process + nt_process->NextEntryOffset);

@@ -204,7 +204,6 @@ static void test_WTSEnumerateProcessesW(void)
     check_wts_process_info(info, session1_count);
     pWTSFreeMemoryExW(WTSTypeProcessInfoLevel0, info, session1_count);
 
-    todo_wine
     ok(session0_count + session1_count <= any_session_count, "Got unexpected process count.\n");
 
     info = NULL;
