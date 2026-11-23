@@ -484,7 +484,7 @@ static void check_token_information(const char *username, HANDLE token)
         {
             DWORD *id = (DWORD *)buffer;
 
-            service_todo_wine_ok(*id == 0, "Got unexpected id %#lx.\n", *id);
+            service_ok(*id == 0, "Got unexpected id %#lx.\n", *id);
             break;
         }
         case TokenElevationType:

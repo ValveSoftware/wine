@@ -1162,7 +1162,7 @@ DECL_HANDLER(create_token)
     struct sid_attrs *groups;
     struct luid_attr *privs;
     struct acl *dacl = NULL;
-    unsigned int i;
+    unsigned int i, session_id;
     data_size_t data_size, groups_size;
     struct acl *default_dacl = NULL;
     unsigned int *attrs;
@@ -1252,7 +1252,8 @@ DECL_HANDLER(create_token)
     else
         dacl = default_dacl = create_default_dacl( &domain_users_sid );
 
-    token = create_token( req->primary, default_session_id, user, owner, primary_group, groups,
+    session_id = req->auth_id.low_part;
+    token = create_token( req->primary, session_id, user, owner, primary_group, groups,
                           req->group_count, privs, req->priv_count, dacl, NULL,
                           req->impersonation_level, TokenElevationTypeFull );
     if (token)
