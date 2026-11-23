@@ -954,13 +954,7 @@ LookupAccountSidW(
                             ac = L"RAS and IAS Servers";
                             break;
                         case 1000:	/* first user account */
-                            size = UNLEN + 1;
-                            account_name = malloc(size * sizeof(WCHAR));
-                            if (GetUserNameW(account_name, &size))
-                                ac = account_name;
-                            else
-                                dm = NULL;
-
+                            ac = L"steamuser";
                             break;
                         default:
                             dm = NULL;
