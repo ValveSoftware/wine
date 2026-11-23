@@ -112,7 +112,7 @@ static void check_wts_process_info(const WTS_PROCESS_INFOW *info, DWORD count)
 static void test_WTSEnumerateProcessesW(void)
 {
     PWTS_PROCESS_INFOW info;
-    DWORD count, level;
+    DWORD count, level, session0_count, session1_count, current_session_count, any_session_count;
     BOOL ret;
 
     info = NULL;
@@ -187,6 +187,33 @@ static void test_WTSEnumerateProcessesW(void)
     ok(!GetLastError(), "got error %lu\n", GetLastError());
     check_wts_process_info(info, count);
     pWTSFreeMemoryExW(WTSTypeProcessInfoLevel0, info, count);
+
+    any_session_count = count;
+
+    info = NULL;
+    session0_count = 0;
+    ret = pWTSEnumerateProcessesExW(WTS_CURRENT_SERVER_HANDLE, &level, 0, (WCHAR **)&info, &session0_count);
+    ok(ret, "expected success\n");
+    pWTSFreeMemoryExW(WTSTypeProcessInfoLevel0, info, session0_count);
+
+    info = NULL;
+    session1_count = 0;
+    ret = pWTSEnumerateProcessesExW(WTS_CURRENT_SERVER_HANDLE, &level, WTSGetActiveConsoleSessionId(),
+                                   (WCHAR **)&info, &session1_count);
+    ok(ret, "expected success\n");
+    check_wts_process_info(info, session1_count);
+    pWTSFreeMemoryExW(WTSTypeProcessInfoLevel0, info, session1_count);
+
+    todo_wine
+    ok(session0_count + session1_count <= any_session_count, "Got unexpected process count.\n");
+
+    info = NULL;
+    current_session_count = 0;
+    ret = pWTSEnumerateProcessesExW(WTS_CURRENT_SERVER_HANDLE, &level, WTS_CURRENT_SESSION,
+                                   (WCHAR **)&info, &current_session_count);
+    ok(ret, "expected success\n");
+    pWTSFreeMemoryExW(WTSTypeProcessInfoLevel0, info, current_session_count);
+    ok(current_session_count <= any_session_count, "Got unexpected process count.\n");
 }
 
 static LONGLONG get_system_time_as_longlong(void)
