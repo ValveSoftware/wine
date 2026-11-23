@@ -417,7 +417,7 @@ static void test_WTSEnumerateSessions(void)
 
     bret = WTSEnumerateSessionsW(WTS_CURRENT_SERVER_HANDLE, 0, 1, &info, &count);
     ok(bret, "got error %lu.\n", GetLastError());
-    todo_wine_if(count == 1) ok(count >= 2, "got %lu.\n", count);
+    ok(count >= 2, "got %lu.\n", count);
 
     bret = WTSEnumerateSessionsA(WTS_CURRENT_SERVER_HANDLE, 0, 1, &infoA, &count2);
     ok(bret, "got error %lu.\n", GetLastError());
@@ -440,7 +440,7 @@ static void test_WTSEnumerateSessions(void)
         }
     }
     ok(console_found, "Console session not found.\n");
-    todo_wine ok(services_found, "Services session not found.\n");
+    ok(services_found, "Services session not found.\n");
 
     WTSFreeMemory(info);
     WTSFreeMemory(infoA);

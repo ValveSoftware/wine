@@ -348,27 +348,32 @@ BOOL WINAPI WTSEnumerateSessionsA(HANDLE server, DWORD reserved, DWORD version,
 BOOL WINAPI WTSEnumerateSessionsW(HANDLE server, DWORD reserved, DWORD version,
         PWTS_SESSION_INFOW *session_info, DWORD *count)
 {
-    static const WCHAR session_name[] = L"Console";
+    static const WCHAR console_session_name[] = L"Console", services_session_name[] = L"Services";
+    PWTS_SESSION_INFOW info;
 
-    FIXME("%p 0x%08lx 0x%08lx %p %p semi-stub.\n", server, reserved, version, session_info, count);
+    TRACE("%p 0x%08lx 0x%08lx %p %p.\n", server, reserved, version, session_info, count);
 
     if (!session_info || !count) return FALSE;
 
-    if (!(*session_info = malloc(sizeof(**session_info) + sizeof(session_name))))
+    if (!(info = malloc(sizeof(*info) * 2 + sizeof(services_session_name) + sizeof(console_session_name))))
     {
         SetLastError(ERROR_OUTOFMEMORY);
         return FALSE;
     }
-    if (!ProcessIdToSessionId( GetCurrentProcessId(), &(*session_info)->SessionId))
-    {
-        WTSFreeMemory(*session_info);
-        return FALSE;
-    }
-    *count = 1;
-    (*session_info)->State = WTSActive;
-    (*session_info)->pWinStationName = (WCHAR *)((char *)*session_info + sizeof(**session_info));
-    memcpy((*session_info)->pWinStationName, session_name, sizeof(session_name));
 
+    *count = 2;
+
+    info[0].SessionId = 0;
+    info[0].State = WTSDisconnected;
+    info[0].pWinStationName = (WCHAR *)((char *)info + sizeof(*info) * 2);
+    memcpy(info[0].pWinStationName, services_session_name, sizeof(services_session_name));
+
+    info[1].SessionId = WTSGetActiveConsoleSessionId();
+    info[1].State = WTSActive;
+    info[1].pWinStationName = (WCHAR *)((char *)info[0].pWinStationName + sizeof(services_session_name));
+    memcpy(info[1].pWinStationName, console_session_name, sizeof(console_session_name));
+
+    *session_info = info;
     return TRUE;
 }
 
