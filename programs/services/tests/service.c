@@ -809,6 +809,16 @@ static void test_LogonUser(void)
     }
 }
 
+static void test_WTSGetActiveConsoleSessionId(void)
+{
+    DWORD session_id;
+
+    /* Test that when called in services, WTSGetActiveConsoleSessionId() returns the session ID for
+     * normal desktop applications */
+    session_id = WTSGetActiveConsoleSessionId();
+    service_ok(session_id == 1, "Got unexpected session ID %#lx.\n", session_id);
+}
+
 static DWORD WINAPI service_handler(DWORD ctrl, DWORD event_type, void *event_data, void *context)
 {
     SERVICE_STATUS status;
@@ -835,6 +845,7 @@ static DWORD WINAPI service_handler(DWORD ctrl, DWORD event_type, void *event_da
         test_create_window();
         test_monitors();
         test_LogonUser();
+        test_WTSGetActiveConsoleSessionId();
         service_event("CUSTOM");
         return 0xdeadbeef;
     default:
