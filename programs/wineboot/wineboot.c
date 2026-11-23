@@ -1615,16 +1615,12 @@ static void install_root_pnp_devices(void)
     SetupDiDestroyDeviceInfoList(set);
 }
 
-static void update_user_profile(void)
+static void add_profile_list_entry(HANDLE token, const WCHAR *profile, DWORD flags)
 {
     char token_buf[sizeof(TOKEN_USER) + sizeof(SID) + sizeof(DWORD) * SID_MAX_SUB_AUTHORITIES];
-    HANDLE token;
-    WCHAR profile[MAX_PATH], *sid;
-    DWORD size;
     HKEY hkey, profile_hkey;
-
-    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_READ, &token))
-        return;
+    WCHAR *sid;
+    DWORD size;
 
     size = sizeof(token_buf);
     GetTokenInformation(token, TokenUser, token_buf, size, &size);
@@ -1638,10 +1634,8 @@ static void update_user_profile(void)
         if (!RegCreateKeyExW(hkey, sid, 0, NULL, 0,
                              KEY_ALL_ACCESS, NULL, &profile_hkey, NULL))
         {
-            DWORD flags = 0;
-            if (SHGetSpecialFolderPathW(NULL, profile, CSIDL_PROFILE, TRUE))
-                set_reg_value(profile_hkey, L"ProfileImagePath", profile);
-            RegSetValueExW( profile_hkey, L"Flags", 0, REG_DWORD, (const BYTE *)&flags, sizeof(flags) );
+            set_reg_value(profile_hkey, L"ProfileImagePath", profile);
+            RegSetValueExW(profile_hkey, L"Flags", 0, REG_DWORD, (const BYTE *)&flags, sizeof(flags));
             RegCloseKey(profile_hkey);
         }
 
@@ -1698,6 +1692,40 @@ static void update_root_certs(void)
     store = CertOpenStore( CERT_STORE_PROV_SYSTEM_REGISTRY_W, 0, 0, CERT_STORE_OPEN_EXISTING_FLAG
                            | CERT_STORE_READONLY_FLAG | CERT_SYSTEM_STORE_LOCAL_MACHINE, L"Root");
     CertCloseStore( store, 0 );
+}
+
+static void update_user_profile(void)
+{
+    WCHAR profile[MAX_PATH] = {0};
+
+    if (SHGetSpecialFolderPathW(NULL, profile, CSIDL_PROFILE, TRUE))
+        add_profile_list_entry(GetCurrentProcessToken(), profile, 0);
+    else
+        WINE_ERR("Failed to get the user profile directory.\n");
+}
+
+static void add_service_user_profiles(const WCHAR *username, HANDLE token)
+{
+    WCHAR profile[MAX_PATH] = {0};
+    DWORD flags = 0;
+
+    if (!wcsicmp(username, L"System"))
+    {
+        GetSystemDirectoryW(profile, ARRAY_SIZE(profile));
+        PathAppendW(profile, L"config\\systemprofile");
+        flags = 0xc; /* undocumented */
+    }
+    else if (!wcsicmp(username, L"LocalService"))
+    {
+        GetWindowsDirectoryW(profile, ARRAY_SIZE(profile));
+        PathAppendW(profile, L"ServiceProfiles\\LocalService");
+    }
+    else if (!wcsicmp(username, L"NetworkService"))
+    {
+        GetWindowsDirectoryW(profile, ARRAY_SIZE(profile));
+        PathAppendW(profile, L"ServiceProfiles\\NetworkService");
+    }
+    add_profile_list_entry(token, profile, flags);
 }
 
 /* execute rundll32 on the wine.inf file if necessary */
@@ -1790,6 +1818,7 @@ static void update_wineprefix( BOOL force )
                     count++;
                 }
 
+                add_service_user_profiles( service_accounts[i], token );
                 CloseHandle( token );
             }
         }

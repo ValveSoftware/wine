@@ -662,12 +662,13 @@ static void check_environment_block(const void *env_block, const char *username,
             wcscat(key, sid);
             size = sizeof(profile_path);
             ls = RegGetValueW(HKEY_LOCAL_MACHINE, key, L"ProfileImagePath", RRF_RT_REG_SZ, NULL, profile_path, &size);
+            service_ok(ls == ERROR_SUCCESS, "RegGetValueW ProfileImagePath failed, error %lu.\n", ls);
             if (is_default)
-                service_ok(ls == ERROR_SUCCESS, "RegGetValueW ProfileImagePath failed, error %lu.\n", ls);
+                service_todo_wine_ok(!wcsicmp(profile_path, test[i].value), "Expected %s, got %s.\n",
+                                     wine_dbgstr_w(test[i].value), wine_dbgstr_w(profile_path));
             else
-                service_todo_wine_ok(ls == ERROR_SUCCESS, "RegGetValueW ProfileImagePath failed, error %lu.\n", ls);
-            service_todo_wine_ok(!wcsicmp(profile_path, test[i].value), "Expected %s, got %s.\n",
-                                 wine_dbgstr_w(test[i].value), wine_dbgstr_w(profile_path));
+                service_ok(!wcsicmp(profile_path, test[i].value), "Expected %s, got %s.\n",
+                           wine_dbgstr_w(test[i].value), wine_dbgstr_w(profile_path));
 
             LocalFree(sid);
         }
