@@ -610,7 +610,16 @@ static void sync_window_input_shape( struct x11drv_win_data *data )
      * the cursor position becomes stale. This hack rejects setting an empty input shape for the
      * window so that it can get input.
      */
-    if ((sgi = getenv( "SteamGameId" )) && !strcmp( sgi, "3678970" )) return;
+    if ((sgi = getenv( "SteamGameId" )) &&
+        (
+            !strcmp( sgi, "3678970" )
+            || !strcmp( sgi, "4623570" )
+        ))
+    {
+        static int once;
+        if (!once++) FIXME( "HACK: ignoring input shape.\n" );
+        return;
+    }
 
     if (ex_style & WS_EX_TRANSPARENT)
     {
