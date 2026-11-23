@@ -144,6 +144,19 @@ Needs=BaseWow64Install
 AddReg=\
     CurrentVersionWow64.ntarm
 
+[ServiceAccountInstall]
+RegisterDlls=ServiceAccountRegisterDlls
+AddReg=\
+    CurrentVersion,\
+    Debugger,\
+    Fonts,\
+    Misc,\
+    ProtonOverrides,\
+    ThemeManager
+
+[ServiceAccountWow64Install]
+RegisterDlls=ServiceAccountRegisterDlls
+
 [DefaultInstall.Services]
 AddService=BITS,0,BITSService
 AddService=EventLog,0x800,EventLogService
@@ -736,6 +749,9 @@ HKLM,SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x86,"Major",0x10003,0x0000
 HKLM,SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x86,"Minor",0x10003,0x0000002a
 HKLM,SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x86,"Rbld",0x10003,0x00000000
 HKLM,SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x86,"Version",2,"14.42.34433.0"
+
+[ServiceAccountRegisterDlls]
+11,,shell32.dll,1
 
 [RegisterDllsSection]
 ;;some dlls have to be registered first

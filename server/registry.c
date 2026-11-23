@@ -145,7 +145,7 @@ struct save_branch_info
     const char  *filename;
 };
 
-#define MAX_SAVE_BRANCH_INFO 3
+#define MAX_SAVE_BRANCH_INFO 6
 static int save_branch_count;
 static struct save_branch_info save_branch_info[MAX_SAVE_BRANCH_INFO];
 
@@ -1896,6 +1896,9 @@ void init_registry(void)
     static const WCHAR REGISTRY[] = {'\\','R','E','G','I','S','T','R','Y'};
     static const WCHAR HKLM[] = { 'M','a','c','h','i','n','e' };
     static const WCHAR HKU_default[] = { 'U','s','e','r','\\','.','D','e','f','a','u','l','t' };
+    static const WCHAR HKU_localsystem[] = {'U','s','e','r','\\','S','-','1','-','5','-','1','8'};
+    static const WCHAR HKU_localservice[] = {'U','s','e','r','\\','S','-','1','-','5','-','1','9'};
+    static const WCHAR HKU_networkservice[] = {'U','s','e','r','\\','S','-','1','-','5','-','2','0'};
     static const WCHAR classes_i386[] = {'S','o','f','t','w','a','r','e','\\',
                                          'C','l','a','s','s','e','s','\\',
                                          'W','o','w','6','4','3','2','N','o','d','e'};
@@ -1917,9 +1920,26 @@ void init_registry(void)
     static const WCHAR software[] = {'S','o','f','t','w','a','r','e',};
     static const struct unicode_str root_name = { REGISTRY, sizeof(REGISTRY) };
     static const struct unicode_str HKLM_name = { HKLM, sizeof(HKLM) };
-    static const struct unicode_str HKU_name = { HKU_default, sizeof(HKU_default) };
+    static const struct unicode_str HKU_default_name = { HKU_default, sizeof(HKU_default) };
+    static const struct unicode_str HKU_localsystem_name = { HKU_localsystem, sizeof(HKU_localsystem) };
+    static const struct unicode_str HKU_localservice_name = { HKU_localservice, sizeof(HKU_localservice) };
+    static const struct unicode_str HKU_networkservice_name = { HKU_networkservice, sizeof(HKU_networkservice) };
     static const struct unicode_str perflib_name = { perflib, sizeof(perflib) };
     static const struct unicode_str controlset_name = { controlset, sizeof(controlset) };
+
+    static const struct
+    {
+        const char *keyname;
+        const char *filename;
+        struct unicode_str hku_name;
+    }
+    hku_keys[] =
+    {
+        {"User\\.Default", "userdef.reg", HKU_default_name},
+        {"User\\S-1-5-18", "userlocalsystem.reg", HKU_localsystem_name},
+        {"User\\S-1-5-19", "userlocalservice.reg", HKU_localservice_name},
+        {"User\\S-1-5-20", "usernetworkservice.reg", HKU_networkservice_name},
+    };
 
     WCHAR *current_user_path;
     struct unicode_str current_user_str, name;
@@ -1960,13 +1980,15 @@ void init_registry(void)
 
     init_supported_machines();
 
-    /* load userdef.reg into Registry\User\.Default */
+    /* load user*.reg into Registry\User\ */
+    for (i = 0; i < ARRAY_SIZE(hku_keys); i++)
+    {
+        if (!(key = create_key_recursive( root_key, &hku_keys[i].hku_name, current_time )))
+            fatal_error( "could not create %s registry key\n", hku_keys[i].keyname );
 
-    if (!(key = create_key_recursive( root_key, &HKU_name, current_time )))
-        fatal_error( "could not create User\\.Default registry key\n" );
-
-    load_init_registry_from_file( "userdef.reg", key );
-    release_object( key );
+        load_init_registry_from_file( hku_keys[i].filename, key );
+        release_object( key );
+    }
 
     /* load user.reg into HKEY_CURRENT_USER */
 

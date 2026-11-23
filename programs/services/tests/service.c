@@ -642,8 +642,8 @@ static void check_environment_block(const void *env_block, const char *username,
 
         /* Check that these folders actually exist */
         attr = GetFileAttributesW(test[i].value);
-        service_todo_wine_ok(attr != INVALID_FILE_ATTRIBUTES && attr & FILE_ATTRIBUTE_DIRECTORY,
-                             "Directory %s not found.\n", wine_dbgstr_w(test[i].value));
+        service_ok(attr != INVALID_FILE_ATTRIBUTES && attr & FILE_ATTRIBUTE_DIRECTORY,
+                   "Directory %s not found.\n", wine_dbgstr_w(test[i].value));
 
         /* Check that %USERPROFILE% is equal to the value of ProfileImagePath at
          * HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\ProfileList */
