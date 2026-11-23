@@ -909,9 +909,35 @@ error:
     return ERROR_NOT_ENOUGH_SERVER_MEMORY;
 }
 
+static void set_preserved_vars(WCHAR **env_block)
+{
+    static const WCHAR *preserve[] =
+    {
+        L"WINEBOOTSTRAPMODE",
+        L"PROTON_DISABLE_HIDRAW",
+        L"PROTON_ENABLE_HIDRAW",
+        L"FEX_APP_DATA_LOCATION",
+        L"FEX_APP_CONFIG_LOCATION",
+        L"FEX_APP_CONFIG",
+    };
+    WCHAR buffer[1024];
+
+    for (size_t i = 0; i < ARRAY_SIZE(preserve); i++)
+    {
+        if (GetEnvironmentVariableW( preserve[i], buffer, ARRAY_SIZE(buffer) ))
+        {
+            UNICODE_STRING value, name;
+            RtlInitUnicodeString( &name, preserve[i] );
+            RtlInitUnicodeString( &value, buffer );
+            RtlSetEnvironmentVariable( env_block, &name, &value );
+        }
+    }
+}
+
 static DWORD service_start_process(struct service_entry *service_entry, struct process_entry **new_process,
                                    BOOL *shared_process)
 {
+    const WCHAR *service_start_name, *service_username = NULL;
     struct process_entry *process;
     PROCESS_INFORMATION pi;
     STARTUPINFOW si;
@@ -1033,33 +1059,6 @@ found:
         FIXME("HACK: Creating service %s on default desktop.\n", debugstr_w(service_entry->config.lpDisplayName));
     }
 
-    if (!environment && OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &token))
-    {
-        static const WCHAR *preserve[] =
-        {
-            L"WINEBOOTSTRAPMODE",
-            L"PROTON_DISABLE_HIDRAW",
-            L"PROTON_ENABLE_HIDRAW",
-            L"FEX_APP_DATA_LOCATION",
-            L"FEX_APP_CONFIG_LOCATION",
-            L"FEX_APP_CONFIG",
-        };
-        WCHAR buffer[1024];
-
-        CreateEnvironmentBlock(&environment, token, FALSE);
-        for (size_t i = 0; i < ARRAY_SIZE(preserve); i++)
-        {
-            if (GetEnvironmentVariableW( preserve[i], buffer, ARRAY_SIZE(buffer) ))
-            {
-                UNICODE_STRING value, name;
-                RtlInitUnicodeString( &name, preserve[i] );
-                RtlInitUnicodeString( &value, buffer );
-                RtlSetEnvironmentVariable( (WCHAR **)&environment, &name, &value );
-            }
-        }
-        CloseHandle(token);
-    }
-
     service_entry->status.dwCurrentState = SERVICE_START_PENDING;
     service_entry->status.dwControlsAccepted = 0;
     ResetEvent(service_entry->status_changed_event);
@@ -1070,15 +1069,53 @@ found:
     process->use_count++;
     service_unlock(service_entry);
 
-    r = CreateProcessW(NULL, path, NULL, NULL, FALSE, CREATE_UNICODE_ENVIRONMENT | DETACHED_PROCESS, environment, NULL, &si, &pi);
+    service_start_name = service_entry->config.lpServiceStartName ?
+                         service_entry->config.lpServiceStartName : L"NT AUTHORITY\\System";
+    if (!wcsicmp(service_start_name, L"NT AUTHORITY\\System")
+        || !wcsicmp(service_start_name, L"LocalSystem")
+        || !wcsicmp(service_start_name, L".\\LocalSystem"))
+        service_username = L"System";
+    else if (!wcsicmp(service_start_name, L"NT AUTHORITY\\LocalService")
+             || !wcsicmp(service_start_name, L"LocalService")
+             || !wcsicmp(service_start_name, L".\\LocalService"))
+        service_username = L"LocalService";
+    else if (!wcsicmp(service_start_name, L"NT AUTHORITY\\NetworkService")
+             || !wcsicmp(service_start_name, L"NetworkService")
+             || !wcsicmp(service_start_name, L".\\NetworkService"))
+        service_username = L"NetworkService";
+
+    if (service_username)
+    {
+        void *env_block = NULL;
+
+        r = LogonUserW(service_username, L"NT AUTHORITY", NULL, LOGON32_LOGON_SERVICE, LOGON32_PROVIDER_DEFAULT, &token);
+        if (!r)
+        {
+            free(path);
+            goto failed;
+        }
+
+        CreateEnvironmentBlock(&env_block, token, FALSE);
+        set_preserved_vars((WCHAR **)&env_block);
+        r = CreateProcessAsUserW(token, NULL, path, NULL, NULL, FALSE, CREATE_UNICODE_ENVIRONMENT | DETACHED_PROCESS,
+                                 env_block, NULL, &si, &pi);
+        DestroyEnvironmentBlock(env_block);
+        CloseHandle(token);
+    }
+    else
+    {
+        if (!environment && OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &token))
+        {
+            CreateEnvironmentBlock(&environment, token, FALSE);
+            set_preserved_vars((WCHAR **)&environment);
+            CloseHandle(token);
+        }
+
+        r = CreateProcessW(NULL, path, NULL, NULL, FALSE, CREATE_UNICODE_ENVIRONMENT | DETACHED_PROCESS, environment, NULL, &si, &pi);
+    }
     free(path);
     if (!r)
-    {
-        err = GetLastError();
-        process_terminate(process);
-        release_process(process);
-        return err;
-    }
+        goto failed;
     if (!AssignProcessToJobObject(job_object, pi.hProcess))
         WINE_ERR("Could not add object to job.\n");
 
@@ -1088,6 +1125,12 @@ found:
 
     *new_process = process;
     return ERROR_SUCCESS;
+
+failed:
+    err = GetLastError();
+    process_terminate(process);
+    release_process(process);
+    return err;
 }
 
 static DWORD service_wait_for_startup(struct service_entry *service, struct process_entry *process)

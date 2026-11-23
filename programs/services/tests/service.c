@@ -293,10 +293,6 @@ static void check_token_information(const char *username, HANDLE token, BOOL is_
         {
             TOKEN_USER *user = (TOKEN_USER *)buffer;
 
-            /* Wine reports the current desktop user instead of SYSTEM */
-            if (!strcmpi(username, "System") && !EqualSid(user->User.Sid, &system))
-                return;
-
             if (!strcmpi(username, "System"))
                 service_ok(EqualSid(user->User.Sid, &system), "Got unexpected user.\n");
             else if (!strcmpi(username, "LocalService"))
@@ -450,7 +446,7 @@ static void check_token_information(const char *username, HANDLE token, BOOL is_
             if (!strcmpi(username, "System"))
             {
                 if (is_default)
-                    service_ok(EqualSid(owner->Owner, (PSID)&administrators), "Got unexpected owner.\n");
+                    service_todo_wine_ok(EqualSid(owner->Owner, (PSID)&administrators), "Got unexpected owner.\n");
                 else
                     service_ok(EqualSid(owner->Owner, (PSID)&system), "Got unexpected owner.\n");
             }
@@ -633,12 +629,8 @@ static void check_environment_block(const void *env_block, const char *username,
     for (i = 0; i < 3; i++)
     {
         value = get_env_from_block(env_block, test[i].name);
-        if (is_default)
-            service_todo_wine_ok(value && !wcsicmp(value, test[i].value), "%s: Got unexpected value %s for key %s.\n",
-                                 username, wine_dbgstr_w(value), wine_dbgstr_w(test[i].name));
-        else
-            service_ok(value && !wcsicmp(value, test[i].value), "%s: Got unexpected value %s for key %s.\n",
-                       username, wine_dbgstr_w(value), wine_dbgstr_w(test[i].name));
+        service_ok(value && !wcsicmp(value, test[i].value), "%s: Got unexpected value %s for key %s.\n",
+                   username, wine_dbgstr_w(value), wine_dbgstr_w(test[i].name));
 
         /* Check that these folders actually exist */
         attr = GetFileAttributesW(test[i].value);
@@ -663,12 +655,8 @@ static void check_environment_block(const void *env_block, const char *username,
             size = sizeof(profile_path);
             ls = RegGetValueW(HKEY_LOCAL_MACHINE, key, L"ProfileImagePath", RRF_RT_REG_SZ, NULL, profile_path, &size);
             service_ok(ls == ERROR_SUCCESS, "RegGetValueW ProfileImagePath failed, error %lu.\n", ls);
-            if (is_default)
-                service_todo_wine_ok(!wcsicmp(profile_path, test[i].value), "Expected %s, got %s.\n",
-                                     wine_dbgstr_w(test[i].value), wine_dbgstr_w(profile_path));
-            else
-                service_ok(!wcsicmp(profile_path, test[i].value), "Expected %s, got %s.\n",
-                           wine_dbgstr_w(test[i].value), wine_dbgstr_w(profile_path));
+            service_ok(!wcsicmp(profile_path, test[i].value), "Expected %s, got %s.\n",
+                       wine_dbgstr_w(test[i].value), wine_dbgstr_w(profile_path));
 
             LocalFree(sid);
         }
@@ -864,17 +852,11 @@ static void test_WTSQueryUserToken(void)
         SetLastError(0xdeadbeef);
         token = NULL;
         ret = WTSQueryUserToken(id, &token);
-        if (id == 0)
+        if (id == 0 || id == WTS_CURRENT_SESSION)
         {
             service_ok(!ret, "Session %lu: WTSQueryUserToken succeeded.\n", id);
             service_ok(ERROR_NO_TOKEN == GetLastError(), "Session %lu: Got unexpected error %lu.\n",
                        id, GetLastError());
-        }
-        else if (id == WTS_CURRENT_SESSION)
-        {
-            service_todo_wine_ok(!ret, "Session %lu: WTSQueryUserToken succeeded.\n", id);
-            service_todo_wine_ok(ERROR_NO_TOKEN == GetLastError(), "Session %lu: Got unexpected error %lu.\n",
-                                 id, GetLastError());
         }
         else if (id == WTS_ANY_SESSION)
         {

@@ -585,8 +585,8 @@ static void test_current_thread(BOOL is_system)
        PsGetProcessSessionId(current), session_id);
 
     /* the system process reports session 0 on windows */
-    todo_wine ok(!PsGetProcessSessionId(*pPsInitialSystemProcess), "got session id %lu for the system process\n",
-                 PsGetProcessSessionId(*pPsInitialSystemProcess));
+    ok(!PsGetProcessSessionId(*pPsInitialSystemProcess), "got session id %lu for the system process\n",
+       PsGetProcessSessionId(*pPsInitialSystemProcess));
 
     memset(&times, 0xcc, sizeof(times));
     ret = ZwQueryInformationProcess(process_handle, ProcessTimes, &times, sizeof(times), NULL);
