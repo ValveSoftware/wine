@@ -4756,6 +4756,7 @@ struct create_token_request
 
 
 
+
     char __pad_52[4];
 };
 struct create_token_reply
@@ -7094,6 +7095,6 @@ union generic_reply
     struct d3dkmt_mutex_release_reply d3dkmt_mutex_release_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 930
+#define SERVER_PROTOCOL_VERSION 965
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
