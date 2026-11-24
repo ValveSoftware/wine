@@ -7406,6 +7406,29 @@ static void test_file_map_large_size(void)
 
 done:
     CloseHandle(hmapfile);
+    SetFilePointer(hfile, 0x11000, NULL, FILE_BEGIN);
+    SetEndOfFile(hfile);
+    status = NtCreateSection(&hmapfile, SECTION_MAP_READ, NULL, NULL, PAGE_READWRITE, SEC_RESERVE, hfile);
+    ok(!status, "Failed to create offset section %#lx.\n", status);
+    if (!status)
+    {
+        LARGE_INTEGER offset;
+
+        offset.QuadPart = 0x10000;
+        size = 0x10000;
+        addr = NULL;
+        status = NtMapViewOfSection(hmapfile, GetCurrentProcess(), &addr, 0, 0, &offset, &size,
+                ViewUnmap, MEM_RESERVE, PAGE_READONLY);
+        CloseHandle(hmapfile);
+        ok(!status, "Failed to map offset view %#lx.\n", status);
+        if (!status)
+        {
+            ok(VirtualAlloc((char *)addr + 0x2000, 1, MEM_COMMIT, PAGE_READONLY) == (char *)addr + 0x2000,
+                    "Failed to commit offset view after closing the section.\n");
+            ok(GetFileSize(hfile, NULL) == 0x13000, "Unexpected end of offset view.\n");
+            NtUnmapViewOfSection(GetCurrentProcess(), addr);
+        }
+    }
     status = NtCreateSection(&hmapfile, SECTION_MAP_READ, NULL, NULL, PAGE_READONLY, SEC_RESERVE, hfile);
     ok(!status, "Failed to create read-only section %#lx.\n", status);
     if (!status)
