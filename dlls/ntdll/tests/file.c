@@ -7390,11 +7390,14 @@ static void test_file_map_large_size(void)
         VirtualQuery((char *)peer + 0x1000, &info, sizeof(info));
         ok(info.State == MEM_COMMIT && info.Protect == PAGE_READONLY, "Unexpected state %#lx, protect %#lx.\n",
                 info.State, info.Protect);
+        ok(VirtualProtect(peer, 0x1000, PAGE_NOACCESS, &ret), "Failed to change peer protection.\n");
         ok(VirtualAlloc((char *)addr + 0x7000, 1, MEM_COMMIT, PAGE_READONLY) == (char *)addr + 0x7000,
                 "Failed to extend the view.\n");
         ok(GetFileSize(hfile, NULL) == 0x8000, "Unexpected size after nonadjacent commit.\n");
         VirtualQuery((char *)peer + 0x3000, &info, sizeof(info));
         ok(info.State == MEM_COMMIT, "Intermediate page state %#lx.\n", info.State);
+        VirtualQuery(peer, &info, sizeof(info));
+        ok(info.Protect == PAGE_NOACCESS, "Growth reset the peer's protection to %#lx.\n", info.Protect);
         VirtualQuery((char *)peer + 0x8000, &info, sizeof(info));
         ok(info.State == MEM_RESERVE, "Unexpected tail state %#lx.\n", info.State);
     }
