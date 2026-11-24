@@ -7327,9 +7327,10 @@ static void test_file_map_large_size(void)
 {
     char temp_path[MAX_PATH], source[MAX_PATH];
     HANDLE hfile, hmapfile;
+    MEMORY_BASIC_INFORMATION info;
     NTSTATUS status;
     SIZE_T size;
-    void *addr;
+    void *addr, *peer;
     DWORD ret;
 
     ret = GetTempPathA(MAX_PATH, temp_path);
@@ -7355,28 +7356,65 @@ static void test_file_map_large_size(void)
 
     status = NtMapViewOfSection(hmapfile, GetCurrentProcess(), &addr, 0, 0, NULL, &size,
             ViewUnmap, MEM_RESERVE, PAGE_READONLY);
-    todo_wine
     ok(!status, "Failed to map the section %#lx.\n", status);
+    if (status) goto done;
+
+    peer = NULL;
+    status = NtMapViewOfSection(hmapfile, GetCurrentProcess(), &peer, 0, 0, NULL, &size,
+            ViewUnmap, MEM_RESERVE, PAGE_READONLY);
+    ok(!status, "Failed to map second view %#lx.\n", status);
+    VirtualQuery((char *)addr + 0x1000, &info, sizeof(info));
+    ok(info.State == MEM_RESERVE, "Unexpected state %#lx.\n", info.State);
 
     ret = GetFileSize(hfile, NULL);
     ok(ret == 0x400, "Unexpected size %lu.\n", ret);
 
-    addr = VirtualAlloc(addr, 0x500, MEM_COMMIT, PAGE_READONLY);
-    ok(!!addr, "Failed to resize, error %ld.\n", GetLastError());
+    ok(VirtualAlloc(addr, 0x500, MEM_COMMIT, PAGE_READONLY) == addr, "Failed to resize, error %ld.\n", GetLastError());
 
     ret = GetFileSize(hfile, NULL);
-    todo_wine
     ok(ret == 0x1000, "Unexpected size %lu.\n", ret);
 
-    addr = VirtualAlloc(addr, 0x1100, MEM_COMMIT, PAGE_READONLY);
-    todo_wine
-    ok(!!addr, "Failed to resize, error %ld.\n", GetLastError());
+    ok(VirtualAlloc(addr, 0x1100, MEM_COMMIT, PAGE_READONLY) == addr, "Failed to resize, error %ld.\n", GetLastError());
 
     ret = GetFileSize(hfile, NULL);
-    todo_wine
     ok(ret == 0x2000, "Unexpected size %lu.\n", ret);
+    ok(VirtualAlloc(addr, 1, MEM_COMMIT, PAGE_READONLY) == addr, "Failed to recommit.\n");
+    ok(GetFileSize(hfile, NULL) == 0x2000, "Recommit changed the file size.\n");
+    ok(!VirtualAlloc((char *)addr + 0xf000, 0x2000, MEM_COMMIT, PAGE_READONLY), "Committed past the view.\n");
+    ok(GetFileSize(hfile, NULL) == 0x2000, "Failed commit changed the file size.\n");
+    if (peer && ret == 0x2000)
+    {
+        SetFilePointer(hfile, 0x1000, NULL, FILE_BEGIN);
+        ok(WriteFile(hfile, "x", 1, &ret, NULL) && ret == 1, "Write failed.\n");
+        ok(((char *)peer)[0x1000] == 'x', "File growth was not visible through the peer view.\n");
+        VirtualQuery((char *)peer + 0x1000, &info, sizeof(info));
+        ok(info.State == MEM_COMMIT && info.Protect == PAGE_READONLY, "Unexpected state %#lx, protect %#lx.\n",
+                info.State, info.Protect);
+        ok(VirtualAlloc((char *)addr + 0x7000, 1, MEM_COMMIT, PAGE_READONLY) == (char *)addr + 0x7000,
+                "Failed to extend the view.\n");
+        ok(GetFileSize(hfile, NULL) == 0x8000, "Unexpected size after nonadjacent commit.\n");
+        VirtualQuery((char *)peer + 0x3000, &info, sizeof(info));
+        ok(info.State == MEM_COMMIT, "Intermediate page state %#lx.\n", info.State);
+        VirtualQuery((char *)peer + 0x8000, &info, sizeof(info));
+        ok(info.State == MEM_RESERVE, "Unexpected tail state %#lx.\n", info.State);
+    }
+    if (peer) NtUnmapViewOfSection(GetCurrentProcess(), peer);
+    NtUnmapViewOfSection(GetCurrentProcess(), addr);
 
+done:
     CloseHandle(hmapfile);
+    status = NtCreateSection(&hmapfile, SECTION_MAP_READ, NULL, NULL, PAGE_READONLY, SEC_RESERVE, hfile);
+    ok(!status, "Failed to create read-only section %#lx.\n", status);
+    if (!status)
+    {
+        addr = NULL;
+        size = 0x10000;
+        status = NtMapViewOfSection(hmapfile, GetCurrentProcess(), &addr, 0, 0, NULL, &size,
+                ViewUnmap, MEM_RESERVE, PAGE_READONLY);
+        ok(status == STATUS_SECTION_PROTECTION, "Unexpected read-only map status %#lx.\n", status);
+        if (!status) NtUnmapViewOfSection(GetCurrentProcess(), addr);
+        CloseHandle(hmapfile);
+    }
     CloseHandle(hfile);
     DeleteFileA(source);
 }

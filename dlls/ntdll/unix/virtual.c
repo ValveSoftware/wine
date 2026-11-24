@@ -1242,6 +1242,32 @@ static inline int is_view_valloc( const struct file_view *view )
     return !(view->protect & (SEC_FILE | SEC_RESERVE | SEC_COMMIT));
 }
 
+static inline BOOL is_reserved_file( const struct file_view *view )
+{
+    return (view->protect & (SEC_FILE | SEC_RESERVE)) == (SEC_FILE | SEC_RESERVE);
+}
+
+/* A protection change cannot switch a Unix mapping between MAP_SHARED and MAP_PRIVATE. */
+static BOOL conflicts_with_file_sharing( const struct file_view *view, unsigned int vprot )
+{
+    return (vprot & (VPROT_WRITE | VPROT_WRITECOPY)) && ((view->protect ^ vprot) & VPROT_WRITECOPY);
+}
+
+static NTSTATUS commit_mapping_range( struct file_view *view, char *base, SIZE_T size )
+{
+    NTSTATUS status;
+
+    SERVER_START_REQ( add_mapping_committed_range )
+    {
+        req->base   = wine_server_client_ptr( view->base );
+        req->offset = base - (char *)view->base;
+        req->size   = size;
+        status = wine_server_call( req );
+    }
+    SERVER_END_REQ;
+    return status;
+}
+
 /***********************************************************************
  *           get_page_vprot
  *
@@ -2112,6 +2138,7 @@ static NTSTATUS set_protection( struct file_view *view, void *base, SIZE_T size,
     {
         BYTE access = vprot & (VPROT_READ | VPROT_WRITE | VPROT_EXEC);
         if ((view->protect & access) != access) return STATUS_INVALID_PAGE_PROTECTION;
+        if (is_reserved_file( view ) && conflicts_with_file_sharing( view, vprot )) return STATUS_INVALID_PAGE_PROTECTION;
     }
 
     if (!set_vprot( view, base, size, vprot | VPROT_COMMITTED )) return STATUS_ACCESS_DENIED;
@@ -2689,8 +2716,11 @@ static SIZE_T get_committed_size( struct file_view *view, void *base, size_t max
                 size = min( reply->size, max_size );
                 if (reply->committed)
                 {
+                    BOOL refresh = is_reserved_file( view ) && (!(*vprot & VPROT_COMMITTED) ||
+                            get_vprot_range_size( base, size, VPROT_COMMITTED, vprot ) < size);
                     *vprot |= VPROT_COMMITTED;
                     set_page_vprot_bits( base, size, VPROT_COMMITTED, 0 );
+                    if (refresh && mprotect_range( base, size, 0, 0 ) == -1) size = 0;
                 }
             }
         }
@@ -3739,6 +3769,7 @@ static unsigned int virtual_map_section( HANDLE handle, PVOID *addr_ptr, ULONG_P
     ANSI_STRING exp_name;
     void *base;
     int unix_handle = -1, needs_close;
+    BOOL reserve_file;
     unsigned int vprot, sec_flags;
     struct file_view *view;
     HANDLE shared_file;
@@ -3797,10 +3828,11 @@ static unsigned int virtual_map_section( HANDLE handle, PVOID *addr_ptr, ULONG_P
 
     base = *addr_ptr;
     if (offset.QuadPart >= full_size) return STATUS_INVALID_PARAMETER;
+    reserve_file = (alloc_type & MEM_RESERVE) && (sec_flags & SEC_FILE);
     if (*size_ptr)
     {
         size = *size_ptr;
-        if (size > full_size - offset.QuadPart) return STATUS_INVALID_VIEW_SIZE;
+        if (size > full_size - offset.QuadPart && !reserve_file) return STATUS_INVALID_VIEW_SIZE;
     }
     else
     {
@@ -3815,6 +3847,7 @@ static unsigned int virtual_map_section( HANDLE handle, PVOID *addr_ptr, ULONG_P
     if (!(size = ROUND_SIZE( 0, size, page_mask ))) return STATUS_INVALID_PARAMETER;  /* wrap-around */
 
     get_vprot_flags( protect, &vprot, FALSE );
+    if (reserve_file) sec_flags |= SEC_RESERVE;
     vprot |= sec_flags;
     if (!(sec_flags & SEC_RESERVE)) vprot |= VPROT_COMMITTED;
 
@@ -3826,16 +3859,27 @@ static unsigned int virtual_map_section( HANDLE handle, PVOID *addr_ptr, ULONG_P
     if (res) goto done;
 
     TRACE( "handle=%p size=%lx offset=%s\n", handle, size, wine_dbgstr_longlong(offset.QuadPart) );
-    res = map_file_into_view( view, unix_handle, 0, size, offset.QuadPart, vprot, needs_close );
+    if (reserve_file)
+    {
+        size_t committed = ROUND_SIZE( 0, min( size, full_size - offset.QuadPart ), page_mask );
+        int flags = (vprot & VPROT_WRITECOPY) ? MAP_PRIVATE : MAP_SHARED;
+
+        /* Keep the tail file-backed as well: other views can extend the file after this mmap. */
+        if (mmap( view->base, size, PROT_NONE, MAP_FIXED | flags, unix_handle, offset.QuadPart ) == MAP_FAILED)
+            res = errno_to_status( errno );
+        else if (!set_vprot( view, view->base, committed, vprot | VPROT_COMMITTED ))
+            res = STATUS_ACCESS_DENIED;
+    }
+    else res = map_file_into_view( view, unix_handle, 0, size, offset.QuadPart, vprot, needs_close );
     if (res == STATUS_SUCCESS)
     {
-        /* file mappings must always be accessible */
-        mprotect_range( view->base, view->size, VPROT_COMMITTED, 0 );
+        if (!reserve_file) mprotect_range( view->base, view->size, VPROT_COMMITTED, 0 );
 
         SERVER_START_REQ( map_view )
         {
             req->mapping = wine_server_obj_handle( handle );
             req->access  = access;
+            req->reserve = reserve_file;
             req->base    = wine_server_client_ptr( view->base );
             req->size    = size;
             req->start   = offset.QuadPart;
@@ -4923,6 +4967,18 @@ NTSTATUS virtual_handle_fault( EXCEPTION_RECORD *rec, void *stack )
     }
 #endif
 
+    if (!(vprot & VPROT_COMMITTED))
+    {
+        struct file_view *view = find_view( addr, 1 );
+
+        /* A peer may have committed this part of a shared file view. */
+        if (view && is_reserved_file( view ) &&
+            get_committed_size( view, addr, view->size, &vprot, VPROT_COMMITTED ) && (vprot & VPROT_COMMITTED))
+        {
+            ret = STATUS_SUCCESS;
+            goto done;
+        }
+    }
     if (!is_inside_signal_stack( stack ) && (vprot & VPROT_GUARD))
     {
         struct thread_stack_info stack_info;
@@ -4957,6 +5013,7 @@ NTSTATUS virtual_handle_fault( EXCEPTION_RECORD *rec, void *stack )
                 ret = STATUS_SUCCESS;
         }
     }
+done:
     mutex_unlock( &virtual_mutex );
     rec->ExceptionCode = ret;
     return ret;
@@ -5314,7 +5371,7 @@ void virtual_set_force_exec( BOOL enable )
             if (view->protect & VPROT_NATIVE)
                 continue;
 
-            commit = is_view_valloc( view ) ? 0 : VPROT_COMMITTED;
+            commit = is_view_valloc( view ) || is_reserved_file( view ) ? 0 : VPROT_COMMITTED;
 
             mprotect_range( view->base, view->size, commit, 0 );
         }
@@ -5527,19 +5584,23 @@ static NTSTATUS allocate_virtual_memory( void **ret, SIZE_T *size_ptr, ULONG typ
     else  /* commit the pages */
     {
         if (!(view = find_view( base, size ))) status = STATUS_NOT_MAPPED_VIEW;
+        else if (is_reserved_file( view ))
+        {
+            unsigned int page_prot;
+
+            if (!(status = get_vprot_flags( protect, &page_prot, FALSE )))
+            {
+                if ((page_prot & VPROT_EXEC & ~view->protect) || conflicts_with_file_sharing( view, page_prot ))
+                    status = STATUS_INVALID_PAGE_PROTECTION;
+                else if (!(status = commit_mapping_range( view, base, size )) &&
+                         !set_vprot( view, base, size, page_prot | VPROT_COMMITTED ))
+                    status = STATUS_ACCESS_DENIED;
+            }
+        }
         else if (view->protect & SEC_FILE) status = STATUS_ALREADY_COMMITTED;
         else if (view->protect & VPROT_FREE_PLACEHOLDER) status = STATUS_CONFLICTING_ADDRESSES;
         else if (!(status = set_protection( view, base, size, protect )) && (view->protect & SEC_RESERVE))
-        {
-            SERVER_START_REQ( add_mapping_committed_range )
-            {
-                req->base   = wine_server_client_ptr( view->base );
-                req->offset = (char *)base - (char *)view->base;
-                req->size   = size;
-                wine_server_call( req );
-            }
-            SERVER_END_REQ;
-        }
+            commit_mapping_range( view, base, size );
     }
 
     if (!status && (attributes & MEM_EXTENDED_PARAMETER_EC_CODE))

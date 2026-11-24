@@ -162,6 +162,7 @@ struct mapping
 {
     struct object        obj;        /* object header */
     mem_size_t           size;       /* mapping size */
+    int                  writable_file;
     unsigned int         flags;      /* SEC_* flags */
     struct fd           *fd;         /* fd for mapped file */
     struct pe_image_info image;      /* image info (for PE image mapping) */
@@ -572,6 +573,29 @@ static void add_committed_range( struct memory_view *view, file_pos_t start, fil
         return;
     }
 
+    if ((view->flags & (SEC_FILE | SEC_RESERVE)) == (SEC_FILE | SEC_RESERVE))
+    {
+        struct stat st;
+        int fd = get_unix_fd( view->fd );
+
+        end += view->start;
+        if (fstat( fd, &st ) == -1) file_set_error();
+        else if (st.st_size < end)
+        {
+#ifdef HAVE_POSIX_FALLOCATE
+            /* Extend at EOF without truncating a concurrent write or filling the sparse gap. */
+            int err = posix_fallocate( fd, end - 1, 1 );
+            if (err)
+            {
+                errno = err;
+                file_set_error();
+            }
+#else
+            if (ftruncate( fd, end ) == -1) file_set_error();
+#endif
+        }
+        return;
+    }
     if (!committed) return;  /* everything committed already */
 
     start += view->start;
@@ -627,8 +651,27 @@ static int find_committed_range( struct memory_view *view, file_pos_t start, mem
         set_error( STATUS_INVALID_PARAMETER );
         return 0;
     }
-    if (!committed)  /* everything is committed */
+    if (!committed)
     {
+        if ((view->flags & (SEC_FILE | SEC_RESERVE)) == (SEC_FILE | SEC_RESERVE))
+        {
+            struct stat st;
+            file_pos_t end;
+
+            if (fstat( get_unix_fd( view->fd ), &st ) == -1)
+            {
+                file_set_error();
+                return 0;
+            }
+            end = round_size( st.st_size, page_mask );
+            if (end <= view->start + start)
+            {
+                *size = view->size - start;
+                return 0;
+            }
+            *size = min( end - view->start, view->size ) - start;
+            return 1;
+        }
         *size = view->size - start;
         return 1;
     }
@@ -1087,6 +1130,7 @@ static struct mapping *create_mapping( struct object *root, const struct unicode
         return mapping;  /* Nothing else to do */
 
     mapping->size        = size;
+    mapping->writable_file = handle && (file_access & FILE_WRITE_DATA);
     mapping->fd          = NULL;
     mapping->shared      = NULL;
     mapping->committed   = NULL;
@@ -1184,6 +1228,7 @@ struct mapping *create_fd_mapping( struct object *root, const struct unicode_str
     mapping->exp_name  = NULL;
     mapping->exp_len   = 0;
     mapping->flags     = SEC_FILE;
+    mapping->writable_file = 0;
     mapping->fd        = (struct fd *)grab_object( fd );
     set_fd_user( mapping->fd, &mapping_fd_ops, NULL );
 
@@ -1646,10 +1691,16 @@ DECL_HANDLER(map_view)
 
     if (!(mapping = get_mapping_obj( current->process, req->mapping, req->access ))) return;
 
+    if (req->reserve && !mapping->writable_file)
+    {
+        set_error( STATUS_SECTION_PROTECTION );
+        goto done;
+    }
     if ((mapping->flags & SEC_IMAGE) ||
         req->start >= mapping->size ||
         req->start + req->size < req->start ||
-        req->start + req->size > round_size( mapping->size, page_mask ))
+        (req->reserve ? (req->start + req->size) >> 54 :
+         req->start + req->size > round_size( mapping->size, page_mask )))
     {
         set_error( STATUS_INVALID_PARAMETER );
         goto done;
@@ -1660,9 +1711,9 @@ DECL_HANDLER(map_view)
         view->base      = req->base;
         view->size      = req->size;
         view->start     = req->start;
-        view->flags     = mapping->flags;
+        view->flags     = mapping->flags | (req->reserve ? SEC_RESERVE : 0);
         view->namelen   = 0;
-        view->fd        = !is_fd_removable( mapping->fd ) ? (struct fd *)grab_object( mapping->fd ) : NULL;
+        view->fd        = req->reserve || !is_fd_removable( mapping->fd ) ? (struct fd *)grab_object( mapping->fd ) : NULL;
         view->committed = mapping->committed ? (struct ranges *)grab_object( mapping->committed ) : NULL;
         view->shared    = NULL;
         add_process_view( current, view );
