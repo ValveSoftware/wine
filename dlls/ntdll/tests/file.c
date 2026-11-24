@@ -7364,7 +7364,8 @@ static void test_file_map_large_size(void)
             ViewUnmap, MEM_RESERVE, PAGE_READONLY);
     ok(!status, "Failed to map second view %#lx.\n", status);
     VirtualQuery((char *)addr + 0x1000, &info, sizeof(info));
-    ok(info.State == MEM_RESERVE, "Unexpected state %#lx.\n", info.State);
+    ok(info.State == MEM_RESERVE && info.RegionSize == 0xf000,
+            "Unexpected tail state %#lx, size %Ix.\n", info.State, info.RegionSize);
 
     ret = GetFileSize(hfile, NULL);
     ok(ret == 0x400, "Unexpected size %lu.\n", ret);
@@ -7394,6 +7395,9 @@ static void test_file_map_large_size(void)
         ok(VirtualAlloc((char *)addr + 0x7000, 1, MEM_COMMIT, PAGE_READONLY) == (char *)addr + 0x7000,
                 "Failed to extend the view.\n");
         ok(GetFileSize(hfile, NULL) == 0x8000, "Unexpected size after nonadjacent commit.\n");
+        SetFilePointer(hfile, 0x7000, NULL, FILE_BEGIN);
+        ok(WriteFile(hfile, "y", 1, &ret, NULL) && ret == 1, "Second write failed.\n");
+        ok(((char *)peer)[0x7000] == 'y', "Second file extension was not visible through the peer view.\n");
         VirtualQuery((char *)peer + 0x3000, &info, sizeof(info));
         ok(info.State == MEM_COMMIT, "Intermediate page state %#lx.\n", info.State);
         VirtualQuery(peer, &info, sizeof(info));

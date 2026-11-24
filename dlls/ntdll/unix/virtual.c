@@ -2754,30 +2754,46 @@ static SIZE_T get_committed_size( struct file_view *view, void *base, size_t max
 
     if (view->protect & SEC_RESERVE)
     {
-        size = 0;
+        struct stat st;
+        BOOL committed;
 
         *vprot = get_page_vprot( base );
-
-        SERVER_START_REQ( get_mapping_committed_range )
+        if (is_reserved_file( view ) && view->file_fd != -1 && !fstat( view->file_fd, &st ))
         {
-            req->base   = wine_server_client_ptr( view->base );
-            req->offset = offset;
-            if (!wine_server_call( req ))
+            SIZE_T end = 0;
+
+            if (st.st_size > view->file_offset)
+                end = ROUND_SIZE( 0, min( view->size, (UINT64)(st.st_size - view->file_offset) ), page_mask );
+            committed = offset < end;
+            size = (committed ? end : view->size) - offset;
+        }
+        else
+        {
+            size = 0;
+            committed = FALSE;
+            SERVER_START_REQ( get_mapping_committed_range )
             {
-                size = min( reply->size, max_size );
-                if (reply->committed && is_reserved_file( view ))
+                req->base   = wine_server_client_ptr( view->base );
+                req->offset = offset;
+                if (!wine_server_call( req ))
                 {
-                    if (!grow_file_view( view, offset + size )) size = 0;
-                    *vprot = get_page_vprot( base );
-                }
-                else if (reply->committed)
-                {
-                    *vprot |= VPROT_COMMITTED;
-                    set_page_vprot_bits( base, size, VPROT_COMMITTED, 0 );
+                    committed = reply->committed;
+                    size = reply->size;
                 }
             }
+            SERVER_END_REQ;
         }
-        SERVER_END_REQ;
+        size = min( size, max_size );
+        if (committed && is_reserved_file( view ))
+        {
+            if (!grow_file_view( view, offset + size )) size = 0;
+            *vprot = get_page_vprot( base );
+        }
+        else if (committed)
+        {
+            *vprot |= VPROT_COMMITTED;
+            set_page_vprot_bits( base, size, VPROT_COMMITTED, 0 );
+        }
 
         if (!size || !(vprot_mask & ~VPROT_COMMITTED) ||
             (is_reserved_file( view ) && !(*vprot & VPROT_COMMITTED))) return size;
