@@ -6644,11 +6644,19 @@ static void update_external_font_keys(void)
 
         path = get_nt_path( (WCHAR *)(buffer + info->DataOffset) );
         if ((tmp = wcsrchr( value, ' ' )) && !facename_compare( tmp, true_type_suffixW, -1 )) *tmp = 0;
-        if ((face = find_face_from_full_name( value )) && !wcsicmp( face->file, path ))
+        if ((face = find_face_from_full_name( value )))
         {
-            face->flags |= ADDFONT_EXTERNAL_FOUND;
-            free( path );
-            continue;
+            if (!wcsicmp( face->file, path ))
+            {
+                face->flags |= ADDFONT_EXTERNAL_FOUND;
+                free( path );
+                continue;
+            }
+            if (!(face->flags & ADDFONT_EXTERNAL_FONT))
+            {
+                free( path );
+                continue;
+            }
         }
         if (tmp && !*tmp) *tmp = ' ';
         if (!(key = malloc( sizeof(*key) ))) break;
