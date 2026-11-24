@@ -570,6 +570,10 @@ static const struct exception
     { { 0xcd, 0xff, 0xc3 },   /* int $0xff; ret */
       0, 2, FALSE, STATUS_ACCESS_VIOLATION, 2, { 0, 0xffffffff } },
 
+    /* syscall interrupt 0x2e */
+    { { 0xcd, 0x2e, 0xc3 },   /* int $0xff; ret */
+      0, 2, FALSE, STATUS_ILLEGAL_INSTRUCTION, 0 },
+
     /* test moves to/from Crx */
     { { 0x0f, 0x20, 0xc0, 0xc3 },  /* movl %cr0,%eax; ret */
       0, 3, FALSE, STATUS_PRIVILEGED_INSTRUCTION, 0 },
@@ -6193,6 +6197,15 @@ static void test_direct_syscalls(void)
         0xc3,                       /* ret */
     };
 
+    static const BYTE code_int2e[] =
+    {
+        0x49, 0x89, 0xd2,           /* movq %rdx, %r10 */
+        0x4c, 0x89, 0xc2,           /* movq %r8,  %rdx */
+        0x89, 0xc8,                 /* movl %ecx, %eax */
+        0xcd, 0x2e,                 /* int $0x2e */
+        0xc3,                       /* ret */
+    };
+
     HANDLE event;
     NTSTATUS (WINAPI *func)(UINT32 syscall_nr, HANDLE h, LONG *prev_state);
 
@@ -6202,6 +6215,12 @@ static void test_direct_syscalls(void)
     func(find_syscall_nr("NtSetEvent"), event, NULL);
 
     ok(WaitForSingleObject(event, 0) == WAIT_OBJECT_0, "Event not signaled.\n");
+
+    memcpy(code_mem, code_int2e, sizeof(code_int2e));
+    func = code_mem;
+    func(find_syscall_nr("NtSetEvent"), event, NULL);
+    ok(WaitForSingleObject(event, 0) == WAIT_OBJECT_0, "Event not signaled.\n");
+
     CloseHandle(event);
 }
 
