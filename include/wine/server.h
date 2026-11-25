@@ -36,7 +36,7 @@ struct __server_iovec
     data_size_t  size;
 };
 
-#define __SERVER_MAX_DATA 7
+#define __SERVER_MAX_DATA 5
 
 struct __server_request_info
 {
