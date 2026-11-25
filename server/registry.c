@@ -2365,7 +2365,7 @@ DECL_HANDLER(delete_key)
 DECL_HANDLER(flush_key)
 {
     struct key *key = get_hkey_obj( req->hkey, 0 );
-    int branches[3], branch_count = 0, i, path_len;
+    int branches[MAX_SAVE_BRANCH_INFO], branch_count = 0, i, path_len;
     char *data;
 
     if (!key) return;
