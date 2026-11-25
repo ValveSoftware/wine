@@ -287,6 +287,9 @@ typedef struct _WSAMSG {
 #define WSA_CMSG_DATA(cmsg)     ((UCHAR*)((WSACMSGHDR*)(cmsg)+1))
 #define WSA_CMSG_FIRSTHDR(mhdr) ((mhdr)->Control.len >= sizeof(WSACMSGHDR) ? (WSACMSGHDR *) (mhdr)->Control.buf : (WSACMSGHDR *) 0)
 #define WSA_CMSG_ALIGN(len)     (((len) + sizeof(SIZE_T) - 1) & ~(sizeof(SIZE_T) - 1))
+
+#define WSA_CMSG_LEN(len)       (WSA_CMSG_ALIGN(sizeof(WSACMSGHDR)) + len)
+
 /*
  * Next Header: If the response is too short (or the next message in the response
  * is too short) then return NULL, otherwise return the next control message.

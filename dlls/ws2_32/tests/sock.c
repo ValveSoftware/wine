@@ -163,6 +163,7 @@ static HANDLE     server_ready;
 static HANDLE     client_ready[MAX_CLIENTS];
 static int        client_id;
 static GUID       WSARecvMsg_GUID = WSAID_WSARECVMSG;
+static GUID       WSASendMsg_GUID = WSAID_WSASENDMSG;
 
 /**************** General utility functions ***************/
 
@@ -7584,7 +7585,6 @@ static void test_WSASendMsg(void)
 {
     SOCKET sock, dst;
     struct sockaddr_in sendaddr, sockaddr;
-    GUID WSASendMsg_GUID = WSAID_WSASENDMSG;
     LPFN_WSASENDMSG pWSASendMsg = NULL;
     char teststr[12] = "hello world", buffer[32];
     WSABUF iovec[2];
@@ -7763,6 +7763,141 @@ todo_wine {
     todo_wine
     ok(err == WSAEINVAL, "expected 10014, got %ld instead\n", err);
     closesocket(sock);
+}
+
+static void test_WSASendMsg_control(void)
+{
+    LPFN_WSASENDMSG pWSASendMsg = NULL;
+    struct sockaddr_in sendaddr;
+    char data_buffer[32768];
+    char control_buffer[1024];
+    WSABUF iovec = { .buf = data_buffer };
+    SOCKET sock;
+    WSAMSG msg =
+    {
+        .name = (struct sockaddr *)&sendaddr,
+        .namelen = sizeof(sendaddr),
+        .lpBuffers = &iovec,
+        .dwBufferCount = 1,
+    };
+    int ret, value, control_len, size;
+    DWORD err, sent;
+    WSACMSGHDR *cmsg;
+
+    sock = socket( AF_INET, SOCK_DGRAM, 0 );
+    ok( sock != INVALID_SOCKET, "got error %u.\n", WSAGetLastError() );
+
+    WSAIoctl( sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &WSASendMsg_GUID, sizeof(WSASendMsg_GUID),
+              &pWSASendMsg, sizeof(pWSASendMsg), &err, NULL, NULL );
+    if (!pWSASendMsg)
+    {
+        closesocket( sock );
+        win_skip( "WSASendMsg is unsupported, skipping tests.\n" );
+        return;
+    }
+
+    sendaddr.sin_family = AF_INET;
+    sendaddr.sin_port = htons( 139 );
+    /* localhost doesn't have MTU limit and is not suitable for this test. */
+    sendaddr.sin_addr.s_addr = inet_addr( "8.8.8.8" );
+
+    iovec.len = 4096;
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    ok( !ret, "got error %u.\n", WSAGetLastError() );
+
+    value = 1;
+    ret = setsockopt( sock, IPPROTO_IP, IP_DONTFRAGMENT, (char *)&value, sizeof(value) );
+    ok(!ret, "got error %u.\n", WSAGetLastError() );
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    ok( ret && WSAGetLastError() == WSAEMSGSIZE, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+
+    memset( control_buffer, 0xcc, sizeof(control_buffer) );
+    msg.Control.buf = control_buffer;
+    msg.Control.len = sizeof(control_buffer);
+    control_len = 0;
+
+    cmsg = WSA_CMSG_FIRSTHDR(&msg);
+    ok(!!cmsg, "got NULL.\n");
+    cmsg->cmsg_level = IPPROTO_UDP;
+    cmsg->cmsg_type = UDP_SEND_MSG_SIZE;
+    cmsg->cmsg_len = WSA_CMSG_LEN(sizeof(DWORD));
+    *(DWORD *)WSA_CMSG_DATA(cmsg) = 1200;
+    control_len += WSA_CMSG_ALIGN(WSA_CMSG_LEN(sizeof(DWORD)));
+
+    msg.Control.len = control_len - 4;
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    todo_wine ok( ret && WSAGetLastError() == WSAEINVAL, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+
+    msg.Control.len = control_len + 4;
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    if (sizeof(void *) == 4)
+    {
+        todo_wine ok( ret && WSAGetLastError() == WSAEINVAL, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+        msg.Control.len = control_len;
+        ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    }
+    if (ret && WSAGetLastError() == WSAEINVAL)
+    {
+        /* Before Win10 2009 */
+        win_skip( "UDP_SEND_MSG_SIZE is not supported, skipping tests.\n" );
+        goto done;
+    }
+    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+
+    msg.Control.len = 0;
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    todo_wine ok( ret && WSAGetLastError() == WSAEFAULT, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+
+    msg.Control.buf = NULL;
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    ok( ret && WSAGetLastError() == WSAEMSGSIZE, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+
+    value = 0xdeadbeef;
+    size = sizeof(value) - 1;
+    ret = getsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, &size );
+    todo_wine ok( ret && WSAGetLastError() == WSAEFAULT, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+    ok( value == 0xdeadbeef, "got %#x.\n", value );
+
+    value = 0xdeadbeef;
+    size = sizeof(value) + 1;
+    ret = getsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, &size );
+    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+    todo_wine ok( size == sizeof(value), "got %d.\n", size );
+    todo_wine ok( !value, "got %#x.\n", value );
+
+    value = 0xdeadbeef;
+    size = sizeof(value);
+    ret = getsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, &size );
+    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+    todo_wine ok( !value, "got %d.\n", value );
+
+    value = 1200;
+
+    ret = setsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, sizeof(value) - 1 );
+    todo_wine ok( ret && WSAGetLastError() == WSAEFAULT, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+    ret = setsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, sizeof(value) * 2 );
+    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+
+    ret = setsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, sizeof(value) );
+    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+
+    value = 0xdeadbeef;
+    size = sizeof(value);
+    ret = getsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, &size );
+    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+    todo_wine ok( value == 1200, "got %d.\n", value );
+
+    value = 0;
+    ret = setsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, sizeof(value) );
+    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    ok( ret && WSAGetLastError() == WSAEMSGSIZE, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+
+done:
+    closesocket( sock );
 }
 
 static void test_WSASendTo(void)
@@ -14993,6 +15128,7 @@ START_TEST( sock )
     test_unsupported_ioctls();
 
     test_WSASendMsg();
+    test_WSASendMsg_control();
     test_WSASendTo();
     test_WSARecv();
     test_WSAPoll();

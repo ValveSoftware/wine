@@ -290,6 +290,12 @@ typedef struct WS(in6_pktinfo) {
 #endif /* USE_WS_PREFIX */
 
 #ifndef USE_WS_PREFIX
+#define UDP_SEND_MSG_SIZE              2
+#else
+#define WS_UDP_SEND_MSG_SIZE           2
+#endif
+
+#ifndef USE_WS_PREFIX
 #define TCP_OFFLOAD_NO_PREFERENCE       0
 #define TCP_OFFLOAD_NOT_PREFERRED       1
 #define TCP_OFFLOAD_PREFERRED           2
