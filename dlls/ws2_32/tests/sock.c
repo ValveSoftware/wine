@@ -7826,13 +7826,13 @@ static void test_WSASendMsg_control(void)
 
     msg.Control.len = control_len - 4;
     ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
-    todo_wine ok( ret && WSAGetLastError() == WSAEINVAL, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+    ok( ret && WSAGetLastError() == WSAEINVAL, "got ret %d, error %u.\n", ret, WSAGetLastError() );
 
-    msg.Control.len = control_len + 4;
+    msg.Control.len = control_len + 8;
     ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
     if (sizeof(void *) == 4)
     {
-        todo_wine ok( ret && WSAGetLastError() == WSAEINVAL, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+        ok( ret && WSAGetLastError() == WSAEINVAL, "got ret %d, error %u.\n", ret, WSAGetLastError() );
         msg.Control.len = control_len;
         ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
     }
@@ -7842,11 +7842,11 @@ static void test_WSASendMsg_control(void)
         win_skip( "UDP_SEND_MSG_SIZE is not supported, skipping tests.\n" );
         goto done;
     }
-    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+    ok( !ret, "got error %u.\n", WSAGetLastError() );
 
     msg.Control.len = 0;
     ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
-    todo_wine ok( ret && WSAGetLastError() == WSAEFAULT, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+    ok( ret && WSAGetLastError() == WSAEFAULT, "got ret %d, error %u.\n", ret, WSAGetLastError() );
 
     msg.Control.buf = NULL;
     ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );

@@ -376,7 +376,7 @@ static int sockaddr_from_unix( const union unix_sockaddr *uaddr, struct WS_socka
     }
 }
 
-static WSACMSGHDR *fill_control_message( int level, int type, WSACMSGHDR *current, ULONG *maxsize, void *data, int len )
+static WSACMSGHDR *fill_win_control_message( int level, int type, WSACMSGHDR *current, ULONG *maxsize, void *data, int len )
 {
     ULONG msgsize = sizeof(WSACMSGHDR) + WSA_CMSG_ALIGN(len);
     char *ptr = (char *) current + sizeof(WSACMSGHDR);
@@ -391,7 +391,7 @@ static WSACMSGHDR *fill_control_message( int level, int type, WSACMSGHDR *curren
     return (WSACMSGHDR *)(ptr + WSA_CMSG_ALIGN(len));
 }
 
-static int convert_control_headers(struct msghdr *hdr, WSABUF *control)
+static int convert_unix_control_headers(struct msghdr *hdr, WSABUF *control)
 {
     WSACMSGHDR *cmsg_win = (WSACMSGHDR *)control->buf, *ptr;
     ULONG ctlsize = control->len;
@@ -413,8 +413,8 @@ static int convert_control_headers(struct msghdr *hdr, WSABUF *control)
 
                         memcpy( &data_win.ipi_addr, &data_unix->ipi_addr.s_addr, 4 ); /* 4 bytes = 32 address bits */
                         data_win.ipi_ifindex = data_unix->ipi_ifindex;
-                        ptr = fill_control_message( WS_IPPROTO_IP, WS_IP_PKTINFO, ptr, &ctlsize,
-                                                    (void *)&data_win, sizeof(data_win) );
+                        ptr = fill_win_control_message( WS_IPPROTO_IP, WS_IP_PKTINFO, ptr, &ctlsize,
+                                                       (void *)&data_win, sizeof(data_win) );
                         if (!ptr) goto error;
                         break;
                     }
@@ -426,8 +426,8 @@ static int convert_control_headers(struct msghdr *hdr, WSABUF *control)
 
                         memcpy( &data_win.ipi_addr, &addr_unix->s_addr, 4 ); /* 4 bytes = 32 address bits */
                         data_win.ipi_ifindex = 0; /* FIXME */
-                        ptr = fill_control_message( WS_IPPROTO_IP, WS_IP_PKTINFO, ptr, &ctlsize,
-                                                    (void *)&data_win, sizeof(data_win) );
+                        ptr = fill_win_control_message( WS_IPPROTO_IP, WS_IP_PKTINFO, ptr, &ctlsize,
+                                                        (void *)&data_win, sizeof(data_win) );
                         if (!ptr) goto error;
                         break;
                     }
@@ -437,8 +437,8 @@ static int convert_control_headers(struct msghdr *hdr, WSABUF *control)
                     case IP_TOS:
                     {
                         INT tos = *(unsigned char *)CMSG_DATA(cmsg_unix);
-                        ptr = fill_control_message( WS_IPPROTO_IP, WS_IP_TOS, ptr, &ctlsize,
-                                                    &tos, sizeof(INT) );
+                        ptr = fill_win_control_message( WS_IPPROTO_IP, WS_IP_TOS, ptr, &ctlsize,
+                                                        &tos, sizeof(INT) );
                         if (!ptr) goto error;
                         break;
                     }
@@ -447,8 +447,8 @@ static int convert_control_headers(struct msghdr *hdr, WSABUF *control)
 #if defined(IP_TTL)
                     case IP_TTL:
                     {
-                        ptr = fill_control_message( WS_IPPROTO_IP, WS_IP_TTL, ptr, &ctlsize,
-                                                    CMSG_DATA(cmsg_unix), sizeof(INT) );
+                        ptr = fill_win_control_message( WS_IPPROTO_IP, WS_IP_TTL, ptr, &ctlsize,
+                                                        CMSG_DATA(cmsg_unix), sizeof(INT) );
                         if (!ptr) goto error;
                         break;
                     }
@@ -466,8 +466,8 @@ static int convert_control_headers(struct msghdr *hdr, WSABUF *control)
 #if defined(IPV6_HOPLIMIT)
                     case IPV6_HOPLIMIT:
                     {
-                        ptr = fill_control_message( WS_IPPROTO_IPV6, WS_IPV6_HOPLIMIT, ptr, &ctlsize,
-                                                    CMSG_DATA(cmsg_unix), sizeof(INT) );
+                        ptr = fill_win_control_message( WS_IPPROTO_IPV6, WS_IPV6_HOPLIMIT, ptr, &ctlsize,
+                                                        CMSG_DATA(cmsg_unix), sizeof(INT) );
                         if (!ptr) goto error;
                         break;
                     }
@@ -481,8 +481,8 @@ static int convert_control_headers(struct msghdr *hdr, WSABUF *control)
 
                         memcpy(&data_win.ipi6_addr, &data_unix->ipi6_addr.s6_addr, 16);
                         data_win.ipi6_ifindex = data_unix->ipi6_ifindex;
-                        ptr = fill_control_message( WS_IPPROTO_IPV6, WS_IPV6_PKTINFO, ptr, &ctlsize,
-                                                    (void *)&data_win, sizeof(data_win) );
+                        ptr = fill_win_control_message( WS_IPPROTO_IPV6, WS_IPV6_PKTINFO, ptr, &ctlsize,
+                                                       (void *)&data_win, sizeof(data_win) );
                         if (!ptr) goto error;
                         break;
                     }
@@ -491,8 +491,8 @@ static int convert_control_headers(struct msghdr *hdr, WSABUF *control)
 #if defined(IPV6_TCLASS)
                     case IPV6_TCLASS:
                     {
-                        ptr = fill_control_message( WS_IPPROTO_IPV6, WS_IPV6_TCLASS, ptr, &ctlsize,
-                                                    CMSG_DATA(cmsg_unix), sizeof(INT) );
+                        ptr = fill_win_control_message( WS_IPPROTO_IPV6, WS_IPV6_TCLASS, ptr, &ctlsize,
+                                                        CMSG_DATA(cmsg_unix), sizeof(INT) );
                         if (!ptr) goto error;
                         break;
                     }
@@ -516,6 +516,42 @@ static int convert_control_headers(struct msghdr *hdr, WSABUF *control)
 error:
     control->len = 0;
     return 0;
+}
+
+static NTSTATUS convert_win_control_message( struct msghdr *hdr, struct cmsghdr **cmsg, int win_level,
+                                             int win_type, ULONG *maxsize, void *data, int len )
+{
+    struct cmsghdr *current = *cmsg;
+    ULONG msgsize;
+
+    TRACE( "message level %d, type %d.\n", win_level, win_type );
+
+#if defined(UDP_SEGMENT)
+    if (win_level == WS_IPPROTO_UDP && win_type == WS_UDP_SEND_MSG_SIZE)
+    {
+        DWORD seg_size;
+
+        if (len != sizeof(DWORD)) return STATUS_INVALID_PARAMETER;
+        if ((seg_size = *(DWORD *)data) >= 65536) return STATUS_INVALID_PARAMETER;
+        msgsize = CMSG_SPACE(sizeof(uint16_t));
+        if (msgsize > *maxsize) return STATUS_ACCESS_VIOLATION;
+        current->cmsg_len = CMSG_LEN(sizeof(uint16_t));
+        current->cmsg_level = IPPROTO_UDP;
+        current->cmsg_type = UDP_SEGMENT;
+        *(uint16_t *)(CMSG_DATA(current)) = seg_size;
+    }
+    else
+#endif
+    {
+        WARN( "message level %d, type %d is not implemented.\n", win_level, win_type );
+        /* Don't fail on unrecognized messages even if Windows does, or the things which can work
+         * without will be failing until all of them are supported. */
+        return STATUS_SUCCESS;
+    }
+
+    *maxsize -= msgsize;
+    if (!(*cmsg = CMSG_NXTHDR(hdr, current))) return STATUS_ACCESS_VIOLATION;
+    return STATUS_SUCCESS;
 }
 
 struct cmsghdr_32
@@ -838,7 +874,7 @@ static NTSTATUS try_recv( int fd, struct async_recv_ioctl *async, ULONG_PTR *siz
 
             wsabuf.len = sizeof(control_buffer64);
             wsabuf.buf = control_buffer64;
-            if (convert_control_headers( &hdr, &wsabuf ))
+            if (convert_unix_control_headers( &hdr, &wsabuf ))
             {
                 if (!wow64_translate_control( &wsabuf, async->control ))
                 {
@@ -856,7 +892,7 @@ static NTSTATUS try_recv( int fd, struct async_recv_ioctl *async, ULONG_PTR *siz
         }
         else
         {
-            if (!convert_control_headers( &hdr, async->control ))
+            if (!convert_unix_control_headers( &hdr, async->control ))
             {
                 WARN( "Application passed insufficient room for control headers.\n" );
                 *async->ret_flags |= WS_MSG_CTRUNC;
@@ -1047,6 +1083,7 @@ NTSTATUS sock_read( HANDLE handle, int fd, HANDLE event, PIO_APC_ROUTINE apc,
 static NTSTATUS try_send( int fd, struct async_send_ioctl *async )
 {
     union unix_sockaddr unix_addr;
+    char control_buffer[512];
     struct msghdr hdr;
     int attempt = 0;
     int sock_type;
@@ -1095,7 +1132,66 @@ static NTSTATUS try_send( int fd, struct async_send_ioctl *async )
     hdr.msg_iov = async->iov + async->iov_cursor;
     hdr.msg_iovlen = async->count - async->iov_cursor;
 
-    if (async->control.iov_base) FIXME( "Control messages are not implemented.\n" );
+    if (async->control.iov_base)
+    {
+        SIZE_T input_len = async->control.iov_len;
+        ULONG maxsize = sizeof(control_buffer), msg_size;
+        struct cmsghdr *cmsg;
+        NTSTATUS status;
+
+        hdr.msg_control = control_buffer;
+        hdr.msg_controllen = sizeof(control_buffer);
+
+        cmsg = CMSG_FIRSTHDR(&hdr);
+
+        if (in_wow64_call())
+        {
+            struct cmsghdr_32 *win_cmsg;
+
+            if (input_len < cmsg_align_32(sizeof(*win_cmsg))) return STATUS_ACCESS_VIOLATION;
+            win_cmsg = async->control.iov_base;
+            while (input_len)
+            {
+                if (input_len < cmsg_align_32(sizeof(*win_cmsg))) return STATUS_INVALID_PARAMETER;
+                msg_size = cmsg_align_32(win_cmsg->cmsg_len);
+                if (input_len < msg_size) return STATUS_INVALID_PARAMETER;
+                if ((status = convert_win_control_message( &hdr, &cmsg, win_cmsg->cmsg_level, win_cmsg->cmsg_type, &maxsize,
+                                                           win_cmsg + 1, win_cmsg->cmsg_len - cmsg_align_32(sizeof(*win_cmsg)) )))
+                {
+                    WARN( "Failed to convert control message, status %#x.\n", status );
+                    return status;
+                }
+                win_cmsg = (struct cmsghdr_32 *)((char *)win_cmsg + msg_size);
+                input_len -= msg_size;
+            }
+        }
+        else
+        {
+            WSACMSGHDR *win_cmsg;
+
+            if (input_len < WSA_CMSG_ALIGN(sizeof(*win_cmsg))) return STATUS_ACCESS_VIOLATION;
+            win_cmsg = async->control.iov_base;
+            while (input_len)
+            {
+                if (input_len < WSA_CMSG_ALIGN(sizeof(*win_cmsg)))
+                {
+                    if (is_old_wow64()) return STATUS_INVALID_PARAMETER;
+                    break;
+                }
+                msg_size = WSA_CMSG_ALIGN(win_cmsg->cmsg_len);
+                if (input_len < msg_size) return STATUS_INVALID_PARAMETER;
+                if ((status = convert_win_control_message( &hdr, &cmsg, win_cmsg->cmsg_level, win_cmsg->cmsg_type, &maxsize,
+                                                           win_cmsg + 1, win_cmsg->cmsg_len - WSA_CMSG_ALIGN(sizeof(*win_cmsg)) )))
+                {
+                    WARN( "Failed to convert control message, status %#x.\n", status );
+                    return status;
+                }
+                win_cmsg = (WSACMSGHDR *)((char *)win_cmsg + msg_size);
+                input_len -= msg_size;
+            }
+        }
+        hdr.msg_controllen = sizeof(control_buffer) - maxsize;
+    }
 
     while ((ret = sendmsg( fd, &hdr, async->unix_flags )) == -1)
     {
