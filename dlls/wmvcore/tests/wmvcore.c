@@ -4021,7 +4021,7 @@ static void test_sync_reader_allocator(void)
     IWMSyncReader2 *reader;
     QWORD pts, duration;
     INSSBuffer *sample;
-    WORD stream_num;
+    WORD stream_num, requested_stream_num;
     HANDLE file;
     HRESULT hr;
     BOOL ret;
@@ -4130,17 +4130,21 @@ static void test_sync_reader_allocator(void)
 
     hr = IWMSyncReader2_GetStreamNumberForOutput(reader, 0, &stream_num);
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
-    hr = IWMSyncReader2_GetNextSample(reader, stream_num, &sample, &pts, &duration, &flags,
+    requested_stream_num = stream_num;
+    hr = IWMSyncReader2_GetNextSample(reader, requested_stream_num, &sample, &pts, &duration, &flags,
             &output_num, &stream_num);
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
+    ok(stream_num == requested_stream_num, "Expected stream %u, got %u.\n", requested_stream_num, stream_num);
     ok(sample->lpVtbl == &buffer_vtbl, "Buffer vtbl didn't match.\n");
     INSSBuffer_Release(sample);
 
     hr = IWMSyncReader2_GetStreamNumberForOutput(reader, 1, &stream_num);
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
-    hr = IWMSyncReader2_GetNextSample(reader, stream_num, &sample, &pts, &duration, &flags,
+    requested_stream_num = stream_num;
+    hr = IWMSyncReader2_GetNextSample(reader, requested_stream_num, &sample, &pts, &duration, &flags,
             &output_num, &stream_num);
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
+    ok(stream_num == requested_stream_num, "Expected stream %u, got %u.\n", requested_stream_num, stream_num);
     ok(sample->lpVtbl == &buffer_vtbl, "Buffer vtbl didn't match.\n");
     INSSBuffer_Release(sample);
 
@@ -4152,9 +4156,11 @@ static void test_sync_reader_allocator(void)
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
     hr = IWMSyncReader2_SetReadStreamSamples(reader, stream_num, FALSE);
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
-    hr = IWMSyncReader2_GetNextSample(reader, stream_num, &sample, &pts, &duration, &flags,
+    requested_stream_num = stream_num;
+    hr = IWMSyncReader2_GetNextSample(reader, requested_stream_num, &sample, &pts, &duration, &flags,
             &output_num, &stream_num);
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
+    ok(stream_num == requested_stream_num, "Expected stream %u, got %u.\n", requested_stream_num, stream_num);
     ok(sample->lpVtbl != &buffer_vtbl, "Unexpected buffer vtbl.\n");
     INSSBuffer_Release(sample);
 
@@ -4181,18 +4187,22 @@ static void test_sync_reader_allocator(void)
 
     hr = IWMSyncReader2_GetStreamNumberForOutput(reader, 1, &stream_num);
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
-    hr = IWMSyncReader2_GetNextSample(reader, stream_num, &sample, &pts, &duration, &flags,
+    requested_stream_num = stream_num;
+    hr = IWMSyncReader2_GetNextSample(reader, requested_stream_num, &sample, &pts, &duration, &flags,
             &output_num, &stream_num);
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
+    ok(stream_num == requested_stream_num, "Expected stream %u, got %u.\n", requested_stream_num, stream_num);
     todo_wine
     ok(sample->lpVtbl == &buffer_vtbl, "Buffer vtbl didn't match.\n");
     INSSBuffer_Release(sample);
 
     hr = IWMSyncReader2_GetStreamNumberForOutput(reader, 0, &stream_num);
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
-    hr = IWMSyncReader2_GetNextSample(reader, stream_num, &sample, &pts, &duration, &flags,
+    requested_stream_num = stream_num;
+    hr = IWMSyncReader2_GetNextSample(reader, requested_stream_num, &sample, &pts, &duration, &flags,
             &output_num, &stream_num);
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
+    ok(stream_num == requested_stream_num, "Expected stream %u, got %u.\n", requested_stream_num, stream_num);
     todo_wine
     ok(sample->lpVtbl == &buffer_vtbl, "Unexpected buffer vtbl.\n");
     INSSBuffer_Release(sample);
