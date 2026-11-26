@@ -1076,6 +1076,12 @@ case $host_os in
         esac
         ;;
     esac
+
+    # Stamp $ORIGIN in the default rpath so musl loads sibling DLLs. glibc doesn't need this: the
+    # DLLs were already loaded by absolute path and glibc recognises them as the same (based on
+    # basename).
+    # Must come last. Value ends up in a makefile, hence the double dollar.
+    WINE_TRY_CFLAGS([-Wl,-rpath,\\\$ORIGIN],[UNIXLDFLAGS="$UNIXLDFLAGS '-Wl,-rpath,\$\$ORIGIN'"])
     ;;
 esac
 
