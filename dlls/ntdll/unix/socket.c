@@ -42,6 +42,9 @@
 #ifdef HAVE_NETINET_TCP_H
 # include <netinet/tcp.h>
 #endif
+#ifdef HAVE_NETINET_UDP_H
+# include <netinet/udp.h>
+#endif
 
 #ifdef HAVE_NETIPX_IPX_H
 # include <netipx/ipx.h>
@@ -2677,6 +2680,14 @@ NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc
 
         case IOCTL_AFD_WINE_SET_TCP_KEEPCNT:
             return do_setsockopt( handle, io, IPPROTO_TCP, TCP_KEEPCNT, in_buffer, in_size );
+
+#if defined(UDP_SEGMENT)
+        case IOCTL_AFD_WINE_GET_UDP_SEND_MSG_SIZE:
+            return do_getsockopt( handle, io, IPPROTO_UDP, UDP_SEGMENT, out_buffer, out_size );
+
+        case IOCTL_AFD_WINE_SET_UDP_SEND_MSG_SIZE:
+            return do_setsockopt( handle, io, IPPROTO_UDP, UDP_SEGMENT, in_buffer, in_size );
+#endif
 
         default:
         {

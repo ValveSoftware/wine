@@ -365,6 +365,12 @@ static inline const char *debugstr_sockopt(int level, int optname)
             DEBUG_SOCKOPT(IPV6_DONTFRAG);
         }
         break;
+
+        DEBUG_SOCKLEVEL(IPPROTO_UDP);
+        switch(optname)
+        {
+            DEBUG_SOCKOPT(UDP_SEND_MSG_SIZE);
+        }
     }
 #undef DEBUG_SOCKLEVEL
 #undef DEBUG_SOCKOPT
@@ -2187,6 +2193,24 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
             return -1;
         }
 
+    case IPPROTO_UDP:
+        switch(optname)
+        {
+        case UDP_SEND_MSG_SIZE:
+            if (*optlen < sizeof(DWORD) || !optval)
+            {
+                SetLastError( WSAEFAULT );
+                return SOCKET_ERROR;
+            }
+            *optlen = sizeof(DWORD);
+            return server_getsockopt( s, IOCTL_AFD_WINE_GET_UDP_SEND_MSG_SIZE, optval, optlen );
+
+        default:
+            FIXME( "unrecognized UDP option %u\n", optname );
+            SetLastError( WSAENOPROTOOPT );
+            return -1;
+        }
+
     default:
         WARN("Unknown level: 0x%08x\n", level);
         SetLastError(WSAEINVAL);
@@ -3672,6 +3696,23 @@ int WINAPI setsockopt( SOCKET s, int level, int optname, const char *optval, int
             return SOCKET_ERROR;
         }
         break;
+
+    case IPPROTO_UDP:
+        switch(optname)
+        {
+        case UDP_SEND_MSG_SIZE:
+            if (optlen < sizeof(DWORD) || !optval)
+            {
+                SetLastError( WSAEFAULT );
+                return SOCKET_ERROR;
+            }
+            return server_setsockopt( s, IOCTL_AFD_WINE_SET_UDP_SEND_MSG_SIZE, optval, optlen );
+
+        default:
+            FIXME( "unrecognized UDP option %u\n", optname );
+            SetLastError( WSAENOPROTOOPT );
+            return -1;
+        }
 
     default:
         WARN("Unknown level: 0x%08x\n", level);

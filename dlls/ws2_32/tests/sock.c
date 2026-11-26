@@ -7855,44 +7855,44 @@ static void test_WSASendMsg_control(void)
     value = 0xdeadbeef;
     size = sizeof(value) - 1;
     ret = getsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, &size );
-    todo_wine ok( ret && WSAGetLastError() == WSAEFAULT, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+    ok( ret && WSAGetLastError() == WSAEFAULT, "got ret %d, error %u.\n", ret, WSAGetLastError() );
     ok( value == 0xdeadbeef, "got %#x.\n", value );
 
     value = 0xdeadbeef;
     size = sizeof(value) + 1;
     ret = getsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, &size );
-    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
-    todo_wine ok( size == sizeof(value), "got %d.\n", size );
-    todo_wine ok( !value, "got %#x.\n", value );
+    ok( !ret, "got error %u.\n", WSAGetLastError() );
+    ok( size == sizeof(value), "got %d.\n", size );
+    ok( !value, "got %#x.\n", value );
 
     value = 0xdeadbeef;
     size = sizeof(value);
     ret = getsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, &size );
-    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
-    todo_wine ok( !value, "got %d.\n", value );
+    ok( !ret, "got error %u.\n", WSAGetLastError() );
+    ok( !value, "got %d.\n", value );
 
     value = 1200;
 
     ret = setsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, sizeof(value) - 1 );
-    todo_wine ok( ret && WSAGetLastError() == WSAEFAULT, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+    ok( ret && WSAGetLastError() == WSAEFAULT, "got ret %d, error %u.\n", ret, WSAGetLastError() );
     ret = setsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, sizeof(value) * 2 );
-    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+    ok( !ret, "got error %u.\n", WSAGetLastError() );
 
     ret = setsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, sizeof(value) );
-    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+    ok( !ret, "got error %u.\n", WSAGetLastError() );
 
     ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
-    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+    ok( !ret, "got error %u.\n", WSAGetLastError() );
 
     value = 0xdeadbeef;
     size = sizeof(value);
     ret = getsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, &size );
-    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
-    todo_wine ok( value == 1200, "got %d.\n", value );
+    ok( !ret, "got error %u.\n", WSAGetLastError() );
+    ok( value == 1200, "got %d.\n", value );
 
     value = 0;
     ret = setsockopt( sock, IPPROTO_UDP, UDP_SEND_MSG_SIZE, (char *)&value, sizeof(value) );
-    todo_wine ok( !ret, "got error %u.\n", WSAGetLastError() );
+    ok( !ret, "got error %u.\n", WSAGetLastError() );
     ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
     ok( ret && WSAGetLastError() == WSAEMSGSIZE, "got ret %d, error %u.\n", ret, WSAGetLastError() );
 
