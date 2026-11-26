@@ -7804,11 +7804,12 @@ todo_wine {
 static void test_WSASendMsg_control(void)
 {
     LPFN_WSASENDMSG pWSASendMsg = NULL;
+    LPFN_WSARECVMSG pWSARecvMsg = NULL;
     struct sockaddr_in sendaddr;
     char data_buffer[32768];
-    char control_buffer[1024];
+    char control_buffer[1024], recv_control_buffer[1024];
     WSABUF iovec = { .buf = data_buffer };
-    SOCKET sock;
+    SOCKET sock, server;
     WSAMSG msg =
     {
         .name = (struct sockaddr *)&sendaddr,
@@ -7816,9 +7817,16 @@ static void test_WSASendMsg_control(void)
         .lpBuffers = &iovec,
         .dwBufferCount = 1,
     };
+    WSAMSG recvmsg =
+    {
+        .lpBuffers = &iovec,
+        .dwBufferCount = 1,
+        .Control = { .buf = recv_control_buffer, .len = sizeof(recv_control_buffer) },
+    };
     int ret, value, control_len, size;
     DWORD err, sent;
     WSACMSGHDR *cmsg;
+    int *data;
 
     sock = socket( AF_INET, SOCK_DGRAM, 0 );
     ok( sock != INVALID_SOCKET, "got error %u.\n", WSAGetLastError() );
@@ -7831,6 +7839,9 @@ static void test_WSASendMsg_control(void)
         win_skip( "WSASendMsg is unsupported, skipping tests.\n" );
         return;
     }
+    WSAIoctl( sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &WSARecvMsg_GUID, sizeof(WSARecvMsg_GUID),
+              &pWSARecvMsg, sizeof(pWSARecvMsg), &err, NULL, NULL );
+    ok( !!pWSARecvMsg, "got NULL.\n" );
 
     sendaddr.sin_family = AF_INET;
     sendaddr.sin_port = htons( 139 );
@@ -7932,6 +7943,83 @@ static void test_WSASendMsg_control(void)
     ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
     ok( ret && WSAGetLastError() == WSAEMSGSIZE, "got ret %d, error %u.\n", ret, WSAGetLastError() );
 
+    sendaddr.sin_family = AF_INET;
+    sendaddr.sin_port = htons( SERVERPORT );
+    sendaddr.sin_addr.s_addr = inet_addr( "127.0.0.1" );
+
+    server = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
+    ok(server != INVALID_SOCKET, "got error %u.\n", WSAGetLastError() );
+
+    ret = bind(server, (SOCKADDR *)&sendaddr, sizeof(sendaddr));
+    ok(!ret, "bind failed, error %u\n", WSAGetLastError());
+
+    value = 1;
+    ret = setsockopt( server, IPPROTO_IP, IP_RECVECN, (const char *)&value, sizeof(value) );
+    ok( !ret, "bind failed, error %u\n", WSAGetLastError() );
+
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    ok( !ret, "got error %u.\n", WSAGetLastError() );
+    iovec.buf = data_buffer;
+    iovec.len = sizeof(data_buffer);
+    recvmsg.Control.buf = recv_control_buffer;
+    recvmsg.Control.len = sizeof(recv_control_buffer);
+    ret = pWSARecvMsg(server, &recvmsg, &sent, NULL, NULL);
+    ok(!ret, "got error %u.\n", WSAGetLastError() );
+    cmsg = WSA_CMSG_FIRSTHDR(&recvmsg);
+    ok(!!cmsg, "got NULL.\n");
+    data = (int *)(cmsg + 1);
+    ok(cmsg->cmsg_level == IPPROTO_IP, "got %d.\n", cmsg->cmsg_level);
+    ok(cmsg->cmsg_type == IP_ECN, "got %d.\n", cmsg->cmsg_type);
+    ok(cmsg->cmsg_len == sizeof(*cmsg) + sizeof(int), "got %Iu.\n", cmsg->cmsg_len);
+    ok(*data == 0, "got %d\n", *data);
+
+    iovec.buf = data_buffer;
+    iovec.len = sizeof(data_buffer);
+    memset( control_buffer, 0, sizeof(control_buffer) );
+    msg.Control.buf = control_buffer;
+    msg.Control.len = sizeof(control_buffer);
+    cmsg = WSA_CMSG_FIRSTHDR(&msg);
+    ok(!!cmsg, "got NULL.\n");
+
+    control_len = 0;
+    cmsg->cmsg_level = IPPROTO_UDP;
+    cmsg->cmsg_type = UDP_SEND_MSG_SIZE;
+    cmsg->cmsg_len = WSA_CMSG_LEN(sizeof(DWORD));
+    *(DWORD *)WSA_CMSG_DATA(cmsg) = 1200;
+    control_len += WSA_CMSG_ALIGN(cmsg->cmsg_len);
+
+    cmsg = WSA_CMSG_NXTHDR(&msg, cmsg);
+    ok(!!cmsg, "got NULL.\n");
+    cmsg->cmsg_level = IPPROTO_IP;
+    cmsg->cmsg_type = IP_ECN;
+    cmsg->cmsg_len = WSA_CMSG_LEN(sizeof(int));
+    *(int *)WSA_CMSG_DATA(cmsg) = 3;
+    control_len += WSA_CMSG_ALIGN(WSA_CMSG_LEN(sizeof(int)));
+
+    msg.Control.len = control_len;
+
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    ok( ret && WSAGetLastError() == WSAEINVAL, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+
+    *(int *)WSA_CMSG_DATA(cmsg) = 4;
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    ok( ret && WSAGetLastError() == WSAEINVAL, "got ret %d, error %u.\n", ret, WSAGetLastError() );
+
+    *(int *)WSA_CMSG_DATA(cmsg) = 2;
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    ok( !ret, "got error %u.\n", WSAGetLastError() );
+
+    ret = pWSARecvMsg(server, &recvmsg, &sent, NULL, NULL);
+    ok(!ret, "got error %u.\n", WSAGetLastError() );
+    cmsg = WSA_CMSG_FIRSTHDR(&recvmsg);
+    ok(!!cmsg, "got NULL.\n");
+    data = (int *)(cmsg + 1);
+    ok(cmsg->cmsg_level == IPPROTO_IP, "got %d.\n", cmsg->cmsg_level);
+    ok(cmsg->cmsg_type == IP_ECN, "got %d.\n", cmsg->cmsg_type);
+    ok(cmsg->cmsg_len == sizeof(*cmsg) + sizeof(int), "got %Iu.\n", cmsg->cmsg_len);
+    ok(*data == 2, "got %d\n", *data);
+
+    closesocket( server );
 done:
     closesocket( sock );
 }

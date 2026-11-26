@@ -540,7 +540,7 @@ error:
     return 0;
 }
 
-static NTSTATUS convert_win_control_message( struct msghdr *hdr, struct cmsghdr **cmsg, int win_level,
+static NTSTATUS convert_win_control_message( int sock_fd, struct msghdr *hdr, struct cmsghdr **cmsg, int win_level,
                                              int win_type, ULONG *maxsize, void *data, int len )
 {
     struct cmsghdr *current = *cmsg;
@@ -561,6 +561,29 @@ static NTSTATUS convert_win_control_message( struct msghdr *hdr, struct cmsghdr 
         current->cmsg_level = IPPROTO_UDP;
         current->cmsg_type = UDP_SEGMENT;
         *(uint16_t *)(CMSG_DATA(current)) = seg_size;
+    }
+    else
+#endif
+#if defined(IP_TOS)
+    if (win_level == WS_IPPROTO_IP && win_type == WS_IP_ECN)
+    {
+        socklen_t len;
+        int ecn, tos;
+
+        len = sizeof(tos);
+        if (getsockopt( sock_fd, IPPROTO_IP, IP_TOS, &tos, &len ))
+        {
+            ERR( "getsockopt: %s\n", strerror( errno ) );
+            tos = 0;
+        }
+        if (len != sizeof(int)) return STATUS_INVALID_PARAMETER;
+        if ((ecn = *(int *)data) >= 3) return STATUS_INVALID_PARAMETER;
+        msgsize = CMSG_SPACE(sizeof(int));
+        if (msgsize > *maxsize) return STATUS_ACCESS_VIOLATION;
+        current->cmsg_len = CMSG_LEN(sizeof(int));
+        current->cmsg_level = IPPROTO_IP;
+        current->cmsg_type = IP_TOS;
+        *(int *)(CMSG_DATA(current)) = (tos & ~3) | ecn;
     }
     else
 #endif
@@ -1181,7 +1204,7 @@ static NTSTATUS try_send( int fd, struct async_send_ioctl *async )
                 if (input_len < cmsg_align_32(sizeof(*win_cmsg))) return STATUS_INVALID_PARAMETER;
                 msg_size = cmsg_align_32(win_cmsg->cmsg_len);
                 if (input_len < msg_size) return STATUS_INVALID_PARAMETER;
-                if ((status = convert_win_control_message( &hdr, &cmsg, win_cmsg->cmsg_level, win_cmsg->cmsg_type, &maxsize,
+                if ((status = convert_win_control_message( fd, &hdr, &cmsg, win_cmsg->cmsg_level, win_cmsg->cmsg_type, &maxsize,
                                                            win_cmsg + 1, win_cmsg->cmsg_len - cmsg_align_32(sizeof(*win_cmsg)) )))
                 {
                     WARN( "Failed to convert control message, status %#x.\n", status );
@@ -1206,7 +1229,7 @@ static NTSTATUS try_send( int fd, struct async_send_ioctl *async )
                 }
                 msg_size = WSA_CMSG_ALIGN(win_cmsg->cmsg_len);
                 if (input_len < msg_size) return STATUS_INVALID_PARAMETER;
-                if ((status = convert_win_control_message( &hdr, &cmsg, win_cmsg->cmsg_level, win_cmsg->cmsg_type, &maxsize,
+                if ((status = convert_win_control_message( fd, &hdr, &cmsg, win_cmsg->cmsg_level, win_cmsg->cmsg_type, &maxsize,
                                                            win_cmsg + 1, win_cmsg->cmsg_len - WSA_CMSG_ALIGN(sizeof(*win_cmsg)) )))
                 {
                     WARN( "Failed to convert control message, status %#x.\n", status );
