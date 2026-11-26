@@ -1036,7 +1036,7 @@ static int WS2_recv_base( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *
     return status ? -1 : 0;
 }
 
-static int WS2_sendto( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *ret_size, DWORD flags,
+static int WS2_sendto( SOCKET s, WSABUF *buffers, DWORD buffer_count, WSABUF *control, DWORD *ret_size, DWORD flags,
                        const struct sockaddr *addr, int addr_len, OVERLAPPED *overlapped,
                        LPWSAOVERLAPPED_COMPLETION_ROUTINE completion )
 {
@@ -1088,6 +1088,7 @@ static int WS2_sendto( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *ret
     params.force_async = !!overlapped;
     params.count = buffer_count;
     params.buffers_ptr = u64_from_user_ptr( buffers );
+    params.control_ptr = u64_from_user_ptr( control );
 
     status = NtDeviceIoControlFile( (HANDLE)s, event, apc, cvalue, piosb,
                                     IOCTL_AFD_WINE_SENDMSG, &params, sizeof(params), NULL, 0 );
@@ -1117,7 +1118,7 @@ int WINAPI WSASendMsg( SOCKET s, LPWSAMSG msg, DWORD dwFlags, LPDWORD lpNumberOf
         return SOCKET_ERROR;
     }
 
-    return WS2_sendto( s, msg->lpBuffers, msg->dwBufferCount, lpNumberOfBytesSent,
+    return WS2_sendto( s, msg->lpBuffers, msg->dwBufferCount, &msg->Control, lpNumberOfBytesSent,
                        dwFlags, msg->name, msg->namelen,
                        lpOverlapped, lpCompletionRoutine );
 }
@@ -3162,7 +3163,7 @@ int WINAPI send( SOCKET s, const char *buf, int len, int flags )
     wsabuf.len = len;
     wsabuf.buf = (char*) buf;
 
-    if ( WS2_sendto( s, &wsabuf, 1, &n, flags, NULL, 0, NULL, NULL) == SOCKET_ERROR )
+    if ( WS2_sendto( s, &wsabuf, 1, NULL, &n, flags, NULL, 0, NULL, NULL) == SOCKET_ERROR )
         return SOCKET_ERROR;
     else
         return n;
@@ -3176,7 +3177,7 @@ INT WINAPI WSASend( SOCKET s, LPWSABUF lpBuffers, DWORD dwBufferCount,
                     LPWSAOVERLAPPED lpOverlapped,
                     LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine )
 {
-    return WS2_sendto( s, lpBuffers, dwBufferCount, lpNumberOfBytesSent, dwFlags,
+    return WS2_sendto( s, lpBuffers, dwBufferCount, NULL, lpNumberOfBytesSent, dwFlags,
                       NULL, 0, lpOverlapped, lpCompletionRoutine );
 }
 
@@ -3199,7 +3200,7 @@ INT WINAPI WSASendTo( SOCKET s, LPWSABUF lpBuffers, DWORD dwBufferCount,
                       LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine )
 {
     /* Garena hooks WSASendTo(), so we need a wrapper */
-    return WS2_sendto( s, lpBuffers, dwBufferCount,
+    return WS2_sendto( s, lpBuffers, dwBufferCount, NULL,
                 lpNumberOfBytesSent, dwFlags,
                 to, tolen,
                 lpOverlapped, lpCompletionRoutine );
@@ -3216,7 +3217,7 @@ int WINAPI sendto( SOCKET s, const char *buf, int len, int flags, const struct s
     wsabuf.len = len;
     wsabuf.buf = (char*) buf;
 
-    if ( WS2_sendto(s, &wsabuf, 1, &n, flags, to, tolen, NULL, NULL) == SOCKET_ERROR )
+    if ( WS2_sendto(s, &wsabuf, 1, NULL, &n, flags, to, tolen, NULL, NULL) == SOCKET_ERROR )
         return SOCKET_ERROR;
     else
         return n;

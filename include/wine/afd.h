@@ -337,6 +337,7 @@ C_ASSERT( sizeof(struct afd_recvmsg_params) == 48 );
 
 struct afd_sendmsg_params
 {
+    ULONGLONG control_ptr; /* WSABUF */
     ULONGLONG addr_ptr; /* const struct WS(sockaddr) */
     unsigned int addr_len;
     unsigned int ws_flags;
@@ -344,7 +345,7 @@ struct afd_sendmsg_params
     unsigned int count;
     ULONGLONG buffers_ptr; /* const WSABUF[] */
 };
-C_ASSERT( sizeof(struct afd_sendmsg_params) == 32 );
+C_ASSERT( sizeof(struct afd_sendmsg_params) == 40 );
 
 struct afd_transmit_params
 {

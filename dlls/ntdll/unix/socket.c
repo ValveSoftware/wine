@@ -127,6 +127,7 @@ struct async_recv_ioctl
 struct async_send_ioctl
 {
     struct async_fileio io;
+    struct iovec control;
     const struct WS_sockaddr *addr;
     int addr_len;
     int unix_flags;
@@ -1094,6 +1095,8 @@ static NTSTATUS try_send( int fd, struct async_send_ioctl *async )
     hdr.msg_iov = async->iov + async->iov_cursor;
     hdr.msg_iovlen = async->count - async->iov_cursor;
 
+    if (async->control.iov_base) FIXME( "Control messages are not implemented.\n" );
+
     while ((ret = sendmsg( fd, &hdr, async->unix_flags )) == -1)
     {
         if (errno == EISCONN)
@@ -1276,6 +1279,7 @@ static NTSTATUS sock_send( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, voi
                 rem_async->unix_flags = async->unix_flags;
                 memcpy( p, async->addr, addr_size );
                 rem_async->addr = (const struct WS_sockaddr *)p;
+                rem_async->control = async->control;
                 p += addr_size;
                 rem_async->addr_len = async->addr_len;
                 rem_async->iov_cursor = 0;
@@ -1310,8 +1314,9 @@ static NTSTATUS sock_send( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, voi
 }
 
 static NTSTATUS sock_ioctl_send( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc_user,
-                                 IO_STATUS_BLOCK *io, int fd, const void *buffers_ptr, unsigned int count,
-                                 const struct WS_sockaddr *addr, unsigned int addr_len, int unix_flags, int force_async )
+                                 IO_STATUS_BLOCK *io, int fd, const void *buffers_ptr, const void *control_ptr,
+                                 unsigned int count, const struct WS_sockaddr *addr, unsigned int addr_len,
+                                 int unix_flags, int force_async )
 {
     struct async_send_ioctl *async;
     DWORD async_size;
@@ -1323,24 +1328,35 @@ static NTSTATUS sock_ioctl_send( HANDLE handle, HANDLE event, PIO_APC_ROUTINE ap
         return STATUS_NO_MEMORY;
 
     async->count = count;
+    memset( &async->control, 0, sizeof(async->control) );
     if (in_wow64_call())
     {
-        const struct afd_wsabuf_32 *buffers = buffers_ptr;
+        const struct afd_wsabuf_32 *wsabuf32 = buffers_ptr;
 
         for (i = 0; i < count; ++i)
         {
-            async->iov[i].iov_base = ULongToPtr( buffers[i].buf );
-            async->iov[i].iov_len = buffers[i].len;
+            async->iov[i].iov_base = ULongToPtr( wsabuf32[i].buf );
+            async->iov[i].iov_len = wsabuf32[i].len;
+        }
+        if ((wsabuf32 = control_ptr))
+        {
+            async->control.iov_base = ULongToPtr( wsabuf32->buf );
+            async->control.iov_len = wsabuf32->len;
         }
     }
     else
     {
-        const WSABUF *buffers = buffers_ptr;
+        const WSABUF *wsabuf = buffers_ptr;
 
         for (i = 0; i < count; ++i)
         {
-            async->iov[i].iov_base = buffers[i].buf;
-            async->iov[i].iov_len = buffers[i].len;
+            async->iov[i].iov_base = wsabuf[i].buf;
+            async->iov[i].iov_len = wsabuf[i].len;
+        }
+        if ((wsabuf = control_ptr))
+        {
+            async->control.iov_base = wsabuf->buf;
+            async->control.iov_len = wsabuf->len;
         }
     }
     async->fd = -1;
@@ -1372,6 +1388,7 @@ NTSTATUS sock_write( HANDLE handle, int fd, HANDLE event, PIO_APC_ROUTINE apc,
     async->addr_len = 0;
     async->iov_cursor = 0;
     async->sent_len = 0;
+    memset( &async->control, 0, sizeof(async->control) );
 
     return sock_send( handle, event, apc, apc_user, io, fd, async, SERVER_SOCKET_IO_FORCE_ASYNC );
 }
@@ -1828,6 +1845,7 @@ NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc
             if (params->ws_flags & ~(WS_MSG_OOB | WS_MSG_PARTIAL))
                 FIXME( "unknown flags %#x\n", params->ws_flags );
             status = sock_ioctl_send( handle, event, apc, apc_user, io, fd, u64_to_user_ptr( params->buffers_ptr ),
+                                      u64_to_user_ptr( params->control_ptr ),
                                       params->count, u64_to_user_ptr( params->addr_ptr ), params->addr_len,
                                       unix_flags, params->force_async );
             if (needs_close) close( fd );
