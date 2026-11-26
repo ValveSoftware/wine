@@ -340,6 +340,7 @@ static inline const char *debugstr_sockopt(int level, int optname)
             DEBUG_SOCKOPT(IP_OPTIONS);
             DEBUG_SOCKOPT(IP_PKTINFO);
             DEBUG_SOCKOPT(IP_RECEIVE_BROADCAST);
+            DEBUG_SOCKOPT(IP_RECVECN);
             DEBUG_SOCKOPT(IP_RECVTOS);
             DEBUG_SOCKOPT(IP_RECVTTL);
             DEBUG_SOCKOPT(IP_TOS);
@@ -358,6 +359,7 @@ static inline const char *debugstr_sockopt(int level, int optname)
             DEBUG_SOCKOPT(IPV6_MULTICAST_HOPS);
             DEBUG_SOCKOPT(IPV6_MULTICAST_LOOP);
             DEBUG_SOCKOPT(IPV6_PKTINFO);
+            DEBUG_SOCKOPT(IPV6_RECVECN);
             DEBUG_SOCKOPT(IPV6_RECVTCLASS);
             DEBUG_SOCKOPT(IPV6_UNICAST_HOPS);
             DEBUG_SOCKOPT(IPV6_V6ONLY);
@@ -2055,6 +2057,15 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
             }
             return server_getsockopt( s, IOCTL_AFD_WINE_GET_IP_PKTINFO, optval, optlen );
 
+        case IP_RECVECN:
+            if (*optlen < sizeof(DWORD) || !optval)
+            {
+                *optlen = 0;
+                SetLastError( WSAEFAULT );
+                return SOCKET_ERROR;
+            }
+            return server_getsockopt( s, IOCTL_AFD_WINE_GET_IP_RECVECN, optval, optlen );
+
         case IP_RECVTOS:
             if (*optlen < sizeof(DWORD) || !optval)
             {
@@ -2162,6 +2173,15 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
                 return SOCKET_ERROR;
             }
             return server_getsockopt( s, IOCTL_AFD_WINE_GET_IPV6_RECVTCLASS, optval, optlen );
+
+        case IPV6_RECVECN:
+            if (*optlen < sizeof(DWORD) || !optval)
+            {
+                if (optlen) *optlen = 0;
+                SetLastError( WSAEFAULT );
+                return SOCKET_ERROR;
+            }
+            return server_getsockopt( s, IOCTL_AFD_WINE_GET_IPV6_RECVECN, optval, optlen );
 
         case IPV6_UNICAST_HOPS:
             if (*optlen < 1 || !optval)
@@ -3545,6 +3565,14 @@ int WINAPI setsockopt( SOCKET s, int level, int optname, const char *optval, int
             }
             return server_setsockopt( s, IOCTL_AFD_WINE_SET_IP_PKTINFO, optval, optlen );
 
+        case IP_RECVECN:
+            if (optlen < sizeof(DWORD) || !optval)
+            {
+                SetLastError( WSAEFAULT );
+                return SOCKET_ERROR;
+            }
+            return server_setsockopt( s, IOCTL_AFD_WINE_SET_IP_RECVECN, optval, optlen );
+
         case IP_RECVTOS:
             if (optlen < sizeof(DWORD) || !optval)
             {
@@ -3669,6 +3697,14 @@ int WINAPI setsockopt( SOCKET s, int level, int optname, const char *optval, int
                 return SOCKET_ERROR;
             }
             return server_setsockopt( s, IOCTL_AFD_WINE_SET_IPV6_RECVTCLASS, optval, optlen );
+
+        case IPV6_RECVECN:
+            if (optlen < sizeof(DWORD) || !optval)
+            {
+                SetLastError( WSAEFAULT );
+                return SOCKET_ERROR;
+            }
+            return server_setsockopt( s, IOCTL_AFD_WINE_SET_IPV6_RECVECN, optval, optlen );
 
         case IPV6_UNICAST_HOPS:
             if (!optlen || !optval)

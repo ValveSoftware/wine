@@ -2912,6 +2912,7 @@ static void test_ipv4_cmsg(void)
     ok(state == 1, "expected 1, got %lu\n", state);
     rc = send(client, payload, sizeof(payload), 0);
     ok(rc == sizeof(payload), "send failed, error %u\n", WSAGetLastError());
+    memset(control, 0xcc, sizeof(control));
     rc = pWSARecvMsg(server, &msg, &count, NULL, NULL);
     ok(!rc, "WSARecvMsg failed, error %u\n", WSAGetLastError());
     ok(count == sizeof(payload), "expected length %Iu, got %lu\n", sizeof(payload), count);
@@ -2923,6 +2924,23 @@ static void test_ipv4_cmsg(void)
     ok(*int_data == 0, "expected 0, got %i\n", *int_data);
     rc = setsockopt(server, IPPROTO_IP, IP_RECVTOS, (const char *)&off, sizeof(off));
     ok(!rc, "failed to clear IP_RECVTOS, error %u\n", WSAGetLastError());
+
+    rc = setsockopt(server, IPPROTO_IP, IP_RECVECN, (const char *)&on, sizeof(on));
+    ok(!rc, "got error %u\n", WSAGetLastError());
+    rc = send(client, payload, sizeof(payload), 0);
+    ok(rc == sizeof(payload), "send failed, error %u\n", WSAGetLastError());
+    memset(control, 0xcc, sizeof(control));
+    rc = pWSARecvMsg(server, &msg, &count, NULL, NULL);
+    ok(!rc, "WSARecvMsg failed, error %u\n", WSAGetLastError());
+    ok(count == sizeof(payload), "expected length %Iu, got %lu\n", sizeof(payload), count);
+    ok(header->cmsg_level == IPPROTO_IP, "expected IPPROTO_IP, got %i\n", header->cmsg_level);
+    ok(header->cmsg_type == IP_ECN,
+       "expected IP_ECN, got %i\n", header->cmsg_type);
+    ok(header->cmsg_len == sizeof(*header) + sizeof(INT),
+       "expected length %Iu, got %Iu\n", sizeof(*header) + sizeof(INT), header->cmsg_len);
+    ok(*int_data == 0, "expected 0, got %i\n", *int_data);
+    rc = setsockopt(server, IPPROTO_IP, IP_RECVECN, (const char *)&off, sizeof(on));
+    ok(!rc, "got error %u\n", WSAGetLastError());
 
     closesocket(server);
     closesocket(client);
@@ -3023,6 +3041,7 @@ static void test_ipv6_cmsg(void)
     ok(state == 1, "expected 1, got %lu\n", state);
     rc = send(client, payload, sizeof(payload), 0);
     ok(rc == sizeof(payload), "send failed, error %u\n", WSAGetLastError());
+    memset(control, 0xcc, sizeof(control));
     rc = pWSARecvMsg(server, &msg, &count, NULL, NULL);
     ok(!rc, "WSARecvMsg failed, error %u\n", WSAGetLastError());
     ok(count == sizeof(payload), "expected length %Iu, got %lu\n", sizeof(payload), count);
@@ -3033,6 +3052,23 @@ static void test_ipv6_cmsg(void)
     ok(*int_data == 0, "expected 0, got %i\n", *int_data);
     rc = setsockopt(server, IPPROTO_IPV6, IPV6_RECVTCLASS, (const char *)&off, sizeof(off));
     ok(!rc, "failed to clear IPV6_RECVTCLASS, error %u\n", WSAGetLastError());
+
+    rc = setsockopt(server, IPPROTO_IPV6, IPV6_RECVECN, (const char *)&on, sizeof(on));
+    ok(!rc, "got error %u\n", WSAGetLastError());
+    rc = send(client, payload, sizeof(payload), 0);
+    ok(rc == sizeof(payload), "send failed, error %u\n", WSAGetLastError());
+    memset(control, 0xcc, sizeof(control));
+    rc = pWSARecvMsg(server, &msg, &count, NULL, NULL);
+    ok(!rc, "WSARecvMsg failed, error %u\n", WSAGetLastError());
+    ok(count == sizeof(payload), "expected length %Iu, got %lu\n", sizeof(payload), count);
+    ok(header->cmsg_level == IPPROTO_IPV6, "expected IPPROTO_IPV6, got %i\n", header->cmsg_level);
+    ok(header->cmsg_type == IPV6_ECN, "expected IPV6_ECN, got %i\n", header->cmsg_type);
+    ok(header->cmsg_len == sizeof(*header) + sizeof(INT),
+       "expected length %Iu, got %Iu\n", sizeof(*header) + sizeof(INT), header->cmsg_len);
+    ok(*int_data == 0, "expected 0, got %i\n", *int_data);
+    rc = setsockopt(server, IPPROTO_IPV6, IPV6_RECVTCLASS, (const char *)&off, sizeof(off));
+    ok(!rc, "got error %u\n", WSAGetLastError());
+
 
 cleanup:
     closesocket(server);
@@ -13822,7 +13858,7 @@ static void test_sockopt_validity(void)
         { IP_RECVRTHDR,               WSAEINVAL,       0,          TRUE },
         { IP_RECVTOS,                 WSAEINVAL                         },
         { IP_ORIGINAL_ARRIVAL_IF,     WSAEINVAL,       0,          TRUE },
-        { IP_ECN,                     WSAEINVAL,       0,          TRUE },
+        { IP_RECVECN,                 WSAEINVAL,       0,               },
         { IP_PKTINFO_EX,              WSAEINVAL,       0,          TRUE },
         { IP_WFP_REDIRECT_RECORDS,    WSAEINVAL,       0,          TRUE },
         { IP_WFP_REDIRECT_CONTEXT,    WSAEINVAL,       0,          TRUE },
@@ -13857,7 +13893,7 @@ static void test_sockopt_validity(void)
         { IP_RECVRTHDR,               0,               0,          TRUE },
         { IP_RECVTOS                                                    },
         { IP_ORIGINAL_ARRIVAL_IF,     0,               0,          TRUE },
-        { IP_ECN,                     0,               0,          TRUE },
+        { IP_RECVECN,                 0,               0,               },
         { IP_PKTINFO_EX,              0,               0,          TRUE },
         { IP_WFP_REDIRECT_RECORDS,    0,               0,          TRUE },
         { IP_WFP_REDIRECT_CONTEXT,    0,               0,          TRUE },
@@ -13892,7 +13928,7 @@ static void test_sockopt_validity(void)
         { IP_RECVRTHDR,               0,               0,          TRUE },
         { IP_RECVTOS                                                    },
         { IP_ORIGINAL_ARRIVAL_IF,     0,               0,          TRUE },
-        { IP_ECN,                     0,               0,          TRUE },
+        { IP_RECVECN,                 0,               0,          TRUE },
         { IP_PKTINFO_EX,              0,               0,          TRUE },
         { IP_WFP_REDIRECT_RECORDS,    0,               0,          TRUE },
         { IP_WFP_REDIRECT_CONTEXT,    0,               0,          TRUE },
@@ -13927,7 +13963,7 @@ static void test_sockopt_validity(void)
         { IPV6_RECVRTHDR,             WSAEINVAL,       0,          TRUE },
         { IPV6_RECVTCLASS,            WSAEINVAL                         },
         { IP_ORIGINAL_ARRIVAL_IF,     WSAEINVAL,       0,          TRUE },
-        { IPV6_ECN,                   WSAEINVAL,       0,          TRUE },
+        { IPV6_RECVECN,               WSAEINVAL,       0,               },
         { IPV6_PKTINFO_EX,            WSAEINVAL,       0,          TRUE },
         { IPV6_WFP_REDIRECT_RECORDS,  WSAEINVAL,       0,          TRUE },
         { IPV6_WFP_REDIRECT_CONTEXT,  WSAEINVAL,       0,          TRUE },
@@ -13962,7 +13998,7 @@ static void test_sockopt_validity(void)
         { IPV6_RECVRTHDR,             0,               0,          TRUE },
         { IPV6_RECVTCLASS                                               },
         { IP_ORIGINAL_ARRIVAL_IF,     0,               0,          TRUE },
-        { IPV6_ECN,                   0,               0,          TRUE },
+        { IPV6_RECVECN,               0,               0,               },
         { IPV6_PKTINFO_EX,            0,               0,          TRUE },
         { IPV6_WFP_REDIRECT_RECORDS,  0,               0,          TRUE },
         { IPV6_WFP_REDIRECT_CONTEXT,  0,               0,          TRUE },
@@ -13997,7 +14033,7 @@ static void test_sockopt_validity(void)
         { IPV6_RECVRTHDR,             0,               0,          TRUE },
         { IPV6_RECVTCLASS                                               },
         { IP_ORIGINAL_ARRIVAL_IF,     0,               0,          TRUE },
-        { IPV6_ECN,                   0,               0,          TRUE },
+        { IPV6_RECVECN,                   0,               0,           },
         { IPV6_PKTINFO_EX,            0,               0,          TRUE },
         { IPV6_WFP_REDIRECT_RECORDS,  0,               0,          TRUE },
         { IPV6_WFP_REDIRECT_CONTEXT,  0,               0,          TRUE },
