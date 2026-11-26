@@ -1632,6 +1632,7 @@ static HRESULT init_stream(struct wm_reader *reader)
                 if (id && (0
                     || !strcmp(id, "1113000")
                     || !strcmp(id, "638160")
+                    || !strcmp(id, "237890") /* Agarest: bypass I420 to RGB24 conversion. */
                     ))
                 {
                     stream->format.u.video.format = WG_VIDEO_FORMAT_BGRx;
@@ -2683,6 +2684,7 @@ static HRESULT WINAPI reader_SetReadStreamSamples(IWMSyncReader2 *iface, WORD st
         const char *sgi = getenv("SteamGameId");
         if (sgi && (0
             || !strcmp(sgi, "638160")
+            || !strcmp(sgi, "237890") /* Agarest: deliver decoded BGRx samples. */
             || !strcmp(sgi, "802870")
             || !strcmp(sgi, "1083650")
             || !strcmp(sgi, "1097880")
