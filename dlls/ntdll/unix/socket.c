@@ -587,6 +587,29 @@ static NTSTATUS convert_win_control_message( int sock_fd, struct msghdr *hdr, st
     }
     else
 #endif
+#if defined(IPV6_TCLASS)
+    if (win_level == WS_IPPROTO_IPV6 && win_type == WS_IPV6_ECN)
+    {
+        socklen_t len;
+        int ecn, tclass;
+
+        len = sizeof(tclass);
+        if (getsockopt( sock_fd, IPPROTO_IPV6, IPV6_TCLASS, &tclass, &len ))
+        {
+            ERR( "getsockopt: %s\n", strerror( errno ) );
+            tclass = 0;
+        }
+        if (len != sizeof(int)) return STATUS_INVALID_PARAMETER;
+        if ((ecn = *(int *)data) >= 3) return STATUS_INVALID_PARAMETER;
+        msgsize = CMSG_SPACE(sizeof(int));
+        if (msgsize > *maxsize) return STATUS_ACCESS_VIOLATION;
+        current->cmsg_len = CMSG_LEN(sizeof(int));
+        current->cmsg_level = IPPROTO_IPV6;
+        current->cmsg_type = IPV6_TCLASS;
+        *(int *)(CMSG_DATA(current)) = (tclass & ~3) | ecn;
+    }
+    else
+#endif
     {
         WARN( "message level %d, type %d is not implemented.\n", win_level, win_type );
         /* Don't fail on unrecognized messages even if Windows does, or the things which can work

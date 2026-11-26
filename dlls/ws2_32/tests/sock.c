@@ -7805,6 +7805,7 @@ static void test_WSASendMsg_control(void)
 {
     LPFN_WSASENDMSG pWSASendMsg = NULL;
     LPFN_WSARECVMSG pWSARecvMsg = NULL;
+    struct sockaddr_in6 localhost6;
     struct sockaddr_in sendaddr;
     char data_buffer[32768];
     char control_buffer[1024], recv_control_buffer[1024];
@@ -7887,7 +7888,8 @@ static void test_WSASendMsg_control(void)
     {
         /* Before Win10 2009 */
         win_skip( "UDP_SEND_MSG_SIZE is not supported, skipping tests.\n" );
-        goto done;
+        closesocket( sock );
+        return;
     }
     ok( !ret, "got error %u.\n", WSAGetLastError() );
 
@@ -8020,7 +8022,69 @@ static void test_WSASendMsg_control(void)
     ok(*data == 2, "got %d\n", *data);
 
     closesocket( server );
-done:
+    closesocket( sock );
+
+    sock = socket( AF_INET6, SOCK_DGRAM, IPPROTO_UDP );
+    ok( sock != INVALID_SOCKET, "got error %u.\n", WSAGetLastError() );
+    server = socket( AF_INET6, SOCK_DGRAM, IPPROTO_UDP );
+    ok(server != INVALID_SOCKET, "got error %u.\n", WSAGetLastError() );
+
+    value = 1;
+    ret = setsockopt( server, IPPROTO_IPV6, IPV6_RECVECN, (const char *)&value, sizeof(value) );
+    ok(!ret, "got error %u.\n", WSAGetLastError() );
+
+    localhost6.sin6_family = AF_INET6;
+    localhost6.sin6_port = htons( SERVERPORT );
+    inet_pton( AF_INET6, "::1", &localhost6.sin6_addr );
+
+    ret = bind( server, (SOCKADDR *)&localhost6, sizeof(localhost6) );
+    ok( ret != SOCKET_ERROR || WSAGetLastError() == WSAEADDRNOTAVAIL, "bind failed, error %u.\n", WSAGetLastError() );
+    if (WSAGetLastError() == WSAEADDRNOTAVAIL)
+    {
+        skip( "IPv6 not supported, skipping test\n" );
+        closesocket( server );
+        closesocket( sock );
+        return;
+    }
+
+    msg.name = (struct sockaddr *)&localhost6;
+    msg.namelen = sizeof(localhost6);
+
+    iovec.buf = data_buffer;
+    iovec.len = sizeof(data_buffer);
+    memset( control_buffer, 0, sizeof(control_buffer) );
+    msg.Control.buf = control_buffer;
+    msg.Control.len = sizeof(control_buffer);
+    cmsg = WSA_CMSG_FIRSTHDR(&msg);
+    ok(!!cmsg, "got NULL.\n");
+
+    control_len = 0;
+
+    cmsg->cmsg_level = IPPROTO_IPV6;
+    cmsg->cmsg_type = IPV6_ECN;
+    cmsg->cmsg_len = WSA_CMSG_LEN(sizeof(int));
+    *(int *)WSA_CMSG_DATA(cmsg) = 2;
+    control_len += WSA_CMSG_ALIGN(WSA_CMSG_LEN(sizeof(int)));
+
+    msg.Control.len = control_len;
+
+    ret = pWSASendMsg( sock, &msg, 0, &sent, NULL, NULL );
+    ok( !ret, "got error %u.\n", WSAGetLastError() );
+
+    memset( recv_control_buffer, 0xcc, sizeof(recv_control_buffer) );
+    recvmsg.Control.buf = recv_control_buffer;
+    recvmsg.Control.len = sizeof(recv_control_buffer);
+    ret = pWSARecvMsg(server, &recvmsg, &sent, NULL, NULL);
+    ok(!ret, "got error %u.\n", WSAGetLastError() );
+    cmsg = WSA_CMSG_FIRSTHDR(&recvmsg);
+    ok(!!cmsg, "got NULL.\n");
+    data = (int *)(cmsg + 1);
+    ok(cmsg->cmsg_level == IPPROTO_IPV6, "got %d.\n", cmsg->cmsg_level);
+    ok(cmsg->cmsg_type == IPV6_ECN, "got %d.\n", cmsg->cmsg_type);
+    ok(cmsg->cmsg_len == sizeof(*cmsg) + sizeof(int), "got %Iu.\n", cmsg->cmsg_len);
+    ok(*data == 2, "got %d\n", *data);
+
+    closesocket( server );
     closesocket( sock );
 }
 
