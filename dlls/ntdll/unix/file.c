@@ -1826,8 +1826,17 @@ static int get_file_info( const char *path, struct stat *st, ULONG *attr, ULONG 
         if (!stat( parent_path, &parent_st )
                 && (st->st_dev != parent_st.st_dev || st->st_ino == parent_st.st_ino))
         {
-            *attr |= FILE_ATTRIBUTE_REPARSE_POINT;
-            if (reparse_tag) *reparse_tag = IO_REPARSE_TAG_MOUNT_POINT;
+            struct stat steam_install_st;
+            char *steam_install_path;
+
+            /* HACK: if the path is the root of game library, don't report it as reparse point, some games do not
+             * expect that. */
+            if (!((steam_install_path = getenv( "STEAM_COMPAT_INSTALL_PATH" )) && !stat( steam_install_path, &steam_install_st )
+                && (st->st_dev == steam_install_st.st_dev)))
+            {
+                *attr |= FILE_ATTRIBUTE_REPARSE_POINT;
+                if (reparse_tag) *reparse_tag = IO_REPARSE_TAG_MOUNT_POINT;
+            }
         }
 
         free( parent_path );
