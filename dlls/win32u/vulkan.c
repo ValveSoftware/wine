@@ -1165,6 +1165,9 @@ static BOOL add_instance_extension( const char *extension, size_t len, struct vu
 static void parse_instance_extensions( struct vulkan_instance_extensions *extensions, const char *str )
 {
     const char *next;
+
+    if (!str) return;
+
     for (next = str; *next; next++)
     {
         if (*next != ' ') continue;
